@@ -822,6 +822,13 @@ impl OrderbookService {
                 "symbol_id is required for orderbook subscriptions ({symbol:?})"
             )));
         };
+        if let Some(catalog_id) = self.ctx.catalogs.symbol_id_for_symbol(&symbol)
+            && catalog_id != symbol_id
+        {
+            return Err(Error::validation(format!(
+                "orderbook symbol {symbol:?} does not match symbol_id {symbol_id}"
+            )));
+        }
         let channel = format!("public:spot:orderbook:deltas:depth:{ws_depth}:{symbol_id}:proto");
         let quantity_scale = self
             .ctx
@@ -1205,5 +1212,97 @@ mod tests {
                 .await
                 .expect("recv must not hang after close");
         assert!(finished.is_none());
+    }
+    #[tokio::test]
+    async fn ticket_8511_terminal_transport_unblocks_recv() {
+        let (tx, rx) = mpsc::channel::<crate::models::OrderbookData>(2);
+        let tx_slot = Arc::new(Mutex::new(Some(tx)));
+        let closed = Arc::new(AtomicBool::new(false));
+        let last_error = Arc::new(Mutex::new(None));
+        let stream =
+            crate::realtime::SnapshotThenStream::new(crate::realtime::SnapshotThenStreamConfig {
+                client: crate::realtime::Client::new(
+                    "wss://example.invalid",
+                    "https://example.invalid",
+                    None,
+                    None,
+                ),
+                channel: "public:test".into(),
+                decode: Arc::new(|_: &[u8]| {
+                    Ok(crate::models::OrderBookDeltaUpdate {
+                        symbol_id: 1,
+                        book_seq_start: 1,
+                        book_seq_end: 1,
+                        reset: false,
+                        bids: vec![],
+                        asks: vec![],
+                    })
+                }),
+                fetch_snapshot: Arc::new(|| {
+                    Box::pin(async {
+                        Ok(crate::models::OrderbookData {
+                            symbol: "BTC-USDT".into(),
+                            depth: 1,
+                            book_seq: "1".into(),
+                            bids: vec![],
+                            asks: vec![],
+                            available: true,
+                        })
+                    })
+                }),
+                read_publication: Arc::new(|d| vec![d]),
+                apply_snapshot: Arc::new(|_, _| {}),
+                apply_live_publications: Arc::new(|_| {}),
+                max_buffered: 10,
+                on_reconnect: None,
+                on_snapshot_refresh: None,
+                on_error: None,
+            });
+        let mut sub = crate::orderbook::Subscription::new(
+            rx,
+            stream.clone(),
+            closed,
+            Arc::new(Mutex::new(0)),
+            Arc::new(|| {}),
+            last_error,
+            tx_slot.clone(),
+        );
+        let errors = Arc::new(Mutex::new(Vec::new()));
+        let reported = errors.clone();
+        sub.set_on_error(move |error| reported.lock().unwrap().push(error));
+        tx_slot
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .try_send(crate::models::OrderbookData {
+                symbol: "BTC-USDT".into(),
+                depth: 1,
+                book_seq: "1".into(),
+                bids: vec![],
+                asks: vec![],
+                available: true,
+            })
+            .unwrap();
+        stream.fail(Error::transport("terminal transport failure"));
+        assert_eq!(
+            sub.updates()
+                .recv()
+                .await
+                .expect("queued view must drain")
+                .book_seq,
+            "1"
+        );
+        let finished =
+            tokio::time::timeout(std::time::Duration::from_secs(1), sub.updates().recv())
+                .await
+                .expect("recv must not hang after close");
+        assert!(finished.is_none());
+        assert!(matches!(sub.err(), Some(Error::Transport(_))));
+        assert_eq!(errors.lock().unwrap().len(), 1);
+        assert_eq!(
+            sub.err().unwrap().to_string(),
+            errors.lock().unwrap()[0].to_string()
+        );
     }
 }

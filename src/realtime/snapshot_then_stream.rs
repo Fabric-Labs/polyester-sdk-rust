@@ -57,6 +57,7 @@ struct Inner<TSnapshot, TPublication> {
     on_reconnect: Option<NotifyFn>,
     on_snapshot_refresh: Option<NotifyFn>,
     on_error: Mutex<Option<SnapshotErrorFn>>,
+    on_terminal_error: Mutex<Option<SnapshotErrorFn>>,
     ready: AtomicBool,
     disposed: AtomicBool,
     generation: AtomicU64,
@@ -103,6 +104,7 @@ where
                 on_reconnect: cfg.on_reconnect,
                 on_snapshot_refresh: cfg.on_snapshot_refresh,
                 on_error: Mutex::new(cfg.on_error),
+                on_terminal_error: Mutex::new(None),
                 ready: AtomicBool::new(false),
                 disposed: AtomicBool::new(false),
                 generation: AtomicU64::new(0),
@@ -218,6 +220,12 @@ where
         if let Some(err) = current {
             let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(err)));
         }
+    }
+
+    // The managed consumer owns its output sender independently of the pump.
+    // Keep its terminal cleanup separate from the replaceable user error callback.
+    pub(crate) fn set_on_terminal_error(&self, callback: SnapshotErrorFn) {
+        *lock_unpoisoned(&self.inner.on_terminal_error) = Some(callback);
     }
 
     /// Stop the stream.
@@ -367,8 +375,8 @@ where
                 continue;
             }
             if attempts >= MAX_REQUEST_REFRESH_ATTEMPTS {
-                if last_error.is_some() {
-                    self.stop_after_recorded_error();
+                if let Some(err) = last_error {
+                    self.stop_after_recorded_error(err);
                 } else {
                     self.fail_closed(Error::realtime(
                         "snapshot refresh did not converge after repeated publication gaps"
@@ -482,17 +490,28 @@ where
         self.disposed.store(true, Ordering::SeqCst);
         self.generation.fetch_add(1, Ordering::SeqCst);
         self.clear_publications();
+        *lock_unpoisoned(&self.last_error) = Some(err.clone());
+        self.notify_terminal_error(err.clone());
         self.record_error(err.clone());
         self.connection_tx.send_replace(Some(Err(err)));
         let _ = self.stop_tx.send(true);
     }
 
-    fn stop_after_recorded_error(&self) {
+    fn stop_after_recorded_error(&self, err: Error) {
         self.ready.store(false, Ordering::SeqCst);
         self.disposed.store(true, Ordering::SeqCst);
         self.generation.fetch_add(1, Ordering::SeqCst);
         self.clear_publications();
+        *lock_unpoisoned(&self.last_error) = Some(err.clone());
+        self.notify_terminal_error(err);
         let _ = self.stop_tx.send(true);
+    }
+
+    fn notify_terminal_error(&self, err: Error) {
+        let callback = lock_unpoisoned(&self.on_terminal_error).clone();
+        if let Some(callback) = callback {
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| callback(err)));
+        }
     }
 
     async fn run(self: Arc<Self>) {
@@ -561,11 +580,11 @@ where
                 if refresh.is_err() {
                     refresh = this.refresh_snapshot().await;
                 }
-                if refresh.is_err() {
+                if let Err(err) = refresh {
                     // refresh_snapshot already preserved and reported the
                     // underlying error. Stop without invoking the callback a
                     // second time for the same terminal attempt.
-                    self.stop_after_recorded_error();
+                    self.stop_after_recorded_error(err);
                     self.ready.store(false, Ordering::SeqCst);
                     sub.close();
                     break;

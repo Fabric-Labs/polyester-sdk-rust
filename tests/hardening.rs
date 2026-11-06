@@ -6356,3 +6356,520 @@ async fn create_quantity_uses_catalog_scale_on_wire_and_result() {
         }
     }
 }
+
+// Ticket regressions use explicit protocol messages and channels as barriers.
+async fn ticket_ws(
+    setup_frames: Vec<Vec<u8>>,
+    expected_symbol_id: Option<u32>,
+) -> (
+    String,
+    tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
+    tokio::task::JoinHandle<()>,
+) {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::Message as WsMessage;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
+    let task = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_hdr_async(
+            socket,
+            |_: &_, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                response.headers_mut().insert(
+                    "sec-websocket-protocol",
+                    "centrifuge-protobuf".parse().unwrap(),
+                );
+                Ok(response)
+            },
+        )
+        .await
+        .unwrap();
+        ws.next().await.unwrap().unwrap();
+        ws.send(WsMessage::Binary(centrifugo_ok_reply(1).into()))
+            .await
+            .unwrap();
+        let subscribe = ws.next().await.unwrap().unwrap();
+        if let Some(id) = expected_symbol_id {
+            let expected = format!("public:spot:orderbook:deltas:depth:50:{id}:proto");
+            let command = subscribe.into_data();
+            assert!(
+                command
+                    .windows(expected.len())
+                    .any(|bytes| bytes == expected.as_bytes()),
+                "subscription channel identity mismatch"
+            );
+        }
+        for frame in setup_frames {
+            ws.send(WsMessage::Binary(frame.into())).await.unwrap();
+        }
+        loop {
+            tokio::select! {
+                frame = rx.recv() => {
+                    let Some(frame) = frame else { break };
+                    if ws.send(WsMessage::Binary(frame.into())).await.is_err() { break; }
+                }
+                msg = ws.next() => {
+                    if !matches!(msg, Some(Ok(WsMessage::Binary(_) | WsMessage::Pong(_)))) { break; }
+                }
+            }
+        }
+    });
+    (url, tx, task)
+}
+
+#[tokio::test]
+async fn ticket_8475_setup_preserves_publication_order() {
+    use hardening_support::centrifugo_publication as publication;
+    let ack = centrifugo_ok_reply(2);
+    let first = publication(b"first");
+    assert_eq!(
+        hex::encode([ack.clone(), first.clone()].concat()),
+        "0208020b2209220722056669727374"
+    );
+    for frames in [
+        vec![[ack.clone(), first.clone()].concat()],
+        vec![[first.clone(), ack.clone()].concat()],
+        vec![first.clone(), ack.clone()],
+        vec![ack.clone(), first.clone()],
+        vec![[first.clone(), ack.clone(), publication(b"second")].concat()],
+    ] {
+        let multiple = frames[0].len() > ack.len() + first.len();
+        let mut frames = frames;
+        frames.push(publication(b"control"));
+        let (url, _tx, task) = ticket_ws(frames, None).await;
+        let rt = RealtimeClient::new(url, "", None, None);
+        let mut sub = rt.subscribe_raw(PUBLIC_CHANNEL).await.unwrap();
+        let mut received = Vec::new();
+        loop {
+            let item = tokio::time::timeout(Duration::from_secs(10), sub.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            let done = item == b"control";
+            received.push(item);
+            if done {
+                break;
+            }
+        }
+        let mut expected = vec![b"first".to_vec()];
+        if multiple {
+            expected.push(b"second".to_vec());
+        }
+        expected.push(b"control".to_vec());
+        assert_eq!(received, expected);
+        sub.close();
+        task.await.unwrap();
+    }
+}
+
+fn ticket_book_client(http_url: String, ws_url: String) -> Client {
+    let client = Client::new(Config {
+        api_url: http_url,
+        ws_url,
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({"pairs": [
+            {"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8},
+            {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 6}
+        ]}))
+        .unwrap();
+    client
+}
+
+#[tokio::test]
+async fn ticket_8510_zero_sequence_and_availability_are_independent() {
+    use polyester::proto::orderbook::v1::GetOrderBookResponse;
+    for seq in [0, 1] {
+        for available in [false, true] {
+            let http = MockHttpServer::spawn(move |_| {
+                connect_proto_ok(&GetOrderBookResponse {
+                    symbol_id: 1,
+                    book_seq: seq,
+                    available,
+                    ..Default::default()
+                })
+            })
+            .await;
+            let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
+            let client = ticket_book_client(http.base_url(), url);
+            let unary = client.orderbook.get("BTC-USDT", Some(50)).await.unwrap();
+            assert_eq!(unary.book_seq, seq.to_string());
+            assert_eq!(unary.available, available);
+            let mut sub = client
+                .orderbook
+                .create_subscription(polyester::services::CreateSubscriptionOptions {
+                    symbol: "BTC-USDT".into(),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            let view = tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(view.book_seq, seq.to_string());
+            assert_eq!(view.available, available);
+            assert!(sub.err().is_none());
+            sub.close();
+            task.await.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn ticket_8512_conflicting_selectors_rejected_before_io() {
+    let client = ticket_book_client("http://127.0.0.1:1".into(), "ws://127.0.0.1:1".into());
+    let result = client
+        .orderbook
+        .create_subscription(polyester::services::CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            symbol_id: Some(2),
+            ..Default::default()
+        })
+        .await;
+    let err = match result {
+        Err(err) => err,
+        Ok(_) => panic!("conflicting selectors accepted"),
+    };
+    assert!(matches!(err, Error::Validation(_)), "{err}");
+    assert!(
+        err.to_string().contains("symbol") && err.to_string().contains("symbol_id"),
+        "{err}"
+    );
+}
+
+#[tokio::test]
+async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
+    use hardening_support::centrifugo_publication;
+    use polyester::proto::orderbook::v1::{
+        GetOrderBookRequest, GetOrderBookResponse, OrderBookDelta, PriceLevel,
+    };
+    for (symbol, id, supplied_id, quantity) in [
+        ("BTC-USDT", 1, None, "0.01"),
+        ("ETH-USDT", 2, None, "1"),
+        ("ETH-USDT", 2, Some(2), "1"),
+    ] {
+        let http = MockHttpServer::spawn(move |req| {
+            assert_eq!(
+                GetOrderBookRequest::decode_from_slice(&req.body)
+                    .unwrap()
+                    .symbol_id,
+                id
+            );
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: id,
+                book_seq: 1,
+                available: true,
+                ..Default::default()
+            })
+        })
+        .await;
+        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], Some(id)).await;
+        let client = ticket_book_client(http.base_url(), url);
+        let mut sub = client
+            .orderbook
+            .create_subscription(polyester::services::CreateSubscriptionOptions {
+                symbol: symbol.into(),
+                symbol_id: supplied_id,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(sub.updates().recv().await.unwrap().symbol, symbol);
+        tx.send(centrifugo_publication(
+            &OrderBookDelta {
+                symbol_id: id,
+                book_seq_start: 0,
+                book_seq_end: 2,
+                reset: true,
+                bids: vec![PriceLevel {
+                    price_ticks: 1_000_000_000,
+                    qty_scaled: 1_000_000,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ))
+        .unwrap();
+        let reset = tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reset.symbol, symbol);
+        assert_eq!(reset.book_seq, "2");
+        assert_eq!(
+            reset.bids[0].qty.as_ref().unwrap().format(None).unwrap(),
+            quantity
+        );
+        sub.close();
+        task.await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
+    use hardening_support::{HttpScript, centrifugo_publication};
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta};
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = calls.clone();
+    let http = MockHttpServer::spawn(move |_| {
+        if count.fetch_add(1, Ordering::SeqCst) == 0 {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 1,
+                available: true,
+                ..Default::default()
+            })
+        } else {
+            HttpScript::Json {
+                status: 503,
+                body: br#"{"code":"unavailable","message":"snapshot unavailable"}"#.to_vec(),
+            }
+        }
+    })
+    .await;
+    let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
+    let client = ticket_book_client(http.base_url(), url);
+    let mut sub = client
+        .orderbook
+        .create_subscription(polyester::services::CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(sub.updates().recv().await.unwrap().book_seq, "1");
+    let errors = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let reported = errors.clone();
+    sub.set_on_error(move |err| reported.lock().unwrap().push(err));
+    tx.send(centrifugo_publication(
+        &OrderBookDelta {
+            symbol_id: 1,
+            book_seq_start: 3,
+            book_seq_end: 3,
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    ))
+    .unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+            .await
+            .expect("terminal receiver must close")
+            .is_none()
+    );
+    assert!(
+        calls.load(Ordering::SeqCst) >= 4,
+        "refresh exhaustion must occur"
+    );
+    let err = sub.err().expect("typed terminal error");
+    assert!(!errors.lock().unwrap().is_empty());
+    assert_eq!(
+        err.to_string(),
+        errors.lock().unwrap().last().unwrap().to_string()
+    );
+    sub.close();
+    task.await.unwrap();
+}
+
+#[tokio::test]
+async fn ticket_8510_zero_sequence_keeps_ordering() {
+    use hardening_support::centrifugo_publication;
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    for mode in ["gap", "contiguous", "reset"] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let count = calls.clone();
+        let http = MockHttpServer::spawn(move |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 0,
+                available: true,
+                ..Default::default()
+            })
+        })
+        .await;
+        let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
+        let client = ticket_book_client(http.base_url(), url);
+        let mut sub = client
+            .orderbook
+            .create_subscription(polyester::services::CreateSubscriptionOptions {
+                symbol: "BTC-USDT".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(sub.updates().recv().await.unwrap().book_seq, "0");
+        let seq = if mode == "contiguous" { 1 } else { 5 };
+        tx.send(centrifugo_publication(
+            &OrderBookDelta {
+                book_seq_start: seq,
+                book_seq_end: seq,
+                reset: mode == "reset",
+                bids: vec![PriceLevel {
+                    price_ticks: 100,
+                    qty_scaled: 1,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        ))
+        .unwrap();
+        let view = tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+            .await
+            .unwrap()
+            .unwrap();
+        if mode == "gap" {
+            assert_eq!(view.book_seq, "0", "gap must refetch, never apply");
+            assert!(view.bids.is_empty());
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+        } else {
+            assert_eq!(view.book_seq, seq.to_string());
+            assert_eq!(view.bids.len(), 1);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+        }
+        sub.close();
+        task.await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn ticket_8512_unknown_matching_selectors_require_catalogs() {
+    let client = Client::new(Config {
+        api_url: "http://127.0.0.1:1".into(),
+        ws_url: "ws://127.0.0.1:1".into(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let result = client
+        .orderbook
+        .create_subscription(polyester::services::CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            symbol_id: Some(1),
+            ..Default::default()
+        })
+        .await;
+    let Err(polyester::Error::Validation(message)) = result else {
+        panic!("expected hydration validation")
+    };
+    assert!(message.contains("wait_for_catalogs"), "{message}");
+}
+
+#[tokio::test]
+async fn ticket_8475_setup_overflow_keeps_typed_error() {
+    use hardening_support::centrifugo_publication;
+    let mut frames = vec![centrifugo_publication(b"early"); 201];
+    frames.push(centrifugo_ok_reply(2));
+    let (url, _tx, task) = ticket_ws(frames, None).await;
+    let rt = RealtimeClient::new(url, "", None, None);
+    let result = rt.subscribe_raw(PUBLIC_CHANNEL).await;
+    assert!(
+        matches!(result, Err(polyester::Error::QueueOverflow(_))),
+        "setup overflow lost its type"
+    );
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
+    use futures_util::{SinkExt, StreamExt};
+    use hardening_support::HttpScript;
+    use polyester::proto::orderbook::v1::GetOrderBookResponse;
+    use tokio_tungstenite::tungstenite::Message as WsMessage;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = calls.clone();
+    let http = MockHttpServer::spawn(move |_| {
+        if count.fetch_add(1, Ordering::SeqCst) == 0 {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 0,
+                available: true,
+                ..Default::default()
+            })
+        } else {
+            HttpScript::Json {
+                status: 503,
+                body: br#"{"code":"unavailable","message":"snapshot unavailable"}"#.to_vec(),
+            }
+        }
+    })
+    .await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let (disconnect, disconnected) = tokio::sync::oneshot::channel::<()>();
+    let task = tokio::spawn(async move {
+        let mut disconnected = Some(disconnected);
+        for connection in 0..2 {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_hdr_async(socket,
+                |_: &_, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                    response.headers_mut().insert("sec-websocket-protocol", "centrifuge-protobuf".parse().unwrap());
+                    Ok(response)
+                }
+            ).await.unwrap();
+            for id in 1..=2 {
+                ws.next().await.unwrap().unwrap();
+                ws.send(WsMessage::Binary(centrifugo_ok_reply(id).into()))
+                    .await
+                    .unwrap();
+            }
+            if connection == 0 {
+                disconnected.take().unwrap().await.unwrap();
+                ws.close(None).await.unwrap();
+            } else {
+                while let Some(Ok(message)) = ws.next().await {
+                    if matches!(message, WsMessage::Close(_)) {
+                        break;
+                    }
+                }
+            }
+        }
+    });
+    let client = ticket_book_client(http.base_url(), url);
+    let mut sub = client
+        .orderbook
+        .create_subscription(polyester::services::CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(sub.updates().recv().await.unwrap().book_seq, "0");
+    let errors = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let reported = errors.clone();
+    sub.set_on_error(move |err| reported.lock().unwrap().push(err));
+    // The disconnect cannot happen before the initial snapshot has been delivered.
+    disconnect.send(()).unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
+            .await
+            .expect("terminal receiver must close")
+            .is_none()
+    );
+    assert!(
+        calls.load(Ordering::SeqCst) >= 3,
+        "reconnect snapshot retries must occur"
+    );
+    let error = sub.err().expect("typed terminal snapshot error");
+    assert!(matches!(error, polyester::Error::Server(_)), "{error:?}");
+    assert_eq!(
+        errors.lock().unwrap().last().unwrap().to_string(),
+        error.to_string()
+    );
+    tokio::time::timeout(Duration::from_secs(10), task)
+        .await
+        .expect("replacement socket must be released")
+        .unwrap();
+    sub.close();
+}

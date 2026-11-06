@@ -137,8 +137,7 @@ pub fn apply_delta(
     if delta.reset && seq_end <= current_seq {
         return (current_seq, false);
     }
-    let comparison_seq = if delta.reset { 0 } else { current_seq };
-    if comparison_seq != 0 && seq_start > comparison_seq.saturating_add(1) {
+    if !delta.reset && seq_start > current_seq.saturating_add(1) {
         return (current_seq, true);
     }
     if !delta.reset && seq_end <= current_seq {

@@ -12,6 +12,7 @@ use crate::auth::Credentials;
 use crate::errors::{Error, Result};
 use futures_util::{SinkExt, StreamExt};
 use rand_core::{OsRng, RngCore};
+use std::collections::VecDeque;
 use std::sync::{
     Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
     atomic::{AtomicBool, Ordering},
@@ -413,7 +414,10 @@ impl Client {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(err) if matches!(err, Error::QueueOverflow(_)) => {
-                        record_subscription_error(&error_task, err);
+                        record_subscription_error(&error_task, err.clone());
+                        if let Some(ready) = ready.take() {
+                            let _ = ready.send(Err(err));
+                        }
                         break;
                     }
                     Err(err) => {
@@ -473,6 +477,7 @@ impl Client {
         write: &mut W,
         read: &mut R,
         channel: &str,
+        pending: &mut VecDeque<protocol::Incoming>,
     ) -> Result<()>
     where
         W: SinkExt<Message> + Unpin,
@@ -492,7 +497,7 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            centrifugo_connect(write, read, Some(&connection_token)).await?;
+            centrifugo_connect(write, read, Some(&connection_token), pending).await?;
             let subscription_token = auth::fetch_subscription_token(
                 creds,
                 &self.api_url,
@@ -501,10 +506,10 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            centrifugo_subscribe(write, read, channel, Some(&subscription_token)).await?;
+            centrifugo_subscribe(write, read, channel, Some(&subscription_token), pending).await?;
         } else {
-            centrifugo_connect(write, read, None).await?;
-            centrifugo_subscribe(write, read, channel, None).await?;
+            centrifugo_connect(write, read, None, pending).await?;
+            centrifugo_subscribe(write, read, channel, None, pending).await?;
         }
         Ok(())
     }
@@ -549,7 +554,8 @@ impl Client {
             ));
         }
         let (mut write, mut read) = ws.split();
-        self.handshake_channel(&mut write, &mut read, channel)
+        let mut pending = VecDeque::new();
+        self.handshake_channel(&mut write, &mut read, channel, &mut pending)
             .await?;
         *attempt.connected = true;
         clear_subscription_error(attempt.error_state);
@@ -565,6 +571,55 @@ impl Client {
         loop {
             if *attempt.stop.borrow() {
                 return Ok(());
+            }
+            if let Some(incoming) = pending.pop_front() {
+                match incoming {
+                    protocol::Incoming::Ping => {
+                        write
+                            .send(Message::Binary(protocol::pong_command().into()))
+                            .await
+                            .map_err(|e| Error::realtime(format!("protobuf pong send: {e}")))?;
+                    }
+                    protocol::Incoming::Publication(bytes) => {
+                        let send = |item| {
+                            try_send_direct(
+                                tx,
+                                item,
+                                "typed realtime subscription queue full; consumer too slow",
+                            )
+                        };
+                        match decode(&bytes)? {
+                            Publication::One(item) => {
+                                if !send(item)? {
+                                    return Ok(());
+                                }
+                            }
+                            Publication::Batch(items) => {
+                                for item in items {
+                                    match item {
+                                        Ok(item) => {
+                                            if !send(item)? {
+                                                return Ok(());
+                                            }
+                                        }
+                                        // One bad member must not drop
+                                        // the rest of its batch.
+                                        Err(err) => {
+                                            record_subscription_error(attempt.error_state, err)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    protocol::Incoming::Reply {
+                        error: Some(err), ..
+                    } => {
+                        return Err(centrifugo_protocol_error(err));
+                    }
+                    protocol::Incoming::Reply { .. } => {}
+                }
+                continue;
             }
             let msg = tokio::select! {
                 changed = attempt.stop.changed() => {
@@ -590,57 +645,7 @@ impl Client {
             };
             match msg {
                 Message::Binary(frame) => {
-                    for incoming in protocol::decode_replies(&frame)? {
-                        match incoming {
-                            protocol::Incoming::Ping => {
-                                write
-                                    .send(Message::Binary(protocol::pong_command().into()))
-                                    .await
-                                    .map_err(|e| {
-                                        Error::realtime(format!("protobuf pong send: {e}"))
-                                    })?;
-                            }
-                            protocol::Incoming::Publication(bytes) => {
-                                let send = |item| {
-                                    try_send_direct(
-                                        tx,
-                                        item,
-                                        "typed realtime subscription queue full; consumer too slow",
-                                    )
-                                };
-                                match decode(&bytes)? {
-                                    Publication::One(item) => {
-                                        if !send(item)? {
-                                            return Ok(());
-                                        }
-                                    }
-                                    Publication::Batch(items) => {
-                                        for item in items {
-                                            match item {
-                                                Ok(item) => {
-                                                    if !send(item)? {
-                                                        return Ok(());
-                                                    }
-                                                }
-                                                // One bad member must not drop
-                                                // the rest of its batch.
-                                                Err(err) => record_subscription_error(
-                                                    attempt.error_state,
-                                                    err,
-                                                ),
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            protocol::Incoming::Reply {
-                                error: Some(err), ..
-                            } => {
-                                return Err(centrifugo_protocol_error(err));
-                            }
-                            protocol::Incoming::Reply { .. } => {}
-                        }
-                    }
+                    pending.extend(protocol::decode_replies(&frame)?);
                 }
                 Message::Text(_) => {
                     return Err(Error::realtime(
@@ -797,7 +802,12 @@ pub fn is_private_channel(channel: &str) -> bool {
     channel.starts_with("private:")
 }
 
-async fn centrifugo_connect<W, R>(write: &mut W, read: &mut R, token: Option<&str>) -> Result<()>
+async fn centrifugo_connect<W, R>(
+    write: &mut W,
+    read: &mut R,
+    token: Option<&str>,
+    pending: &mut VecDeque<protocol::Incoming>,
+) -> Result<()>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -808,7 +818,7 @@ where
         .send(Message::Binary(protocol::connect_command(1, token).into()))
         .await
         .map_err(|e| Error::realtime(format!("connect send: {e}")))?;
-    read_centrifugo_reply(write, read, 1).await
+    read_centrifugo_reply(write, read, 1, pending).await
 }
 
 async fn centrifugo_subscribe<W, R>(
@@ -816,6 +826,7 @@ async fn centrifugo_subscribe<W, R>(
     read: &mut R,
     channel: &str,
     token: Option<&str>,
+    pending: &mut VecDeque<protocol::Incoming>,
 ) -> Result<()>
 where
     W: SinkExt<Message> + Unpin,
@@ -829,10 +840,15 @@ where
         ))
         .await
         .map_err(|e| Error::realtime(format!("subscribe send: {e}")))?;
-    read_centrifugo_reply(write, read, 2).await
+    read_centrifugo_reply(write, read, 2, pending).await
 }
 
-async fn read_centrifugo_reply<W, R>(write: &mut W, read: &mut R, expected_id: u32) -> Result<()>
+async fn read_centrifugo_reply<W, R>(
+    write: &mut W,
+    read: &mut R,
+    expected_id: u32,
+    pending: &mut VecDeque<protocol::Incoming>,
+) -> Result<()>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -847,6 +863,7 @@ where
             .map_err(|e| Error::realtime(format!("centrifugo read: {e}")))?;
         match msg {
             Message::Binary(frame) => {
+                let mut matched = false;
                 for incoming in protocol::decode_replies(&frame)? {
                     match incoming {
                         protocol::Incoming::Reply {
@@ -854,7 +871,7 @@ where
                             error: Some(err),
                         } if id == expected_id => return Err(centrifugo_protocol_error(err)),
                         protocol::Incoming::Reply { id, error: None } if id == expected_id => {
-                            return Ok(());
+                            matched = true;
                         }
                         protocol::Incoming::Ping => {
                             write
@@ -862,8 +879,16 @@ where
                                 .await
                                 .map_err(|e| Error::realtime(format!("protobuf pong send: {e}")))?;
                         }
-                        _ => {}
+                        incoming => {
+                            if pending.len() >= 200 {
+                                return Err(Error::queue_overflow("realtime setup buffer full"));
+                            }
+                            pending.push_back(incoming);
+                        }
                     }
+                }
+                if matched {
+                    return Ok(());
                 }
             }
             Message::Text(_) => {

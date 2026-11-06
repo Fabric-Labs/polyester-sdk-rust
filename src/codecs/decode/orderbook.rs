@@ -53,11 +53,7 @@ pub fn orderbook_from_proto(
     Ok(OrderbookData {
         symbol: symbol.to_owned(),
         depth,
-        book_seq: if msg.book_seq == 0 {
-            String::new()
-        } else {
-            msg.book_seq.to_string()
-        },
+        book_seq: msg.book_seq.to_string(),
         bids: levels_from_proto(&msg.bids, symbol, quantity_scale)?,
         asks: levels_from_proto(&msg.asks, symbol, quantity_scale)?,
         available: msg.available,
