@@ -247,6 +247,26 @@ where
     pub(crate) fn fail(&self, err: Error) {
         self.inner.fail_closed(err);
     }
+
+    /// Request a snapshot refresh after `delay`, unless the stream stops first.
+    /// `before` runs right before the request.
+    pub(crate) fn request_refresh_after<F>(&self, delay: Duration, before: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        let inner = self.inner.clone();
+        let mut stop_rx = inner.stop_tx.subscribe();
+        tokio::spawn(async move {
+            let stopped = tokio::select! {
+                changed = stop_rx.changed() => changed.is_err() || *stop_rx.borrow(),
+                _ = tokio::time::sleep(delay) => false,
+            };
+            if !stopped && !*stop_rx.borrow() {
+                before();
+                inner.request_refresh();
+            }
+        });
+    }
 }
 
 impl<TSnapshot, TPublication> Inner<TSnapshot, TPublication>
@@ -594,6 +614,11 @@ where
             if let Err(err) = self.pump_subscription(sub, &mut stop_rx).await
                 && !self.disposed.load(Ordering::SeqCst)
             {
+                // The server ended the channel: reconnecting cannot repair it.
+                if matches!(err, Error::SubscriptionEnded { .. }) {
+                    self.fail_closed(err);
+                    break;
+                }
                 self.record_error(err);
             }
             self.connection_tx.send_replace(None);

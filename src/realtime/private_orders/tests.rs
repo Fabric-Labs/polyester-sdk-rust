@@ -1237,3 +1237,135 @@ fn reconnect_backoff_doubles_from_half_a_second_to_ten_seconds() {
         }
     }
 }
+
+/// Heartbeats keep the connection alive without answering a subscribe: a new
+/// subscription the server never confirms ends with the reason.
+#[tokio::test(start_paused = true)]
+async fn an_unconfirmed_new_subscription_ends_while_heartbeats_keep_the_connection() {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let mut server = harness.server().await;
+    server.auth().await;
+    let _request = server.subscribe().await;
+    let heartbeat = crate::proto::privatews::v1::Heartbeat::default();
+    let started = Instant::now();
+    let pump = async {
+        loop {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            server.send("", 0, heartbeat.clone()).await;
+        }
+    };
+    let event = tokio::select! {
+        _ = pump => unreachable!(),
+        event = tokio::time::timeout(WAIT, consumer.recv()) => event,
+    };
+    let event = event.expect("the subscribe must not wait forever while heartbeats arrive");
+    match event {
+        Some(PrivateOrdersEvent::Error(Error::RealtimeSetupTimeout { channel, deadline })) => {
+            assert_eq!(
+                channel,
+                format!("private:spot:orders:{}", format_id(ACCOUNT))
+            );
+            assert_eq!(deadline, Duration::from_secs(30));
+        }
+        other => panic!("expected the setup timeout, got {other:?}"),
+    }
+    assert!(
+        started.elapsed() >= Duration::from_secs(30),
+        "{:?}",
+        started.elapsed()
+    );
+    assert_eq!(harness.connect_tokens(), 1, "the connection stayed up");
+    expect_disconnected(&mut consumer).await;
+    assert!(matches!(
+        consumer.recv_result().await,
+        Err(Error::RealtimeSetupTimeout { .. })
+    ));
+}
+
+/// A resubscribe on a confirmed stream the server never answers reports it and
+/// subscribes again; a late answer to the old request is unsubscribed.
+#[tokio::test(start_paused = true)]
+async fn an_unanswered_resubscribe_retries_and_recovers() {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    server.send("s1", 1, SnapshotBegin::default()).await;
+    server
+        .send(
+            "s1",
+            2,
+            SnapshotEnd {
+                cursor: "c1".into(),
+                count: 1,
+                ..Default::default()
+            },
+        )
+        .await;
+    match server.recv().await {
+        client_message::Op::Unsubscribe(unsubscribe) => assert_eq!(unsubscribe.sub, "s1"),
+        other => panic!("expected unsubscribe, got {other:?}"),
+    }
+    let first = server.subscribe().await;
+    expect_disconnected(&mut consumer).await;
+
+    let heartbeat = crate::proto::privatews::v1::Heartbeat::default();
+    let pump = async {
+        loop {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            server.send("", 0, heartbeat.clone()).await;
+        }
+    };
+    let reported = tokio::select! {
+        _ = pump => unreachable!(),
+        reported = tokio::time::timeout(WAIT, consumer.recv()) => reported,
+    }
+    .expect("the resubscribe must not wait forever while heartbeats arrive");
+    assert!(
+        matches!(
+            reported,
+            Some(PrivateOrdersEvent::Error(
+                Error::RealtimeSetupTimeout { .. }
+            ))
+        ),
+        "{reported:?}"
+    );
+
+    let second = server.subscribe().await;
+    assert_ne!(second.id, first.id);
+    server.confirm(&second, "s2").await;
+    expect_connected(&mut consumer).await;
+
+    server
+        .send(
+            "late",
+            0,
+            Subscribed {
+                id: first.id.clone(),
+                account: ACCOUNT,
+                ..Default::default()
+            },
+        )
+        .await;
+    match server.recv().await {
+        client_message::Op::Unsubscribe(unsubscribe) => assert_eq!(unsubscribe.sub, "late"),
+        other => panic!("expected unsubscribe, got {other:?}"),
+    }
+}
+
+/// A subscribe answered within the deadline stays up past it.
+#[tokio::test(start_paused = true)]
+async fn a_confirmed_subscribe_is_not_expired() {
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    let heartbeat = crate::proto::privatews::v1::Heartbeat::default();
+    for _ in 0..20 {
+        tokio::time::sleep(Duration::from_millis(2_500)).await;
+        server.send("", 0, heartbeat.clone()).await;
+    }
+    expect_quiet(&mut consumer, Duration::from_millis(100)).await;
+    assert_eq!(harness.connect_tokens(), 1);
+}

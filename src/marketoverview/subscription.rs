@@ -27,6 +27,16 @@ impl Subscription {
         last_error: Arc<Mutex<Option<Error>>>,
         tx_slot: Arc<Mutex<Option<mpsc::Sender<Vec<MarketOverviewEntry>>>>>,
     ) -> Self {
+        // Terminal failure closes the output so consumers finish after draining
+        // what is queued; the typed error and callback stay on the stream.
+        stream.set_on_terminal_error(Arc::new({
+            let closed = closed.clone();
+            let tx_slot = tx_slot.clone();
+            move |_err| {
+                closed.store(true, Ordering::SeqCst);
+                let _ = lock_unpoisoned(&tx_slot).take();
+            }
+        }));
         Self {
             rx,
             stream,
@@ -43,6 +53,14 @@ impl Subscription {
 
     /// Terminal subscription error, if the stream failed (e.g. queue overflow).
     pub fn err(&self) -> Option<Error> {
+        if self.stream.is_disposed() {
+            // The terminal coordinator error supersedes any earlier local
+            // error, and is recorded before closing the output.
+            return self
+                .stream
+                .err()
+                .or_else(|| lock_unpoisoned(&self.last_error).clone());
+        }
         lock_unpoisoned(&self.last_error)
             .clone()
             .or_else(|| self.stream.err())

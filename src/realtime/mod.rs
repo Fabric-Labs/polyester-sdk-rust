@@ -3,13 +3,14 @@
 mod auth;
 mod private_orders;
 mod protocol;
+mod resubscribe;
 mod snapshot_then_stream;
 
 pub use private_orders::{PRIVATE_WS_PATH, PRIVATE_WS_SUBPROTOCOL, PrivateOrdersSubscription};
 pub use snapshot_then_stream::{SnapshotErrorFn, SnapshotThenStream, SnapshotThenStreamConfig};
 
 use crate::auth::Credentials;
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Result, SubscriptionEndReason};
 use futures_util::{SinkExt, StreamExt};
 use rand_core::{OsRng, RngCore};
 use std::collections::VecDeque;
@@ -35,6 +36,9 @@ const CENTRIFUGO_READ_TIMEOUT: Duration = Duration::from_secs(30);
 const RECONNECT_INITIAL_CAP: Duration = Duration::from_millis(500);
 const RECONNECT_MAX_CAP: Duration = Duration::from_secs(30);
 const CENTRIFUGO_PROTOBUF_SUBPROTOCOL: &str = "centrifuge-protobuf";
+/// Bounds connecting, both tokens and both confirmations together. Pings keep a
+/// connection alive without answering, so a timeout between frames cannot.
+const CENTRIFUGO_SETUP_DEADLINE: Duration = Duration::from_secs(30);
 
 type ErrorCallback = Arc<dyn Fn(Error) + Send + Sync>;
 
@@ -65,7 +69,7 @@ struct SubscriptionAttempt<'a> {
     ready: &'a mut Option<oneshot::Sender<Result<()>>>,
     gap: &'a ResubscribeGap,
     error_state: &'a Arc<Mutex<SubscriptionErrorState>>,
-    connected: &'a mut bool,
+    connected: &'a mut Option<tokio::time::Instant>,
 }
 
 fn invoke_error_callback(callback: ErrorCallback, err: Error) {
@@ -183,6 +187,11 @@ pub struct Client {
     allow_insecure_http: bool,
     /// Account order streams, shared by every clone of this client.
     private_orders: private_orders::PrivateOrderStreams,
+    /// Decides whether a subscription the server ended may resume, shared by
+    /// every clone of this client.
+    access: Arc<resubscribe::SubaccountAccess>,
+    /// One deadline over the whole setup of a subscription.
+    setup_deadline: Duration,
 }
 
 impl Client {
@@ -209,18 +218,24 @@ impl Client {
         timeout: Duration,
     ) -> Self {
         let max_queue = max_queue.unwrap_or(DEFAULT_QUEUE).max(1);
+        let timeout = if timeout.is_zero() {
+            auth::DEFAULT_TOKEN_REQUEST_TIMEOUT
+        } else {
+            timeout
+        };
         Self {
             ws_url: ws_url.into(),
             api_url: api_url.into(),
             credentials,
             max_queue,
-            timeout: if timeout.is_zero() {
-                auth::DEFAULT_TOKEN_REQUEST_TIMEOUT
-            } else {
-                timeout
-            },
+            timeout,
+            // A configured HTTP timeout covers each of the two token requests.
+            setup_deadline: CENTRIFUGO_SETUP_DEADLINE.max(timeout.saturating_mul(2)),
             allow_insecure_http: false,
             private_orders: private_orders::PrivateOrderStreams::new(max_queue),
+            access: Arc::new(resubscribe::SubaccountAccess::new(
+                resubscribe::ResubscribeTiming::default(),
+            )),
         }
     }
 
@@ -398,8 +413,9 @@ impl Client {
             let _guard = AliveGuard(alive_task.clone());
             let mut ready = Some(ready_tx);
             let mut backoff = ReconnectBackoff::new();
+            let mut resume: Option<resubscribe::ResubscribeAttempt> = None;
             while !*stop_rx.borrow() {
-                let mut connected_this_attempt = false;
+                let mut connected_this_attempt = None;
                 let mut attempt = SubscriptionAttempt {
                     stop: &mut stop_rx,
                     ready: &mut ready,
@@ -407,10 +423,13 @@ impl Client {
                     error_state: &error_task,
                     connected: &mut connected_this_attempt,
                 };
-                match this
+                let outcome = this
                     .run_proto_subscription_once(&channel, decode.as_ref(), &tx, &mut attempt)
-                    .await
-                {
+                    .await;
+                if let (Some(at), Some(resume)) = (connected_this_attempt, resume.as_mut()) {
+                    resume.note_ready(at);
+                }
+                match outcome {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(err) if matches!(err, Error::QueueOverflow(_)) => {
@@ -420,8 +439,69 @@ impl Client {
                         }
                         break;
                     }
+                    // The server ended this subscription: resume, or say why not.
+                    Err(Error::SubscriptionEnded {
+                        channel: ended_channel,
+                        code,
+                        server_reason,
+                        reason,
+                        cause,
+                    }) => {
+                        let ended = resubscribe::ServerUnsubscribe {
+                            code,
+                            reason: server_reason,
+                        };
+                        if !auto_reconnect {
+                            record_subscription_error(
+                                &error_task,
+                                Error::SubscriptionEnded {
+                                    channel: ended_channel,
+                                    code,
+                                    server_reason: ended.reason,
+                                    reason,
+                                    cause,
+                                },
+                            );
+                            break;
+                        }
+                        let attempt = this.access.attempt_after(resume.take(), ended);
+                        let resuming = resume.insert(attempt);
+                        if let Some(stop) = this
+                            .access
+                            .await_resume(&this, &channel, resuming, &mut stop_rx)
+                            .await
+                        {
+                            record_subscription_error(&error_task, stop);
+                            break;
+                        }
+                    }
+                    // An attempt to resume failed: retry within its limit.
+                    Err(err) if resume.as_ref().is_some_and(|resume| !resume.ready) => {
+                        let resuming = resume.as_mut().expect("resume checked above");
+                        if auth::is_refusal(&err) {
+                            record_subscription_error(
+                                &error_task,
+                                resuming.ended.stop(
+                                    &channel,
+                                    SubscriptionEndReason::TokenRefused,
+                                    Some(err),
+                                ),
+                            );
+                            break;
+                        }
+                        record_subscription_error(&error_task, err.clone());
+                        resuming.last = Some(err);
+                        if let Some(stop) = this
+                            .access
+                            .await_resume(&this, &channel, resuming, &mut stop_rx)
+                            .await
+                        {
+                            record_subscription_error(&error_task, stop);
+                            break;
+                        }
+                    }
                     Err(err) => {
-                        if connected_this_attempt {
+                        if connected_this_attempt.is_some() {
                             backoff.reset();
                         }
                         record_subscription_error(&error_task, err.clone());
@@ -524,40 +604,48 @@ impl Client {
     where
         F: Fn(&[u8]) -> Result<Publication<T>>,
     {
-        crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
-        let url = self.ws_endpoint();
-        let mut request = url
-            .into_client_request()
-            .map_err(|e| Error::realtime(format!("ws request: {e}")))?;
-        request.headers_mut().insert(
-            SEC_WEBSOCKET_PROTOCOL,
-            HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
-        );
-        let websocket_config = WebSocketConfig::default()
-            .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
-            .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
-        let (ws, response) = timeout(
-            CENTRIFUGO_READ_TIMEOUT,
-            connect_async_with_config(request, Some(websocket_config), false),
-        )
+        let (mut write, mut read, mut pending) = timeout(self.setup_deadline, async {
+            crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
+            let url = self.ws_endpoint();
+            let mut request = url
+                .into_client_request()
+                .map_err(|e| Error::realtime(format!("ws request: {e}")))?;
+            request.headers_mut().insert(
+                SEC_WEBSOCKET_PROTOCOL,
+                HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
+            );
+            let websocket_config = WebSocketConfig::default()
+                .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
+                .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
+            let (ws, response) = timeout(
+                CENTRIFUGO_READ_TIMEOUT,
+                connect_async_with_config(request, Some(websocket_config), false),
+            )
+            .await
+            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
+            .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
+            if response
+                .headers()
+                .get(SEC_WEBSOCKET_PROTOCOL)
+                .and_then(|value| value.to_str().ok())
+                != Some(CENTRIFUGO_PROTOBUF_SUBPROTOCOL)
+            {
+                return Err(Error::realtime(
+                    "server did not negotiate centrifuge-protobuf websocket subprotocol".to_owned(),
+                ));
+            }
+            let (mut write, mut read) = ws.split();
+            let mut pending = VecDeque::new();
+            self.handshake_channel(&mut write, &mut read, channel, &mut pending)
+                .await?;
+            Ok::<_, Error>((write, read, pending))
+        })
         .await
-        .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
-        .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
-        if response
-            .headers()
-            .get(SEC_WEBSOCKET_PROTOCOL)
-            .and_then(|value| value.to_str().ok())
-            != Some(CENTRIFUGO_PROTOBUF_SUBPROTOCOL)
-        {
-            return Err(Error::realtime(
-                "server did not negotiate centrifuge-protobuf websocket subprotocol".to_owned(),
-            ));
-        }
-        let (mut write, mut read) = ws.split();
-        let mut pending = VecDeque::new();
-        self.handshake_channel(&mut write, &mut read, channel, &mut pending)
-            .await?;
-        *attempt.connected = true;
+        .map_err(|_| Error::RealtimeSetupTimeout {
+            channel: channel.to_owned(),
+            deadline: self.setup_deadline,
+        })??;
+        *attempt.connected = Some(tokio::time::Instant::now());
         clear_subscription_error(attempt.error_state);
         if let Some(ready) = attempt.ready.take() {
             let _ = ready.send(Ok(()));
@@ -567,6 +655,7 @@ impl Client {
             // this as a possible gap.
             attempt.gap.note_resubscribe();
         }
+        let subaccounts_channel = channel.starts_with(resubscribe::SUBACCOUNTS_CHANNEL_PREFIX);
 
         loop {
             if *attempt.stop.borrow() {
@@ -581,6 +670,9 @@ impl Client {
                             .map_err(|e| Error::realtime(format!("protobuf pong send: {e}")))?;
                     }
                     protocol::Incoming::Publication(bytes) => {
+                        if subaccounts_channel {
+                            self.access.note_update(&bytes);
+                        }
                         let send = |item| {
                             try_send_direct(
                                 tx,
@@ -610,6 +702,16 @@ impl Client {
                                     }
                                 }
                             }
+                        }
+                    }
+                    protocol::Incoming::Unsubscribe {
+                        channel: ended,
+                        code,
+                        reason,
+                    } => {
+                        if ended.is_empty() || ended == channel {
+                            return Err(resubscribe::ServerUnsubscribe { code, reason }
+                                .into_connection_error(channel));
                         }
                     }
                     protocol::Incoming::Reply {
