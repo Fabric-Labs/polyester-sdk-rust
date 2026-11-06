@@ -343,14 +343,9 @@ fn classify_failed_response_inner(
                 ConnectError::new(ErrorCode::DeadlineExceeded, message).with_http_status(status),
             );
         }
-        if matches!(
-            order_name.as_str(),
-            "ERROR_CODE_OVERLOADED"
-                | "ERROR_CODE_SYSTEM_RATE_LIMITED"
-                | "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
-                | "ERROR_CODE_RATE_LIMIT_EXCEEDED"
-                | "ERROR_CODE_PRICE_LEVELS_EXHAUSTED"
-        ) {
+        if crate::errors::retryable_resource_code(&order_name)
+            || order_name == "ERROR_CODE_ORDER_SEQUENCE_EXHAUSTED"
+        {
             use crate::proto::orders::v1::{
                 ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
             };

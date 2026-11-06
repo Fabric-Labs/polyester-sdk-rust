@@ -638,6 +638,39 @@ fn known_admission_refusal(code: &str) -> bool {
             | "ORDER_PLACEMENT_PENDING"
             | "TRIGGER_CONTROLS_BUSY"
             | "TRIGGER_CONTROL_IN_PROGRESS"
+            | "QUICKSWAP_ACCOUNT_OWNER_UNKNOWN"
+    )
+}
+
+fn final_resource_code(code: &str) -> bool {
+    matches!(
+        code.trim_start_matches("ERROR_CODE_"),
+        "ORDER_SEQUENCE_EXHAUSTED"
+            | "TRIGGER_FIRE_LIMIT_REACHED"
+            | "QUICKSWAP_CAPACITY_REACHED"
+            | "ACCOUNT_RESERVATION_LIMIT_REACHED"
+            | "TRIGGER_LIMIT_EXCEEDED"
+    )
+}
+
+pub(crate) fn retryable_resource_code(code: &str) -> bool {
+    matches!(
+        code.trim_start_matches("ERROR_CODE_"),
+        "OVERLOADED"
+            | "SYSTEM_RATE_LIMITED"
+            | "RATE_LIMIT_EXCEEDED"
+            | "PRICE_LEVELS_EXHAUSTED"
+            | "CLIENT_ORDER_IDS_EXHAUSTED"
+            | "CLIENT_ORDER_ID_CAPACITY_REACHED"
+            | "MARKET_LADDER_LIMIT_EXCEEDED"
+            | "MARKET_TRIGGER_LIMIT_EXCEEDED"
+            | "MARKET_TWAP_LIMIT_EXCEEDED"
+            | "NEW_ACCOUNT_CAPACITY_REACHED"
+            | "REQUEST_RECEIPTS_EXHAUSTED"
+            | "RESERVATION_CAPACITY_REACHED"
+            | "TRIGGER_CAPACITY_REACHED"
+            | "TRIGGER_CONTROL_SHARE_EXHAUSTED"
+            | "TWAP_CAPACITY_REACHED"
     )
 }
 
@@ -734,7 +767,40 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             problem: None,
         };
     }
-    for detail in &err.details {
+    let mut details: Vec<_> = err.details.iter().collect();
+    details.sort_by_key(|detail| {
+        decode_order_error_detail(detail).map_or(2, |order| {
+            let code = known_or_unknown_code(
+                order.code.as_known().map(|c| c.proto_name()),
+                order.code.to_i32(),
+            );
+            if is_outcome_unknown_code(&code) {
+                0
+            } else if final_resource_code(&code) {
+                1
+            } else {
+                2
+            }
+        })
+    });
+    if is_outcome_unknown_code(raw_message)
+        && !details.first().is_some_and(|detail| {
+            decode_order_error_detail(detail).is_some_and(|order| {
+                is_outcome_unknown_code(&known_or_unknown_code(
+                    order.code.as_known().map(|c| c.proto_name()),
+                    order.code.to_i32(),
+                ))
+            })
+        })
+    {
+        return Error::Api {
+            message: fallback_message,
+            code: order_error_code_from_name(raw_message),
+            metadata: Vec::new(),
+            violations: Vec::new(),
+        };
+    }
+    for detail in details {
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             match auth_detail.code.as_known() {
                 Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW) => {
@@ -791,17 +857,8 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 order_detail.code.as_known().map(|c| c.proto_name()),
                 order_detail.code.to_i32(),
             );
-            let is_rate_limit = order_detail.rate_limit.is_set()
-                || matches!(
-                    order_detail.code.as_known(),
-                    Some(
-                        OrderErrorCode::RateLimitExceeded
-                            | OrderErrorCode::Overloaded
-                            | OrderErrorCode::SystemRateLimited
-                            | OrderErrorCode::PriceLevelsExhausted
-                    )
-                );
-            if is_rate_limit && !is_outcome_unknown_code(&code) {
+            let is_rate_limit = order_detail.rate_limit.is_set() || retryable_resource_code(&code);
+            if is_rate_limit && !is_outcome_unknown_code(&code) && !final_resource_code(&code) {
                 let detail = order_detail
                     .rate_limit
                     .as_option()
@@ -814,7 +871,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 );
             }
             // Backoff hints and unknown mutation outcomes take precedence.
-            if err.code == ErrorCode::Unavailable && !code.ends_with("_OUTCOME_UNKNOWN") {
+            if err.code == ErrorCode::Unavailable
+                && !code.ends_with("_OUTCOME_UNKNOWN")
+                && code != "ERROR_CODE_ACCOUNT_ROUTING_INVALID"
+                && !final_resource_code(&code)
+            {
                 return if known_admission_refusal(&code) {
                     Error::AdmissionUnavailable {
                         message: fallback_message.clone(),
@@ -912,8 +973,9 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         .and_then(serde_json::Value::as_str)
         .unwrap_or(raw_message);
     let normalized_code = order_error_code_from_name(named_code);
-    if has_marker(crate::transport::HTTP_PROBLEM_TYPE)
-        && err.code == ErrorCode::Unavailable
+    if err.code == ErrorCode::Unavailable
+        && status == 503
+        && normalized_code != "ERROR_CODE_UNAVAILABLE"
         && known_admission_refusal(&normalized_code)
     {
         return Error::AdmissionUnavailable {
@@ -922,17 +984,14 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             problem: None,
         };
     }
-    if is_outcome_unknown_code(named_code)
+    if (err.code == ErrorCode::Unavailable
+        && status == 503
+        && normalized_code == "ERROR_CODE_ACCOUNT_ROUTING_INVALID")
+        || is_outcome_unknown_code(named_code)
         || (err.code == ErrorCode::ResourceExhausted
             && (OrderErrorCode::from_proto_name(&normalized_code).is_some()
                 || is_service_code_message(named_code))
-            && !matches!(
-                normalized_code.as_str(),
-                "ERROR_CODE_OVERLOADED"
-                    | "ERROR_CODE_SYSTEM_RATE_LIMITED"
-                    | "ERROR_CODE_RATE_LIMIT_EXCEEDED"
-                    | "ERROR_CODE_PRICE_LEVELS_EXHAUSTED"
-            ))
+            && !retryable_resource_code(&normalized_code))
     {
         return Error::Api {
             message: fallback_message,
@@ -1198,7 +1257,7 @@ mod tests {
             assert!(
                 matches!(
                     mapped,
-                    Error::Server(_) | Error::AdmissionUnavailable { .. }
+                    Error::Server(_) | Error::AdmissionUnavailable { .. } | Error::Api { .. }
                 ),
                 "{code:?}: {mapped:?}"
             );
@@ -1210,7 +1269,7 @@ mod tests {
             );
             assert_eq!(
                 mapped.mutation_outcome_unknown(),
-                !known_admission_refusal(name)
+                !known_admission_refusal(name) && name != "ERROR_CODE_ACCOUNT_ROUTING_INVALID"
             );
         }
     }
@@ -1333,7 +1392,7 @@ mod tests {
     }
 
     #[test]
-    fn attached_leg_and_trigger_refusal_codes_are_definite_and_not_retryable() {
+    fn attached_leg_and_trigger_refusals_follow_retry_guidance() {
         for (proto_code, connect_code) in [
             (
                 OrderErrorCode::ERROR_CODE_ATTACHED_LEGS_EXCEEDED,
@@ -1363,7 +1422,7 @@ mod tests {
                 OrderErrorCode::ERROR_CODE_CONDITION_PARAMETER_SET,
                 ErrorCode::InvalidArgument,
             ),
-            // A full market is a refusal, not a rate limit to wait out.
+            // TWAP capacity explicitly permits retrying later.
             (
                 OrderErrorCode::ERROR_CODE_TWAP_CAPACITY_REACHED,
                 ErrorCode::ResourceExhausted,
@@ -1375,6 +1434,12 @@ mod tests {
         ] {
             let want = proto_code.proto_name();
             let mapped = map_order(proto_code, connect_code);
+            if proto_code == OrderErrorCode::ERROR_CODE_TWAP_CAPACITY_REACHED {
+                assert!(matches!(&mapped,Error::RateLimit{code:Some(code),..} if code==want));
+                assert!(mapped.is_retryable());
+                assert!(!mapped.mutation_outcome_unknown());
+                continue;
+            }
             match &mapped {
                 Error::Api { code, .. } => assert_eq!(code, want),
                 other => panic!("{want}: unexpected error {other:?}"),

@@ -5374,7 +5374,6 @@ async fn l2_rest_order_unavailable_classification() {
             "RATE_LIMIT_POLICY_UNAVAILABLE"
                 | "POLICY_UNAVAILABLE"
                 | "FEE_SCHEDULE_UNAVAILABLE"
-                | "UNAVAILABLE"
                 | "PAIR_BACKLOGGED"
                 | "ORDER_MODIFY_IN_PROGRESS"
                 | "ORDER_PLACEMENT_PENDING"
@@ -5383,12 +5382,19 @@ async fn l2_rest_order_unavailable_classification() {
                 | "TRIGGER_CONTROL_IN_PROGRESS"
         );
         assert!(
-            matches!(err, Error::Server(_) | Error::AdmissionUnavailable { .. }),
+            matches!(
+                err,
+                Error::Server(_) | Error::AdmissionUnavailable { .. } | Error::Api { .. }
+            ),
             "{code}: {err:?}"
         );
         assert!(!matches!(err, Error::Auth(_)));
         assert_eq!(err.is_retryable(), known, "{code}: {err:?}");
-        assert_eq!(err.mutation_outcome_unknown(), !known, "{code}: {err:?}");
+        assert_eq!(
+            err.mutation_outcome_unknown(),
+            !known && code != "ACCOUNT_ROUTING_INVALID",
+            "{code}: {err:?}"
+        );
     }
 }
 
@@ -7087,17 +7093,26 @@ async fn l2_retry_contract_catalog() {
     }
     for case in catalog["resources"].as_array().unwrap() {
         let code = case["code"].as_str().unwrap();
-        for shape in ["rest", "message", "detail"] {
+        assert_eq!(
+            case["retryable"].as_bool().unwrap(),
+            case["guidance"]
+                .as_str()
+                .unwrap()
+                .to_ascii_lowercase()
+                .contains("retry")
+                || code == "RATE_LIMIT_EXCEEDED"
+        );
+        for shape in ["rest", "message", "detail", "hint"] {
             let status = case["status"].as_u64().unwrap() as u16;
             let mut body = if shape == "rest" {
                 json!({"code":code,"detail":"refused"})
             } else {
                 json!({"code":"resource_exhausted","message":code})
             };
-            if shape == "detail" {
+            if shape == "detail" || shape == "hint" {
                 use base64::Engine;
                 use buffa::Enumeration;
-                let detail = polyester::proto::orders::v1::ErrorDetail {
+                let mut detail = polyester::proto::orders::v1::ErrorDetail {
                     code: polyester::proto::orders::v1::ErrorCode::from_proto_name(&format!(
                         "ERROR_CODE_{code}"
                     ))
@@ -7105,12 +7120,35 @@ async fn l2_retry_contract_catalog() {
                     .into(),
                     ..Default::default()
                 };
+                if shape == "hint" {
+                    detail.rate_limit = Some(
+                        polyester::proto::polyester::ratelimit::v1::RateLimitDetail {
+                            retry_after_ms: Some(1250),
+                            ..Default::default()
+                        },
+                    )
+                    .into();
+                }
                 body["details"] = json!([{"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]);
             }
             let body = body.to_string();
-            let http =
-                MockHttpServer::spawn(move |_| json_body(status, "application/json", &body)).await;
+            let http = MockHttpServer::spawn(move |_| {
+                let mut script = json_body(status, "application/json", &body);
+                if let hardening_support::HttpScript::Raw {
+                    ref mut headers, ..
+                } = script
+                {
+                    headers.push(("Retry-After".into(), "1.25".into()));
+                }
+                script
+            })
+            .await;
             let e = api_key_client(&http).auth.me().await.unwrap_err();
+            if case["retryable"].as_bool().unwrap()
+                && !matches!(&e, Error::RateLimit{retry_after:Some(d),..} if *d==1.25)
+            {
+                failures.push(format!("delay {code}/{shape}: {e:?}"));
+            }
             if e.is_retryable() != case["retryable"].as_bool().unwrap()
                 || e.mutation_outcome_unknown()
             {
@@ -7125,15 +7163,17 @@ async fn l2_retry_contract_catalog() {
 async fn l2_retry_contract_unavailable_refusal() {
     use base64::Engine;
     use buffa::Enumeration;
-    for name in [
-        "UNAVAILABLE",
-        "FEE_SCHEDULE_UNAVAILABLE",
-        "POLICY_UNAVAILABLE",
-        "RATE_LIMIT_POLICY_UNAVAILABLE",
-    ] {
-        for typed in [false, true] {
+    let catalog: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/retry_contract.json")).unwrap();
+    let mut failures = Vec::new();
+    for case in catalog["unavailable"].as_array().unwrap() {
+        let name = case["code"].as_str().unwrap();
+        for shape in ["rest", "message", "detail", "rest502"] {
             let mut body = json!({"code":name,"detail":"not admitted"});
-            if typed {
+            if shape == "message" {
+                body = json!({"code":"unavailable","message":name,"details":[]});
+            }
+            if shape == "detail" {
                 let detail = polyester::proto::orders::v1::ErrorDetail {
                     code: polyester::proto::orders::v1::ErrorCode::from_proto_name(&format!(
                         "ERROR_CODE_{name}"
@@ -7145,15 +7185,24 @@ async fn l2_retry_contract_unavailable_refusal() {
                 body = json!({"code":"unavailable","message":"not admitted","details":[{"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]});
             }
             let body = body.to_string();
+            let status = if shape == "rest502" { 502 } else { 503 };
             let http =
-                MockHttpServer::spawn(move |_| json_body(503, "application/json", &body)).await;
+                MockHttpServer::spawn(move |_| json_body(status, "application/json", &body)).await;
             let e = api_key_client(&http).auth.me().await.unwrap_err();
-            assert!(
-                e.is_retryable() && !e.mutation_outcome_unknown(),
-                "{name}/{typed}: {e:?}"
-            );
+            let unknown = shape == "rest502" || (name == "UNAVAILABLE" && shape != "detail");
+            if e.is_retryable() != (case["retryable"].as_bool().unwrap() && !unknown)
+                || e.mutation_outcome_unknown() != unknown
+            {
+                failures.push(format!("{name}/{shape}: {e:?}"));
+            }
+            if !unknown
+                && !matches!(&e,Error::AdmissionUnavailable{code,..}|Error::Api{code,..} if code==&format!("ERROR_CODE_{name}"))
+            {
+                failures.push(format!("code {name}/{shape}: {e:?}"));
+            }
         }
     }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 #[tokio::test]
@@ -7359,4 +7408,44 @@ async fn l2_retry_contract_future_resource_code() {
     let e = api_key_client(&http).auth.me().await.unwrap_err();
     assert!(!e.is_retryable() && !e.mutation_outcome_unknown(), "{e:?}");
     assert!(matches!(e,Error::Api{code,..} if code=="FUTURE_PERMANENT_CAPACITY"));
+}
+
+#[tokio::test]
+async fn l2_retry_contract_standalone_backoff_never_hides_unknown() {
+    use base64::Engine;
+    let rate = polyester::proto::polyester::ratelimit::v1::RateLimitDetail {
+        retry_after_ms: Some(1250),
+        ..Default::default()
+    };
+    let order = polyester::proto::orders::v1::ErrorDetail {
+        code: polyester::proto::orders::v1::ErrorCode::OrderCreateOutcomeUnknown.into(),
+        ..Default::default()
+    };
+    for first in [true, false] {
+        let mut details = vec![
+            json!({"type":"polyester.ratelimit.v1.RateLimitDetail","value":base64::engine::general_purpose::STANDARD.encode(rate.encode_to_vec())}),
+            json!({"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(order.encode_to_vec())}),
+        ];
+        if !first {
+            details.reverse();
+        }
+        let body =
+            json!({"code":"unavailable","message":"read back","details":details}).to_string();
+        let http = MockHttpServer::spawn(move |_| json_body(503, "application/json", &body)).await;
+        let e = api_key_client(&http).auth.me().await.unwrap_err();
+        assert!(!e.is_retryable() && e.mutation_outcome_unknown(), "{e:?}");
+    }
+}
+
+#[tokio::test]
+async fn l2_retry_contract_code_only_unknown_precedes_standalone_backoff() {
+    use base64::Engine;
+    let rate = polyester::proto::polyester::ratelimit::v1::RateLimitDetail {
+        retry_after_ms: Some(1250),
+        ..Default::default()
+    };
+    let body=json!({"code":"unavailable","message":"ORDER_CREATE_OUTCOME_UNKNOWN","details":[{"type":"polyester.ratelimit.v1.RateLimitDetail","value":base64::engine::general_purpose::STANDARD.encode(rate.encode_to_vec())}]}).to_string();
+    let http = MockHttpServer::spawn(move |_| json_body(503, "application/json", &body)).await;
+    let e = api_key_client(&http).auth.me().await.unwrap_err();
+    assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
 }
