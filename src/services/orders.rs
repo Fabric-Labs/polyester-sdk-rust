@@ -1069,6 +1069,11 @@ impl OrdersService {
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
         Self::validate_batch_size("batch_create", items.len())?;
+        if items.iter().any(|item| item.subaccount_id.is_some()) {
+            return Err(Error::validation(
+                "batch_create item scope is unsupported; use the batch-level subaccount_id",
+            ));
+        }
         Self::validate_batch_client_order_ids(&items)?;
         self.ctx.wait_for_catalogs().await?;
         let mut encoded = Vec::with_capacity(items.len());

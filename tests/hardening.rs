@@ -7738,3 +7738,90 @@ async fn l2_raw_zero_bid_outside_the_requested_depth_is_refused() {
         raw_zero_delta_subscription("bids", bucket, 9, 1).await;
     }
 }
+
+#[tokio::test]
+async fn batch_create_refuses_item_subaccount_instead_of_using_default() {
+    use polyester::Price;
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+    use polyester::proto::orders::v1::{BatchCreateOrdersRequest, BatchCreateOrdersResponse};
+    use std::sync::Mutex;
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let captured = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == "/orders.v1.OrdersService/BatchCreateOrders" {
+            captured
+                .lock()
+                .unwrap()
+                .push(BatchCreateOrdersRequest::decode_from_slice(&request.body).unwrap());
+            return connect_proto_ok(&BatchCreateOrdersResponse::default());
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: Some(polyester::codecs::scalars::format_id(42)),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({"pairs": [{
+            "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8
+        }]}))
+        .unwrap();
+    let item = |subaccount_id| {
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        params.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        params.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
+        params.subaccount_id = subaccount_id;
+        params
+    };
+    for (top, expected) in [(None, 42), (Some(44), 44)] {
+        let before = seen.lock().unwrap().len();
+        client
+            .orders
+            .batch_create(vec![item(None)], top, None)
+            .await
+            .unwrap();
+        let requests = seen.lock().unwrap();
+        assert_eq!(
+            requests.len(),
+            before + 1,
+            "control never reached transport"
+        );
+        assert_eq!(requests.last().unwrap().subaccount_id, Some(expected));
+    }
+    for top in [None, Some(44)] {
+        for sub in [44, 42, 0] {
+            let before = seen.lock().unwrap().len();
+            let result = client
+                .orders
+                .batch_create(vec![item(None), item(Some(sub))], top, None)
+                .await;
+            assert!(
+                matches!(result, Err(Error::Validation(ref message)) if message.contains("batch-level subaccount_id")),
+                "item override must be refused, got {result:?}"
+            );
+            assert_eq!(
+                seen.lock().unwrap().len(),
+                before,
+                "item override reached transport"
+            );
+        }
+    }
+}
