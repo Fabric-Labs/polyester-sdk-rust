@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Create results carry the destination pair's catalog scale for resolved base
+  quantities, so a raw quantity of 16000 at scale 8 formats as 0.00016.
+
 - Fixed API-key request signing to preserve percent-encoded query bytes outside valid UTF-8 text and sort decoded bytes before encoding, matching the server. Added shared regression vectors for repeated parameters, prefix keys, escaped values and empty queries.
 
 - **Breaking:** transfer history now returns the opaque `next_page_token` string
