@@ -6,7 +6,7 @@ pub use subscription::Subscription;
 
 use std::collections::BTreeMap;
 
-use crate::codecs::decode::{decode_price_ticks, decode_qty_scaled};
+use crate::codecs::decode::{decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{OrderBookDeltaUpdate, OrderbookData, OrderbookLevel};
 
@@ -55,6 +55,11 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
             if qty < 0 {
                 return Err(Error::validation("orderbook quantity must be non-negative"));
             }
+            if price == 0 && qty > 0 {
+                return Err(Error::validation(
+                    "orderbook level has invalid or missing price",
+                ));
+            }
         }
         return Ok(book.clone());
     }
@@ -67,6 +72,11 @@ pub fn bucket_side(book: &BookSide, bucket_ticks: i64, asks: bool) -> Result<Boo
         }
         if qty <= 0 {
             continue;
+        }
+        if price == 0 {
+            return Err(Error::validation(
+                "orderbook level has invalid or missing price",
+            ));
         }
         let quotient = price.div_euclid(bucket_ticks);
         let floor = quotient
@@ -185,7 +195,13 @@ fn side_to_levels(
     let symbol = Some(symbol.to_owned());
     let mut levels = Vec::with_capacity(limit);
     for (price, qty) in entries.into_iter().take(limit) {
-        let price = decode_price_ticks(price, symbol.clone())
+        // A positive raw bid may floor into a zero display boundary.
+        let decode_price = if bucket_ticks > 0 && side == "bids" {
+            decode_price_ticks_allow_zero
+        } else {
+            decode_price_ticks
+        };
+        let price = decode_price(price, symbol.clone())
             .ok_or_else(|| Error::validation("orderbook level has invalid or missing price"))?;
         let qty = decode_qty_scaled(qty, Some(quantity_scale), symbol.clone(), None)
             .ok_or_else(|| Error::validation("orderbook level has invalid or missing quantity"))?;

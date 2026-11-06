@@ -7449,3 +7449,292 @@ async fn l2_retry_contract_code_only_unknown_precedes_standalone_backoff() {
     let e = api_key_client(&http).auth.me().await.unwrap_err();
     assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
 }
+
+#[tokio::test]
+async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    for (symbol, bid, ask, coarse, fine) in [
+        ("DOGE-USDT", 71_600_000_i64, 71_700_000_i64, "0.1", "0.001"),
+        ("LTC-USDT", 51_750_000_000, 51_760_000_000, "100", "0.1"),
+        ("BNB-USDT", 650_100_000_000, 650_200_000_000, "100", "1"),
+    ] {
+        for live_delta in [false, true] {
+            // Exercise snapshot rendering and live updates independently: a buffered
+            // publication may otherwise replace the initial view before it is read.
+            let ws = if live_delta {
+                let delta = OrderBookDelta {
+                    symbol_id: 1,
+                    book_seq_start: 2,
+                    book_seq_end: 2,
+                    bids: vec![PriceLevel {
+                        price_ticks: bid,
+                        qty_scaled: 5,
+                        ..Default::default()
+                    }],
+                    asks: vec![PriceLevel {
+                        price_ticks: ask,
+                        qty_scaled: 6,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }
+                .encode_to_vec();
+                MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), delta)
+                    .await
+            } else {
+                MockWsServer::spawn_centrifugo_public(Arc::default()).await
+            };
+            let http = MockHttpServer::spawn(move |request| {
+                if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
+                    connect_proto_ok(&GetOrderBookResponse {
+                        symbol_id: 1,
+                        book_seq: 1,
+                        available: true,
+                        bids: if live_delta {
+                            vec![]
+                        } else {
+                            vec![PriceLevel {
+                                price_ticks: bid,
+                                qty_scaled: 3,
+                                ..Default::default()
+                            }]
+                        },
+                        asks: if live_delta {
+                            vec![]
+                        } else {
+                            vec![PriceLevel {
+                                price_ticks: ask,
+                                qty_scaled: 4,
+                                ..Default::default()
+                            }]
+                        },
+                        ..Default::default()
+                    })
+                } else {
+                    hardening_support::HttpScript::NotFound
+                }
+            })
+            .await;
+            let client = Client::new(Config {
+                api_url: http.base_url(),
+                ws_url: ws.ws_url(),
+                hydrate_catalogs: false,
+                ..Default::default()
+            })
+            .unwrap();
+            client
+                .catalogs
+                .hydrate_spot_config_json(json!({
+                    "pairs": [{"symbol": symbol, "symbol_id": 1, "base_quantity_scale": 8}]
+                }))
+                .unwrap();
+            let mut subscription = client
+                .orderbook
+                .create_subscription(CreateSubscriptionOptions {
+                    symbol: symbol.into(),
+                    symbol_id: Some(1),
+                    depth: Some(50),
+                    bucket: Some(coarse.into()),
+                })
+                .await
+                .unwrap();
+            for (index, bucket) in [coarse, fine, coarse, ""].into_iter().enumerate() {
+                if index > 0 {
+                    subscription.set_bucket(bucket).unwrap();
+                }
+                let mut view =
+                    tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                        .await
+                        .expect("bucket must emit a view")
+                        .expect("stream must remain open");
+                if live_delta && index == 0 && view.book_seq == "1" {
+                    assert!(view.bids.is_empty() && view.asks.is_empty());
+                    view =
+                        tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                            .await
+                            .expect("delta must emit a view")
+                            .expect("stream must remain open");
+                }
+                assert_eq!(view.book_seq, if live_delta { "2" } else { "1" });
+                let ticks = polyester::orderbook::parse_bucket_ticks(bucket)
+                    .unwrap()
+                    .max(1);
+                assert_eq!(view.bids.len(), 1);
+                assert_eq!(view.asks.len(), 1);
+                assert_eq!(
+                    view.bids[0].price.as_ref().unwrap().as_ticks(),
+                    bid / ticks * ticks
+                );
+                assert_eq!(
+                    view.asks[0].price.as_ref().unwrap().as_ticks(),
+                    (ask + ticks - 1) / ticks * ticks
+                );
+                assert_eq!(
+                    view.bids[0].qty.as_ref().unwrap().as_scaled(),
+                    if live_delta { 5 } else { 3 }
+                );
+                assert_eq!(
+                    view.asks[0].qty.as_ref().unwrap().as_scaled(),
+                    if live_delta { 6 } else { 4 }
+                );
+            }
+            assert!(subscription.err().is_none());
+            subscription.close();
+        }
+    }
+}
+
+async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, depth: u32) {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    let level = PriceLevel {
+        qty_scaled: quantity,
+        ..Default::default()
+    };
+    let delta = OrderBookDelta {
+        symbol_id: 1,
+        book_seq_start: 2,
+        book_seq_end: 2,
+        bids: if side == "bids" {
+            vec![level.clone()]
+        } else {
+            vec![]
+        },
+        asks: if side == "asks" { vec![level] } else { vec![] },
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let ws =
+        MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), delta).await;
+    let http = MockHttpServer::spawn(|request| {
+        assert_eq!(request.path, "/orderbook.v1.OrderbookService/GetOrderBook");
+        connect_proto_ok(&GetOrderBookResponse {
+            symbol_id: 1,
+            book_seq: 1,
+            available: true,
+            bids: vec![PriceLevel {
+                price_ticks: 71_600_000,
+                qty_scaled: 3,
+                ..Default::default()
+            }],
+            asks: vec![PriceLevel {
+                price_ticks: 71_700_000,
+                qty_scaled: 4,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: ws.ws_url(),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+        }))
+        .unwrap();
+    let result = client
+        .orderbook
+        .create_subscription(CreateSubscriptionOptions {
+            symbol: "DOGE-USDT".into(),
+            symbol_id: Some(1),
+            depth: Some(depth),
+            bucket: Some(bucket.into()),
+        })
+        .await;
+    if quantity > 0 {
+        match result {
+            Err(error) => assert!(
+                error.to_string().contains("invalid or missing price"),
+                "{error}"
+            ),
+            Ok(mut subscription) => {
+                while let Some(view) =
+                    tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                        .await
+                        .expect("invalid raw price must terminate the receiver")
+                {
+                    assert_eq!(view.book_seq, "1", "corrupt delta was emitted: {view:?}");
+                }
+                let error = subscription.err().expect("missing terminal error");
+                assert!(
+                    error.to_string().contains("invalid or missing price"),
+                    "{error}"
+                );
+                subscription.close();
+            }
+        }
+    } else {
+        let mut subscription = result.unwrap();
+        let mut view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+            .await
+            .expect("snapshot or delta view")
+            .expect("stream open");
+        if view.book_seq == "1" {
+            view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                .await
+                .expect("removal delta must be applied")
+                .expect("stream open");
+        }
+        assert_eq!(view.book_seq, "2");
+        let ticks = polyester::orderbook::parse_bucket_ticks(bucket)
+            .unwrap()
+            .max(1);
+        assert_eq!(view.bids.len(), 1);
+        assert_eq!(view.asks.len(), 1);
+        assert_eq!(
+            view.bids[0].price.as_ref().unwrap().as_ticks(),
+            71_600_000 / ticks * ticks
+        );
+        assert_eq!(
+            view.asks[0].price.as_ref().unwrap().as_ticks(),
+            (71_700_000 + ticks - 1) / ticks * ticks
+        );
+        assert_eq!(view.bids[0].qty.as_ref().unwrap().as_scaled(), 3);
+        assert_eq!(view.asks[0].qty.as_ref().unwrap().as_scaled(), 4);
+        assert!(subscription.err().is_none());
+        subscription.close();
+    }
+    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+    assert_eq!(ws.connects.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn l2_raw_zero_bid_delta_is_refused_before_aggregation() {
+    for bucket in ["", "0.001", "0.1"] {
+        raw_zero_delta_subscription("bids", bucket, 9, 50).await;
+    }
+}
+
+#[tokio::test]
+async fn l2_raw_zero_ask_delta_is_refused_before_aggregation() {
+    for bucket in ["", "0.001", "0.1"] {
+        raw_zero_delta_subscription("asks", bucket, 9, 50).await;
+    }
+}
+
+#[tokio::test]
+async fn l2_raw_zero_price_removal_deltas_are_harmless() {
+    for side in ["bids", "asks"] {
+        for bucket in ["", "0.001", "0.1"] {
+            raw_zero_delta_subscription(side, bucket, 0, 50).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_raw_zero_bid_outside_the_requested_depth_is_refused() {
+    // A zero bid sorts last, so depth 1 alone would never render it.
+    for bucket in ["", "0.001", "0.1"] {
+        raw_zero_delta_subscription("bids", bucket, 9, 1).await;
+    }
+}
