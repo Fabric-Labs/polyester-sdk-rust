@@ -3654,7 +3654,7 @@ async fn l2_connect_json_errors_and_other_json_bodies_keep_their_mapping() {
     })
     .await;
     assert!(
-        matches!(err, Error::Server(_)) && err.is_retryable(),
+        matches!(err, Error::Server(_)) && !err.is_retryable(),
         "{err:?}"
     );
     // A non-Connect code on a status other than 401/403 is left to Connect's
@@ -4609,7 +4609,7 @@ async fn l2_trigger_reads_give_up_after_about_two_seconds() {
         .expect_err("still unavailable");
     let elapsed = started.elapsed();
     assert!(
-        matches!(err, Error::Server(_)) && err.is_retryable(),
+        matches!(err, Error::Server(_)) && !err.is_retryable(),
         "{err:?}"
     );
     // 25, 50, 100, 200, 400, 500, 500 ms of backoff: at most eight attempts
@@ -5369,9 +5369,26 @@ async fn l2_rest_order_unavailable_classification() {
             .me()
             .await
             .expect_err("unavailable");
-        assert!(matches!(err, Error::Server(_)), "{code}: {err:?}");
+        let known = matches!(
+            code,
+            "RATE_LIMIT_POLICY_UNAVAILABLE"
+                | "POLICY_UNAVAILABLE"
+                | "FEE_SCHEDULE_UNAVAILABLE"
+                | "UNAVAILABLE"
+                | "PAIR_BACKLOGGED"
+                | "ORDER_MODIFY_IN_PROGRESS"
+                | "ORDER_PLACEMENT_PENDING"
+                | "SETTLEMENT_BACKLOGGED"
+                | "TRIGGER_CONTROLS_BUSY"
+                | "TRIGGER_CONTROL_IN_PROGRESS"
+        );
+        assert!(
+            matches!(err, Error::Server(_) | Error::AdmissionUnavailable { .. }),
+            "{code}: {err:?}"
+        );
         assert!(!matches!(err, Error::Auth(_)));
-        assert!(err.is_retryable(), "{code}: {err:?}");
+        assert_eq!(err.is_retryable(), known, "{code}: {err:?}");
+        assert_eq!(err.mutation_outcome_unknown(), !known, "{code}: {err:?}");
     }
 }
 
@@ -5440,6 +5457,10 @@ async fn l2_order_create_never_resends_unknown_outcome() {
                 r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN"}"#,
             ),
             (504, "text/html", "<html>Gateway Timeout</html>"),
+            (502, "text/plain", ""),
+            (503, "text/html", "<html>Unavailable</html>"),
+            (504, "application/json", r#"{"code":"deadline_exceeded"}"#),
+            (503, "application/json", r#"{"code":"unavailable"}"#),
             (
                 503,
                 "application/json",
@@ -5484,7 +5505,7 @@ async fn l2_order_create_never_resends_unknown_outcome() {
             assert!(err.mutation_outcome_unknown(), "{err:?}");
             assert_eq!(http.requests.load(Ordering::SeqCst), 1);
             assert!(!err.is_retryable());
-            if content_type != "text/html" {
+            if body.contains("OUTCOME_UNKNOWN") || body.contains("details") {
                 assert!(matches!(err, Error::Api { .. }), "{err:?}");
                 assert!(!err.is_retryable());
             }
@@ -6981,24 +7002,30 @@ async fn l2_future_outcome_code_classification() {
 
 #[tokio::test]
 async fn l2_rest_admission_keeps_retry_delay() {
-    let http = MockHttpServer::spawn(move |_| {
-        let mut response = json_body(
-            429,
-            "application/problem+json",
-            r#"{"code":"SYSTEM_RATE_LIMITED"}"#,
-        );
-        if let hardening_support::HttpScript::Raw { headers, .. } = &mut response {
-            headers.push(("Retry-After".into(), "1.25".into()));
-        }
-        response
-    })
-    .await;
-    let error = api_key_client(&http)
-        .auth
-        .me()
-        .await
-        .expect_err("rate limited");
-    assert_eq!(error.retry_after(), Some(1.25), "{error:?}");
+    for code in [
+        "SYSTEM_RATE_LIMITED",
+        "RATE_LIMIT_EXCEEDED",
+        "PRICE_LEVELS_EXHAUSTED",
+    ] {
+        let http = MockHttpServer::spawn(move |_| {
+            let mut response = json_body(
+                429,
+                "application/problem+json",
+                &json!({"code":code}).to_string(),
+            );
+            if let hardening_support::HttpScript::Raw { headers, .. } = &mut response {
+                headers.push(("Retry-After".into(), "1.25".into()));
+            }
+            response
+        })
+        .await;
+        let error = api_key_client(&http)
+            .auth
+            .me()
+            .await
+            .expect_err("rate limited");
+        assert_eq!(error.retry_after(), Some(1.25), "{error:?}");
+    }
 }
 
 #[tokio::test]
@@ -7040,4 +7067,296 @@ async fn l2_snapshot_refresh_retries_gateway_504() {
     assert!(stream.is_ready(), "{:?}", stream.err());
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     stream.close();
+}
+
+#[tokio::test]
+async fn l2_retry_contract_catalog() {
+    let catalog: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/retry_contract.json")).unwrap();
+    let mut failures = Vec::new();
+    for case in catalog["bad_requests"].as_array().unwrap() {
+        let code = case["code"].as_str().unwrap();
+        let body = json!({"code":code,"detail":"refused"}).to_string();
+        let http =
+            MockHttpServer::spawn(move |_| json_body(400, "application/problem+json", &body)).await;
+        let e = api_key_client(&http).auth.me().await.unwrap_err();
+        if e.is_retryable() != case["retryable"].as_bool().unwrap() || e.mutation_outcome_unknown()
+        {
+            failures.push(format!("400 {code}: {e:?}"));
+        }
+    }
+    for case in catalog["resources"].as_array().unwrap() {
+        let code = case["code"].as_str().unwrap();
+        for shape in ["rest", "message", "detail"] {
+            let status = case["status"].as_u64().unwrap() as u16;
+            let mut body = if shape == "rest" {
+                json!({"code":code,"detail":"refused"})
+            } else {
+                json!({"code":"resource_exhausted","message":code})
+            };
+            if shape == "detail" {
+                use base64::Engine;
+                use buffa::Enumeration;
+                let detail = polyester::proto::orders::v1::ErrorDetail {
+                    code: polyester::proto::orders::v1::ErrorCode::from_proto_name(&format!(
+                        "ERROR_CODE_{code}"
+                    ))
+                    .unwrap()
+                    .into(),
+                    ..Default::default()
+                };
+                body["details"] = json!([{"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]);
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(status, "application/json", &body)).await;
+            let e = api_key_client(&http).auth.me().await.unwrap_err();
+            if e.is_retryable() != case["retryable"].as_bool().unwrap()
+                || e.mutation_outcome_unknown()
+            {
+                failures.push(format!("{code}/{shape}: {e:?}"));
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+#[tokio::test]
+async fn l2_retry_contract_unavailable_refusal() {
+    use base64::Engine;
+    use buffa::Enumeration;
+    for name in [
+        "UNAVAILABLE",
+        "FEE_SCHEDULE_UNAVAILABLE",
+        "POLICY_UNAVAILABLE",
+        "RATE_LIMIT_POLICY_UNAVAILABLE",
+    ] {
+        for typed in [false, true] {
+            let mut body = json!({"code":name,"detail":"not admitted"});
+            if typed {
+                let detail = polyester::proto::orders::v1::ErrorDetail {
+                    code: polyester::proto::orders::v1::ErrorCode::from_proto_name(&format!(
+                        "ERROR_CODE_{name}"
+                    ))
+                    .unwrap()
+                    .into(),
+                    ..Default::default()
+                };
+                body = json!({"code":"unavailable","message":"not admitted","details":[{"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]});
+            }
+            let body = body.to_string();
+            let http =
+                MockHttpServer::spawn(move |_| json_body(503, "application/json", &body)).await;
+            let e = api_key_client(&http).auth.me().await.unwrap_err();
+            assert!(
+                e.is_retryable() && !e.mutation_outcome_unknown(),
+                "{name}/{typed}: {e:?}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_retry_contract_ambiguous() {
+    for (status, kind, body) in [
+        (504, "application/json", r#"{"code":"deadline_exceeded"}"#),
+        (503, "application/json", r#"{"code":"unavailable"}"#),
+        (502, "text/plain", ""),
+        (503, "text/html", "<html>unavailable</html>"),
+    ] {
+        let http = MockHttpServer::spawn(move |_| json_body(status, kind, body)).await;
+        let e = api_key_client(&http).auth.me().await.unwrap_err();
+        assert!(
+            e.mutation_outcome_unknown() && !e.is_retryable(),
+            "{status}: {e:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn l2_retry_contract_read_recovery() {
+    use polyester::proto::orders::v1::BatchReplacePhase;
+    for (status, kind, body) in [
+        (0, "timeout", "timeout"),
+        (502, "text/plain", ""),
+        (503, "text/html", "<html>Unavailable</html>"),
+        (504, "application/json", r#"{"code":"deadline_exceeded"}"#),
+        (503, "application/json", r#"{"code":"unavailable"}"#),
+    ] {
+        for operation in ["trigger", "wait", "snapshot"] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let counter = calls.clone();
+            let http = MockHttpServer::spawn(move |_| {
+                if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+                    if status == 0 {
+                        hardening_support::HttpScript::NeverRespond {
+                            stall: Duration::from_secs(1),
+                        }
+                    } else {
+                        json_body(status, kind, body)
+                    }
+                } else if operation == "trigger" {
+                    connect_proto_ok(&polyester::proto::triggers::v1::GetTriggerResponse {
+                        trigger: Some(polyester::proto::triggers::v1::Trigger {
+                            trigger_id: 9,
+                            ..Default::default()
+                        })
+                        .into(),
+                        ..Default::default()
+                    })
+                } else {
+                    batch_status(BatchReplacePhase::Rejected, "POST_ONLY_CROSS")
+                }
+            })
+            .await;
+            let client = Arc::new(
+                Client::new(Config {
+                    api_url: http.base_url(),
+                    api_key_id: Some("ak_test".into()),
+                    api_private_key: Some(TEST_KEY.into()),
+                    hydrate_catalogs: false,
+                    timeout: if status == 0 {
+                        Duration::from_millis(50)
+                    } else {
+                        Duration::from_secs(10)
+                    },
+                    ..Default::default()
+                })
+                .unwrap(),
+            );
+            match operation {
+                "trigger" => {
+                    client
+                        .triggers
+                        .get(polyester::proto::triggers::v1::GetTriggerRequest {
+                            trigger_id: 9,
+                            ..Default::default()
+                        })
+                        .await
+                        .unwrap();
+                }
+                "wait" => {
+                    client
+                        .orders
+                        .wait_batch_replace("4242", None, Some(Duration::from_secs(2)))
+                        .await
+                        .unwrap();
+                }
+                _ => {
+                    let stream = SnapshotThenStream::new(SnapshotThenStreamConfig {
+                        client: RealtimeClient::new("ws://example.invalid", "", None, None),
+                        channel: "public:test".into(),
+                        decode: Arc::new(|_| Ok(1u8)),
+                        fetch_snapshot: Arc::new(move || {
+                            let client = client.clone();
+                            async move {client.orders.get_batch_replace_status("4242",None).await}.boxed()
+                        }),
+                        read_publication: Arc::new(|p| vec![p]),
+                        apply_snapshot: Arc::new(|_, _| {}),
+                        apply_live_publications: Arc::new(|_| {}),
+                        max_buffered: 8,
+                        on_reconnect: None,
+                        on_snapshot_refresh: None,
+                        on_error: None,
+                    });
+                    stream.request_refresh();
+                    wait_until(
+                        || stream.is_ready() || stream.is_disposed(),
+                        Duration::from_secs(2),
+                    )
+                    .await;
+                    assert!(stream.is_ready(), "{:?}", stream.err());
+                    stream.close();
+                }
+            }
+            assert_eq!(calls.load(Ordering::SeqCst), 2, "{status}/{operation}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn l2_retry_contract_client_timeout() {
+    let http = MockHttpServer::spawn(|_| hardening_support::HttpScript::NeverRespond {
+        stall: Duration::from_secs(1),
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        timeout: Duration::from_millis(50),
+        ..Default::default()
+    })
+    .unwrap();
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+    client
+        .catalogs
+        .hydrate_spot_config_json(
+            json!({"pairs":[{"symbol":"BTC-USDT","symbol_id":1,"base_quantity_scale":8}]}),
+        )
+        .unwrap();
+    let mut params = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+    params.quantity = Some(
+        Quantity::from_scaled(
+            1,
+            Some(8),
+            QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(1),
+        )
+        .unwrap(),
+    );
+    let e = client.orders.create(params).await.unwrap_err();
+    assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
+    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn l2_retry_contract_unavailable_message_not_proof() {
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            503,
+            "application/json",
+            r#"{"code":"unavailable","message":"UNAVAILABLE"}"#,
+        )
+    })
+    .await;
+    let e = api_key_client(&http).auth.me().await.unwrap_err();
+    assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
+}
+
+#[tokio::test]
+async fn l2_retry_contract_unknown_precedes_backoff() {
+    use base64::Engine;
+    let detail = polyester::proto::orders::v1::ErrorDetail {
+        code: polyester::proto::orders::v1::ErrorCode::OrderCreateOutcomeUnknown.into(),
+        rate_limit: Some(
+            polyester::proto::polyester::ratelimit::v1::RateLimitDetail {
+                retry_after_ms: Some(1250),
+                ..Default::default()
+            },
+        )
+        .into(),
+        ..Default::default()
+    };
+    let body=json!({"code":"unavailable","message":"read back","details":[{"type":"orders.v1.ErrorDetail","value":base64::engine::general_purpose::STANDARD.encode(detail.encode_to_vec())}]}).to_string();
+    let http = MockHttpServer::spawn(move |_| json_body(503, "application/json", &body)).await;
+    let e = api_key_client(&http).auth.me().await.unwrap_err();
+    assert!(e.mutation_outcome_unknown() && !e.is_retryable(), "{e:?}");
+}
+
+#[tokio::test]
+async fn l2_retry_contract_future_resource_code() {
+    let http = MockHttpServer::spawn(|_| {
+        json_body(
+            429,
+            "application/json",
+            r#"{"code":"resource_exhausted","message":"FUTURE_PERMANENT_CAPACITY"}"#,
+        )
+    })
+    .await;
+    let e = api_key_client(&http).auth.me().await.unwrap_err();
+    assert!(!e.is_retryable() && !e.mutation_outcome_unknown(), "{e:?}");
+    assert!(matches!(e,Error::Api{code,..} if code=="FUTURE_PERMANENT_CAPACITY"));
 }

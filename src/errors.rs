@@ -49,7 +49,8 @@ pub enum Error {
     ResponseContract { context: String, message: String },
     #[error("{message}")]
     RateLimit {
-        /// Structured service code, or None when none was supplied.
+        /// Structured service code, or None without a service detail.
+        /// An orders detail without a code uses `ERROR_CODE_UNSPECIFIED`.
         /// Known order codes use the `ERROR_CODE_` prefix.
         code: Option<String>,
         message: String,
@@ -60,6 +61,13 @@ pub enum Error {
     },
     #[error("{0}")]
     Server(String),
+    /// A structured orders-service refusal: the request was not admitted.
+    #[error("{message}")]
+    AdmissionUnavailable {
+        message: String,
+        code: String,
+        problem: Option<Box<crate::problem::HttpProblem>>,
+    },
     /// A REST gateway timeout without a recognized mutation outcome code.
     /// The write may have applied; reconcile before retrying. Safe reads may retry.
     #[error("{message}")]
@@ -299,7 +307,8 @@ impl Error {
     /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
     pub fn http_problem(&self) -> Option<crate::problem::HttpProblem> {
         match self {
-            Self::GatewayTimeout { problem, .. }
+            Self::AdmissionUnavailable { problem, .. }
+            | Self::GatewayTimeout { problem, .. }
             | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
@@ -314,7 +323,8 @@ impl Error {
 
     pub(crate) fn with_http_problem(mut self, value: crate::problem::HttpProblem) -> Self {
         match &mut self {
-            Self::GatewayTimeout { problem, .. }
+            Self::AdmissionUnavailable { problem, .. }
+            | Self::GatewayTimeout { problem, .. }
             | Self::ApiKeyRejected { problem, .. }
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
@@ -358,30 +368,18 @@ impl Error {
 
     /// Whether retrying may succeed after backoff.
     ///
-    /// True for transport, rate-limit and server errors, for
-    /// [`Self::TimestampSkew`], and for `AUTH_TEMPORARILY_UNAVAILABLE` and
-    /// `ERROR_CODE_ACCOUNT_REPAIRING`, where the request changed nothing and
-    /// the same request can be sent again.
-    ///
-    /// False for an order or trigger mutation whose outcome is unknown
-    /// ([`order_codes::OUTCOME_UNKNOWN`]): it may still apply, so a blind
-    /// retry can place a second order. Read the order or trigger back and
-    /// reuse the original idempotency key instead.
-    ///
-    /// A plain REST gateway 504 is [`Self::GatewayTimeout`], non-retryable
-    /// with outcome unknown. This classifier has no operation context: safe
-    /// reads may explicitly retry it; writes must read back first. A client
-    /// order ID enables reconciliation, not exact replay of a single create.
-    ///
-    /// This is not a guarantee that a mutation was not applied. A transport
-    /// or server error is retryable and its outcome is also unknown: when
-    /// [`Self::mutation_outcome_unknown`] is true, reconcile server state and
-    /// preserve the same idempotency key before retrying.
+    /// Unknown mutation outcomes always return false, including bare server
+    /// and transport failures. Read back before sending a mutation again;
+    /// safe reads may retry explicitly. A client order ID enables lookup,
+    /// not exact replay. Explicit admission refusals, timestamp skew and
+    /// account repairing may retry.
     pub fn is_retryable(&self) -> bool {
+        if self.mutation_outcome_unknown() {
+            return false;
+        }
         match self {
-            Self::Transport(_)
-            | Self::RateLimit { .. }
-            | Self::Server(_)
+            Self::RateLimit { .. }
+            | Self::AdmissionUnavailable { .. }
             | Self::TimestampSkew { .. } => true,
             Self::Api { code, .. } => {
                 code == auth_codes::TEMPORARILY_UNAVAILABLE
@@ -620,6 +618,29 @@ fn order_error_code_from_name(code: &str) -> String {
     }
 }
 
+fn is_service_code_message(code: &str) -> bool {
+    code.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
+}
+
+fn known_admission_refusal(code: &str) -> bool {
+    matches!(
+        code.trim_start_matches("ERROR_CODE_"),
+        "UNAVAILABLE"
+            | "FEE_SCHEDULE_UNAVAILABLE"
+            | "POLICY_UNAVAILABLE"
+            | "RATE_LIMIT_POLICY_UNAVAILABLE"
+            | "PAIR_BACKLOGGED"
+            | "SETTLEMENT_BACKLOGGED"
+            | "ORDER_MODIFY_IN_PROGRESS"
+            | "ORDER_PLACEMENT_PENDING"
+            | "TRIGGER_CONTROLS_BUSY"
+            | "TRIGGER_CONTROL_IN_PROGRESS"
+    )
+}
+
 fn rate_limit_error(
     message: String,
     detail: Option<RateLimitDetail>,
@@ -777,9 +798,10 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         OrderErrorCode::RateLimitExceeded
                             | OrderErrorCode::Overloaded
                             | OrderErrorCode::SystemRateLimited
+                            | OrderErrorCode::PriceLevelsExhausted
                     )
                 );
-            if is_rate_limit {
+            if is_rate_limit && !is_outcome_unknown_code(&code) {
                 let detail = order_detail
                     .rate_limit
                     .as_option()
@@ -793,7 +815,15 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             }
             // Backoff hints and unknown mutation outcomes take precedence.
             if err.code == ErrorCode::Unavailable && !code.ends_with("_OUTCOME_UNKNOWN") {
-                return Error::Server(fallback_message.clone());
+                return if known_admission_refusal(&code) {
+                    Error::AdmissionUnavailable {
+                        message: fallback_message.clone(),
+                        code,
+                        problem: None,
+                    }
+                } else {
+                    Error::Server(fallback_message.clone())
+                };
             }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
@@ -881,9 +911,28 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         .and_then(|d| d.get("code"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or(raw_message);
+    let normalized_code = order_error_code_from_name(named_code);
+    if has_marker(crate::transport::HTTP_PROBLEM_TYPE)
+        && err.code == ErrorCode::Unavailable
+        && known_admission_refusal(&normalized_code)
+    {
+        return Error::AdmissionUnavailable {
+            message: fallback_message,
+            code: normalized_code,
+            problem: None,
+        };
+    }
     if is_outcome_unknown_code(named_code)
         || (err.code == ErrorCode::ResourceExhausted
-            && named_code.trim_start_matches("ERROR_CODE_") == "ORDER_SEQUENCE_EXHAUSTED")
+            && (OrderErrorCode::from_proto_name(&normalized_code).is_some()
+                || is_service_code_message(named_code))
+            && !matches!(
+                normalized_code.as_str(),
+                "ERROR_CODE_OVERLOADED"
+                    | "ERROR_CODE_SYSTEM_RATE_LIMITED"
+                    | "ERROR_CODE_RATE_LIMIT_EXCEEDED"
+                    | "ERROR_CODE_PRICE_LEVELS_EXHAUSTED"
+            ))
     {
         return Error::Api {
             message: fallback_message,
@@ -909,7 +958,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         ErrorCode::Unimplemented => Error::NotImplemented { message },
         _ => Error::Api {
             message,
-            code: format!("{code:?}"),
+            code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) {
+                order_error_code_from_name(named_code)
+            } else {
+                format!("{code:?}")
+            },
             metadata: Vec::new(),
             violations: Vec::new(),
         },
@@ -1104,7 +1157,7 @@ mod tests {
     #[test]
     fn retry_classification_is_conservative_for_mutations() {
         let timeout = Error::transport("deadline exceeded");
-        assert!(timeout.is_retryable());
+        assert!(!timeout.is_retryable());
         assert!(timeout.mutation_outcome_unknown());
 
         let limited = Error::RateLimit {
@@ -1142,9 +1195,23 @@ mod tests {
         ] {
             let code = OrderErrorCode::from_proto_name(name).unwrap();
             let mapped = map_order(code, ErrorCode::Unavailable);
-            assert!(matches!(mapped, Error::Server(_)), "{code:?}: {mapped:?}");
+            assert!(
+                matches!(
+                    mapped,
+                    Error::Server(_) | Error::AdmissionUnavailable { .. }
+                ),
+                "{code:?}: {mapped:?}"
+            );
             assert!(!matches!(mapped, Error::Auth(_)));
-            assert!(mapped.is_retryable(), "{code:?}: {mapped:?}");
+            assert_eq!(
+                mapped.is_retryable(),
+                known_admission_refusal(name),
+                "{code:?}: {mapped:?}"
+            );
+            assert_eq!(
+                mapped.mutation_outcome_unknown(),
+                !known_admission_refusal(name)
+            );
         }
     }
 
@@ -1171,7 +1238,8 @@ mod tests {
             );
             assert!(matches!(mapped, Error::Server(_)), "{name}: {mapped:?}");
             assert!(!matches!(mapped, Error::Auth(_)));
-            assert!(mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(mapped.mutation_outcome_unknown());
         }
     }
 
@@ -1194,7 +1262,8 @@ mod tests {
             );
             assert!(matches!(mapped, Error::Server(_)), "{name}: {mapped:?}");
             assert!(!matches!(mapped, Error::Auth(_)));
-            assert!(mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(mapped.mutation_outcome_unknown());
         }
     }
 

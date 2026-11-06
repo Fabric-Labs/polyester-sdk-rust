@@ -908,6 +908,23 @@ can place a second order. Read the order or trigger back, and reuse the same ide
 send it again. `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING` are retryable and
 changed nothing, so `mutation_outcome_unknown()` is false for them.
 
+
+The retry flag is always false when the mutation outcome is unknown. This includes
+bare Connect `unavailable` and `deadline_exceeded`, gateway 502/503 bodies and client
+timeouts. Read back after an unknown outcome; retry reads explicitly. Automatic
+trigger reads, status waits and snapshot refresh use read context and can retry these
+failures within their existing budgets. Creates are never automatically resent.
+
+A recognized order-service `UNAVAILABLE`, `FEE_SCHEDULE_UNAVAILABLE`,
+`POLICY_UNAVAILABLE` or `RATE_LIMIT_POLICY_UNAVAILABLE` code means admission was
+refused: outcome known and retryable. An HTTP status without that code does not
+establish refusal. `RATE_LIMIT_EXCEEDED` and `PRICE_LEVELS_EXHAUSTED` likewise mean
+nothing was admitted; retry after any server delay. Permanent resource-exhausted
+codes require caller action even when Connect sends their code only as its message.
+
+Recognized temporary order admission refusals return `Error::AdmissionUnavailable`,
+including their canonical service code and REST problem when present.
+
 A plain REST gateway 504 returns `Error::GatewayTimeout`: `is_retryable()` is
 false and `mutation_outcome_unknown()` is true. The classifier has no operation
 context. Reads may retry a 504 explicitly; writes read back first. A client order
