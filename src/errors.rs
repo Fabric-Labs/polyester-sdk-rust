@@ -49,6 +49,9 @@ pub enum Error {
     ResponseContract { context: String, message: String },
     #[error("{message}")]
     RateLimit {
+        /// Structured service code, or None when none was supplied.
+        /// Known order codes use the `ERROR_CODE_` prefix.
+        code: Option<String>,
         message: String,
         retry_after: Option<f64>,
         /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached.
@@ -608,16 +611,27 @@ fn rate_limit_detail_from_proto_local(msg: &ProtoRateLimitDetail) -> RateLimitDe
     }
 }
 
+fn order_error_code_from_name(code: &str) -> String {
+    let prefixed = format!("ERROR_CODE_{code}");
+    if OrderErrorCode::from_proto_name(&prefixed).is_some() {
+        prefixed
+    } else {
+        code.to_owned()
+    }
+}
+
 fn rate_limit_error(
     message: String,
     detail: Option<RateLimitDetail>,
     header_retry: Option<f64>,
+    code: Option<String>,
 ) -> Error {
     let retry_after = detail
         .as_ref()
         .and_then(RateLimitDetail::retry_after_seconds)
         .or(header_retry);
     Error::RateLimit {
+        code,
         message,
         retry_after,
         detail: detail.map(Box::new),
@@ -748,9 +762,14 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 fallback_message.clone(),
                 Some(rate_limit_detail_from_proto_local(&rl)),
                 header_retry,
+                None,
             );
         }
         if let Some(order_detail) = decode_order_error_detail(detail) {
+            let code = known_or_unknown_code(
+                order_detail.code.as_known().map(|c| c.proto_name()),
+                order_detail.code.to_i32(),
+            );
             let is_rate_limit = order_detail.rate_limit.is_set()
                 || matches!(
                     order_detail.code.as_known(),
@@ -765,12 +784,13 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     .rate_limit
                     .as_option()
                     .map(rate_limit_detail_from_proto_local);
-                return rate_limit_error(fallback_message.clone(), detail, header_retry);
+                return rate_limit_error(
+                    fallback_message.clone(),
+                    detail,
+                    header_retry,
+                    Some(code),
+                );
             }
-            let code = known_or_unknown_code(
-                order_detail.code.as_known().map(|c| c.proto_name()),
-                order_detail.code.to_i32(),
-            );
             // Backoff hints and unknown mutation outcomes take precedence.
             if err.code == ErrorCode::Unavailable && !code.ends_with("_OUTCOME_UNKNOWN") {
                 return Error::Server(fallback_message.clone());
@@ -813,7 +833,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 withdraw_detail.code.as_known(),
                 Some(WithdrawErrorCode::RateLimitExceeded)
             ) {
-                return rate_limit_error(fallback_message.clone(), None, header_retry);
+                return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
             if err.code == ErrorCode::Unavailable {
                 return Error::Server(fallback_message.clone());
@@ -837,7 +857,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 transfer_detail.code.as_known(),
                 Some(TransferErrorCode::RateLimitExceeded)
             ) {
-                return rate_limit_error(fallback_message.clone(), None, header_retry);
+                return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
             if err.code == ErrorCode::Unavailable {
                 return Error::Server(fallback_message.clone());
@@ -867,7 +887,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     {
         return Error::Api {
             message: fallback_message,
-            code: named_code.to_owned(),
+            code: order_error_code_from_name(named_code),
             metadata: Vec::new(),
             violations: Vec::new(),
         };
@@ -879,7 +899,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     }
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
-        ErrorCode::ResourceExhausted => rate_limit_error(message, None, header_retry),
+        ErrorCode::ResourceExhausted => {
+            let code = order_error_code_from_name(named_code);
+            let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
+            rate_limit_error(message, None, header_retry, code)
+        }
         ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented { message },
@@ -994,10 +1018,12 @@ mod tests {
                 message,
                 retry_after,
                 detail,
+                code,
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
                 assert_eq!(retry_after, Some(2.5));
                 assert!(detail.is_none());
+                assert!(code.is_none());
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -1082,6 +1108,7 @@ mod tests {
         assert!(timeout.mutation_outcome_unknown());
 
         let limited = Error::RateLimit {
+            code: None,
             message: "slow down".into(),
             retry_after: Some(1.0),
             detail: None,

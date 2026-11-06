@@ -3,8 +3,8 @@
 ## Unreleased
 
 - **Breaking:** A plain REST gateway 504 is now non-retryable with mutation outcome unknown. Reads may retry a 504 explicitly; writes read back first. A client order ID enables reconciliation, not exact replay of a single create. Automatic read retries remain operation-specific; creates are never automatically resent.
-- **Breaking:** `OVERLOADED` and `SYSTEM_RATE_LIMITED` now classify as retryable admission refusals with no unknown mutation outcome on Connect and REST. `ORDER_SEQUENCE_EXHAUSTED` remains a permanent refusal, including REST 429 and Connect responses without typed details. Supplied retry delays are preserved.
-- **Breaking:** A Connect message naming an `*_OUTCOME_UNKNOWN` code now classifies as non-retryable with outcome unknown, including codes introduced by a newer server.
+- **Breaking:** `OVERLOADED` and `SYSTEM_RATE_LIMITED` now return `Error::RateLimit` instead of API/server errors on Connect and REST. They are retryable admission refusals with no unknown mutation outcome. The new `code: Option<String>` field retains the service code; known order codes use the `ERROR_CODE_` prefix. Update constructions and exhaustive field patterns for the new variant field. `ORDER_SEQUENCE_EXHAUSTED` remains a permanent refusal, including REST 429 and Connect responses without typed details. Supplied retry delays are preserved.
+- **Breaking:** A Connect message naming an `*_OUTCOME_UNKNOWN` code now classifies as non-retryable with outcome unknown, including codes introduced by a newer server. Known order names are normalized to `ERROR_CODE_…`; future names remain as sent.
 - **Breaking:** Unknown REST `*_OUTCOME_UNKNOWN` codes now remain API errors with problem metadata and are non-retryable with outcome unknown. Bare gateway timeouts use the new `Error::GatewayTimeout` variant; update exhaustive matches.
 
 ## 0.8.1

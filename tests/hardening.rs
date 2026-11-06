@@ -6924,6 +6924,15 @@ async fn l2_admission_error_classification() {
                 .me()
                 .await
                 .expect_err("refused admission");
+            let actual_code = match &err {
+                Error::Api { code, .. } => Some(code.as_str()),
+                Error::RateLimit { code, .. } => code.as_deref(),
+                _ => None,
+            };
+            let expected_code = format!("ERROR_CODE_{name}");
+            if actual_code != Some(expected_code.as_str()) {
+                failures.push(format!("{name}/{shape} code={actual_code:?}: {err:?}"));
+            }
             if err.is_retryable() != retryable || err.mutation_outcome_unknown() {
                 failures.push(format!("{name}/{shape}: {err:?}"));
             }
@@ -6935,6 +6944,8 @@ async fn l2_admission_error_classification() {
 #[tokio::test]
 async fn l2_future_outcome_code_classification() {
     for name in [
+        "ORDER_CREATE_OUTCOME_UNKNOWN",
+        "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN",
         "TWAP_CREATE_OUTCOME_UNKNOWN",
         "ERROR_CODE_TWAP_CREATE_OUTCOME_UNKNOWN",
     ] {
@@ -6949,6 +6960,15 @@ async fn l2_future_outcome_code_classification() {
                     .me()
                     .await
                     .expect_err("unknown outcome");
+                let expected = if name == "ORDER_CREATE_OUTCOME_UNKNOWN" {
+                    "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"
+                } else {
+                    name
+                };
+                assert!(
+                    matches!(&err, Error::Api {code, ..} if code == expected),
+                    "{name}/{status}/{connect}: {err:?}"
+                );
                 assert!(!err.is_retryable(), "{name}/{status}/{connect}: {err:?}");
                 assert!(err.mutation_outcome_unknown(), "{err:?}");
                 if !connect {
