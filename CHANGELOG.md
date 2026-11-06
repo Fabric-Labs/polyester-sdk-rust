@@ -22,6 +22,10 @@ Package version: `0.8.0`. Git tag: `v0.8.0`. Released 2026-11-06. Built on publi
 - Heatmap history now offers `get_with_options` for explicit time bounds and
   opaque continuation tokens. A continuation omits a new default time window.
 - **Breaking:** Trigger creation now rejects options that do not apply to the selected strategy or child execution before sending. Migration: remove incompatible options, or select the trigger type and execution that support them (use `trailing_stop` for trailing distances and activation price).
+- Order book snapshots preserve sequence zero as a valid value, independently of availability.
+- Managed order books finish their update stream after terminal failure, keeping the error and callback.
+- Conflicting order book market name and ID selectors are rejected before connecting.
+- Realtime subscriptions preserve publications sent alongside or before the subscribe reply.
 
 ## 0.7.2
 
