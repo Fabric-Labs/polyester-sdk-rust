@@ -375,8 +375,8 @@ where
                 continue;
             }
             if attempts >= MAX_REQUEST_REFRESH_ATTEMPTS {
-                if last_error.is_some() {
-                    self.stop_after_recorded_error();
+                if let Some(err) = last_error {
+                    self.stop_after_recorded_error(err);
                 } else {
                     self.fail_closed(Error::realtime(
                         "snapshot refresh did not converge after repeated publication gaps"
@@ -497,14 +497,13 @@ where
         let _ = self.stop_tx.send(true);
     }
 
-    fn stop_after_recorded_error(&self) {
+    fn stop_after_recorded_error(&self, err: Error) {
         self.ready.store(false, Ordering::SeqCst);
         self.disposed.store(true, Ordering::SeqCst);
         self.generation.fetch_add(1, Ordering::SeqCst);
         self.clear_publications();
-        if let Some(err) = lock_unpoisoned(&self.last_error).clone() {
-            self.notify_terminal_error(err);
-        }
+        *lock_unpoisoned(&self.last_error) = Some(err.clone());
+        self.notify_terminal_error(err);
         let _ = self.stop_tx.send(true);
     }
 
@@ -581,11 +580,11 @@ where
                 if refresh.is_err() {
                     refresh = this.refresh_snapshot().await;
                 }
-                if refresh.is_err() {
+                if let Err(err) = refresh {
                     // refresh_snapshot already preserved and reported the
                     // underlying error. Stop without invoking the callback a
                     // second time for the same terminal attempt.
-                    self.stop_after_recorded_error();
+                    self.stop_after_recorded_error(err);
                     self.ready.store(false, Ordering::SeqCst);
                     sub.close();
                     break;

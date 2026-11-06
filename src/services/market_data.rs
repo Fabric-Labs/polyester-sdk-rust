@@ -822,7 +822,9 @@ impl OrderbookService {
                 "symbol_id is required for orderbook subscriptions ({symbol:?})"
             )));
         };
-        if self.ctx.catalogs.symbol_id_for_symbol(&symbol) != Some(symbol_id) {
+        if let Some(catalog_id) = self.ctx.catalogs.symbol_id_for_symbol(&symbol)
+            && catalog_id != symbol_id
+        {
             return Err(Error::validation(format!(
                 "orderbook symbol {symbol:?} does not match symbol_id {symbol_id}"
             )));

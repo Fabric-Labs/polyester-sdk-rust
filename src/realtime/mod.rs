@@ -414,7 +414,10 @@ impl Client {
                     Ok(()) => break,
                     Err(_) if *stop_rx.borrow() => break,
                     Err(err) if matches!(err, Error::QueueOverflow(_)) => {
-                        record_subscription_error(&error_task, err);
+                        record_subscription_error(&error_task, err.clone());
+                        if let Some(ready) = ready.take() {
+                            let _ = ready.send(Err(err));
+                        }
                         break;
                     }
                     Err(err) => {
