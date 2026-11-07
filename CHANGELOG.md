@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
+
+Package version: `0.9.0`. Git tag: `v0.9.0`. Released 2026-11-07. Built on public contract `748066a`.
+
+**Known issue:** a managed order book subscribed at a depth other than 1, 20, 50,
+200 or 500 can stop updating with no error. Use one of those depths until the
+next release.
 
 - **Breaking:** A new order stream subscription the server never confirms now ends after 30 seconds with `Error::RealtimeSetupTimeout`, instead of waiting forever while heartbeats keep the connection alive. A resubscribe on a confirmed stream that gets no answer reports the same error as an event and subscribes again with backoff.
 - **Breaking:** A realtime subscription the server ends no longer stays open and silent. The receiver delivers what is queued and finishes, and `err()`, `recv_result()` and the error callback report the new `Error::SubscriptionEnded` with the channel, the server's code and text, and `reason` (`SubscriptionEndReason`). Update exhaustive matches. Migration: handle the finished receiver; subscribe again if you still need the stream. Server unsubscribe codes from 2500 ask for a new subscribe and reconnect as before.
