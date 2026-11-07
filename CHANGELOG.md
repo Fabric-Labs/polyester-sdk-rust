@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.12.0
+
+Package version: `0.12.0`. Git tag: `v0.12.0`. Released 2026-11-07. Built on public contract `748066a`.
 
 - **Breaking:** `Order::quote_used` and `Order::quote_unspent` return the exact amount at high base quantity scales whenever it fits a `Decimal`, instead of `None`. They rescaled each amount to 9 plus the base scale in a 128-bit integer before combining them, which overflowed: at base scale 30, a quote budget of 1 at quote scale 6 became 10^39, and at base scale 36 a fee of 0.000001 did too. Trailing zeros are now dropped before rescaling, so only an amount that needs more digits than a `Decimal` holds is `None`, as documented. `Order::cum_quote` is unchanged. Migration: none, unless you treated `None` at those scales as an amount that can't be shown.
 - `orders.batch_cancel` and `orders.batch_replace` accept up to 50 items, the limit the public contract sets, instead of 20; 51 or more still return a validation error before sending. `orders.batch_create` keeps its limit of 20.
