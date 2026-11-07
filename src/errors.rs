@@ -12,7 +12,9 @@ use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
 };
-use crate::proto::ledger::read::v1::ErrorDetail as LedgerErrorDetail;
+use crate::proto::ledger::read::v1::{
+    ErrorCode as LedgerErrorCode, ErrorDetail as LedgerErrorDetail,
+};
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::proto::transfer::v1::{
@@ -355,6 +357,53 @@ fn is_outcome_unknown_code(code: &str) -> bool {
     code.ends_with("_OUTCOME_UNKNOWN")
 }
 
+/// Contract REST codes that no generated error enum names.
+const REST_ONLY_CODES: [&str; 21] = [
+    "API_KEY_ACTION_DENY",
+    "API_KEY_POLICY_NOT_FOUND",
+    "INVALID_BEFORE_TS_NS",
+    "INVALID_DEPTH",
+    "INVALID_END_TIME",
+    "INVALID_LIMIT",
+    "INVALID_OFFSET",
+    "INVALID_ORDER_STATUS",
+    "INVALID_PAGE_TOKEN",
+    "INVALID_START_TIME",
+    "INVALID_SYMBOL",
+    "INVALID_TRIGGER_ID",
+    "INVALID_TRIGGER_STATUS",
+    "ORDER_ID_REQUIRED",
+    "REQUEST_TOO_LARGE",
+    "ROLE_ACTION_DENY",
+    "ROLE_SPOT_TRADE_DENY",
+    "SERVER_ERROR",
+    "SUBACCOUNT_POLICY_DENY",
+    "TRAILING_STOP_ORDER_TYPE_UNSUPPORTED",
+    "TRIGGER_ID_REQUIRED",
+];
+
+/// Whether the contract defines this REST problem `code`. A mutation's unknown
+/// outcome is recognised by its suffix, including one added to the contract
+/// after this SDK was generated.
+pub(crate) fn is_recognised_rest_code(code: &str) -> bool {
+    if code.is_empty() {
+        return false;
+    }
+    if is_outcome_unknown_code(code) || REST_ONLY_CODES.contains(&code) {
+        return true;
+    }
+    let prefixed = format!("ERROR_CODE_{code}");
+    let auth = format!("AUTH_{code}");
+    [code, prefixed.as_str()].iter().any(|name| {
+        OrderErrorCode::from_proto_name(name).is_some()
+            || WithdrawErrorCode::from_proto_name(name).is_some()
+            || TransferErrorCode::from_proto_name(name).is_some()
+            || LedgerErrorCode::from_proto_name(name).is_some()
+    }) || [code, auth.as_str()]
+        .iter()
+        .any(|name| AuthErrorCode::from_proto_name(name).is_some())
+}
+
 impl Error {
     /// Original REST metadata, when a REST problem supplied this error.
     /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
@@ -444,9 +493,10 @@ impl Error {
 
     /// Whether this error can occur after the server accepted a mutation.
     ///
-    /// True for transport, server and response-contract errors, and for an
-    /// order create, cancel or modify or a trigger create or change that was
-    /// sent but not confirmed in time ([`order_codes::OUTCOME_UNKNOWN`]): it
+    /// True for transport, server and response-contract errors, for any HTTP
+    /// error with no recognised code except a 401 or 403, for a bare 404, and
+    /// for an order create, cancel or modify or a trigger create or change that
+    /// was sent but not confirmed in time ([`order_codes::OUTCOME_UNKNOWN`]): it
     /// may still apply. Those outcome-unknown codes are not retryable.
     ///
     /// Callers must treat these failures as ambiguous: read the order or
@@ -457,7 +507,8 @@ impl Error {
             Self::Transport(_)
             | Self::ResponseContract { .. }
             | Self::Server(_)
-            | Self::GatewayTimeout { .. } => true,
+            | Self::GatewayTimeout { .. }
+            | Self::RouteNotFound { .. } => true,
             Self::Api { code, .. } => is_outcome_unknown_code(code),
             _ => false,
         }
@@ -678,7 +729,7 @@ fn order_error_code_from_name(code: &str) -> String {
     }
 }
 
-fn is_service_code_message(code: &str) -> bool {
+pub(crate) fn is_service_code_message(code: &str) -> bool {
     code.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
         && code
             .bytes()
@@ -804,8 +855,8 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return gateway_rejection_error(status, raw_message);
     }
     if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
-        // A bare 404 means the route is missing; a bare 501 that the server
-        // does not implement the call.
+        // A bare 404 means the route is missing; a contract code at 501 that
+        // the server does not implement the call.
         return if status == 404 {
             Error::RouteNotFound {
                 procedure: String::new(),
@@ -1090,7 +1141,13 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
             rate_limit_error(message, None, header_retry, code)
         }
-        ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
+        // The contract never uses unknown, data_loss or canceled, and none of
+        // them says a request was refused.
+        ErrorCode::Unavailable
+        | ErrorCode::Internal
+        | ErrorCode::Unknown
+        | ErrorCode::DataLoss
+        | ErrorCode::Canceled => Error::Server(message),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented { message },
         _ => Error::Api {
