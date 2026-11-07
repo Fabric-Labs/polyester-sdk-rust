@@ -849,6 +849,10 @@ impl OrderbookService {
             asks: BookSide::new(),
             book_seq: 0,
             available: false,
+            last_view_unavailable: false,
+            recheck_pending: false,
+            recheck_delay: UNAVAILABLE_SNAPSHOT_INITIAL_DELAY,
+            recheck_generation: 0,
         }));
         let closed = Arc::new(AtomicBool::new(false));
         let last_error: Arc<Mutex<Option<crate::Error>>> = Arc::new(Mutex::new(None));
@@ -876,7 +880,8 @@ impl OrderbookService {
                     return;
                 }
                 let (bids, asks, book_seq, available) = {
-                    let s = crate::realtime::lock_unpoisoned(&state);
+                    let mut s = crate::realtime::lock_unpoisoned(&state);
+                    s.last_view_unavailable = !s.available;
                     (s.bids.clone(), s.asks.clone(), s.book_seq, s.available)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
@@ -951,6 +956,46 @@ impl OrderbookService {
             }) as Arc<dyn Fn(OrderBookDeltaUpdate) -> bool + Send + Sync>
         };
 
+        // An unavailable book's levels are unknown, not empty: ask again later,
+        // with a paced delay, until it is available or the stream stops.
+        let recheck_unavailable_snapshot = {
+            let state = state.clone();
+            let stream_slot = stream_slot.clone();
+            Arc::new(move |available: bool| {
+                let mut s = crate::realtime::lock_unpoisoned(&state);
+                if available {
+                    // A pending request for the older unavailable snapshot is obsolete.
+                    s.recheck_delay = UNAVAILABLE_SNAPSHOT_INITIAL_DELAY;
+                    s.recheck_pending = false;
+                    s.recheck_generation = s.recheck_generation.wrapping_add(1);
+                    return;
+                }
+                if s.recheck_pending {
+                    return;
+                }
+                let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot)
+                    .as_ref()
+                    .cloned()
+                else {
+                    return;
+                };
+                s.recheck_pending = true;
+                let delay = s.recheck_delay;
+                s.recheck_delay = delay.saturating_mul(2).min(UNAVAILABLE_SNAPSHOT_MAX_DELAY);
+                let generation = s.recheck_generation;
+                drop(s);
+                let state = state.clone();
+                stream.request_refresh_after(delay, move || {
+                    let mut s = crate::realtime::lock_unpoisoned(&state);
+                    if s.recheck_generation != generation {
+                        return false;
+                    }
+                    s.recheck_pending = false;
+                    true
+                });
+            }) as Arc<dyn Fn(bool) + Send + Sync>
+        };
+
         let svc = self.clone();
         let fetch_symbol = symbol.clone();
         let stream = SnapshotThenStream::new(SnapshotThenStreamConfig {
@@ -969,6 +1014,7 @@ impl OrderbookService {
                 let emit = emit.clone();
                 let stream_slot = stream_slot.clone();
                 let last_error = last_error.clone();
+                let recheck_unavailable_snapshot = recheck_unavailable_snapshot.clone();
                 Arc::new(
                     move |snapshot: OrderbookData, buffered: Vec<OrderBookDeltaUpdate>| {
                         let parsed_seq = match snapshot.book_seq.parse::<u64>() {
@@ -987,13 +1033,15 @@ impl OrderbookService {
                                 return;
                             }
                         };
-                        {
+                        // A repeated unavailable answer adds no view.
+                        let repeated = {
                             let mut s = crate::realtime::lock_unpoisoned(&state);
                             s.bids = levels_from_orderbook_side(&snapshot.bids);
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
                             s.available = snapshot.available;
-                        }
+                            !snapshot.available && s.last_view_unavailable && buffered.is_empty()
+                        };
                         let mut applied_all = true;
                         for delta in buffered {
                             if !handle_delta(delta) {
@@ -1001,9 +1049,10 @@ impl OrderbookService {
                                 break;
                             }
                         }
-                        if applied_all {
+                        if applied_all && !repeated {
                             emit();
                         }
+                        recheck_unavailable_snapshot(snapshot.available);
                     },
                 )
             },
@@ -1047,7 +1096,20 @@ struct BookState {
     book_seq: u64,
     /// Whether the book is current; see [`OrderbookData::available`].
     available: bool,
+    /// Whether the last view emitted reported the book unavailable.
+    last_view_unavailable: bool,
+    /// A request for an unavailable snapshot is scheduled.
+    recheck_pending: bool,
+    /// Delay before the next request for an unavailable snapshot.
+    recheck_delay: std::time::Duration,
+    /// Invalidates a scheduled request once a newer snapshot is available.
+    recheck_generation: u64,
 }
+
+/// A snapshot that came back unavailable is requested again after these delays:
+/// the first delay doubles up to the limit, for as long as the stream runs.
+const UNAVAILABLE_SNAPSHOT_INITIAL_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+const UNAVAILABLE_SNAPSHOT_MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(8);
 
 #[cfg(test)]
 mod tests {

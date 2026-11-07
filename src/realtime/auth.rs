@@ -84,6 +84,33 @@ async fn fetch_rt_token(
     timeout: Duration,
     allow_insecure: bool,
 ) -> Result<String> {
+    let body = signed_get(
+        creds,
+        url,
+        label,
+        MAX_TOKEN_RESPONSE_BYTES,
+        timeout,
+        allow_insecure,
+    )
+    .await?;
+    let payload: TokenResponse = serde_json::from_slice(&body)
+        .map_err(|e| Error::realtime(format!("{label}: invalid token response: {e}")))?;
+    if payload.token.is_empty() {
+        return Err(Error::realtime(format!("{label}: response missing token")));
+    }
+    Ok(payload.token)
+}
+
+/// One API-key-signed GET, returning a successful body. 401 and 403 become the
+/// refusal errors [`is_refusal`] recognises.
+pub(super) async fn signed_get(
+    creds: &Credentials,
+    url: &str,
+    label: &str,
+    max_bytes: usize,
+    timeout: Duration,
+    allow_insecure: bool,
+) -> Result<bytes::Bytes> {
     let timeout = if timeout.is_zero() {
         DEFAULT_TOKEN_REQUEST_TIMEOUT
     } else {
@@ -117,12 +144,12 @@ async fn fetch_rt_token(
             .await
             .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
         let status = resp.status();
-        if content_length_exceeds_limit(resp.headers(), MAX_TOKEN_RESPONSE_BYTES) {
+        if content_length_exceeds_limit(resp.headers(), max_bytes) {
             return Err(Error::realtime(format!(
-                "{label}: response exceeds {MAX_TOKEN_RESPONSE_BYTES} bytes"
+                "{label}: response exceeds {max_bytes} bytes"
             )));
         }
-        let body = Limited::new(resp.into_body(), MAX_TOKEN_RESPONSE_BYTES)
+        let body = Limited::new(resp.into_body(), max_bytes)
             .collect()
             .await
             .map_err(|e| Error::realtime(format!("{label}: read bounded body: {e}")))?
@@ -169,12 +196,15 @@ async fn fetch_rt_token(
             truncate_body(&body)
         )));
     }
-    let payload: TokenResponse = serde_json::from_slice(&body)
-        .map_err(|e| Error::realtime(format!("{label}: invalid token response: {e}")))?;
-    if payload.token.is_empty() {
-        return Err(Error::realtime(format!("{label}: response missing token")));
-    }
-    Ok(payload.token)
+    Ok(body)
+}
+
+/// Whether the server refused this API key, as opposed to failing to answer.
+pub(super) fn is_refusal(err: &Error) -> bool {
+    matches!(
+        err,
+        Error::Auth(_) | Error::ApiKeyRejected { .. } | Error::PermissionDenied { .. }
+    )
 }
 
 /// The API gateway's rejection code from a `{"code": ...}` JSON body.

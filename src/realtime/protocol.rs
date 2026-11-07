@@ -15,9 +15,17 @@ const WIRE_FIXED32: u8 = 5;
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Incoming {
-    Reply { id: u32, error: Option<ProtoError> },
+    Reply {
+        id: u32,
+        error: Option<ProtoError>,
+    },
     Publication(Vec<u8>),
     Ping,
+    Unsubscribe {
+        channel: String,
+        code: u32,
+        reason: String,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -132,14 +140,45 @@ fn decode_error(bytes: &[u8]) -> Result<ProtoError> {
 
 fn decode_push(bytes: &[u8], out: &mut Vec<Incoming>) -> Result<()> {
     let mut cursor = Cursor::new(bytes);
+    let mut channel = String::new();
+    let mut unsubscribe = None;
     while !cursor.is_empty() {
         let (field, wire) = cursor.key()?;
         match (field, wire) {
+            (2, WIRE_LEN) => channel = String::from_utf8_lossy(cursor.len_bytes()?).into_owned(),
             (4, WIRE_LEN) => decode_publication(cursor.len_bytes()?, out)?,
+            (7, WIRE_LEN) => unsubscribe = Some(decode_unsubscribe(cursor.len_bytes()?)?),
             _ => cursor.skip(wire)?,
         }
     }
+    if let Some((code, reason)) = unsubscribe {
+        out.push(Incoming::Unsubscribe {
+            channel,
+            code,
+            reason,
+        });
+    }
     Ok(())
+}
+
+/// `Unsubscribe { code = 2, reason = 3 }`.
+fn decode_unsubscribe(bytes: &[u8]) -> Result<(u32, String)> {
+    let mut cursor = Cursor::new(bytes);
+    let mut code = 0;
+    let mut reason = String::new();
+    while !cursor.is_empty() {
+        let (field, wire) = cursor.key()?;
+        match (field, wire) {
+            (2, WIRE_VARINT) => {
+                code = u32::try_from(cursor.varint()?).map_err(|_| {
+                    Error::realtime("centrifugo unsubscribe code exceeds u32".to_owned())
+                })?;
+            }
+            (3, WIRE_LEN) => reason = String::from_utf8_lossy(cursor.len_bytes()?).into_owned(),
+            _ => cursor.skip(wire)?,
+        }
+    }
+    Ok((code, reason))
 }
 
 fn decode_publication(bytes: &[u8], out: &mut Vec<Incoming>) -> Result<()> {

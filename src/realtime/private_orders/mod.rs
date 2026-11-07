@@ -42,6 +42,9 @@ const BACKOFF_MAX: Duration = Duration::from_secs(10);
 const STABLE_CONNECTION: Duration = Duration::from_secs(10);
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long the server may take to confirm a subscribe. Heartbeats keep the
+/// connection alive without answering it, so the heartbeat timeout cannot bound this.
+const SUBSCRIBE_ACK_TIMEOUT: Duration = Duration::from_secs(30);
 /// A malformed frame (4400) and a rejected connect token (4403) recur on every reconnect.
 const TERMINAL_CLOSE_CODES: [u16; 2] = [4400, 4403];
 const HEARTBEAT_CLOSE_CODE: u16 = 4000;
@@ -340,6 +343,10 @@ struct Subscription {
     /// Subscribe attempts since the subscription last delivered data; drives retry backoff.
     retries: u32,
     retry_at: Option<Instant>,
+    /// The server has confirmed this subscription at least once.
+    confirmed: bool,
+    /// When to give up on the current subscribe request.
+    ack_due: Option<(Instant, String)>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -508,6 +515,11 @@ impl Actor {
         self.subs
             .values()
             .filter_map(|s| s.retry_at)
+            .chain(
+                self.subs
+                    .values()
+                    .filter_map(|s| s.ack_due.as_ref().map(|(at, _)| *at)),
+            )
             .chain(self.reconnect_at)
             .chain(self.heartbeat_at)
             .min()
@@ -574,6 +586,8 @@ impl Actor {
                 ready: false,
                 retries: 0,
                 retry_at: None,
+                confirmed: false,
+                ack_due: None,
             },
         );
         if self.conn.is_some() {
@@ -789,8 +803,11 @@ impl Actor {
                 }
                 let cursor = self
                     .subs
-                    .get(&pending.account)
-                    .map(|s| s.cursor.clone())
+                    .get_mut(&pending.account)
+                    .map(|s| {
+                        s.ack_due = Some((Instant::now() + SUBSCRIBE_ACK_TIMEOUT, request.clone()));
+                        s.cursor.clone()
+                    })
                     .unwrap_or_default();
                 self.send(client_message::Op::from(Subscribe {
                     id: request,
@@ -801,6 +818,32 @@ impl Actor {
                     ..Default::default()
                 }));
             }
+        }
+    }
+
+    /// Handles a subscribe the server never answered: a new subscription ends,
+    /// a confirmed one reports it and subscribes again. A late answer is
+    /// unsubscribed, since its request is gone.
+    fn expire_subscribe(&mut self, account: u64, request: &str) {
+        if !self.pending.contains_key(request) {
+            return;
+        }
+        let Some(s) = self.subs.get(&account) else {
+            return;
+        };
+        let err = Error::RealtimeSetupTimeout {
+            channel: s.channel.clone(),
+            deadline: SUBSCRIBE_ACK_TIMEOUT,
+        };
+        let (confirmed, unsubscribed) = (s.confirmed, s.sub.is_empty());
+        if !confirmed {
+            self.terminate(account, err);
+            return;
+        }
+        self.pending.remove(request);
+        self.report(account, &err);
+        if unsubscribed {
+            self.retry_subscribe(account);
         }
     }
 
@@ -955,6 +998,8 @@ impl Actor {
                 s.sub = msg.sub.clone();
                 s.seq = 0;
                 s.ready = false;
+                s.confirmed = true;
+                s.ack_due = None;
                 let connected = s.state != State::Connected;
                 s.state = State::Connected;
                 // A new subscription reports Unavailable itself if its view is still behind.
@@ -1209,6 +1254,20 @@ impl Actor {
                 self.open();
             }
         }
+        let expired: Vec<(u64, String)> = self
+            .subs
+            .iter_mut()
+            .filter_map(|(account, s)| {
+                if s.ack_due.as_ref().is_some_and(|(at, _)| *at <= now) {
+                    s.ack_due.take().map(|(_, request)| (*account, request))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for (account, request) in expired {
+            self.expire_subscribe(account, &request);
+        }
         let due: Vec<u64> = self
             .subs
             .iter()
@@ -1242,6 +1301,7 @@ impl Actor {
         self.unsubscribing.clear();
         for s in self.subs.values_mut() {
             s.retry_at = None;
+            s.ack_due = None;
             s.sub.clear();
             s.seq = 0;
             s.ready = false;

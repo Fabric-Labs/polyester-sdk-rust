@@ -1256,7 +1256,9 @@ higher `version`; equal versions are identical. Wait for `Ready` before
 relying on the stream: to combine it with an order read, read first, then
 subscribe, wait for `Ready`, and merge both by `version`. The stream reconnects with
 backoff, resumes from its last applied position, and takes a fresh snapshot
-when it cannot resume. Several `orders.subscribe` calls for one account share
+when it cannot resume. If the server does not confirm a subscribe within 30 s, a
+new subscription ends with `Error::RealtimeSetupTimeout`; a confirmed one reports it
+as `Error(error)` and subscribes again with backoff. Several `orders.subscribe` calls for one account share
 one server subscription.
 
 ```rust,no_run
@@ -1310,6 +1312,38 @@ base quantity scale, so `Quantity::scale()` can return `None`. A bot must
 resolve the scale from the hydrated catalog using `Quantity::symbol_id()` (or
 `Quantity::symbol()`), then pass that catalog scale to `Quantity::format`.
 Never trust, guess, or invent a stream quantity scale.
+
+
+### Subscriptions the server ends
+
+When the server ends a realtime subscription, the receiver delivers what is
+queued and finishes, and `err()`, `recv_result()` and the error callback report
+`Error::SubscriptionEnded` with the channel, the server's code and text, and
+`reason`. Managed order books and market overviews finish `updates()` and report
+the same error.
+
+The exception is a sub-account's balances, transfers, trades, triggers or
+lifecycle channel: the server can end one of those after access was granted
+again, so the SDK reads `ListSubaccounts` and, while the sub-account is listed
+with a role, subscribes again with a fresh token. `take_resubscribed()` reports
+the gap. It stops, with the reason, when a `removed` update for that sub-account
+arrived on this client, when the list no longer has it, when the list or the
+token is refused (`cause` holds the refusal), or after 6 attempts that did not
+stay up for a minute. Requests are paced across the client, so many subscriptions
+ending together share one list read per second and at most five attempts per
+second. An API key bound to a sub-account sees that sub-account in the list; a
+root key cannot subscribe to a sub-account's channels.
+
+Setting up a subscription has one deadline, 30 seconds or twice the configured
+HTTP timeout if longer, covering the connection, both tokens and both
+confirmations. A server that keeps the connection alive without confirming fails
+with `Error::RealtimeSetupTimeout`.
+
+A managed order book requests an unavailable snapshot again by itself, after 1 s
+doubling to 8 s, until the book is available or the subscription stops; repeated
+unavailable answers add no view. A market whose book stays unavailable keeps being
+requested once every 8 s, so a bot recovers by itself when the book comes back;
+close the subscription to stop.
 
 ## Development
 

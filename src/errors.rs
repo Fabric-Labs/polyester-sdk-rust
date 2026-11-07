@@ -4,6 +4,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 use buffa::{Enumeration, Message};
 use connectrpc::{ConnectError, ErrorCode, ErrorDetail};
+use std::time::Duration;
 use thiserror::Error;
 
 use crate::models::{OrderFieldViolation, RateLimitDetail};
@@ -141,6 +142,57 @@ pub enum Error {
     /// silently dropping updates.
     #[error("{0}")]
     QueueOverflow(String),
+    /// Realtime setup did not complete within its deadline: the server kept the
+    /// connection alive, or stayed silent, without confirming the subscription.
+    #[error("realtime setup of {channel:?} did not complete within {deadline:?}")]
+    RealtimeSetupTimeout { channel: String, deadline: Duration },
+    /// The server ended a realtime subscription and the SDK stopped. Queued
+    /// messages stay readable; `reason` says why it did not resume.
+    #[error(
+        "server ended realtime subscription to {channel:?} (code {code}: {server_reason}): {reason}{}",
+        .cause.as_ref().map(|cause| format!(": {cause}")).unwrap_or_default()
+    )]
+    SubscriptionEnded {
+        channel: String,
+        /// The server's unsubscribe code.
+        code: u32,
+        /// The server's unsubscribe text.
+        server_reason: String,
+        reason: SubscriptionEndReason,
+        /// The refusal or last failure behind `reason`, if any.
+        cause: Option<Box<Error>>,
+    },
+}
+
+/// Why a subscription the server ended did not resume.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SubscriptionEndReason {
+    /// No sub-account's access governs the channel, or automatic reconnection
+    /// is off. Subscribe again if the channel should still be live.
+    NotResubscribable,
+    /// A sub-account update on this client said `removed` true.
+    AccessRemoved,
+    /// `ListSubaccounts` no longer lists the sub-account with a role.
+    NotListed,
+    /// `ListSubaccounts` refused this API key; `cause` holds the refusal.
+    ListRefused,
+    /// A fresh subscribe token was refused; `cause` holds the refusal.
+    TokenRefused,
+    /// Bounded attempts to subscribe again did not hold.
+    RetriesExhausted,
+}
+
+impl std::fmt::Display for SubscriptionEndReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::NotResubscribable => "not_resubscribable",
+            Self::AccessRemoved => "access_removed",
+            Self::NotListed => "not_listed",
+            Self::ListRefused => "list_refused",
+            Self::TokenRefused => "token_refused",
+            Self::RetriesExhausted => "retries_exhausted",
+        })
+    }
 }
 
 /// Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
