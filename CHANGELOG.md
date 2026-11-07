@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.12.0
+
+Package version: `0.12.0`. Git tag: `v0.12.0`. Released 2026-11-07. Built on public contract `748066a`.
 
 - `orders.wait_for_order_trades_complete` documents when it reports completion: once the order has ended (`filled`, `canceled` or `rejected`) and its trades add up to `cum_qty`. Its behavior is unchanged, and the Go and Python SDKs now follow the same rule. `executions_complete` alone is not completion, because it is also true for a working order whose fills so far are all recorded.
 - An explicit sub-account ID of 0, such as `subaccount_id: Some(0)` in params or in a request passed to `balances.list`, `orders.cancel` or `triggers.cancel`, or `sub_accounts.get(0, ..)`, returns a validation error before sending instead of being sent; on the wire 0 means no sub-account (the main account).
