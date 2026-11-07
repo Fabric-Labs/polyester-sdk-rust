@@ -116,12 +116,19 @@ fn scaled_decimal(value: &str, scale: u32) -> Option<Decimal> {
 /// `value / 10^scale` as a [`Decimal`] with every digit, trailing zeros
 /// dropped; `None` when it needs more digits than a `Decimal` holds. Never
 /// rounded.
-fn exact_decimal(mut value: i128, mut scale: u32) -> Option<Decimal> {
+fn exact_decimal(value: i128, scale: u32) -> Option<Decimal> {
+    let (value, scale) = trim_scale(value, scale);
+    Decimal::try_from_i128_with_scale(value, scale).ok()
+}
+
+/// `value / 10^scale` at the smallest scale that keeps every digit, so that
+/// rescaling to a common scale overflows only when the digits need it.
+fn trim_scale(mut value: i128, mut scale: u32) -> (i128, u32) {
     while scale > 0 && value % 10 == 0 {
         value /= 10;
         scale -= 1;
     }
-    Decimal::try_from_i128_with_scale(value, scale).ok()
+    (value, scale)
 }
 
 /// `value`, scaled by `10^from`, rescaled to `10^to` (`to >= from`).
@@ -175,10 +182,14 @@ impl Order {
         if covered != Some(self.cum_qty.as_ref().map_or(0, Quantity::as_scaled)) {
             return None;
         }
-        let notional_scale = 9_u32.checked_add(base_quantity_scale)?;
-        let scale = notional_scale.max(FEE_SCALE);
-        let notional = rescale(self.cum_notional.parse().ok()?, notional_scale, scale)?;
-        let amount = rescale(fee.amount_e18.parse().ok()?, FEE_SCALE, scale)?;
+        let (notional, notional_scale) = trim_scale(
+            self.cum_notional.parse().ok()?,
+            9_u32.checked_add(base_quantity_scale)?,
+        );
+        let (amount, fee_scale) = trim_scale(fee.amount_e18.parse().ok()?, FEE_SCALE);
+        let scale = notional_scale.max(fee_scale);
+        let notional = rescale(notional, notional_scale, scale)?;
+        let amount = rescale(amount, fee_scale, scale)?;
         let used = match self.fee_asset.as_str() {
             "base" => notional,
             "quote" if fee.is_rebate => notional.checked_sub(amount)?,
@@ -200,10 +211,13 @@ impl Order {
         base_quantity_scale: u32,
         quote_quantity_scale: u32,
     ) -> Option<Decimal> {
-        let submitted = i128::from(self.submitted_max_quote_debit_scaled?);
+        let (submitted, submitted_scale) = trim_scale(
+            i128::from(self.submitted_max_quote_debit_scaled?),
+            quote_quantity_scale,
+        );
         let (used, used_scale) = self.quote_used_scaled(base_quantity_scale)?;
-        let scale = used_scale.max(quote_quantity_scale);
-        let unspent = rescale(submitted, quote_quantity_scale, scale)?
+        let scale = used_scale.max(submitted_scale);
+        let unspent = rescale(submitted, submitted_scale, scale)?
             .checked_sub(rescale(used, used_scale, scale)?)?;
         exact_decimal(unspent, scale)
     }
@@ -1197,4 +1211,56 @@ pub struct ResolvedAccount {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedAccountsList {
     pub accounts: Vec<ResolvedAccount>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::codecs::decode::{decode_qty_scaled_allow_zero, order_from_proto};
+    use crate::proto::orders::v1::Order as ProtoOrder;
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
+
+    /// A quote-sized buy with notional 3e-21 quote at `base_scale`, a
+    /// 0.000001 quote fee, and a budget of 1 at quote scale 6.
+    fn quote_buy(base_scale: u32) -> super::Order {
+        super::Order {
+            fee_asset: "quote".into(),
+            cum_notional: format!("3{}", "0".repeat(base_scale as usize + 9 - 21)),
+            submitted_max_quote_debit_scaled: Some(1_000_000),
+            fee_total: Some(super::OrderFeeTotal {
+                amount_e18: "1000000000000".into(),
+                is_rebate: false,
+                qty: decode_qty_scaled_allow_zero(1500, None, None, None),
+            }),
+            cum_qty: decode_qty_scaled_allow_zero(1500, None, None, None),
+            ..order_from_proto(&ProtoOrder {
+                order_id: 1,
+                ..Default::default()
+            })
+            .unwrap()
+        }
+    }
+
+    #[test]
+    fn execution_totals_at_every_catalog_base_scale() {
+        let dec = |s: &str| Decimal::from_str(s).unwrap();
+        for scale in [12, 27, 28, 30, 36] {
+            let order = quote_buy(scale);
+            assert_eq!(
+                order.cum_quote(scale),
+                Some(dec("0.000000000000000000003")),
+                "{scale}"
+            );
+            assert_eq!(
+                order.quote_used(scale),
+                Some(dec("0.000001000000000000003")),
+                "{scale}"
+            );
+            assert_eq!(
+                order.quote_unspent(scale, 6),
+                Some(dec("0.999998999999999999997")),
+                "{scale}"
+            );
+        }
+    }
 }
