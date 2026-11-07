@@ -60,6 +60,8 @@ fn post_summary_from_proto(msg: &PostSummary) -> ChangelogPostSummary {
         title: msg.title.clone(),
         introduction: msg.introduction.clone(),
         published_at: clone_timestamp(msg.published_at.as_option()),
+        updated_at: clone_timestamp(msg.updated_at.as_option()),
+        revision: msg.revision,
         coverage_cutoff: clone_timestamp(msg.coverage_cutoff.as_option()),
         change_count: msg.change_count,
         breaking_change_count: msg.breaking_change_count,

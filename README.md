@@ -646,16 +646,25 @@ the API host serves. It is public and read-only: it needs no API key, and
 requests are rate-limited per client address. Responses are newest post first.
 
 - `list_posts(opts)` returns one page of post summaries with change counts;
-  `posts(opts)` is a stream over every page.
+  `posts(opts)` is a stream over every page. A published post can be
+  republished, for example to correct its copy or withdraw a change: its
+  `slug`, `published_at` and change ids stay the same, `revision` (from 1)
+  increases and `updated_at` is when the current revision was published. To
+  follow edits, read a post again when its `revision` differs from the one you
+  hold, and drop a post that is no longer listed.
 - `get_post(slug)` returns one post with its sections and changes. A slug is the
   post's coverage cutoff date, `YYYY-MM-DD`; a later post on the same day gets
   `-2`, `-3`. An unknown slug is `Error::Api` with code `NotFound`.
 - `list_changes(opts)` returns one page of individual changes across posts,
-  filtered by category, surface, audience, `action_required`, publication time
-  (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)` is a
-  stream over every page. Values within one filter combine with OR.
+  filtered by category, surface, audience, `action_required`, first publication
+  time (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)`
+  is a stream over every page that yields each change id once: when a post is
+  republished during the walk, paging restarts at that post's first change.
+  Values within one filter combine with OR.
 - `breaking_changes_since(t)` and `action_required_since(t)` collect every
-  matching change published at or after `t`.
+  matching change published at or after `t`, each once with the wording last
+  received. They filter on first publication, so they don't report an edit to
+  an older post; compare `revision` for that.
 
 Category, audience and surface are lowercase labels (`breaking_change`, `api`,
 `market_makers`, `market_data`, `quickswap`, `rewards`, ...; see the
@@ -1019,7 +1028,11 @@ Services answer the same reasons with a ConnectRPC `unauthenticated` error and a
 returns the typed `auth.v1.AuthErrorCode` whichever transport answered: the
 Connect detail, or a REST problem or gateway `code` with `AUTH_` added
 (`UNAUTHENTICATED` reads `AUTH_AUTHENTICATION_REQUIRED`). Only
-`AUTH_TIMESTAMP_SKEW` is retryable.
+`AUTH_TIMESTAMP_SKEW` is retryable. `auth_codes::WALLET_ALREADY_LINKED`
+(`AUTH_WALLET_ALREADY_LINKED`, ConnectRPC `already_exists`, REST 409) refuses a
+wallet login whose wallet is already linked to another account; it is a
+terminal `Error::Api`, and `Error::is_wallet_already_linked()` reports it. Log
+in with the account address the wallet already uses.
 
 ```rust,no_run
 use polyester::proto::auth::v1::AuthErrorCode;
@@ -1081,8 +1094,25 @@ An empty retried list does not mean nothing was canceled: read open orders for c
 Connect `ResourceExhausted` maps to `Error::RateLimit { detail, .. }`. When the server attaches
 `polyester.ratelimit.v1.RateLimitDetail` (top-level Connect detail or nested under
 `orders.v1.ErrorDetail.rate_limit`), `detail` carries `policy_class`, `scope`, `operation_id`, and
-presence-aware quota fields. `retry_after` prefers `detail.retry_after_ms`, then `Retry-After` /
-`Retry-After-Ms` / `grpc-retry-pushback-ms` headers. Preview and batch rejections expose the same
+presence-aware quota fields. A REST `RATE_LIMIT_EXCEEDED` problem is the same `Error::RateLimit`,
+whichever side refused, with its `rate_limit` object in `detail`; every field is optional. The
+gateway's own refusal names only `reason` and `scope` (`CLIENT_IP`, no `operation_id`); a
+service's also names the operation, the policy class and the remaining quota. The gateway's
+Connect refusal (`resource_exhausted`, "rate limit exceeded, retry later") has no detail at all.
+`retry_after` prefers `detail.retry_after_ms`, then `Retry-After` / `Retry-After-Ms` /
+`grpc-retry-pushback-ms` headers, and is `None` when the server gave no hint, as for a refusal
+of too many concurrent requests: back off on your own schedule then. A 429 problem with another
+code, such as `AUTH_RESOURCE_EXHAUSTED` (no new account can be created), is an `Error::Api` that
+waiting does not resolve.
+
+A request body over an endpoint's size limit is refused with HTTP 413 and the problem
+`REQUEST_TOO_LARGE` on every service, before the request is authenticated. It is an `Error::Api`
+with code `problem_codes::REQUEST_TOO_LARGE` and the problem in `http_problem()`;
+`Error::is_request_too_large()` reports it. Nothing changed and the same body is refused again:
+reduce it to fit the limit. A ConnectRPC message over the limit once decoded keeps its Connect
+`resource_exhausted` answer and maps as before.
+
+Preview and batch rejections expose the same
 payload on `OrderErrorDetail.rate_limit` / batch item `rate_limit`. That error payload is
 distinct from `client.rate_limits` (`ratelimit.v1.RateLimitService`), which returns the
 public trading quota catalog and authenticated account / API-key limits.
@@ -1114,8 +1144,16 @@ status or order reads confirm one. Reuse the same `request_id` when retrying a
 logical batch, then call `orders.wait_batch_replace(batch_request_id, None,
 None)`. It polls `get_batch_replace_status` with a short backoff until no item
 is `admitted` (each is `working`, `rejected` or `terminal`) and returns that
-status. `working` is live, not terminal execution. A status reads `not_found`
-for a few seconds after admission; the helper keeps polling through it. A
+status. `working` is live, not terminal execution. The status is retained for
+60 seconds from acceptance and is readable as soon as `batch_replace` returns.
+`get_batch_replace_status` returns the retryable `Error::AdmissionUnavailable`
+for `unavailable` (send the same read again within the window), and
+`not_found` means no retained batch with that ID, never a rejected
+replacement. The helper polls through `unavailable`, and through `not_found`
+because an older API could answer it for a few seconds after admission. After
+the window, reconcile the individual orders with `orders.get` and never send
+an accepted batch again. An item's `updated_ts_ns` is an observation time, not
+the refusal's identity. A
 refused item reads `rejected` with `code`, the refusal without its
 `ERROR_CODE_` prefix (`POST_ONLY_CROSS`); `item.error_code()` gives the full
 code an `Error::Api` from a single modify carries (`ERROR_CODE_POST_ONLY_CROSS`),

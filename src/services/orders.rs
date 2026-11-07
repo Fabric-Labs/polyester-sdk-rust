@@ -1167,7 +1167,10 @@ impl OrdersService {
     /// so its planned `replacement_order_id` is not proof of an order. Wait
     /// with [`Self::wait_batch_replace`], or poll
     /// [`Self::get_batch_replace_status`], using the returned
-    /// `batch_request_id`.
+    /// `batch_request_id`. An identical retry replays the admission for 60
+    /// seconds from acceptance. Read the status within that window; after
+    /// it, reconcile the individual orders and never send an accepted batch
+    /// again.
     pub async fn batch_replace(
         &self,
         items: Vec<BatchReplaceItem>,
@@ -1244,11 +1247,29 @@ impl OrdersService {
         batch_replace_from_proto(&resp)
     }
 
-    /// Get durable execution status for an admitted batch replacement.
+    /// Get the execution status of one accepted batch replacement: its
+    /// admission and each item's current phase.
     ///
-    /// The server keeps it for 60 seconds from admission. An item refused
-    /// after admission reads `rejected` with its code; see
+    /// The status is retained for 60 seconds from the batch's acceptance and
+    /// is readable as soon as [`Self::batch_replace`] returns; each item's
+    /// phase then advances asynchronously. `batch_request_id` is the exact
+    /// 64-bit `batch_request_id` that [`Self::batch_replace`] returned. An
+    /// item refused after admission reads `rejected` with its code; see
     /// [`crate::models::BatchReplaceStatusItem::error_code`].
+    ///
+    /// - `unavailable` returns the retryable [`Error::AdmissionUnavailable`]
+    ///   (`ERROR_CODE_UNAVAILABLE`): the status can't be established yet, so
+    ///   send the same request again within the window.
+    /// - `not_found` ([`Error::Api`] with code `NotFound`) means the account
+    ///   has no retained batch with this ID: none was accepted for it, or the
+    ///   window ended. It never proves that a replacement was rejected.
+    ///
+    /// After the window, reconcile the individual orders with [`Self::get`],
+    /// by each item's old and replacement order IDs, and never send an
+    /// accepted batch again because its status is not found: a batch sent
+    /// after the window is admitted as a new one. An item's `updated_ts_ns`
+    /// is an observation time that can be a later recovery time, so two reads
+    /// may differ for the same refusal; don't use it to identify the refusal.
     pub async fn get_batch_replace_status(
         &self,
         batch_request_id: &str,
@@ -1279,9 +1300,10 @@ impl OrdersService {
     /// its previous price and quantity under `old_order_id`, and it has no
     /// successor.
     ///
-    /// Polls with a short backoff (50 ms, doubling, at most 500 ms). The
-    /// status can read `not_found` for a few seconds after admission, so
-    /// `not_found` and `unavailable` are polled again. Stops when the
+    /// Polls with a short backoff (50 ms, doubling, at most 500 ms).
+    /// `unavailable` is polled again, and so is `not_found`, because an older
+    /// API could answer it for a few seconds after admission; it never means
+    /// the batch was rejected. Stops when the
     /// 60-second status window since admission ends, or after `timeout` when
     /// that comes first, with an [`Error::Transport`]: then the status proves
     /// nothing, so reconcile through the orders themselves ([`Self::get`] with
