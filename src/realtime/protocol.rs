@@ -3,7 +3,7 @@
 //! Centrifugo protobuf WebSocket frames contain one or more length-delimited
 //! `Command` or `Reply` messages from the authoritative
 //! `centrifugal/protocol/definitions/client.proto` schema. Polyester only needs
-//! connect, subscribe, errors, pings, and publication payloads.
+//! connect, subscribe, token renewal, errors, pings, and publication payloads.
 
 use super::MAX_REALTIME_MESSAGE_BYTES;
 use crate::errors::{Error, Result};
@@ -18,6 +18,9 @@ pub(super) enum Incoming {
     Reply {
         id: u32,
         error: Option<ProtoError>,
+        /// A connect, subscribe or renewal result's token lifetime: `Some(ttl)`
+        /// when the token expires and must be renewed within `ttl` seconds.
+        expiry: Option<u32>,
     },
     Publication(Vec<u8>),
     Ping,
@@ -50,6 +53,23 @@ pub(super) fn subscribe_command(id: u32, channel: &str, token: Option<&str>) -> 
         put_string(&mut request, 2, token);
     }
     command(id, 5, &request)
+}
+
+/// Renews the connection token: `Command.refresh = 14`,
+/// `RefreshRequest { token = 1 }`.
+pub(super) fn refresh_command(id: u32, token: &str) -> Vec<u8> {
+    let mut request = Vec::new();
+    put_string(&mut request, 1, token);
+    command(id, 14, &request)
+}
+
+/// Renews a subscription token: `Command.sub_refresh = 15`,
+/// `SubRefreshRequest { channel = 1, token = 2 }`.
+pub(super) fn sub_refresh_command(id: u32, channel: &str, token: &str) -> Vec<u8> {
+    let mut request = Vec::new();
+    put_string(&mut request, 1, channel);
+    put_string(&mut request, 2, token);
+    command(id, 15, &request)
 }
 
 pub(super) fn pong_command() -> Vec<u8> {
@@ -97,6 +117,7 @@ fn decode_reply(bytes: &[u8], out: &mut Vec<Incoming>) -> Result<()> {
     let mut cursor = Cursor::new(bytes);
     let mut id = 0_u32;
     let mut error = None;
+    let mut expiry = None;
     let mut saw_payload = false;
     while !cursor.is_empty() {
         let (field, wire) = cursor.key()?;
@@ -107,13 +128,37 @@ fn decode_reply(bytes: &[u8], out: &mut Vec<Incoming>) -> Result<()> {
                 saw_payload = true;
                 decode_push(cursor.len_bytes()?, out)?;
             }
+            (5 | 6 | 14 | 15, WIRE_LEN) => expiry = decode_expiry(cursor.len_bytes()?, field)?,
             _ => cursor.skip(wire)?,
         }
     }
     if id != 0 || error.is_some() || !saw_payload {
-        out.push(Incoming::Reply { id, error });
+        out.push(Incoming::Reply { id, error, expiry });
     }
     Ok(())
+}
+
+/// The token lifetime of a reply result: `ConnectResult` (Reply field 5) and
+/// `RefreshResult` (14) carry `expires = 3` and `ttl = 4`; `SubscribeResult`
+/// (6) and `SubRefreshResult` (15) carry `expires = 1` and `ttl = 2`.
+fn decode_expiry(bytes: &[u8], result_field: u32) -> Result<Option<u32>> {
+    let (expires_field, ttl_field) = if matches!(result_field, 5 | 14) {
+        (3, 4)
+    } else {
+        (1, 2)
+    };
+    let mut cursor = Cursor::new(bytes);
+    let mut expires = false;
+    let mut ttl = 0;
+    while !cursor.is_empty() {
+        let (field, wire) = cursor.key()?;
+        match (field, wire) {
+            (f, WIRE_VARINT) if f == expires_field => expires = cursor.varint()? != 0,
+            (f, WIRE_VARINT) if f == ttl_field => ttl = to_u32(cursor.varint()?, "token ttl")?,
+            _ => cursor.skip(wire)?,
+        }
+    }
+    Ok(expires.then_some(ttl))
 }
 
 fn decode_error(bytes: &[u8]) -> Result<ProtoError> {
@@ -352,7 +397,11 @@ mod tests {
         assert_eq!(
             decode_replies(&frame).unwrap(),
             vec![
-                Incoming::Reply { id: 1, error: None },
+                Incoming::Reply {
+                    id: 1,
+                    error: None,
+                    expiry: None,
+                },
                 Incoming::Ping,
                 Incoming::Publication(b"abc".to_vec()),
             ]
@@ -371,7 +420,38 @@ mod tests {
                     message: "denied".to_owned(),
                     temporary: true,
                 }),
+                expiry: None,
             }]
+        );
+    }
+
+    #[test]
+    fn encodes_renewals_and_decodes_result_expiry() {
+        // Command{id:3, refresh:{token:"t"}}, Command{id:4, sub_refresh:{channel:"c", token:"t"}}
+        assert_eq!(refresh_command(3, "t"), vec![7, 8, 3, 114, 3, 10, 1, b't']);
+        assert_eq!(
+            sub_refresh_command(4, "c", "t"),
+            vec![10, 8, 4, 122, 6, 10, 1, b'c', 18, 1, b't']
+        );
+        // Reply{id:1, connect:{expires:true, ttl:60}}, Reply{id:2, subscribe:{expires:true, ttl:30}},
+        // Reply{id:3, refresh:{}}, Reply{id:4, sub_refresh:{expires:true, ttl:0}}
+        let frame = [
+            8, 8, 1, 42, 4, 24, 1, 32, 60, // connect
+            8, 8, 2, 50, 4, 8, 1, 16, 30, // subscribe
+            4, 8, 3, 114, 0, // refresh without expiry
+            6, 8, 4, 122, 2, 8, 1, // sub_refresh expiring now
+        ];
+        let expiries: Vec<_> = decode_replies(&frame)
+            .unwrap()
+            .into_iter()
+            .map(|incoming| match incoming {
+                Incoming::Reply { id, expiry, .. } => (id, expiry),
+                other => panic!("unexpected {other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            expiries,
+            vec![(1, Some(60)), (2, Some(30)), (3, None), (4, Some(0))]
         );
     }
 

@@ -93,6 +93,13 @@ pub struct LedgerTransfer {
     /// legs of a transfer share it; with `account_code` and `is_debit` it
     /// identifies this leg. Empty when the server did not send one.
     pub transfer_id: String,
+    /// The account bucket's balance after this transfer, an exact decimal
+    /// integer at the fixed 18-decimal ledger scale, like `amount`. `None`
+    /// when the server sent none; a zero balance is `Some("0")`.
+    pub balance_after: Option<String>,
+    /// Decimal correlation ID that groups related transfer legs. `None` when
+    /// the server has none.
+    pub link_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

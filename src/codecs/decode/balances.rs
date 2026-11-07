@@ -160,6 +160,11 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
         source: transfer_side_from_proto(msg.source.as_option()),
         destination: transfer_side_from_proto(msg.destination.as_option()),
         transfer_id: msg.transfer_id.clone(),
+        balance_after: msg
+            .balance_after_e18
+            .as_option()
+            .map(|u| u128_to_str(u.hi, u.lo)),
+        link_id: (msg.link_id != 0).then(|| msg.link_id.to_string()),
     }
 }
 
@@ -350,6 +355,85 @@ mod tests {
         });
         assert_eq!(balance.points, u32::MAX);
         assert_eq!(equity.points, u32::MAX);
+    }
+
+    /// Both values lie beyond f64's exact integer range: 2^64+5 and 2^63+1.
+    fn populated_transfer_row() -> TransferRow {
+        TransferRow {
+            asset_id: 2,
+            amount_e18: U128 {
+                lo: 1000,
+                ..Default::default()
+            }
+            .into(),
+            balance_after_e18: U128 {
+                hi: 1,
+                lo: 5,
+                ..Default::default()
+            }
+            .into(),
+            link_id: 9_223_372_036_854_775_809,
+            ts_us: 999,
+            transfer_id: "42".into(),
+            ..Default::default()
+        }
+    }
+
+    // Debug output keeps this check independent of the field types it checks.
+    #[test]
+    fn transfer_read_and_stream_keep_balance_after_and_link_id() {
+        use buffa::Message;
+        let row = populated_transfer_row();
+        let batch = crate::proto::ledger::read::v1::TransferRowBatch {
+            events: vec![row.clone()],
+            ..Default::default()
+        };
+        let streamed = super::super::ledger_transfer_batch_from_bytes(&batch.encode_to_vec())
+            .expect("stream decode")
+            .remove(0)
+            .expect("stream row");
+        let listed = transfers_list_from_proto(&ListTransfersResponse {
+            transfers: vec![row],
+            ..Default::default()
+        })
+        .transfers
+        .remove(0);
+        for (path, transfer) in [("list", listed), ("stream", streamed)] {
+            let debug = format!("{transfer:?}");
+            assert!(
+                debug.contains(r#"balance_after: Some("18446744073709551621")"#),
+                "{path}: want the exact E18 balance in {debug}"
+            );
+            assert!(
+                debug.contains(r#"link_id: Some("9223372036854775809")"#),
+                "{path}: want the exact link ID in {debug}"
+            );
+        }
+    }
+
+    #[test]
+    fn transfer_balance_after_zero_is_not_absent() {
+        let mut zero = populated_transfer_row();
+        zero.balance_after_e18 = U128::default().into();
+        zero.link_id = 0;
+        let debug = format!("{:?}", transfer_row_from_proto(&zero));
+        assert!(
+            debug.contains(r#"balance_after: Some("0")"#),
+            "a zero post-transfer balance must read \"0\": {debug}"
+        );
+        // The contract sends link_id 0 when no correlation ID exists.
+        assert!(
+            debug.contains("link_id: None"),
+            "link_id 0 means unavailable: {debug}"
+        );
+
+        let mut absent = populated_transfer_row();
+        absent.balance_after_e18 = Default::default();
+        let debug = format!("{:?}", transfer_row_from_proto(&absent));
+        assert!(
+            debug.contains("balance_after: None"),
+            "an absent post-transfer balance must be None: {debug}"
+        );
     }
 
     #[test]

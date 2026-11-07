@@ -3,6 +3,9 @@
 mod auth;
 mod private_orders;
 mod protocol;
+mod renewal;
+#[cfg(test)]
+mod renewal_tests;
 mod resubscribe;
 mod snapshot_then_stream;
 
@@ -192,6 +195,8 @@ pub struct Client {
     access: Arc<resubscribe::SubaccountAccess>,
     /// One deadline over the whole setup of a subscription.
     setup_deadline: Duration,
+    /// The unit of a Centrifugo token TTL: a second; tests shorten it.
+    renewal_unit: Duration,
 }
 
 impl Client {
@@ -236,6 +241,7 @@ impl Client {
             access: Arc::new(resubscribe::SubaccountAccess::new(
                 resubscribe::ResubscribeTiming::default(),
             )),
+            renewal_unit: Duration::from_secs(1),
         }
     }
 
@@ -558,7 +564,7 @@ impl Client {
         read: &mut R,
         channel: &str,
         pending: &mut VecDeque<protocol::Incoming>,
-    ) -> Result<()>
+    ) -> Result<(TokenExpiry, TokenExpiry)>
     where
         W: SinkExt<Message> + Unpin,
         W::Error: std::fmt::Display,
@@ -577,7 +583,10 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            centrifugo_connect(write, read, Some(&connection_token), pending).await?;
+            let connection_ttl =
+                centrifugo_connect(write, read, Some(&connection_token), pending).await?;
+            // The connection token's TTL runs from its reply, through the rest of setup.
+            let connection_expiry = (tokio::time::Instant::now(), connection_ttl);
             let subscription_token = auth::fetch_subscription_token(
                 creds,
                 &self.api_url,
@@ -586,12 +595,17 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            centrifugo_subscribe(write, read, channel, Some(&subscription_token), pending).await?;
+            let subscription_ttl =
+                centrifugo_subscribe(write, read, channel, Some(&subscription_token), pending)
+                    .await?;
+            let subscription_expiry = (tokio::time::Instant::now(), subscription_ttl);
+            Ok((connection_expiry, subscription_expiry))
         } else {
             centrifugo_connect(write, read, None, pending).await?;
             centrifugo_subscribe(write, read, channel, None, pending).await?;
+            let now = tokio::time::Instant::now();
+            Ok(((now, None), (now, None)))
         }
-        Ok(())
     }
 
     async fn run_proto_subscription_once<T, F>(
@@ -604,7 +618,7 @@ impl Client {
     where
         F: Fn(&[u8]) -> Result<Publication<T>>,
     {
-        let (mut write, mut read, mut pending) = timeout(self.setup_deadline, async {
+        let (mut write, mut read, mut pending, expiries) = timeout(self.setup_deadline, async {
             crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
             let url = self.ws_endpoint();
             let mut request = url
@@ -636,9 +650,10 @@ impl Client {
             }
             let (mut write, mut read) = ws.split();
             let mut pending = VecDeque::new();
-            self.handshake_channel(&mut write, &mut read, channel, &mut pending)
+            let expiries = self
+                .handshake_channel(&mut write, &mut read, channel, &mut pending)
                 .await?;
-            Ok::<_, Error>((write, read, pending))
+            Ok::<_, Error>((write, read, pending, expiries))
         })
         .await
         .map_err(|_| Error::RealtimeSetupTimeout {
@@ -656,6 +671,29 @@ impl Client {
             attempt.gap.note_resubscribe();
         }
         let subaccounts_channel = channel.starts_with(resubscribe::SUBACCOUNTS_CHANNEL_PREFIX);
+        // Renewal belongs to this connection and ends with it.
+        let (mut renewer, mut fetched) = renewal::TokenRenewer::new(
+            renewal::TokenSource {
+                credentials: self.credentials.clone(),
+                api_url: self.api_url.clone(),
+                channel: channel.to_owned(),
+                timeout: self.timeout,
+                allow_insecure_http: self.allow_insecure_http,
+            },
+            self.renewal_unit,
+            3,
+        );
+        let ((connected_at, connection_ttl), (subscribed_at, subscription_ttl)) = expiries;
+        renewer.schedule(
+            renewal::RenewalKind::Connection,
+            connected_at,
+            connection_ttl,
+        );
+        renewer.schedule(
+            renewal::RenewalKind::Subscription,
+            subscribed_at,
+            subscription_ttl,
+        );
 
         loop {
             if *attempt.stop.borrow() {
@@ -714,19 +752,44 @@ impl Client {
                                 .into_connection_error(channel));
                         }
                     }
-                    protocol::Incoming::Reply {
-                        error: Some(err), ..
-                    } => {
-                        return Err(centrifugo_protocol_error(err));
+                    protocol::Incoming::Reply { id, error, expiry } => {
+                        match renewer.take_reply(id, error.as_ref(), expiry) {
+                            Some(Ok(())) => {}
+                            Some(Err(refused)) => {
+                                record_subscription_error(attempt.error_state, refused)
+                            }
+                            None => {
+                                if let Some(err) = error {
+                                    return Err(centrifugo_protocol_error(err));
+                                }
+                            }
+                        }
                     }
-                    protocol::Incoming::Reply { .. } => {}
                 }
                 continue;
             }
+            let renewal_due = renewer.next_due();
             let msg = tokio::select! {
                 changed = attempt.stop.changed() => {
                     if changed.is_err() || *attempt.stop.borrow() {
                         return Ok(());
+                    }
+                    None
+                }
+                _ = until(renewal_due) => {
+                    renewer.start_due();
+                    None
+                }
+                Some((kind, token)) = fetched.recv() => {
+                    match token {
+                        Ok(token) => {
+                            write
+                                .send(Message::Binary(renewer.command(kind, &token).into()))
+                                .await
+                                .map_err(|e| Error::realtime(format!("token renewal send: {e}")))?;
+                        }
+                        // An unrenewed token expires and the server ends it.
+                        Err(err) => record_subscription_error(attempt.error_state, err),
                     }
                     None
                 }
@@ -909,7 +972,7 @@ async fn centrifugo_connect<W, R>(
     read: &mut R,
     token: Option<&str>,
     pending: &mut VecDeque<protocol::Incoming>,
-) -> Result<()>
+) -> Result<Option<u32>>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -929,7 +992,7 @@ async fn centrifugo_subscribe<W, R>(
     channel: &str,
     token: Option<&str>,
     pending: &mut VecDeque<protocol::Incoming>,
-) -> Result<()>
+) -> Result<Option<u32>>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -945,12 +1008,14 @@ where
     read_centrifugo_reply(write, read, 2, pending).await
 }
 
+/// Waits for the reply to `expected_id`, holding back anything else that
+/// arrives first, and returns its token expiry.
 async fn read_centrifugo_reply<W, R>(
     write: &mut W,
     read: &mut R,
     expected_id: u32,
     pending: &mut VecDeque<protocol::Incoming>,
-) -> Result<()>
+) -> Result<Option<u32>>
 where
     W: SinkExt<Message> + Unpin,
     W::Error: std::fmt::Display,
@@ -965,15 +1030,20 @@ where
             .map_err(|e| Error::realtime(format!("centrifugo read: {e}")))?;
         match msg {
             Message::Binary(frame) => {
-                let mut matched = false;
+                let mut matched = None;
                 for incoming in protocol::decode_replies(&frame)? {
                     match incoming {
                         protocol::Incoming::Reply {
                             id,
                             error: Some(err),
+                            ..
                         } if id == expected_id => return Err(centrifugo_protocol_error(err)),
-                        protocol::Incoming::Reply { id, error: None } if id == expected_id => {
-                            matched = true;
+                        protocol::Incoming::Reply {
+                            id,
+                            error: None,
+                            expiry,
+                        } if id == expected_id => {
+                            matched = Some(expiry);
                         }
                         protocol::Incoming::Ping => {
                             write
@@ -989,8 +1059,8 @@ where
                         }
                     }
                 }
-                if matched {
-                    return Ok(());
+                if let Some(expiry) = matched {
+                    return Ok(expiry);
                 }
             }
             Message::Text(_) => {
@@ -1012,13 +1082,28 @@ where
     }
 }
 
-fn centrifugo_protocol_error(error: protocol::ProtoError) -> Error {
-    Error::realtime(format!(
+fn centrifugo_protocol_error_message(error: &protocol::ProtoError) -> String {
+    format!(
         "centrifugo error {}: {}{}",
         error.code,
         error.message,
         if error.temporary { " (temporary)" } else { "" }
-    ))
+    )
+}
+
+fn centrifugo_protocol_error(error: protocol::ProtoError) -> Error {
+    Error::realtime(centrifugo_protocol_error_message(&error))
+}
+
+/// When a reply carrying a token TTL arrived, and its TTL when the token expires.
+type TokenExpiry = (tokio::time::Instant, Option<u32>);
+
+/// Sleeps until `at`; forever when there is nothing to wait for.
+async fn until(at: Option<tokio::time::Instant>) {
+    match at {
+        Some(at) => tokio::time::sleep_until(at).await,
+        None => std::future::pending().await,
+    }
 }
 
 #[cfg(test)]
