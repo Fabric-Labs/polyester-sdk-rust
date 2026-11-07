@@ -9470,3 +9470,214 @@ async fn l2_batch_replace_sends_new_attached_risk() {
     };
     assert_eq!(stop_loss.trigger_price_ticks, 30_000_000_000_000);
 }
+
+// Sub-account 0 is not a sub-account: on the wire 0 means unset (the main
+// account). An explicit Some(0) or 0 is refused before any request is sent.
+#[tokio::test]
+async fn explicit_subaccount_zero_is_refused_before_sending() {
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
+    use polyester::proto::orders::v1::{CreateOrderRequest, CreateOrderResponse};
+    use polyester::services::GetSubaccountOpts;
+    use polyester::{Price, Quantity};
+    use std::sync::Mutex;
+
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let observed_handler = observed.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == "/orders.v1.OrdersService/CreateOrder" {
+            let decoded = CreateOrderRequest::decode_from_slice(&request.body).unwrap();
+            observed_handler.lock().unwrap().push(decoded.subaccount_id);
+            return connect_proto_ok(&CreateOrderResponse {
+                order_id: 9,
+                client_order_id: "zero-scope".into(),
+                ..Default::default()
+            });
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: Some("5".into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    let order = |subaccount_id: Option<u64>| {
+        let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        p.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some("zero-scope".into());
+        p.subaccount_id = subaccount_id;
+        p
+    };
+
+    // Control: a real sub-account ID is sent.
+    client.orders.create(order(Some(42))).await.unwrap();
+    assert_eq!(*observed.lock().unwrap(), vec![Some(42)]);
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+
+    let refused = [
+        client.orders.create(order(Some(0))).await.map(|_| ()),
+        client.orders.list_open(Some(0)).await.map(|_| ()),
+        client.api_keys.list(Some(0)).await.map(|_| ()),
+        client
+            .sub_accounts
+            .get(0, GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+    ];
+    for result in refused {
+        let err = result.expect_err("sub-account 0 must be refused");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("not 0"), "{err}");
+    }
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
+
+// Request-object wrappers forward the caller's request; an explicit
+// subaccount_id of Some(0) is refused before sending, None still means none.
+async fn zero_scope_request_client() -> (MockHttpServer, Client) {
+    use polyester::proto::ledger::read::v1::GetBalancesResponse;
+    let server = MockHttpServer::spawn(|request| {
+        if request.path == GET_BALANCES_PATH {
+            return connect_proto_ok(&GetBalancesResponse::default());
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    (server, client)
+}
+
+#[tokio::test]
+async fn request_object_without_subaccount_is_still_sent() {
+    use polyester::proto::ledger::read::v1::GetBalancesRequest;
+    let (server, client) = zero_scope_request_client().await;
+    client
+        .balances
+        .list(GetBalancesRequest::default())
+        .await
+        .unwrap();
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
+
+macro_rules! request_object_refuses_subaccount_zero {
+    ($($name:ident: |$client:ident| $call:expr;)+) => {$(
+        #[tokio::test]
+        async fn $name() {
+            let (server, $client) = zero_scope_request_client().await;
+            let err = $call
+                .await
+                .map(|_| ())
+                .expect_err("sub-account 0 must be refused");
+            assert!(matches!(err, Error::Validation(_)), "{err:?}");
+            assert!(err.to_string().contains("not 0"), "{err}");
+            assert_eq!(server.requests.load(Ordering::SeqCst), 0);
+        }
+    )+};
+}
+
+request_object_refuses_subaccount_zero! {
+    balances_list_refuses_subaccount_zero: |client| client.balances.list(
+        polyester::proto::ledger::read::v1::GetBalancesRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_get_balance_history_refuses_subaccount_zero: |client| client.balances.get_balance_history(
+        polyester::proto::ledger::read::v1::GetBalanceHistoryRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_get_equity_history_refuses_subaccount_zero: |client| client.balances.get_equity_history(
+        polyester::proto::ledger::read::v1::GetEquityHistorySeriesRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_list_transfers_refuses_subaccount_zero: |client| client.balances.list_transfers(
+        polyester::proto::ledger::read::v1::ListTransfersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    transfers_list_refuses_subaccount_zero: |client| client.transfers.list(
+        polyester::proto::ledger::read::v1::ListTransfersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    orders_cancel_refuses_subaccount_zero: |client| client.orders.cancel(
+        polyester::proto::orders::v1::CancelOrderRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_list_refuses_subaccount_zero: |client| client.triggers.list(
+        polyester::proto::triggers::v1::ListTriggersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_get_refuses_subaccount_zero: |client| client.triggers.get(
+        polyester::proto::triggers::v1::GetTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_cancel_refuses_subaccount_zero: |client| client.triggers.cancel(
+        polyester::proto::triggers::v1::CancelTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_pause_refuses_subaccount_zero: |client| client.triggers.pause(
+        polyester::proto::triggers::v1::PauseTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_resume_refuses_subaccount_zero: |client| client.triggers.resume(
+        polyester::proto::triggers::v1::ResumeTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_list_events_refuses_subaccount_zero: |client| client.triggers.list_events(
+        polyester::proto::triggers::v1::ListTriggerEventsRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+}

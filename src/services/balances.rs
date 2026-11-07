@@ -30,6 +30,7 @@ impl BalancesService {
     }
 
     pub async fn list(&self, req: GetBalancesRequest) -> Result<BalancesList> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -46,6 +47,7 @@ impl BalancesService {
         &self,
         req: GetBalanceHistoryRequest,
     ) -> Result<BalanceHistory> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -62,6 +64,7 @@ impl BalancesService {
         &self,
         req: GetEquityHistorySeriesRequest,
     ) -> Result<EquityHistory> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -78,6 +81,7 @@ impl BalancesService {
         &self,
         req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> Result<TransfersList> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
