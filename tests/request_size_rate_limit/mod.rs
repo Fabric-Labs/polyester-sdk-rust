@@ -436,3 +436,35 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
     assert!(!api("AUTH_WALLET_LOGIN_FAILED").is_wallet_already_linked());
     assert!(api("AUTH_WALLET_ALREADY_LINKED").is_wallet_already_linked());
 }
+
+/// Only ASCII digits within uint64 are an integer; anything else is absent, so
+/// the delay falls back to Retry-After.
+#[tokio::test]
+async fn rate_limit_problem_ignores_an_unreadable_integer() {
+    let long = "9".repeat(5000);
+    for value in [
+        "\u{b2}",
+        "\u{663}",
+        long.as_str(),
+        "18446744073709551616",
+        "-1",
+        "1.5",
+        "+5",
+    ] {
+        let body = rate_limit_problem(json!({
+            "reason": "QUOTA_EXCEEDED", "scope": "CLIENT_IP", "limit": value, "retry_after_ms": value
+        }));
+        let err = me_error(move || response(429, PROBLEM, &body, &[("Retry-After", "2")])).await;
+        let Error::RateLimit { code, detail, .. } = &err else {
+            panic!("{err:?}");
+        };
+        let label: String = value.chars().take(8).collect();
+        assert_eq!(
+            code.as_deref(),
+            Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
+            "{label}"
+        );
+        assert_eq!(detail.as_deref(), Some(&gateway_detail()), "{label}");
+        assert_eq!(err.retry_after(), Some(2.0), "{label}");
+    }
+}
