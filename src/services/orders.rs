@@ -1408,6 +1408,7 @@ impl OrdersService {
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::cancel_with`] to apply it.
     pub async fn cancel(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
