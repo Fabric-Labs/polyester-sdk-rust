@@ -350,6 +350,48 @@ mod tests {
         assert_eq!(req.limit, 50);
     }
 
+    /// Time bounds are sent as exact protobuf timestamps across its range:
+    /// `seconds` rounds toward negative infinity and `nanos` is never
+    /// negative, as protobuf's own conversions do.
+    #[test]
+    fn list_changes_request_sends_exact_time_bounds() {
+        let cases = [
+            (
+                "half a second before the epoch",
+                UNIX_EPOCH - Duration::from_millis(500),
+                (-1, 500_000_000),
+            ),
+            (
+                "one nanosecond before the epoch",
+                UNIX_EPOCH - Duration::from_nanos(1),
+                (-1, 999_999_999),
+            ),
+            (
+                "the first second of year 1",
+                UNIX_EPOCH - Duration::from_secs(62_135_596_800),
+                (-62_135_596_800, 0),
+            ),
+            ("the epoch", UNIX_EPOCH, (0, 0)),
+            (
+                "the last microsecond of year 9999",
+                UNIX_EPOCH + Duration::new(253_402_300_799, 999_999_000),
+                (253_402_300_799, 999_999_000),
+            ),
+        ];
+        for (name, time, want) in cases {
+            let req = list_changes_request(ListChangelogChangesOptions {
+                start_time: Some(time),
+                end_time: Some(time),
+                ..Default::default()
+            })
+            .unwrap_or_else(|err| panic!("{name}: {err}"));
+            for ts in [req.start_time.as_option(), req.end_time.as_option()] {
+                let ts = ts.unwrap();
+                assert_eq!((ts.seconds, ts.nanos), want, "{name}");
+            }
+        }
+    }
+
     #[test]
     fn list_changes_request_filters_by_the_new_product_areas() {
         let req = list_changes_request(ListChangelogChangesOptions {

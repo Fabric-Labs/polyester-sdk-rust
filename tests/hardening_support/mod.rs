@@ -52,6 +52,13 @@ pub enum HttpScript {
         headers: Vec<(String, String)>,
         body: Vec<u8>,
     },
+    /// `Raw`, answered after `delay`: a slow server.
+    RawAfter {
+        delay: Duration,
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: Vec<u8>,
+    },
     HeadersThenStall {
         status: u16,
         headers: Vec<(String, String)>,
@@ -150,6 +157,21 @@ impl MockHttpServer {
                                 "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                                 body.len()
                             );
+                            let _ = stream.write_all(head.as_bytes()).await;
+                            let _ = stream.write_all(&body).await;
+                        }
+                        HttpScript::RawAfter {
+                            delay,
+                            status,
+                            headers,
+                            body,
+                        } => {
+                            tokio::time::sleep(delay).await;
+                            let mut head = format!("HTTP/1.1 {status} OK\r\n");
+                            for (k, v) in headers {
+                                head.push_str(&format!("{k}: {v}\r\n"));
+                            }
+                            head.push_str("Connection: close\r\n\r\n");
                             let _ = stream.write_all(head.as_bytes()).await;
                             let _ = stream.write_all(&body).await;
                         }

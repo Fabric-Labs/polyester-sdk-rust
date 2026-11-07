@@ -2100,6 +2100,139 @@ mod tests {
         }
     }
 
+    /// Every typed order read (GetOrder, open orders, history and the order
+    /// stream) decodes through `order_from_proto`.
+    fn order_read_debug(msg: ProtoOrder) -> Vec<(&'static str, String)> {
+        let get = get_order_from_proto(&GetOrderResponse {
+            order: Some(msg.clone()).into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .order
+        .unwrap();
+        let open = orders_list_from_open(&GetOpenOrdersResponse {
+            orders: vec![msg.clone()],
+            ..Default::default()
+        })
+        .unwrap()
+        .orders
+        .remove(0);
+        let history =
+            orders_list_from_history(&crate::proto::orders::v1::GetOrderHistoryResponse {
+                orders: vec![msg.clone()],
+                ..Default::default()
+            })
+            .unwrap()
+            .orders
+            .remove(0);
+        let stream = order_from_proto(&msg).unwrap();
+        vec![
+            ("get", format!("{get:?}")),
+            ("open orders", format!("{open:?}")),
+            ("history", format!("{history:?}")),
+            ("order stream", format!("{stream:?}")),
+        ]
+    }
+
+    #[test]
+    fn order_reads_keep_terminal_time_origin_and_market_slippage() {
+        use crate::proto::orders::v1::{OrderOrigin, OrderOriginScope, OrderTriggerType};
+        let cases: Vec<(&str, ProtoOrder, Vec<String>)> = vec![
+            (
+                "filled TWAP child with bps slippage",
+                ProtoOrder {
+                    order_id: 11,
+                    symbol_id: 1,
+                    status: OrderStatus::Filled.into(),
+                    terminal_ts_ns: 1_700_000_000_250_000_000,
+                    origin: Some(OrderOrigin {
+                        scope: OrderOriginScope::StandaloneTrigger.into(),
+                        trigger_type: OrderTriggerType::Twap.into(),
+                        trigger_id: Some(77),
+                        child_seq: 3,
+                        ..Default::default()
+                    })
+                    .into(),
+                    market_max_slippage_bps: 100,
+                    ..Default::default()
+                },
+                vec![
+                    "terminal_ts_ns: \"1700000000250000000\"".into(),
+                    format!(
+                        "origin: Some(OrderOrigin {{ scope: \"standalone_trigger\", trigger_type: \"twap\", trigger_id: \"{}\", parent_order_id: \"\", child_seq: 3 }})",
+                        format_uint64_id(77)
+                    ),
+                    "market_client_ref_price: None".into(),
+                    "market_max_slippage: None".into(),
+                    "market_max_slippage_bps: 100".into(),
+                ],
+            ),
+            (
+                "attached-risk market child with a tick cap",
+                ProtoOrder {
+                    order_id: 12,
+                    symbol_id: 1,
+                    status: OrderStatus::Canceled.into(),
+                    terminal_ts_ns: 1_700_000_001_000_000_000,
+                    origin: Some(OrderOrigin {
+                        scope: OrderOriginScope::AttachedRisk.into(),
+                        trigger_type: OrderTriggerType::StopLoss.into(),
+                        trigger_id: Some(78),
+                        parent_order_id: Some(10),
+                        ..Default::default()
+                    })
+                    .into(),
+                    market_client_ref_price_ticks: 50_000_000_000,
+                    market_max_slippage_ticks: 2_500_000,
+                    ..Default::default()
+                },
+                vec![
+                    "terminal_ts_ns: \"1700000001000000000\"".into(),
+                    format!(
+                        "origin: Some(OrderOrigin {{ scope: \"attached_risk\", trigger_type: \"stop_loss\", trigger_id: \"{}\", parent_order_id: \"{}\", child_seq: 0 }})",
+                        format_uint64_id(78),
+                        format_uint64_id(10)
+                    ),
+                    format!(
+                        "market_client_ref_price: Some({:?})",
+                        crate::types::Price::from_ticks(50_000_000_000, None).unwrap()
+                    ),
+                    format!(
+                        "market_max_slippage: Some({:?})",
+                        crate::types::Price::from_ticks(2_500_000, None).unwrap()
+                    ),
+                    "market_max_slippage_bps: 0".into(),
+                ],
+            ),
+            (
+                "open order without any of them",
+                ProtoOrder {
+                    order_id: 14,
+                    symbol_id: 1,
+                    status: OrderStatus::Working.into(),
+                    ..Default::default()
+                },
+                vec![
+                    "terminal_ts_ns: \"\"".into(),
+                    "origin: None".into(),
+                    "market_client_ref_price: None".into(),
+                    "market_max_slippage: None".into(),
+                    "market_max_slippage_bps: 0".into(),
+                ],
+            ),
+        ];
+        for (name, msg, wants) in cases {
+            for (path, debug) in order_read_debug(msg.clone()) {
+                for want in &wants {
+                    assert!(
+                        debug.contains(want.as_str()),
+                        "{name} via {path}: want {want} in {debug}"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn get_order_reports_whether_executions_are_complete() {
         let recording = get_order_from_proto(&GetOrderResponse::default()).unwrap();

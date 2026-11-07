@@ -1111,7 +1111,13 @@ async fn a_broken_write_path_reconnects(writes: Writes) {
             }
             event = consumer.recv() => {
                 match event.expect("stream open") {
-                    PrivateOrdersEvent::Disconnected => disconnected = true,
+                    PrivateOrdersEvent::Disconnected => {
+                        disconnected = true;
+                        // A heartbeat that lands once the client dropped the
+                        // socket: the 1 s heartbeat when the reconnect backoff
+                        // draws its 1 s maximum.
+                        server.send("", 0, heartbeat.clone()).await;
+                    }
                     PrivateOrdersEvent::Error(error) => panic!("unexpected error: {error}"),
                     other => panic!("unexpected event: {other:?}"),
                 }
