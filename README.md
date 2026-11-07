@@ -75,7 +75,10 @@ still applies. In particular, social-verification routes may require a JWT
 session or may not be mounted.
 Private streams require an Account ID and the corresponding API-key permission.
 A successful Centrifugo subscribe call means the token exchange and realtime
-handshake completed. The order stream (`orders.subscribe`) returns at once and
+handshake completed. The connection and subscription tokens are renewed on the
+same connection before they expire; a renewal the API or the server refuses is
+reported through the error callback, and the subscription then resubscribes
+when the server ends it. The order stream (`orders.subscribe`) returns at once and
 reports its handshake through `Connected` and `Error` events. Treat a
 structured permission denial as non-transient and update the API-key policy
 before retrying.
@@ -1231,7 +1234,11 @@ Public trade, user fill, ledger transfer and trigger-event publications are
 batches. Their subscriptions yield every event in order, one at a time; an
 event that fails to decode is reported through `set_on_error` and the rest of
 its batch is still delivered. Both legs of a ledger transfer share
-`LedgerTransfer.transfer_id`. Use `realtime::Client::subscribe_proto_batch`
+`LedgerTransfer.transfer_id`. `LedgerTransfer.balance_after` is the account
+bucket's balance after the transfer, an exact integer at the 18-decimal ledger
+scale like `amount`, or `None` when the server sends none.
+`LedgerTransfer.link_id` is the decimal correlation ID of related legs, `None`
+when there is none. Use `realtime::Client::subscribe_proto_batch`
 for a batched channel of your own.
 
 A market overview subscription created with `symbols` keeps only those
