@@ -12,7 +12,9 @@ use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
 };
-use crate::proto::ledger::read::v1::ErrorDetail as LedgerErrorDetail;
+use crate::proto::ledger::read::v1::{
+    ErrorCode as LedgerErrorCode, ErrorDetail as LedgerErrorDetail,
+};
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::proto::transfer::v1::{
@@ -355,6 +357,139 @@ fn is_outcome_unknown_code(code: &str) -> bool {
     code.ends_with("_OUTCOME_UNKNOWN")
 }
 
+/// Whether `code` is an enum's zero value: "no code was provided", never a code
+/// of its own.
+pub(crate) fn is_placeholder_code(code: &str) -> bool {
+    matches!(
+        code,
+        "UNSPECIFIED" | "ERROR_CODE_UNSPECIFIED" | "AUTH_UNSPECIFIED"
+    )
+}
+
+/// Whether a service detail says nothing: no code and no backoff. Field
+/// violations alone name what to fix, not an outcome.
+fn is_placeholder_detail(detail: &ErrorDetail) -> bool {
+    if let Some(auth) = decode_auth_error_detail(detail) {
+        return auth.code.to_i32() == 0;
+    }
+    if let Some(rate_limit) = decode_rate_limit_detail(detail) {
+        return rate_limit.encode_to_bytes().is_empty();
+    }
+    if let Some(order) = decode_order_error_detail(detail) {
+        return order.code.to_i32() == 0
+            && order
+                .rate_limit
+                .as_option()
+                .is_none_or(|rate_limit| rate_limit.encode_to_bytes().is_empty());
+    }
+    if let Some(withdraw) = decode_withdraw_error_detail(detail) {
+        return withdraw.code.to_i32() == 0;
+    }
+    if let Some(ledger) = decode_ledger_error_detail(detail) {
+        return ledger.code.to_i32() == 0;
+    }
+    if let Some(transfer) = decode_transfer_error_detail(detail) {
+        return transfer.code.to_i32() == 0;
+    }
+    false
+}
+
+/// Whether a service detail has a code this SDK's enum can't name. Its type shows
+/// that a service sent it, not what the code means: it could be a future refusal
+/// or a future unknown outcome.
+pub(crate) fn has_future_code(detail: &ErrorDetail) -> bool {
+    future_code_label(detail).is_some()
+}
+
+/// The label a code from [`has_future_code`] is reported under.
+fn future_code_label(detail: &ErrorDetail) -> Option<String> {
+    let raw = if let Some(auth) = decode_auth_error_detail(detail) {
+        auth.code.as_known().is_none().then(|| auth.code.to_i32())
+    } else if let Some(order) = decode_order_error_detail(detail) {
+        order.code.as_known().is_none().then(|| order.code.to_i32())
+    } else if let Some(withdraw) = decode_withdraw_error_detail(detail) {
+        withdraw
+            .code
+            .as_known()
+            .is_none()
+            .then(|| withdraw.code.to_i32())
+    } else if let Some(ledger) = decode_ledger_error_detail(detail) {
+        ledger
+            .code
+            .as_known()
+            .is_none()
+            .then(|| ledger.code.to_i32())
+    } else if let Some(transfer) = decode_transfer_error_detail(detail) {
+        transfer
+            .code
+            .as_known()
+            .is_none()
+            .then(|| transfer.code.to_i32())
+    } else {
+        None
+    };
+    raw.map(|raw| known_or_unknown_code(None, raw))
+}
+
+/// Whether a detail is a service detail with a code this SDK can name. One that
+/// is empty or undecodable proves nothing.
+pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
+    let decodes = decode_auth_error_detail(detail).is_some()
+        || decode_rate_limit_detail(detail).is_some()
+        || decode_order_error_detail(detail).is_some()
+        || decode_withdraw_error_detail(detail).is_some()
+        || decode_ledger_error_detail(detail).is_some()
+        || decode_transfer_error_detail(detail).is_some();
+    decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
+}
+
+/// Contract REST codes that no generated error enum names.
+const REST_ONLY_CODES: [&str; 21] = [
+    "API_KEY_ACTION_DENY",
+    "API_KEY_POLICY_NOT_FOUND",
+    "INVALID_BEFORE_TS_NS",
+    "INVALID_DEPTH",
+    "INVALID_END_TIME",
+    "INVALID_LIMIT",
+    "INVALID_OFFSET",
+    "INVALID_ORDER_STATUS",
+    "INVALID_PAGE_TOKEN",
+    "INVALID_START_TIME",
+    "INVALID_SYMBOL",
+    "INVALID_TRIGGER_ID",
+    "INVALID_TRIGGER_STATUS",
+    "ORDER_ID_REQUIRED",
+    "REQUEST_TOO_LARGE",
+    "ROLE_ACTION_DENY",
+    "ROLE_SPOT_TRADE_DENY",
+    "SERVER_ERROR",
+    "SUBACCOUNT_POLICY_DENY",
+    "TRAILING_STOP_ORDER_TYPE_UNSUPPORTED",
+    "TRIGGER_ID_REQUIRED",
+];
+
+/// Whether the contract defines this REST problem `code`. A mutation's unknown
+/// outcome is recognised by its suffix, including one added to the contract
+/// after this SDK was generated.
+pub(crate) fn is_recognised_rest_code(code: &str) -> bool {
+    if code.is_empty() || is_placeholder_code(code) {
+        return false;
+    }
+    if is_outcome_unknown_code(code) || REST_ONLY_CODES.contains(&code) {
+        return true;
+    }
+    let prefixed = format!("ERROR_CODE_{code}");
+    let auth = format!("AUTH_{code}");
+    [code, prefixed.as_str()].iter().any(|name| {
+        OrderErrorCode::from_proto_name(name).is_some()
+            || WithdrawErrorCode::from_proto_name(name).is_some()
+            || TransferErrorCode::from_proto_name(name).is_some()
+            || LedgerErrorCode::from_proto_name(name).is_some()
+    }) || [code, auth.as_str()]
+        .iter()
+        .any(|name| AuthErrorCode::from_proto_name(name).is_some())
+}
+
 impl Error {
     /// Original REST metadata, when a REST problem supplied this error.
     /// For `Error::Api`, this decodes the synthetic JSON `http_problem` metadata entry.
@@ -444,9 +579,10 @@ impl Error {
 
     /// Whether this error can occur after the server accepted a mutation.
     ///
-    /// True for transport, server and response-contract errors, and for an
-    /// order create, cancel or modify or a trigger create or change that was
-    /// sent but not confirmed in time ([`order_codes::OUTCOME_UNKNOWN`]): it
+    /// True for transport, server and response-contract errors, for any HTTP
+    /// error with no recognised code except a 401 or 403, for a bare 404, and
+    /// for an order create, cancel or modify or a trigger create or change that
+    /// was sent but not confirmed in time ([`order_codes::OUTCOME_UNKNOWN`]): it
     /// may still apply. Those outcome-unknown codes are not retryable.
     ///
     /// Callers must treat these failures as ambiguous: read the order or
@@ -457,7 +593,8 @@ impl Error {
             Self::Transport(_)
             | Self::ResponseContract { .. }
             | Self::Server(_)
-            | Self::GatewayTimeout { .. } => true,
+            | Self::GatewayTimeout { .. }
+            | Self::RouteNotFound { .. } => true,
             Self::Api { code, .. } => is_outcome_unknown_code(code),
             _ => false,
         }
@@ -678,7 +815,7 @@ fn order_error_code_from_name(code: &str) -> String {
     }
 }
 
-fn is_service_code_message(code: &str) -> bool {
+pub(crate) fn is_service_code_message(code: &str) -> bool {
     code.as_bytes().first().is_some_and(u8::is_ascii_uppercase)
         && code
             .bytes()
@@ -804,8 +941,8 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return gateway_rejection_error(status, raw_message);
     }
     if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
-        // A bare 404 means the route is missing; a bare 501 that the server
-        // does not implement the call.
+        // A bare 404 means the route is missing; a contract code at 501 that
+        // the server does not implement the call.
         return if status == 404 {
             Error::RouteNotFound {
                 procedure: String::new(),
@@ -860,7 +997,37 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             violations: Vec::new(),
         };
     }
+    // A detail with no code says nothing about the outcome, but its field
+    // violations still name what to fix on a recognised Connect code.
+    let mut placeholder_violations = Vec::new();
+    let mut future_code = None;
+    let server_failure = matches!(
+        err.code,
+        ErrorCode::Internal
+            | ErrorCode::Unknown
+            | ErrorCode::DataLoss
+            | ErrorCode::Canceled
+            | ErrorCode::Unavailable
+            | ErrorCode::DeadlineExceeded
+    );
     for detail in details {
+        if is_placeholder_detail(detail) {
+            if let Some(order) = decode_order_error_detail(detail) {
+                placeholder_violations.extend(order.violations.iter().map(|v| {
+                    OrderFieldViolation {
+                        field_path: v.field_path.clone(),
+                        rule_id: v.rule_id.clone(),
+                        message: v.message.clone(),
+                    }
+                }));
+            }
+            continue;
+        }
+        // A code this SDK can't name stands only behind a recognised refusal.
+        if server_failure && has_future_code(detail) {
+            future_code = future_code.or_else(|| future_code_label(detail));
+            continue;
+        }
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             match auth_detail.code.as_known() {
                 Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW) => {
@@ -1050,6 +1217,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         .and_then(|d| d.get("code"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or(raw_message);
+    let named_code = if is_placeholder_code(named_code) {
+        ""
+    } else {
+        named_code
+    };
     let normalized_code = order_error_code_from_name(named_code);
     if err.code == ErrorCode::Unavailable
         && status == 503
@@ -1090,7 +1262,17 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
             rate_limit_error(message, None, header_retry, code)
         }
-        ErrorCode::Unavailable | ErrorCode::Internal => Error::Server(message),
+        // The contract never uses unknown, data_loss or canceled, and none of
+        // them says a request was refused.
+        ErrorCode::Unavailable
+        | ErrorCode::Internal
+        | ErrorCode::Unknown
+        | ErrorCode::DataLoss
+        | ErrorCode::Canceled => Error::Server(match future_code {
+            // Kept for diagnosis only; this variant has no code field.
+            Some(label) => format!("{message} ({label})"),
+            None => message,
+        }),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented { message },
         _ => Error::Api {
@@ -1101,7 +1283,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 format!("{code:?}")
             },
             metadata: Vec::new(),
-            violations: Vec::new(),
+            violations: placeholder_violations,
         },
     }
 }

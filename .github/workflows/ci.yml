@@ -77,4 +77,4 @@ jobs:
       # Required PR gate: unit/UI plus deterministic local HTTP/WS L2 tests.
       # Credentialed staging tests remain a separate fail-closed release job.
       - name: Test unit and local L2
-        run: cargo test --all-features --lib --test ui --test hardening --test a7_strict_live --test price_fixtures
+        run: cargo test --all-features --lib --test ui --test hardening --test a7_strict_live --test price_fixtures --test read_preservation --test server_unsubscribe

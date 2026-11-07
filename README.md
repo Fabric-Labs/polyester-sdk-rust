@@ -1037,9 +1037,17 @@ an invite for the owner, changing the owner's role or removing the owner) is ref
 not retryable. Show "The owner's role can't be changed", and don't offer role changes, removal or
 invites for the member whose role is `OWNER`.
 
-`Error::NotImplemented` means the server does not offer the call (Connect `unimplemented` or HTTP
-501); `Error::RouteNotFound` is the narrower bare HTTP 404. `Error::is_not_implemented()` is true
-for both, and neither is retryable.
+`Error::NotImplemented` means the server does not offer the call (Connect `unimplemented`, or a
+contract code at HTTP 501); `Error::RouteNotFound` is the narrower bare HTTP 404.
+`Error::is_not_implemented()` is true for both, and neither is retryable.
+
+An HTTP error with no code the contract defines can come from a gateway or an edge, so it doesn't
+prove a request was refused. Only a 401 or 403 is a refusal on its status alone (`Error::Auth` or
+`Error::ApiKeyRejected`). Every other status returns `Error::Server` with
+`mutation_outcome_unknown()` true and `is_retryable()` false, and names any code it did send in its
+message; read back before sending a mutation again. Reads retry 429, 502, 503 and 504 for you. A
+bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
+code at HTTP 429 returns `Error::Api`: known and not retryable.
 
 A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
 counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.

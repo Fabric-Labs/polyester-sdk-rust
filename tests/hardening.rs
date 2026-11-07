@@ -4,6 +4,8 @@
 //! Quantity::format, SnapshotThenStream) against in-process servers — not private helpers.
 
 mod hardening_support;
+#[path = "readable_error_bodies/mod.rs"]
+mod readable_error_bodies;
 
 use buffa::Message;
 use futures_util::future::FutureExt;
@@ -3785,8 +3787,7 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
         auth_me_error(|| json_body(501, "application/json", r#"{"code":"unimplemented"}"#)).await;
     assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
 
-    // A bare HTTP 501, whatever its body, is NotImplemented: JSON bodies that
-    // are not Connect errors included.
+    // A bare HTTP 501 proves nothing about a mutation, whatever its body.
     for script in [
         (|| json_body(501, "text/plain", "Not Implemented"))
             as fn() -> hardening_support::HttpScript,
@@ -3794,21 +3795,34 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
         || json_body(501, "application/json", r#"{"message":"Not Implemented"}"#),
     ] {
         let err = auth_me_error(script).await;
-        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
-        assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");
+        assert!(matches!(err, Error::Server(_)), "{err:?}");
+        assert!(
+            !err.is_retryable() && err.mutation_outcome_unknown(),
+            "{err:?}"
+        );
     }
 
-    // A bare 404, empty or with a non-Connect JSON body, stays the narrower
-    // RouteNotFound.
+    // A bare 404 stays the narrower RouteNotFound. A JSON body that isn't a
+    // router's own message is not bare.
     for script in [
         (|| hardening_support::HttpScript::NotFound) as fn() -> hardening_support::HttpScript,
-        || json_body(404, "application/json", "{}"),
+        || json_body(404, "application/json", ""),
+        || {
+            json_body(
+                404,
+                "application/json",
+                r#"{"message":"404 page not found"}"#,
+            )
+        },
         || json_body(404, "text/html", "<h1>404 page not found</h1>"),
     ] {
         let err = auth_me_error(script).await;
         assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
         assert!(err.is_not_implemented(), "{err:?}");
+        assert!(err.mutation_outcome_unknown(), "{err:?}");
     }
+    let err = auth_me_error(|| json_body(404, "application/json", "{}")).await;
+    assert!(matches!(err, Error::Server(_)), "{err:?}");
 
     // A Connect `not_found` error carried on HTTP 404 is a missing resource,
     // not a missing route.
@@ -4225,32 +4239,38 @@ fn encoded_body(
 // a bare one.
 #[tokio::test]
 async fn l2_encoded_failed_responses_keep_their_classification() {
+    // A bare 501 proves nothing about a mutation, compressed or not.
     for script in [
         (|| encoded_body(501, "text/plain", "gzip", "Not Implemented"))
             as fn() -> hardening_support::HttpScript,
         || encoded_body(501, "text/plain", "identity", "Not Implemented"),
         || encoded_body(501, "application/json", "gzip", "{}"),
-        || {
-            encoded_body(
-                501,
-                "application/json",
-                "gzip",
-                r#"{"code":"unimplemented"}"#,
-            )
-        },
     ] {
         let err = auth_me_error(script).await;
-        assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
+        assert!(matches!(err, Error::Server(_)), "{err:?}");
+        assert!(err.mutation_outcome_unknown(), "{err:?}");
     }
+    let err = auth_me_error(|| {
+        encoded_body(
+            501,
+            "application/json",
+            "gzip",
+            r#"{"code":"unimplemented"}"#,
+        )
+    })
+    .await;
+    assert!(matches!(err, Error::NotImplemented { .. }), "{err:?}");
     for script in [
         (|| encoded_body(404, "text/plain", "identity", "404 page not found"))
             as fn() -> hardening_support::HttpScript,
         || encoded_body(404, "text/plain", "gzip", "404 page not found"),
-        || encoded_body(404, "application/json", "gzip", "{}"),
     ] {
         let err = auth_me_error(script).await;
         assert!(matches!(err, Error::RouteNotFound { .. }), "{err:?}");
     }
+    // A compressed JSON body that names no code is no more bare than a plain one.
+    let err = auth_me_error(|| encoded_body(404, "application/json", "gzip", "{}")).await;
+    assert!(matches!(err, Error::Server(_)), "{err:?}");
     // A compressed Connect not_found stays a resource error.
     let err = auth_me_error(|| {
         encoded_body(

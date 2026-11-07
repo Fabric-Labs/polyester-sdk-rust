@@ -155,9 +155,9 @@ pub type SharedTransport = GatewayTransport;
 /// and [`crate::errors::map_connect_error`] reads it back.
 pub(crate) const GATEWAY_REJECTION_TYPE: &str = "polyester.sdk.GatewayRejection";
 
-/// Type URL of the SDK-local Connect error detail that marks a bare HTTP 404
-/// or 501: a failed response whose body is not a Connect error. The error's
-/// HTTP status is the response's.
+/// Type URL of the SDK-local Connect error detail that marks a bare HTTP 404, a
+/// plain 504 or a contract code at 501: a failed response whose body is not a
+/// Connect error. The error's HTTP status is the response's.
 pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 
 /// Longest body excerpt kept in a bare HTTP error message.
@@ -171,9 +171,10 @@ const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 ///   `401 {"code":"TIMESTAMP_SKEW"}`. Connect would keep only the HTTP status
 ///   and drop the code. This transport reports the code, so the rejection
 ///   maps to [`Error::TimestampSkew`] or [`Error::ApiKeyRejected`].
-/// - A bare HTTP 404 or 501 (any body that is not a Connect error) keeps its
-///   real status, so it maps to [`Error::RouteNotFound`] or
-///   [`Error::NotImplemented`] rather than Connect's guess from the status.
+/// - An answer with no recognised code is reported by its real status, because a
+///   gateway or an edge can send it too and it proves nothing about a mutation:
+///   [`Error::Server`], or [`Error::RouteNotFound`] for a bare 404, rather than
+///   Connect's guess from the status.
 #[derive(Clone)]
 pub struct GatewayTransport {
     inner: HttpClient,
@@ -241,7 +242,7 @@ impl ClientTransport for GatewayTransport {
 
 /// For a failed response that may need classifying, whether its body is
 /// JSON; `None` for everything else, which streams through untouched.
-/// Gateway rejections are JSON; bare 404 and 501 have any body.
+/// Gateway rejections are JSON; an answer with no code has any body.
 fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
     let status = response.status();
     if status.is_success() {
@@ -255,11 +256,7 @@ fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
         .is_some_and(|value| {
             value.starts_with("application/json") || value.starts_with("application/problem+json")
         });
-    (is_json
-        || status == StatusCode::NOT_FOUND
-        || status == StatusCode::NOT_IMPLEMENTED
-        || status == StatusCode::GATEWAY_TIMEOUT)
-        .then_some(is_json)
+    (is_json || status.is_client_error() || status.is_server_error()).then_some(is_json)
 }
 
 /// The Connect error for a failed response that Connect would misreport, or
@@ -287,10 +284,18 @@ fn classify_failed_response_inner(
     body: &[u8],
 ) -> Option<ConnectError> {
     #[derive(Deserialize)]
+    struct BodyDetail {
+        #[serde(rename = "type")]
+        type_url: Option<String>,
+        value: Option<String>,
+    }
+    #[derive(Deserialize)]
     struct Body {
         code: Option<String>,
         title: Option<String>,
         detail: Option<String>,
+        message: Option<String>,
+        details: Option<Vec<BodyDetail>>,
     }
     let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
@@ -298,11 +303,46 @@ fn classify_failed_response_inner(
     let code = parsed
         .as_ref()
         .and_then(|body| body.code.clone())
-        .filter(|code| !code.is_empty());
+        .filter(|code| !code.is_empty() && !crate::errors::is_placeholder_code(code));
+    let body_details: Vec<ErrorDetail> = parsed
+        .as_ref()
+        .and_then(|body| body.details.as_ref())
+        .map(|details| {
+            details
+                .iter()
+                .map(|detail| ErrorDetail {
+                    type_url: detail.type_url.clone().unwrap_or_default(),
+                    value: detail.value.clone(),
+                    debug: None,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let has_service_detail = body_details
+        .iter()
+        .any(crate::errors::carries_contract_code);
+    let body_message = parsed
+        .as_ref()
+        .and_then(|body| {
+            [&body.message, &body.detail, &body.title]
+                .into_iter()
+                .flatten()
+                .find(|message| !message.is_empty())
+                .cloned()
+        })
+        .unwrap_or_else(|| bare_http_message(status, body));
     if let Some(code) = code {
         // Connect error codes are lowercase names such as `unimplemented`.
-        if code.parse::<ErrorCode>().is_ok() {
-            return None;
+        if let Ok(connect_code) = code.parse::<ErrorCode>() {
+            // The contract never uses these, and they say nothing a 401 or 403
+            // doesn't already say better.
+            let ambiguous = matches!(
+                connect_code,
+                ErrorCode::Unknown | ErrorCode::DataLoss | ErrorCode::Canceled
+            );
+            return (ambiguous && !has_service_detail)
+                .then(|| refusal_by_status(status, &body_message))
+                .flatten();
         }
         // Preserve a known mutation outcome before falling back to HTTP's
         // temporary-failure code. The Connect detail gives both paths the
@@ -387,13 +427,26 @@ fn classify_failed_response_inner(
                 BARE_HTTP_ERROR_TYPE,
             ));
         }
+        let known_refusal = crate::errors::is_recognised_rest_code(&code)
+            || (status == StatusCode::TOO_MANY_REQUESTS
+                && crate::errors::is_service_code_message(&code));
+        if !known_refusal {
+            // Kept for diagnosis only: the code proves nothing.
+            let message = if message == code {
+                code
+            } else {
+                format!("{code}: {message}")
+            };
+            return Some(no_recognised_code_error(status, message));
+        }
         let connect_code = match status.as_u16() {
-            400 | 422 => ErrorCode::InvalidArgument,
+            400 | 413 | 422 => ErrorCode::InvalidArgument,
+            404 => ErrorCode::NotFound,
             409 => ErrorCode::AlreadyExists,
             412 => ErrorCode::FailedPrecondition,
             429 => ErrorCode::ResourceExhausted,
             502 | 503 => ErrorCode::Unavailable,
-            _ if status == StatusCode::NOT_FOUND || status == StatusCode::NOT_IMPLEMENTED => {
+            501 => {
                 return Some(sdk_marked_error(
                     ErrorCode::Unimplemented,
                     message,
@@ -401,37 +454,86 @@ fn classify_failed_response_inner(
                     BARE_HTTP_ERROR_TYPE,
                 ));
             }
-            _ => return None,
+            500.. => ErrorCode::Internal,
+            _ => ErrorCode::FailedPrecondition,
         };
         return Some(ConnectError::new(connect_code, message).with_http_status(status));
     }
-    if status != StatusCode::NOT_FOUND
-        && status != StatusCode::NOT_IMPLEMENTED
-        && status != StatusCode::GATEWAY_TIMEOUT
-    {
+    if status == StatusCode::GATEWAY_TIMEOUT {
+        return Some(sdk_marked_error(
+            ErrorCode::Unavailable,
+            bare_http_message(status, body),
+            status,
+            BARE_HTTP_ERROR_TYPE,
+        ));
+    }
+    if has_service_detail || !(status.is_client_error() || status.is_server_error()) {
         return None;
     }
+    // Connect's status table already reads these correctly.
+    if matches!(status.as_u16(), 401 | 403 | 429 | 502 | 503) {
+        return None;
+    }
+    if status == StatusCode::NOT_FOUND
+        && (!is_json || body.is_empty() || is_route_not_found_message(&body_message))
+    {
+        return Some(sdk_marked_error(
+            ErrorCode::Unimplemented,
+            bare_http_message(status, body),
+            status,
+            BARE_HTTP_ERROR_TYPE,
+        ));
+    }
+    let mut err = no_recognised_code_error(status, body_message);
+    // The error mapping names a typed code this SDK can't name, for diagnosis.
+    for detail in body_details {
+        if crate::errors::has_future_code(&detail) {
+            err = err.with_detail(detail);
+        }
+    }
+    Some(err)
+}
+
+/// An answer with no recognised code, by its status. A gateway or an edge can
+/// send any of these, so none proves that a mutation was refused.
+fn no_recognised_code_error(status: StatusCode, message: String) -> ConnectError {
+    let code = match status.as_u16() {
+        429 | 502 | 503 => ErrorCode::Unavailable,
+        _ => ErrorCode::Internal,
+    };
+    ConnectError::new(code, message).with_http_status(status)
+}
+
+/// The refusal a 401 or 403 makes on its status alone.
+fn refusal_by_status(status: StatusCode, message: &str) -> Option<ConnectError> {
+    let code = match status {
+        StatusCode::UNAUTHORIZED => ErrorCode::Unauthenticated,
+        StatusCode::FORBIDDEN => ErrorCode::PermissionDenied,
+        _ => return None,
+    };
+    Some(ConnectError::new(code, message.to_owned()).with_http_status(status))
+}
+
+/// A router's own answer for a path it doesn't know.
+fn is_route_not_found_message(message: &str) -> bool {
+    matches!(
+        message.trim().to_ascii_lowercase().as_str(),
+        "not found" | "404 page not found" | "404 not found"
+    )
+}
+
+fn bare_http_message(status: StatusCode, body: &[u8]) -> String {
     let text = String::from_utf8_lossy(body);
     let excerpt: String = text
         .trim()
         .chars()
         .take(BARE_HTTP_ERROR_EXCERPT_CHARS)
         .collect();
-    let message = if excerpt.is_empty() {
+    if excerpt.is_empty() {
         format!("HTTP {}", status.as_u16())
     } else {
         format!("HTTP {}: {excerpt}", status.as_u16())
-    };
-    Some(sdk_marked_error(
-        if status == StatusCode::GATEWAY_TIMEOUT {
-            ErrorCode::Unavailable
-        } else {
-            ErrorCode::Unimplemented
-        },
-        message,
-        status,
-        BARE_HTTP_ERROR_TYPE,
-    ))
+    }
 }
 
 /// The Connect error for an API-gateway rejection `code`, or `None` when the
@@ -668,9 +770,21 @@ mod tests {
         // Connect error bodies are left to Connect, with or without a message.
         assert!(classify(501, true, r#"{"code":"unimplemented"}"#).is_none());
         assert!(classify(404, true, r#"{"code":"not_found","message":"x"}"#).is_none());
-        // Other failures Connect maps correctly by status are left alone.
-        assert!(classify(500, true, "{}").is_none());
-        assert!(classify(500, true, r#"{"code":"INTERNAL_ERROR"}"#).is_none());
+        // Failures Connect maps correctly by status are left alone.
+        assert!(classify(503, true, "{}").is_none());
+        assert!(classify(401, false, "oops").is_none());
+        // A status Connect would guess at is reported as it is.
+        for (status, is_json, body) in [
+            (500, true, "{}"),
+            (500, true, r#"{"code":"INTERNAL_ERROR"}"#),
+            (500, false, "oops"),
+            (501, false, "Not Implemented"),
+            (409, true, r#"{"message":"m"}"#),
+        ] {
+            let err = classify(status, is_json, body).expect("server error");
+            assert_eq!(err.code, ErrorCode::Internal, "{status} {body}");
+            assert_eq!(err.http_status().as_u16(), status);
+        }
         assert_eq!(
             classify(503, true, r#"{"code":"MAINTENANCE"}"#)
                 .unwrap()
@@ -680,13 +794,13 @@ mod tests {
 
         for (status, is_json, body, message) in [
             (404, false, "", "HTTP 404"),
-            (404, true, "{}", "HTTP 404: {}"),
-            (501, false, "Not Implemented", "HTTP 501: Not Implemented"),
+            (404, true, "", "HTTP 404"),
+            (404, false, "oops", "HTTP 404: oops"),
             (
-                501,
+                404,
                 true,
-                r#"{"message":"Not Implemented"}"#,
-                r#"HTTP 501: {"message":"Not Implemented"}"#,
+                r#"{"message":"Not Found"}"#,
+                r#"HTTP 404: {"message":"Not Found"}"#,
             ),
         ] {
             let err = classify(status, is_json, body).expect("bare HTTP error");
