@@ -240,16 +240,6 @@ impl ClientTransport for GatewayTransport {
     }
 }
 
-/// Detail types that carry a contract code; a body with one of these has a code.
-const SERVICE_DETAIL_TYPES: [&str; 6] = [
-    "auth.v1.AuthErrorDetail",
-    "orders.v1.ErrorDetail",
-    "chain.withdraw.v1.ErrorDetail",
-    "transfer.v1.ErrorDetail",
-    "ledger.read.v1.ErrorDetail",
-    "polyester.ratelimit.v1.RateLimitDetail",
-];
-
 /// For a failed response that may need classifying, whether its body is
 /// JSON; `None` for everything else, which streams through untouched.
 /// Gateway rejections are JSON; an answer with no code has any body.
@@ -294,9 +284,10 @@ fn classify_failed_response_inner(
     body: &[u8],
 ) -> Option<ConnectError> {
     #[derive(Deserialize)]
-    struct DetailType {
+    struct BodyDetail {
         #[serde(rename = "type")]
         type_url: Option<String>,
+        value: Option<String>,
     }
     #[derive(Deserialize)]
     struct Body {
@@ -304,7 +295,7 @@ fn classify_failed_response_inner(
         title: Option<String>,
         detail: Option<String>,
         message: Option<String>,
-        details: Option<Vec<DetailType>>,
+        details: Option<Vec<BodyDetail>>,
     }
     let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
@@ -312,16 +303,17 @@ fn classify_failed_response_inner(
     let code = parsed
         .as_ref()
         .and_then(|body| body.code.clone())
-        .filter(|code| !code.is_empty());
+        .filter(|code| !code.is_empty() && !crate::errors::is_placeholder_code(code));
     let has_service_detail = parsed
         .as_ref()
         .and_then(|body| body.details.as_ref())
         .is_some_and(|details| {
             details.iter().any(|detail| {
-                detail
-                    .type_url
-                    .as_deref()
-                    .is_some_and(|name| SERVICE_DETAIL_TYPES.contains(&name))
+                crate::errors::carries_contract_code(&ErrorDetail {
+                    type_url: detail.type_url.clone().unwrap_or_default(),
+                    value: detail.value.clone(),
+                    debug: None,
+                })
             })
         });
     let body_message = parsed

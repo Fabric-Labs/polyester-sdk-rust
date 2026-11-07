@@ -357,6 +357,55 @@ fn is_outcome_unknown_code(code: &str) -> bool {
     code.ends_with("_OUTCOME_UNKNOWN")
 }
 
+/// Whether `code` is an enum's zero value: "no code was provided", never a code
+/// of its own.
+pub(crate) fn is_placeholder_code(code: &str) -> bool {
+    matches!(
+        code,
+        "UNSPECIFIED" | "ERROR_CODE_UNSPECIFIED" | "AUTH_UNSPECIFIED"
+    )
+}
+
+/// Whether a service detail says nothing: no code and no backoff. Field
+/// violations alone name what to fix, not an outcome.
+fn is_placeholder_detail(detail: &ErrorDetail) -> bool {
+    if let Some(auth) = decode_auth_error_detail(detail) {
+        return auth.code.to_i32() == 0;
+    }
+    if let Some(rate_limit) = decode_rate_limit_detail(detail) {
+        return rate_limit.encode_to_bytes().is_empty();
+    }
+    if let Some(order) = decode_order_error_detail(detail) {
+        return order.code.to_i32() == 0
+            && order
+                .rate_limit
+                .as_option()
+                .is_none_or(|rate_limit| rate_limit.encode_to_bytes().is_empty());
+    }
+    if let Some(withdraw) = decode_withdraw_error_detail(detail) {
+        return withdraw.code.to_i32() == 0;
+    }
+    if let Some(ledger) = decode_ledger_error_detail(detail) {
+        return ledger.code.to_i32() == 0;
+    }
+    if let Some(transfer) = decode_transfer_error_detail(detail) {
+        return transfer.code.to_i32() == 0;
+    }
+    false
+}
+
+/// Whether a detail is a service detail that says something. One that is empty
+/// or undecodable proves nothing.
+pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
+    let decodes = decode_auth_error_detail(detail).is_some()
+        || decode_rate_limit_detail(detail).is_some()
+        || decode_order_error_detail(detail).is_some()
+        || decode_withdraw_error_detail(detail).is_some()
+        || decode_ledger_error_detail(detail).is_some()
+        || decode_transfer_error_detail(detail).is_some();
+    decodes && !is_placeholder_detail(detail)
+}
+
 /// Contract REST codes that no generated error enum names.
 const REST_ONLY_CODES: [&str; 21] = [
     "API_KEY_ACTION_DENY",
@@ -386,7 +435,7 @@ const REST_ONLY_CODES: [&str; 21] = [
 /// outcome is recognised by its suffix, including one added to the contract
 /// after this SDK was generated.
 pub(crate) fn is_recognised_rest_code(code: &str) -> bool {
-    if code.is_empty() {
+    if code.is_empty() || is_placeholder_code(code) {
         return false;
     }
     if is_outcome_unknown_code(code) || REST_ONLY_CODES.contains(&code) {
@@ -911,7 +960,22 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             violations: Vec::new(),
         };
     }
+    // A detail with no code says nothing about the outcome, but its field
+    // violations still name what to fix on a recognised Connect code.
+    let mut placeholder_violations = Vec::new();
     for detail in details {
+        if is_placeholder_detail(detail) {
+            if let Some(order) = decode_order_error_detail(detail) {
+                placeholder_violations.extend(order.violations.iter().map(|v| {
+                    OrderFieldViolation {
+                        field_path: v.field_path.clone(),
+                        rule_id: v.rule_id.clone(),
+                        message: v.message.clone(),
+                    }
+                }));
+            }
+            continue;
+        }
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
             match auth_detail.code.as_known() {
                 Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW) => {
@@ -1101,6 +1165,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         .and_then(|d| d.get("code"))
         .and_then(serde_json::Value::as_str)
         .unwrap_or(raw_message);
+    let named_code = if is_placeholder_code(named_code) {
+        ""
+    } else {
+        named_code
+    };
     let normalized_code = order_error_code_from_name(named_code);
     if err.code == ErrorCode::Unavailable
         && status == 503
@@ -1158,7 +1227,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 format!("{code:?}")
             },
             metadata: Vec::new(),
-            violations: Vec::new(),
+            violations: placeholder_violations,
         },
     }
 }
