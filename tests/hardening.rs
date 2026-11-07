@@ -7937,7 +7937,20 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
     }
 }
 
-async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, depth: u32) {
+/// Subscribe to a book whose stream sends one delta at price zero on `side`.
+///
+/// The delta is published right after the subscribe reply, so it reaches the
+/// client before or after the first snapshot read answers, depending on
+/// timing; `first_snapshot_delay` holds that answer back to choose. A refused
+/// delta is rebuilt from a second snapshot read, which answers the book as of
+/// sequence 2.
+async fn raw_zero_delta_subscription(
+    side: &str,
+    bucket: &str,
+    quantity: i64,
+    depth: u32,
+    first_snapshot_delay: Duration,
+) {
     use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
     use polyester::services::CreateSubscriptionOptions;
 
@@ -7960,24 +7973,42 @@ async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, de
     .encode_to_vec();
     let ws =
         MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), delta).await;
-    let http = MockHttpServer::spawn(|request| {
+    let reads = Arc::new(AtomicUsize::new(0));
+    let http = MockHttpServer::spawn(move |request| {
         assert_eq!(request.path, "/orderbook.v1.OrderbookService/GetOrderBook");
-        connect_proto_ok(&GetOrderBookResponse {
+        let first = reads.fetch_add(1, Ordering::SeqCst) == 0;
+        let (book_seq, bid_qty, ask_qty) = if first { (1, 3, 4) } else { (2, 5, 6) };
+        let body = GetOrderBookResponse {
             symbol_id: 1,
-            book_seq: 1,
+            book_seq,
             available: true,
             bids: vec![PriceLevel {
                 price_ticks: 71_600_000,
-                qty_scaled: 3,
+                qty_scaled: bid_qty,
                 ..Default::default()
             }],
             asks: vec![PriceLevel {
                 price_ticks: 71_700_000,
-                qty_scaled: 4,
+                qty_scaled: ask_qty,
                 ..Default::default()
             }],
             ..Default::default()
-        })
+        }
+        .encode_to_vec();
+        if !first || first_snapshot_delay.is_zero() {
+            return hardening_support::HttpScript::Raw {
+                status: 200,
+                headers: vec![("Content-Type".into(), "application/proto".into())],
+                body,
+            };
+        }
+        // The answer completes only after the delay.
+        hardening_support::HttpScript::SlowDrip {
+            status: 200,
+            headers: vec![("Content-Type".into(), "application/proto".into())],
+            chunks: vec![body[..1].to_vec(), body[1..].to_vec()],
+            inter_chunk_delay: first_snapshot_delay,
+        }
     })
     .await;
     let client = Client::new(Config {
@@ -8004,16 +8035,31 @@ async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, de
         .await;
     if quantity > 0 {
         // Refused like any malformed delta: never shown, the book is rebuilt from a
-        // fresh snapshot, and the stream stays open.
+        // fresh snapshot, and the stream stays open. The first snapshot has a view
+        // only when it was shown before the delta arrived; a delta buffered behind
+        // it is refused before it is shown, so the rebuilt book is the first view.
         let mut subscription = result.unwrap();
-        for what in ["snapshot view", "view after the refreshed snapshot"] {
+        let mut views = 0;
+        loop {
             let view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
                 .await
-                .unwrap_or_else(|_| panic!("no {what}"))
+                .unwrap_or_else(|_| panic!("no view after the refreshed snapshot ({views} views)"))
                 .expect("a raw zero price must not close the stream");
-            assert_eq!(view.book_seq, "1", "corrupt delta was emitted: {view:?}");
-            assert_eq!(view.bids.len(), 1);
-            assert_eq!(view.asks.len(), 1);
+            views += 1;
+            assert_eq!(view.bids.len(), 1, "corrupt delta was emitted: {view:?}");
+            assert_eq!(view.asks.len(), 1, "corrupt delta was emitted: {view:?}");
+            let quantities = (
+                view.bids[0].qty.as_ref().unwrap().as_scaled(),
+                view.asks[0].qty.as_ref().unwrap().as_scaled(),
+            );
+            match view.book_seq.as_str() {
+                "1" if views == 1 => assert_eq!(quantities, (3, 4), "{view:?}"),
+                "2" => {
+                    assert_eq!(quantities, (5, 6), "{view:?}");
+                    break;
+                }
+                _ => panic!("corrupt delta was emitted: {view:?}"),
+            }
         }
         assert!(subscription.err().is_none(), "{:?}", subscription.err());
         assert_eq!(http.requests.load(Ordering::SeqCst), 2);
@@ -8053,25 +8099,59 @@ async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, de
     assert_eq!(ws.connects.load(Ordering::SeqCst), 1);
 }
 
+/// Delays for the first snapshot answer: none, a few drawn from one seed so the
+/// delta lands before, during or after that read, and one long enough that it
+/// always arrives first. Set `POLYESTER_INTERLEAVING_SEED` to replay a run.
+fn first_snapshot_delays() -> Vec<Duration> {
+    use rand_core::RngCore;
+    let seed = std::env::var("POLYESTER_INTERLEAVING_SEED")
+        .ok()
+        .map(|raw| {
+            raw.parse::<u64>()
+                .expect("POLYESTER_INTERLEAVING_SEED is a u64")
+        })
+        .unwrap_or_else(|| rand_core::OsRng.next_u64());
+    println!("POLYESTER_INTERLEAVING_SEED={seed}");
+    let mut state = seed;
+    let mut drawn = || {
+        // SplitMix64.
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        Duration::from_micros((z ^ (z >> 31)) % 40_000)
+    };
+    let mut delays = vec![Duration::ZERO];
+    delays.extend((0..3).map(|_| drawn()));
+    delays.push(Duration::from_millis(250));
+    delays
+}
+
 #[tokio::test]
 async fn l2_raw_zero_bid_delta_is_refused_and_resyncs() {
-    for bucket in ["", "0.001", "0.1"] {
-        raw_zero_delta_subscription("bids", bucket, 9, 50).await;
+    for delay in first_snapshot_delays() {
+        for bucket in ["", "0.001", "0.1"] {
+            raw_zero_delta_subscription("bids", bucket, 9, 50, delay).await;
+        }
     }
 }
 
 #[tokio::test]
 async fn l2_raw_zero_ask_delta_is_refused_and_resyncs() {
-    for bucket in ["", "0.001", "0.1"] {
-        raw_zero_delta_subscription("asks", bucket, 9, 50).await;
+    for delay in first_snapshot_delays() {
+        for bucket in ["", "0.001", "0.1"] {
+            raw_zero_delta_subscription("asks", bucket, 9, 50, delay).await;
+        }
     }
 }
 
 #[tokio::test]
 async fn l2_raw_zero_price_removal_deltas_are_harmless() {
-    for side in ["bids", "asks"] {
-        for bucket in ["", "0.001", "0.1"] {
-            raw_zero_delta_subscription(side, bucket, 0, 50).await;
+    for delay in first_snapshot_delays() {
+        for side in ["bids", "asks"] {
+            for bucket in ["", "0.001", "0.1"] {
+                raw_zero_delta_subscription(side, bucket, 0, 50, delay).await;
+            }
         }
     }
 }
@@ -8079,8 +8159,10 @@ async fn l2_raw_zero_price_removal_deltas_are_harmless() {
 #[tokio::test]
 async fn l2_raw_zero_bid_outside_the_requested_depth_is_refused() {
     // A zero bid sorts last, so depth 1 alone would never render it.
-    for bucket in ["", "0.001", "0.1"] {
-        raw_zero_delta_subscription("bids", bucket, 9, 1).await;
+    for delay in first_snapshot_delays() {
+        for bucket in ["", "0.001", "0.1"] {
+            raw_zero_delta_subscription("bids", bucket, 9, 1, delay).await;
+        }
     }
 }
 
