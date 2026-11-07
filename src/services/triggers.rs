@@ -666,11 +666,14 @@ impl TriggersService {
                 .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?,
             ..Default::default()
         };
+        // Zero targets the trigger's own market, which is not known here; a
+        // known market refuses a price bound to another one.
+        let market = self.ctx.catalogs.symbol_for_symbol_id(req.symbol_id);
         if let Some(price) = params.trigger_price.as_ref() {
-            req.trigger_price_ticks = Some(resolve_price_ticks(price, None)?);
+            req.trigger_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
         }
         if let Some(price) = params.activation_price.as_ref() {
-            req.activation_price_ticks = Some(resolve_price_ticks(price, None)?);
+            req.activation_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
         }
         if params.trailing_distance_ticks.is_some() && params.trailing_distance_bps.is_some() {
             return Err(Error::validation(
@@ -867,9 +870,16 @@ impl TriggersService {
         .await
     }
 
-    /// Modify a trigger. Price fields must be `Price` wrappers.
+    /// Modify a trigger. Price fields must be `Price` wrappers. When `symbol`
+    /// or `symbol_id` is given, a price bound to another market is refused.
     pub async fn modify(&self, params: ModifyTriggerParams) -> Result<TriggerMutationResult> {
-        if params.symbol.is_some() {
+        // A symbol is resolved through the catalogs; a symbol ID needs them to
+        // check a price bound to a market.
+        let bound_price = [&params.trigger_price, &params.activation_price]
+            .into_iter()
+            .flatten()
+            .any(|price| price.symbol().is_some());
+        if params.symbol.is_some() || (params.symbol_id.is_some() && bound_price) {
             self.ctx.wait_for_catalogs().await?;
         }
         let req = self.encode_modify_params(&params)?;
@@ -1771,5 +1781,56 @@ mod tests {
         let decimal_wire = client.triggers.encode_modify_params(&decimal).unwrap();
         let scaled_wire = client.triggers.encode_modify_params(&scaled).unwrap();
         assert_eq!(decimal_wire.encode_to_vec(), scaled_wire.encode_to_vec());
+    }
+
+    // A price bound to another market is refused when the trigger's market is
+    // given, as trigger creation and order writes do.
+    #[test]
+    fn modify_refuses_a_price_for_another_market() {
+        let client = client();
+        let sol = || crate::Price::from_ticks(46_000_000_000_000, Some("SOL-USDT".into())).unwrap();
+        for (symbol, symbol_id) in [(Some("BTC-USDT".to_owned()), None), (None, Some(7))] {
+            for params in [
+                modify_params(Some(sol()), None),
+                modify_params(None, Some(sol())),
+            ] {
+                let params = ModifyTriggerParams {
+                    symbol: symbol.clone(),
+                    symbol_id,
+                    ..params
+                };
+                let err = client
+                    .triggers
+                    .encode_modify_params(&params)
+                    .expect_err("a SOL-USDT price must not modify a BTC-USDT trigger");
+                assert!(
+                    err.to_string().contains(
+                        "price symbol mismatch: value is for SOL-USDT, destination is BTC-USDT"
+                    ),
+                    "{err}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn modify_sends_a_price_for_its_market_or_an_unknown_one() {
+        let client = client();
+        let btc = crate::Price::from_ticks(47_000_000_000_000, Some("BTC-USDT".into())).unwrap();
+        let wire = client
+            .triggers
+            .encode_modify_params(&modify_params(Some(btc), None))
+            .unwrap();
+        assert_eq!(wire.trigger_price_ticks, Some(47_000_000_000_000));
+        assert_eq!(wire.symbol_id, 7);
+        // Without a symbol or symbol ID the trigger's market is not known.
+        let sol = crate::Price::from_ticks(46_000_000_000_000, Some("SOL-USDT".into())).unwrap();
+        let unknown = ModifyTriggerParams {
+            symbol: None,
+            ..modify_params(Some(sol), None)
+        };
+        let wire = client.triggers.encode_modify_params(&unknown).unwrap();
+        assert_eq!(wire.trigger_price_ticks, Some(46_000_000_000_000));
+        assert_eq!(wire.symbol_id, 0);
     }
 }

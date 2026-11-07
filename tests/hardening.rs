@@ -9216,3 +9216,173 @@ fn realtime_policy_updates_keep_scope_caps_and_halt() {
     let got = api_policy_from_bytes(&newer.encode_to_vec()).unwrap();
     assert_eq!(got.spot_market_scope, "UNKNOWN(7)");
 }
+
+// Batch cancel and replace accept the 50 items the public contract allows and
+// refuse 51 before sending; batch create keeps its separate limit of 20.
+#[tokio::test]
+async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
+    use polyester::models::{BatchCancelItem, BatchReplaceItem, OrderKey};
+    use polyester::proto::orders::v1::{BatchCancelOrdersRequest, BatchReplaceOrdersRequest};
+    use polyester::types::Price;
+
+    let spot = spot_config_fixture();
+    let zipper = zipper_config_fixture();
+    let seen = Arc::new(std::sync::Mutex::new(Vec::<(String, usize)>::new()));
+    let sink = seen.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        let items = match req.path.as_str() {
+            path if path == SPOT_CONFIG_PATH => return connect_proto_ok(&spot),
+            path if path == ZIPPER_CONFIG_PATH => return connect_proto_ok(&zipper),
+            "/orders.v1.OrdersService/BatchCancelOrders" => {
+                BatchCancelOrdersRequest::decode_from_slice(&req.body).map(|r| r.items.len())
+            }
+            "/orders.v1.OrdersService/BatchReplaceOrders" => {
+                BatchReplaceOrdersRequest::decode_from_slice(&req.body).map(|r| r.items.len())
+            }
+            _ => return hardening_support::HttpScript::NotFound,
+        };
+        sink.lock()
+            .unwrap()
+            .push((req.path.clone(), items.expect("request decodes")));
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+    client.wait_for_catalogs().await.expect("catalogs");
+
+    let cancel = |n: usize| {
+        (0..n)
+            .map(|i| BatchCancelItem {
+                key: OrderKey::OrderId((i + 1).to_string()),
+                symbol_id: None,
+            })
+            .collect::<Vec<_>>()
+    };
+    let replace = |n: usize| {
+        (0..n)
+            .map(|i| BatchReplaceItem {
+                key: OrderKey::OrderId((i + 1).to_string()),
+                new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
+                new_qty: None,
+                new_attached_risk: None,
+                new_client_order_id: None,
+            })
+            .collect::<Vec<_>>()
+    };
+    for n in [20, 21, 50] {
+        let _ = client.orders.batch_cancel(cancel(n), None, None).await;
+        let _ = client
+            .orders
+            .batch_replace(replace(n), "BTC-USDT", None, None)
+            .await;
+    }
+    let err = client
+        .orders
+        .batch_cancel(cancel(51), None, None)
+        .await
+        .expect_err("51 cancel items exceed the contract");
+    assert!(
+        err.to_string()
+            .contains("batch_cancel accepts at most 50 items; received 51"),
+        "{err}"
+    );
+    let err = client
+        .orders
+        .batch_replace(replace(51), "BTC-USDT", None, None)
+        .await
+        .expect_err("51 replace items exceed the contract");
+    assert!(
+        err.to_string()
+            .contains("batch_replace accepts at most 50 items; received 51"),
+        "{err}"
+    );
+    let cancel_path = "/orders.v1.OrdersService/BatchCancelOrders".to_owned();
+    let replace_path = "/orders.v1.OrdersService/BatchReplaceOrders".to_owned();
+    assert_eq!(
+        *seen.lock().unwrap(),
+        [
+            (cancel_path.clone(), 20),
+            (replace_path.clone(), 20),
+            (cancel_path.clone(), 21),
+            (replace_path.clone(), 21),
+            (cancel_path, 50),
+            (replace_path, 50),
+        ]
+    );
+}
+
+// A batch replace item's attached risk reaches the wire; it is not dropped.
+#[tokio::test]
+async fn l2_batch_replace_sends_new_attached_risk() {
+    use polyester::models::{AttachedRisk, BatchReplaceItem, OrderKey, RiskLeg};
+    use polyester::proto::orders::v1::{BatchReplaceOrdersRequest, risk_policy};
+    use polyester::types::Price;
+
+    let spot = spot_config_fixture();
+    let zipper = zipper_config_fixture();
+    let seen = Arc::new(std::sync::Mutex::new(
+        Vec::<BatchReplaceOrdersRequest>::new(),
+    ));
+    let sink = seen.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == SPOT_CONFIG_PATH {
+            return connect_proto_ok(&spot);
+        }
+        if req.path == ZIPPER_CONFIG_PATH {
+            return connect_proto_ok(&zipper);
+        }
+        if req.path == "/orders.v1.OrdersService/BatchReplaceOrders" {
+            sink.lock()
+                .unwrap()
+                .push(BatchReplaceOrdersRequest::decode_from_slice(&req.body).expect("decodes"));
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: true,
+        ..Default::default()
+    })
+    .expect("client");
+    client.wait_for_catalogs().await.expect("catalogs");
+
+    let stop = Price::from_ticks(30_000_000_000_000, Some("BTC-USDT".into())).expect("price");
+    let _ = client
+        .orders
+        .batch_replace(
+            vec![BatchReplaceItem {
+                key: OrderKey::OrderId("9".into()),
+                new_price: None,
+                new_qty: None,
+                new_attached_risk: Some(AttachedRisk {
+                    stop_loss: Some(RiskLeg::market(stop)),
+                    ..Default::default()
+                }),
+                new_client_order_id: None,
+            }],
+            "BTC-USDT",
+            None,
+            None,
+        )
+        .await;
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    let risk = seen[0].items[0]
+        .new_attached_risk
+        .as_option()
+        .expect("attached risk sent");
+    let Some(risk_policy::StopLeg::StopLoss(stop_loss)) = risk.stop_leg.as_ref() else {
+        panic!("stop loss sent: {risk:?}");
+    };
+    assert_eq!(stop_loss.trigger_price_ticks, 30_000_000_000_000);
+}

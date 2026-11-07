@@ -707,12 +707,15 @@ pub struct CreateWalletTradingWithdrawParams {
 pub struct BatchReplaceAdmissionItem {
     pub item_index: u32,
     pub status: String,
+    /// The targeted order, empty when the server named none (an item refused
+    /// by client order ID can name no order).
     pub old_order_id: String,
     pub client_order_id: String,
-    /// The successor's planned order ID. It is not proof of an order: the
-    /// item can still be refused when applied, and then this ID never
-    /// becomes an order. Only [`BatchReplaceStatusItem`] or order reads
-    /// confirm a successor.
+    /// The successor's planned order ID, empty when there is none (an
+    /// amended or rejected item). It is not proof of an order: the item can
+    /// still be refused when applied, and then this ID never becomes an
+    /// order. Only [`BatchReplaceStatusItem`] or order reads confirm a
+    /// successor.
     pub replacement_order_id: String,
     /// `replaced` when a successor order takes over under
     /// `replacement_order_id`, with its queue priority reset. `amended` when
