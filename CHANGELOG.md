@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
+
+Package version: `0.13.0`. Git tag: `v0.13.0`. Released 2026-11-07. Built on public contract `1bf038e`.
 
 - **Breaking:** `ChangelogPostSummary` (and so `ChangelogPost::summary`) gains `revision` and `updated_at`, from `changelog.list_posts`, `changelog.posts` and `changelog.get_post` (and `changelog_posts_page_from_proto` and `changelog_post_from_proto`). A published post can now be republished, for example to correct its copy or withdraw a change: `revision` starts at 1 and increases with each republication, and `updated_at` is when the current revision was published. Its `slug`, `published_at` and change ids stay the same. A server that predates revisions sends neither: `revision` reads 0 and `updated_at` `None`. To follow edits, read a post again when its `revision` differs from the one you hold. Migration: a struct literal of `ChangelogPostSummary` must set the two fields or end with `..Default::default()`.
 - **Breaking:** `changelog.changes` yields each change id once per stream, and `changelog.breaking_changes_since` and `changelog.action_required_since` return each change once. When a post is republished while a walk pages through it, the next page restarts at that post's first change, so changes already received came again and were returned twice. `changes` skips the repeat; the two helpers keep the change at its first position with the wording last received. The helpers still filter on first publication, which a republication does not move, so they don't report an edit to an older post. Migration: none, unless you counted repeats; compare `revision` from `changelog.posts` to find edited posts.
