@@ -9470,3 +9470,89 @@ async fn l2_batch_replace_sends_new_attached_risk() {
     };
     assert_eq!(stop_loss.trigger_price_ticks, 30_000_000_000_000);
 }
+
+// Sub-account 0 is not a sub-account: on the wire 0 means unset (the main
+// account). An explicit Some(0) or 0 is refused before any request is sent.
+#[tokio::test]
+async fn explicit_subaccount_zero_is_refused_before_sending() {
+    use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
+    use polyester::proto::orders::v1::{CreateOrderRequest, CreateOrderResponse};
+    use polyester::services::GetSubaccountOpts;
+    use polyester::{Price, Quantity};
+    use std::sync::Mutex;
+
+    let observed = Arc::new(Mutex::new(Vec::new()));
+    let observed_handler = observed.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == "/orders.v1.OrdersService/CreateOrder" {
+            let decoded = CreateOrderRequest::decode_from_slice(&request.body).unwrap();
+            observed_handler.lock().unwrap().push(decoded.subaccount_id);
+            return connect_proto_ok(&CreateOrderResponse {
+                order_id: 9,
+                client_order_id: "zero-scope".into(),
+                ..Default::default()
+            });
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: Some("5".into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    let order = |subaccount_id: Option<u64>| {
+        let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        p.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some("zero-scope".into());
+        p.subaccount_id = subaccount_id;
+        p
+    };
+
+    // Control: a real sub-account ID is sent.
+    client.orders.create(order(Some(42))).await.unwrap();
+    assert_eq!(*observed.lock().unwrap(), vec![Some(42)]);
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+
+    let refused = [
+        client.orders.create(order(Some(0))).await.map(|_| ()),
+        client.orders.list_open(Some(0)).await.map(|_| ()),
+        client.api_keys.list(Some(0)).await.map(|_| ()),
+        client
+            .sub_accounts
+            .get(0, GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+    ];
+    for result in refused {
+        let err = result.expect_err("sub-account 0 must be refused");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("not 0"), "{err}");
+    }
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
