@@ -302,7 +302,7 @@ impl Client {
                 "Realtime private order streams require api_url".to_owned(),
             ));
         }
-        let account = crate::codecs::scalars::id_to_u64(account_id, "account_id")?;
+        let account = crate::codecs::scalars::parse_account_id(account_id, "account_id")?;
         let url = private_orders::private_ws_url(&self.api_url, self.allow_insecure_http)?;
         let transport = private_orders::LiveTransport {
             url,

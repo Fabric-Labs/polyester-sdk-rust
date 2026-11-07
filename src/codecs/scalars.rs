@@ -350,6 +350,22 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
     base58_to_u64(value, label)
 }
 
+/// Parse an account or sub-account ID as [`id_to_u64`] does, refusing 0.
+///
+/// On the wire 0 is unset: sub-account 0 is the main account, and account 0
+/// names no account. So `"1"` (`format_id(0)`), `"0"` or `"00"` would address
+/// another account than the one named. Omit a sub-account ID to address the
+/// main account.
+pub fn parse_account_id(value: &str, label: &str) -> Result<u64> {
+    let id = id_to_u64(value, label)?;
+    if id == 0 {
+        return Err(Error::validation(format!(
+            "{label} must be a non-zero ID, not 0"
+        )));
+    }
+    Ok(id)
+}
+
 pub fn format_id(id: u64) -> String {
     if id == 0 {
         return bs58::encode([0u8]).into_string();
