@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.8.1` (git tag `v0.8.1`). Pre-1.0: minor releases may break the API.
+**Status:** `0.9.0` (git tag `v0.9.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.8.1 is the release of Go and Python 0.7.1.
+change breaks only one SDK's API: Rust 0.9.0 is the release of Go and Python 0.8.0.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -86,7 +86,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.8.1"
+polyester-sdk = "0.9.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -96,7 +96,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.8.1" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.9.0" }
 ```
 
 For development from a git checkout:
@@ -935,9 +935,8 @@ name does not establish its source: outcome unknown and non-retryable. Specific
 refusals such as `FEE_SCHEDULE_UNAVAILABLE`, `POLICY_UNAVAILABLE` and
 `RATE_LIMIT_POLICY_UNAVAILABLE` are known and retryable on typed Connect,
 code-only Connect messages and recognized REST 503 problems. A REST 502 cannot
-establish these refusals. `QUICKSWAP_ACCOUNT_OWNER_UNKNOWN` means no order was
-placed and may retry; `ACCOUNT_ROUTING_INVALID` means the trigger was not admitted
-and requires the caller to correct its routing.
+establish these refusals. `ACCOUNT_ROUTING_INVALID` means the trigger was not
+admitted; contact support if it persists.
 
 `RATE_LIMIT_EXCEEDED`, `PRICE_LEVELS_EXHAUSTED` and retry-later capacity codes
 are known, retryable admission refusals; preserve and respect any server delay.
@@ -1045,7 +1044,7 @@ An HTTP error with no code the contract defines can come from a gateway or an ed
 prove a request was refused. Only a 401 or 403 is a refusal on its status alone (`Error::Auth` or
 `Error::ApiKeyRejected`). Every other status returns `Error::Server` with
 `mutation_outcome_unknown()` true and `is_retryable()` false, and names any code it did send in its
-message; read back before sending a mutation again. Reads retry 429, 502, 503 and 504 for you. A
+message; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 
