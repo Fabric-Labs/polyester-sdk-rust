@@ -309,12 +309,18 @@ impl OrdersService {
         get_order_from_proto(&resp)
     }
 
-    /// Poll [`Self::get`] until the order is terminal and projected trade
-    /// quantities sum to order `cum_qty`.
+    /// Poll [`Self::get`] until the order is terminal (`status` `filled`,
+    /// `canceled` or `rejected`) and projected trade quantities sum to order
+    /// `cum_qty`.
     ///
     /// GetOrder can report `cum_qty` before every fill is visible on the trades
     /// list. Prefer this helper after fills
     /// instead of treating a single get as final trade projection.
+    /// `executions_complete` alone is not completion: it is also true for a
+    /// working order whose fills so far are all recorded, for example after a
+    /// partial fill, so such an order keeps the wait polling until it ends or
+    /// the timeout passes. To check the trades recorded so far on a working
+    /// order, read it with [`Self::get`] and compare its trades to `cum_qty`.
     ///
     /// Each poll reads every execution page; the result holds the last poll's
     /// order, trades and transfers with that read's `executions_complete`.

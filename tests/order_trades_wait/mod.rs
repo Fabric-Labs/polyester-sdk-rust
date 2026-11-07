@@ -42,6 +42,8 @@ fn page(trades: &[i64], next: &str, complete: bool) -> Page {
 #[derive(Default)]
 struct ServerState {
     poll: usize,
+    /// Polls started after the first.
+    reads: usize,
     started: bool,
     arrivals: Vec<Instant>,
 }
@@ -53,6 +55,16 @@ struct TradesServer {
 
 impl TradesServer {
     async fn spawn(cum: i64, polls: Vec<Vec<Page>>) -> Self {
+        Self::spawn_with_statuses(cum, polls, vec![]).await
+    }
+
+    /// `statuses` is the order's status on each poll, the last one repeating;
+    /// the order reads `Filled` when it is empty.
+    async fn spawn_with_statuses(
+        cum: i64,
+        polls: Vec<Vec<Page>>,
+        statuses: Vec<OrderStatus>,
+    ) -> Self {
         let state = Arc::new(Mutex::new(ServerState::default()));
         let handler_state = state.clone();
         let http = MockHttpServer::spawn(move |req| {
@@ -64,12 +76,19 @@ impl TradesServer {
             let mut state = handler_state.lock().unwrap();
             state.arrivals.push(Instant::now());
             if token.is_empty() {
-                if state.started && state.poll < polls.len() - 1 {
-                    state.poll += 1;
+                if state.started {
+                    state.reads += 1;
+                    if state.poll < polls.len() - 1 {
+                        state.poll += 1;
+                    }
                 }
                 state.started = true;
             }
             let pages = &polls[state.poll];
+            let status = statuses
+                .get(state.reads.min(statuses.len().saturating_sub(1)))
+                .copied()
+                .unwrap_or(OrderStatus::Filled);
             let index: usize = if token.is_empty() {
                 0
             } else {
@@ -82,11 +101,10 @@ impl TradesServer {
                 };
             }
             let response = GetOrderResponse {
-                // Terminal: this SDK's wait also waits for a terminal status.
                 order: Some(Order {
                     order_id: 1,
                     symbol_id: 1,
-                    status: OrderStatus::Filled.into(),
+                    status: status.into(),
                     cum_qty_scaled: cum,
                     ..Default::default()
                 })
@@ -190,6 +208,90 @@ async fn l2_wait_keeps_the_final_reads_executions_complete() {
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         assert_eq!(trade_qtys(&result).iter().sum::<i64>(), 100, "{name}");
         assert_eq!(result.executions_complete, want, "{name}");
+    }
+}
+
+/// One case of [`l2_wait_requires_a_terminal_order`]: the order's `cum_qty`,
+/// its recorded trades, its status on each poll (the last one repeating), and
+/// the status of the read the wait returns, `None` when it must time out.
+struct TerminalCase {
+    name: &'static str,
+    cum: i64,
+    trades: Vec<i64>,
+    statuses: Vec<OrderStatus>,
+    want_status: Option<&'static str>,
+}
+
+/// The wait reports completion only for a terminal order (filled, canceled or
+/// rejected) whose recorded trades add up to its cum_qty. executions_complete
+/// alone is not enough: it is also true for a working order whose fills so far
+/// are all recorded. The Go and Python SDKs run the same cases.
+#[tokio::test]
+async fn l2_wait_requires_a_terminal_order() {
+    const WORKING: OrderStatus = OrderStatus::Working;
+    const FILLED: OrderStatus = OrderStatus::Filled;
+    const CANCELED: OrderStatus = OrderStatus::Canceled;
+    const REJECTED: OrderStatus = OrderStatus::Rejected;
+    let cases = vec![
+        TerminalCase {
+            name: "partially filled working order",
+            cum: 40,
+            trades: vec![40],
+            statuses: vec![WORKING],
+            want_status: None,
+        },
+        TerminalCase {
+            name: "terminal fully filled order",
+            cum: 100,
+            trades: vec![60, 40],
+            statuses: vec![FILLED],
+            want_status: Some("filled"),
+        },
+        TerminalCase {
+            name: "terminal canceled order with partial fills",
+            cum: 40,
+            trades: vec![40],
+            statuses: vec![CANCELED],
+            want_status: Some("canceled"),
+        },
+        TerminalCase {
+            name: "terminal order with no fills",
+            cum: 0,
+            trades: vec![],
+            statuses: vec![REJECTED],
+            want_status: Some("rejected"),
+        },
+        TerminalCase {
+            name: "partially filled order canceled on a later poll",
+            cum: 40,
+            trades: vec![40],
+            statuses: vec![WORKING, WORKING, CANCELED],
+            want_status: Some("canceled"),
+        },
+    ];
+    for case in cases {
+        let name = case.name;
+        let server = TradesServer::spawn_with_statuses(
+            case.cum,
+            vec![vec![page(&case.trades, "", true)]],
+            case.statuses,
+        )
+        .await;
+        let result = wait_trades(&server.client(), Duration::from_millis(500)).await;
+        match (case.want_status, result) {
+            (Some(want), Ok(result)) => {
+                let status = result.order.as_ref().map(|order| order.status.as_str());
+                assert_eq!(status, Some(want), "{name}");
+                assert_eq!(trade_qtys(&result), case.trades, "{name}");
+                assert!(result.executions_complete, "{name}");
+            }
+            (Some(_), Err(error)) => panic!("{name}: want completion, got {error}"),
+            (None, Err(error)) => assert!(is_wait_timeout(&error), "{name}: {error}"),
+            (None, Ok(result)) => panic!(
+                "{name}: wait reported a {:?} order complete",
+                result.order.map(|order| order.status)
+            ),
+        }
     }
 }
 
