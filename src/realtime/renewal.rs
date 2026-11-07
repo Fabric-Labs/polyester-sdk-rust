@@ -115,11 +115,13 @@ impl TokenRenewer {
         )
     }
 
-    /// Renews `kind`'s token `ttl` units from now when the server said it
-    /// expires (`expiry` is `Some(ttl)`).
-    pub fn schedule(&mut self, kind: RenewalKind, expiry: Option<u32>) {
+    /// Renews `kind`'s token `ttl` units after `answered`, when the reply that
+    /// carried the TTL arrived, if the server said it expires (`expiry` is
+    /// `Some(ttl)`). Time spent since then, such as the rest of setup, counts
+    /// against the TTL.
+    pub fn schedule(&mut self, kind: RenewalKind, answered: Instant, expiry: Option<u32>) {
         if let Some(ttl) = expiry {
-            self.due[kind as usize] = Some(Instant::now() + self.unit.saturating_mul(ttl));
+            self.due[kind as usize] = Some(answered + self.unit.saturating_mul(ttl));
         }
     }
 
@@ -177,7 +179,7 @@ impl TokenRenewer {
                 super::centrifugo_protocol_error_message(error)
             ))),
             None => {
-                self.schedule(kind, expiry);
+                self.schedule(kind, Instant::now(), expiry);
                 Ok(())
             }
         })

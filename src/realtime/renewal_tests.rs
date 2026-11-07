@@ -754,6 +754,59 @@ async fn transfer_renewal_refused_reports_then_resubscribes() {
 
 /// A connection the server drops reconnects with fresh tokens and renews them
 /// on the new connection; nothing from the old connection reaches it.
+/// The connection token's lifetime runs from the connect reply, not from the
+/// end of setup: a slow subscription token must not push the first connection
+/// renewal past the server's expiry.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn connection_renewal_counts_from_connect_reply() {
+    let unit = Duration::from_millis(200);
+    let srv = RenewalServer::spawn(RenewalServerConfig {
+        unit,
+        grace: Duration::from_millis(60),
+        conn_ttl: 2,
+        ..Default::default()
+    })
+    .await;
+    let sub_calls = Arc::new(AtomicUsize::new(0));
+    // Only the setup's subscription token is slow, by more than the grace.
+    srv.set_token_hook(move |kind| {
+        let slow = kind == "sub" && sub_calls.fetch_add(1, Ordering::SeqCst) == 0;
+        let delay = if slow {
+            Duration::from_millis(150)
+        } else {
+            Duration::ZERO
+        };
+        (delay, 200)
+    });
+    let mut client = srv.client();
+    client.renewal_unit = unit;
+    let sub = subscribe_transfers(&client).await;
+
+    tokio::time::sleep(unit * 8).await;
+    let c = srv.counters();
+    let mut failures = Vec::new();
+    let expiries = Counters::get(&c.conn_expiries);
+    if expiries != 0 {
+        failures.push(format!(
+            "server closed {expiries} connections for an expired connection token"
+        ));
+    }
+    let accepted = Counters::get(&c.accepted);
+    if accepted != 1 {
+        failures.push(format!("client opened {accepted} connections, want 1"));
+    }
+    let refreshes = Counters::get(&c.refreshes);
+    if refreshes < 3 {
+        failures.push(format!(
+            "client renewed the connection token {refreshes} times, want at least 3"
+        ));
+    }
+    if sub.resubscribes() != 0 {
+        failures.push(format!("resubscribes() = {}, want 0", sub.resubscribes()));
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn transfer_renewal_continues_after_disconnect() {
     let unit = Duration::from_millis(100);

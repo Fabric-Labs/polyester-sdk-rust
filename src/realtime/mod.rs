@@ -564,7 +564,7 @@ impl Client {
         read: &mut R,
         channel: &str,
         pending: &mut VecDeque<protocol::Incoming>,
-    ) -> Result<(Option<u32>, Option<u32>)>
+    ) -> Result<(TokenExpiry, TokenExpiry)>
     where
         W: SinkExt<Message> + Unpin,
         W::Error: std::fmt::Display,
@@ -583,8 +583,10 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            let connection_expiry =
+            let connection_ttl =
                 centrifugo_connect(write, read, Some(&connection_token), pending).await?;
+            // The connection token's TTL runs from its reply, through the rest of setup.
+            let connection_expiry = (tokio::time::Instant::now(), connection_ttl);
             let subscription_token = auth::fetch_subscription_token(
                 creds,
                 &self.api_url,
@@ -593,14 +595,16 @@ impl Client {
                 self.allow_insecure_http,
             )
             .await?;
-            let subscription_expiry =
+            let subscription_ttl =
                 centrifugo_subscribe(write, read, channel, Some(&subscription_token), pending)
                     .await?;
+            let subscription_expiry = (tokio::time::Instant::now(), subscription_ttl);
             Ok((connection_expiry, subscription_expiry))
         } else {
             centrifugo_connect(write, read, None, pending).await?;
             centrifugo_subscribe(write, read, channel, None, pending).await?;
-            Ok((None, None))
+            let now = tokio::time::Instant::now();
+            Ok(((now, None), (now, None)))
         }
     }
 
@@ -679,8 +683,17 @@ impl Client {
             self.renewal_unit,
             3,
         );
-        renewer.schedule(renewal::RenewalKind::Connection, expiries.0);
-        renewer.schedule(renewal::RenewalKind::Subscription, expiries.1);
+        let ((connected_at, connection_ttl), (subscribed_at, subscription_ttl)) = expiries;
+        renewer.schedule(
+            renewal::RenewalKind::Connection,
+            connected_at,
+            connection_ttl,
+        );
+        renewer.schedule(
+            renewal::RenewalKind::Subscription,
+            subscribed_at,
+            subscription_ttl,
+        );
 
         loop {
             if *attempt.stop.borrow() {
@@ -1081,6 +1094,9 @@ fn centrifugo_protocol_error_message(error: &protocol::ProtoError) -> String {
 fn centrifugo_protocol_error(error: protocol::ProtoError) -> Error {
     Error::realtime(centrifugo_protocol_error_message(&error))
 }
+
+/// When a reply carrying a token TTL arrived, and its TTL when the token expires.
+type TokenExpiry = (tokio::time::Instant, Option<u32>);
 
 /// Sleeps until `at`; forever when there is nothing to wait for.
 async fn until(at: Option<tokio::time::Instant>) {
