@@ -7,6 +7,7 @@ Package version: `0.10.0`. Git tag: `v0.10.0`. Released 2026-11-07. Built on pub
 - `orderbook.create_subscription` at a depth the server doesn't publish no longer goes silent after its first view. Depths 5, 10, 25 and 100, for example, were accepted by the server and got no updates, with no error. Any depth from 1 to 500 now subscribes to the smallest published depth that covers it (1, 20, 50, 200 or 500), takes its snapshot there, and trims each view to the depth you asked for. Sequence-gap, availability and bucket behaviour are unchanged, and a view can update when only levels outside it changed.
 - **Breaking:** `orderbook.create_subscription` returns `Error::Validation` before connecting for a depth above 500, which used to be clamped to 500 and report that depth, and for `Some(0)`, which used to be clamped to 1. `None` still means 50. Migration: pass a depth from 1 to 500, or read a snapshot of up to 1000 levels with `orderbook.get`, which is unchanged.
 - **Breaking:** `orderbook.subscribe_deltas` returns `Error::Validation` before connecting for any depth other than 1, 20, 50, 200 or 500, instead of subscribing to a stream that sends nothing or clamping to 1 or 500. Raw deltas can't be trimmed. Migration: pass a published depth, or use `orderbook.create_subscription` for a book at any depth up to 500.
+- Added `ORDERBOOK_STREAM_DEPTHS`, `orderbook_stream_tier` and `require_published_stream_depth` in `polyester_sdk::codecs::decode`, the published stream depths and the checks the client uses.
 
 ## 0.9.0
 
