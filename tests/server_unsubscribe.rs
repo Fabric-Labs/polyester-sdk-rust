@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-const BOOK_CHANNEL: &str = "public:spot:orderbook:deltas:depth:10:1:proto";
+const BOOK_CHANNEL: &str = "public:spot:orderbook:deltas:depth:20:1:proto";
 const OVERVIEW_CHANNEL: &str = "public:spot:market_overview:updates:proto";
 const WAIT: Duration = Duration::from_secs(10);
 

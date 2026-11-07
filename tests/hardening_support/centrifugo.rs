@@ -196,6 +196,15 @@ impl Centrifugo {
             .unwrap();
     }
 
+    /// Like [`Self::push`], for a channel that may have no live connection.
+    pub fn try_push(&self, channel: &str, frame: Vec<u8>) -> bool {
+        self.conns
+            .lock()
+            .unwrap()
+            .get(channel)
+            .is_some_and(|conn| conn.send(Some(frame)).is_ok())
+    }
+
     pub fn drop_connection(&self, channel: &str) {
         self.conns
             .lock()

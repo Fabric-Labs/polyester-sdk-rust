@@ -5,6 +5,52 @@ use crate::errors::{Error, Result};
 use crate::models::{OrderbookData, OrderbookLevel};
 use crate::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
 
+/// Depths the server publishes on the delta stream, fewer than the snapshot enum.
+/// It also accepts a subscribe at any other depth, and then never sends anything on it.
+pub const ORDERBOOK_STREAM_DEPTHS: [u32; 5] = [1, 20, 50, 200, 500];
+
+const ORDERBOOK_SNAPSHOT_MAX_DEPTH: u32 = 1000;
+
+fn deepest_stream_depth() -> u32 {
+    ORDERBOOK_STREAM_DEPTHS[ORDERBOOK_STREAM_DEPTHS.len() - 1]
+}
+
+/// Smallest published stream depth covering `depth`, for a view trimmed to `depth`.
+/// A depth no tier covers is a validation error.
+pub fn orderbook_stream_tier(depth: u32) -> Result<u32> {
+    if depth == 0 {
+        return Err(Error::validation(
+            "orderbook subscription depth must be positive, got 0",
+        ));
+    }
+    ORDERBOOK_STREAM_DEPTHS
+        .into_iter()
+        .find(|tier| *tier >= depth)
+        .ok_or_else(|| {
+            Error::validation(format!(
+                "orderbook subscription depth {depth} is above the deepest published stream tier \
+                 ({}); use orderbook.get for a snapshot of up to {ORDERBOOK_SNAPSHOT_MAX_DEPTH} levels",
+                deepest_stream_depth()
+            ))
+        })
+}
+
+/// `depth` itself when the server publishes it. Raw deltas of a tier can't be
+/// trimmed, so any other depth is a validation error.
+pub fn require_published_stream_depth(depth: u32) -> Result<u32> {
+    if ORDERBOOK_STREAM_DEPTHS.contains(&depth) {
+        return Ok(depth);
+    }
+    let published = ORDERBOOK_STREAM_DEPTHS
+        .map(|tier| tier.to_string())
+        .join(", ");
+    Err(Error::validation(format!(
+        "orderbook delta streams are published only at depths {published}, got {depth}; use \
+         orderbook.create_subscription for a book trimmed to any depth up to {}",
+        deepest_stream_depth()
+    )))
+}
+
 pub fn depth_enum_for_levels(depth: u32) -> crate::proto::orderbook::v1::Depth {
     use crate::proto::orderbook::v1::Depth;
     match depth {

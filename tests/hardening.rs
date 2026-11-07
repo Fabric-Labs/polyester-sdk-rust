@@ -4,6 +4,8 @@
 //! Quantity::format, SnapshotThenStream) against in-process servers — not private helpers.
 
 mod hardening_support;
+#[path = "orderbook_depths/mod.rs"]
+mod orderbook_depths;
 #[path = "readable_error_bodies/mod.rs"]
 mod readable_error_bodies;
 

@@ -1314,6 +1314,22 @@ if let Some(snapshot) = book.updates().recv().await {
 }
 ```
 
+`orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
+The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
+(`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
+subscribe at any other depth and then sends nothing on it, so the SDK does not
+subscribe there:
+
+- `orderbook.create_subscription` with `depth: Some(10)` takes any depth from 1 to
+  500. It rides the smallest published depth that covers it, 20 here, with its
+  snapshot, and trims each view to 10 levels. Its update rate is that of the depth it
+  rides, and each published update adds a view, also when only levels outside yours
+  changed. With `bucket`, levels are aggregated first and the depth then counts
+  buckets. A depth above 500, or `Some(0)`, is `Error::Validation` before connecting;
+  for more than 500 levels, read a snapshot with `orderbook.get`.
+- `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
+  only a published depth and returns `Error::Validation` for any other.
+
 Streamed orders carry scaled quantity integers but may not carry the
 base quantity scale, so `Quantity::scale()` can return `None`. A bot must
 resolve the scale from the hydrated catalog using `Quantity::symbol_id()` (or
