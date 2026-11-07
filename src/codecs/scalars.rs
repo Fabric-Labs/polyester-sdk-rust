@@ -558,4 +558,74 @@ mod tests {
         );
         assert_eq!(TsNs::from_wire(0, "trade").unwrap().optional_string(), "");
     }
+
+    #[test]
+    fn order_quantity_at_scale_18_stays_within_int64() {
+        assert_eq!(
+            parse_qty_scaled_str("9.223372036854775807", 18, "qty").unwrap(),
+            i64::MAX
+        );
+        for qty in ["10", "9.223372036854775808", "18.446744073709551615"] {
+            let err = parse_qty_scaled_str(qty, 18, "qty").unwrap_err();
+            assert!(err.to_string().contains("qty exceeds int64 range"), "{err}");
+        }
+        let ten = Decimal::from_str("10").unwrap();
+        assert!(parse_qty_scaled(ten, 18, "qty").is_err());
+        assert!(crate::types::Quantity::from_decimal(ten, 18, None, None).is_err());
+        assert!(crate::types::Quantity::from_quote_decimal(ten, 18, None, None).is_err());
+    }
+
+    #[test]
+    fn order_quantity_at_known_zero_scale_is_whole_units() {
+        let qty = crate::types::Quantity::from_decimal_str("1000000", 0, None, Some(5)).unwrap();
+        assert_eq!((qty.as_scaled(), qty.scale()), (1_000_000, Some(0)));
+        assert_eq!(
+            crate::types::resolve_qty_scaled(&qty, 0, None, Some(5)).unwrap(),
+            1_000_000
+        );
+        assert_eq!(
+            parse_qty_scaled_str("1000000.000", 0, "qty").unwrap(),
+            1_000_000
+        );
+        let err = parse_qty_scaled_str("1000000.5", 0, "qty").unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("qty supports at most 0 decimal places: 1000000.5"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn formatters_keep_one_sign_at_min_int64() {
+        for (value, scale, text) in [
+            (i64::MIN, 0, "-9223372036854775808"),
+            (i64::MIN, 9, "-9223372036.854775808"),
+            (i64::MIN, 18, "-9.223372036854775808"),
+            (i64::MIN, 36, "-0.000000000000000009223372036854775808"),
+            (i64::MIN + 1, 9, "-9223372036.854775807"),
+            (i64::MIN + 1, 18, "-9.223372036854775807"),
+        ] {
+            assert_eq!(format_qty_scaled(value, scale).unwrap(), text);
+            if scale == PRICE_TICK_SCALE {
+                assert_eq!(format_price_ticks(value), text);
+            }
+        }
+    }
+
+    #[test]
+    fn decimal_quantity_size_is_bounded_by_the_type() {
+        // A Decimal holds at most 28 fractional digits and a 96-bit mantissa,
+        // so no Decimal input expands to more than a few dozen digits.
+        assert!(Decimal::from_str("1e-1000000").is_err());
+        assert!(Decimal::from_scientific("1e-1000000").is_err());
+        assert!(Decimal::from_scientific("1e+1000000").is_err());
+        let tiny = Decimal::from_scientific("1e-28").unwrap();
+        let err = parse_qty_scaled(tiny, 8, "qty").unwrap_err().to_string();
+        assert!(err.len() < 120, "{err}");
+        let huge = Decimal::MAX;
+        let err = parse_qty_scaled(huge, 8, "qty").unwrap_err().to_string();
+        assert_eq!(err, "qty exceeds int64 range");
+        // Exponent strings are not decimal strings.
+        assert!(parse_qty_scaled_str("1e-1000000", 8, "qty").is_err());
+    }
 }
