@@ -318,7 +318,8 @@ impl OrdersService {
     ///
     /// Each poll reads every execution page; the result holds the last poll's
     /// order, trades and transfers with that read's `executions_complete`.
-    /// `timeout` (15 s when zero) bounds the whole wait, page reads included.
+    /// `timeout` (15 s when zero) bounds the whole wait, page reads included;
+    /// a read that finishes after it is no success.
     /// A `next_page_token` that repeats a page token of the same poll returns
     /// [`Error::ResponseContract`].
     pub async fn wait_for_order_trades_complete(
@@ -1758,6 +1759,12 @@ where
         let last = tokio::time::timeout_at(deadline, poll())
             .await
             .map_err(|_| timed_out())??;
+        // The timeout polls the read before its timer, so a read can finish
+        // after the deadline (for example while it decodes): that is no
+        // success.
+        if tokio::time::Instant::now() >= deadline {
+            return Err(timed_out());
+        }
         if order_trades_projection_complete(&last) {
             return Ok(last);
         }
