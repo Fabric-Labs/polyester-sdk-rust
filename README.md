@@ -494,6 +494,28 @@ if let Some(order) = read.order {
 }
 ```
 
+### Waiting for an order's trades
+
+An order shows a fill as soon as it executes; its trades are recorded shortly
+after. `orders.wait_for_order_trades_complete(key, timeout)` polls
+`orders.get`, every execution page included, until the order has ended
+(`status` `filled`, `canceled` or `rejected`) and its trades add up to
+`cum_qty`, then returns that read. It reports completion at the same point as
+the Go and Python SDKs. `executions_complete` alone is not completion: it is
+also true for a working order whose fills so far are all recorded, for example
+after a partial fill. A working order keeps the wait polling until it ends or
+the timeout passes, which returns `Error::Transport`. To check the trades
+recorded so far on an order that is still working, read it with `orders.get`
+and compare its trades to `cum_qty`.
+
+```rust,no_run
+let detail = client
+    .orders
+    .wait_for_order_trades_complete(OrderKey::OrderId(order_id), Duration::from_secs(20))
+    .await?;
+println!("{:?} {} trades", detail.order.map(|o| o.status), detail.trades.len());
+```
+
 A replacement order reports `Order.inherited_cum_qty`, the filled quantity it
 inherited from its predecessors (zero for an original order); `cum_qty` minus
 it is what this generation executed. A duplicate `client_order_id` is
