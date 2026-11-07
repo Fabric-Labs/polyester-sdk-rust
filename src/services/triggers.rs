@@ -277,25 +277,27 @@ impl TriggersService {
 
     fn encode_create_params(&self, params: &CreateTriggerParams) -> Result<CreateTriggerRequest> {
         validate_create_option_applicability(params)?;
-        let scale = self
-            .ctx
-            .catalogs
-            .base_quantity_scale_for_symbol(&params.symbol)
-            .or(params.qty.scale())
-            .ok_or_else(|| {
-                Error::validation(format!(
-                    "quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before creating triggers, or pass a scaled Quantity",
-                    params.symbol
-                ))
-            })?;
+        // Resolve the market once: the ID sent, the quantity scale and every
+        // symbol check below use the catalog's market, not the caller's text.
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let canonical;
+        let params = if params.symbol == market.symbol {
+            params
+        } else {
+            canonical = CreateTriggerParams {
+                symbol: market.symbol.clone(),
+                ..params.clone()
+            };
+            &canonical
+        };
         let qty = resolve_qty_scaled(
             &params.qty,
-            scale,
-            Some(&params.symbol),
-            self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+            market.base_quantity_scale,
+            Some(&market.symbol),
+            Some(market.symbol_id),
         )?;
         let mut intent = TriggerIntent {
-            symbol_id: self.ctx.catalogs.require_symbol_id(&params.symbol)?,
+            symbol_id: market.symbol_id,
             qty_scaled: qty,
             ..Default::default()
         };

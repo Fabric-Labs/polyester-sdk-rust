@@ -107,6 +107,16 @@ pub struct Manager {
     inner: RwLock<Inner>,
 }
 
+/// A catalog market and the scales a write encodes with, read together.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Market {
+    /// The catalog's display symbol (the caller's, trimmed).
+    pub symbol: String,
+    pub symbol_id: u32,
+    pub base_quantity_scale: u32,
+    pub quote_quantity_scale: Option<u32>,
+}
+
 #[derive(Debug, Default)]
 struct Inner {
     symbol_to_id: HashMap<String, u32>,
@@ -456,6 +466,34 @@ impl Manager {
             Error::validation(format!(
                 "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
             ))
+        })
+    }
+
+    /// Resolve a display symbol to its market for a write. The symbol is
+    /// trimmed once and the ID and scales come from the same catalog read, so
+    /// a quantity is always checked against the market that is sent. Fails
+    /// closed.
+    pub(crate) fn require_market(&self, symbol: &str) -> Result<Market> {
+        let Some(symbol) = Self::normalize_raw_symbol_filter(Some(symbol)) else {
+            return Err(Error::validation("symbol must be non-empty"));
+        };
+        let inner = read_unpoisoned(&self.inner);
+        let Some(symbol_id) = inner.symbol_to_id.get(&symbol).copied() else {
+            return Err(Error::validation(format!(
+                "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
+            )));
+        };
+        let Some(base_quantity_scale) = inner.id_to_base_scale.get(&symbol_id).copied() else {
+            return Err(Error::validation(format!(
+                "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders"
+            )));
+        };
+        let quote_quantity_scale = inner.id_to_quote_scale.get(&symbol_id).copied();
+        Ok(Market {
+            symbol,
+            symbol_id,
+            base_quantity_scale,
+            quote_quantity_scale,
         })
     }
 
