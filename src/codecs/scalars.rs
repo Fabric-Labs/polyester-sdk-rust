@@ -242,8 +242,10 @@ pub fn format_qty_scaled(qty_scaled: i64, scale: u32) -> Result<String> {
 }
 
 /// Format a smaller ledger quantity integer by `10^scale`.
+///
+/// Scale 0 is a real scale (whole units). Pass [`LEDGER_SCALE`] for
+/// 18-decimal balances.
 pub fn format_ledger_u64(value: u64, scale: u32) -> Result<String> {
-    let scale = if scale == 0 { LEDGER_SCALE } else { scale };
     format_scaled(value as i128, scale)
 }
 
@@ -251,7 +253,8 @@ pub fn format_ledger_u64(value: u64, scale: u32) -> Result<String> {
 ///
 /// Balance models expose protobuf `u128` values as decimal strings so no
 /// precision is lost. This helper formats those strings without narrowing to
-/// `u64` or a floating-point type.
+/// `u64` or a floating-point type. Scale 0 is a real scale (whole units); pass
+/// [`LEDGER_SCALE`] for 18-decimal balances.
 pub fn format_ledger_u128(value: &str, scale: u32) -> Result<String> {
     let digits = value.trim();
     if digits.is_empty() || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -267,7 +270,6 @@ pub fn format_ledger_u128(value: &str, scale: u32) -> Result<String> {
     {
         return Err(Error::validation("ledger value exceeds u128 range"));
     }
-    let scale = if scale == 0 { LEDGER_SCALE } else { scale };
     validate_protocol_scale(scale)?;
     if scale == 0 {
         return Ok(digits.to_owned());

@@ -8,8 +8,19 @@ use crate::proto::auth::v1::{
     ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse, GetApiPolicyResponse,
     GetSubaccountPolicyResponse, ListApiPoliciesResponse, ListSubaccountPoliciesResponse,
     SpotMarketRule as ProtoSpotMarketRule, SubaccountPolicyView, UpdateApiPolicyResponse,
-    UpdateSubaccountPolicyResponse,
+    UpdateSubaccountPolicyResponse, market_scope,
 };
+
+/// Contract label for a market scope: `"ALL"` or `"ALLOWLIST"`, empty when
+/// unspecified, and `UNKNOWN(n)` for a value newer than this SDK.
+fn market_scope_label(scope: &buffa::EnumValue<market_scope::Value>) -> String {
+    match scope.as_known() {
+        Some(market_scope::Value::ALL) => "ALL".to_owned(),
+        Some(market_scope::Value::ALLOWLIST) => "ALLOWLIST".to_owned(),
+        Some(market_scope::Value::UNSPECIFIED) => String::new(),
+        None => format!("UNKNOWN({})", scope.to_i32()),
+    }
+}
 
 fn spot_market_rule_from_proto(msg: &ProtoSpotMarketRule) -> SpotMarketRule {
     SpotMarketRule {
@@ -28,6 +39,10 @@ pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPol
             .iter()
             .map(spot_market_rule_from_proto)
             .collect(),
+        spot_market_scope: market_scope_label(&msg.spot_market_scope),
+        max_order_notional: msg.max_order_notional,
+        max_open_orders: msg.max_open_orders,
+        trading_halted: msg.trading_halted,
         revision: msg.revision,
     }
 }
@@ -72,6 +87,7 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
             .iter()
             .map(spot_market_rule_from_proto)
             .collect(),
+        spot_market_scope: market_scope_label(&msg.spot_market_scope),
         revision: msg.revision,
     }
 }

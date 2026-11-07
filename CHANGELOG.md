@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A zipped-asset supply at a quantity scale of 0 now reads as whole units. `subscribe_zipped_asset_supply` reported a BONK supply of 3582802 as `0.000000000003582802`, because `format_ledger_u64` and `format_ledger_u128` treated scale 0 as 18. They now format at the scale you pass, including 0. A zipped asset that isn't in the hydrated catalog is still refused. Migration: pass `LEDGER_SCALE` for 18-decimal balances.
+- **Breaking:** `GuardApproval` gains `nonce_space` and `deadline_unix`, the exact signed values from `sign_protected_action` and `batch_sign_protected_actions`, and `RotateGuardSignerWalletResult` gains `approval`, the rotation's signed approval or `None` when the API returns none. Submit them with the signature. Migration: struct literals must initialize the new fields.
+- **Breaking:** `SubaccountPolicy` gains `spot_market_scope`, `max_order_notional`, `max_open_orders` and `trading_halted`, and `ApiPolicy` gains `spot_market_scope`, from policy reads and realtime policy updates. The scope is `"ALL"` or `"ALLOWLIST"`, empty when unspecified and `UNKNOWN(n)` for a newer value; with `"ALL"`, `spot_markets` is for display only. A cap of 0 means no explicit cap. Migration: struct literals must initialize the new fields.
+
 ## 0.10.0
 
 Package version: `0.10.0`. Git tag: `v0.10.0`. Released 2026-11-07. Built on public contract `748066a`.
