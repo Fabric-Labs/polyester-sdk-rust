@@ -273,6 +273,8 @@ pub struct ApiMock {
     pub url: String,
     counts: Arc<Mutex<HashMap<String, usize>>>,
     respond: Arc<Mutex<Arc<Responder>>>,
+    /// While it holds a path, requests to that path wait without blocking a worker.
+    held: tokio::sync::watch::Sender<Option<String>>,
     task: tokio::task::JoinHandle<()>,
 }
 
@@ -292,10 +294,12 @@ impl ApiMock {
         let respond = Arc::new(Mutex::new(responder));
         let task_counts = counts.clone();
         let task_respond = respond.clone();
+        let (held, held_rx) = tokio::sync::watch::channel(None::<String>);
         let task = tokio::spawn(async move {
             while let Ok((mut stream, _)) = listener.accept().await {
                 let counts = task_counts.clone();
                 let respond = task_respond.clone();
+                let mut held = held_rx.clone();
                 tokio::spawn(async move {
                     let mut buf = vec![0u8; 16 * 1024];
                     let n = stream.read(&mut buf).await.unwrap_or(0);
@@ -306,6 +310,9 @@ impl ApiMock {
                     let path = target.split('?').next().unwrap_or(target).to_owned();
                     let (status, body) = if method == "GET" {
                         *counts.lock().unwrap().entry(path.clone()).or_insert(0) += 1;
+                        let _ = held
+                            .wait_for(|hold| hold.as_deref() != Some(path.as_str()))
+                            .await;
                         let responder = respond.lock().unwrap().clone();
                         responder(&path)
                     } else {
@@ -323,8 +330,18 @@ impl ApiMock {
             url,
             counts,
             respond,
+            held,
             task,
         }
+    }
+
+    /// Holds later and waiting requests to `path` until [`Self::release`].
+    pub fn hold(&self, path: &str) {
+        self.held.send_replace(Some(path.to_owned()));
+    }
+
+    pub fn release(&self) {
+        self.held.send_replace(None);
     }
 
     pub fn set_respond(&self, respond: impl Fn(&str) -> (u16, String) + Send + Sync + 'static) {

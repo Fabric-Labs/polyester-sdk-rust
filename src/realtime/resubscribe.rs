@@ -886,18 +886,10 @@ mod tests {
         assert_eq!(api.count(LIST), 0);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn a_read_cannot_answer_a_decision_made_after_it_started() {
         let ws = Centrifugo::spawn().await;
-        let ok = respond(vec![]);
-        // Each read stays open long enough for a later decision to arrive.
-        let api = ApiMock::spawn(move |path| {
-            if path == LIST {
-                std::thread::sleep(Duration::from_millis(200));
-            }
-            ok(path)
-        })
-        .await;
+        let api = ApiMock::spawn(respond(vec![])).await;
         let client = client(
             &ws,
             &api,
@@ -906,20 +898,31 @@ mod tests {
                 ..FAST
             },
         );
+        // The first read stays open while a later decision asks: only a read of
+        // its own, started after it asked, can reach the server as a second call.
+        api.hold(LIST);
         let first = {
             let client = client.clone();
             tokio::spawn(async move { client.access.read(&client).await })
         };
-        tokio::time::timeout(WAIT, async {
-            while api.count(LIST) == 0 {
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
-        let second = client.access.read(&client).await;
-        assert!(second.is_ok(), "{second:?}");
+        let reaches = async |calls: usize| {
+            tokio::time::timeout(WAIT, async {
+                while api.count(LIST) < calls {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            })
+            .await
+            .expect("the read reaches the server");
+        };
+        reaches(1).await;
+        let second = {
+            let client = client.clone();
+            tokio::spawn(async move { client.access.read(&client).await })
+        };
+        reaches(2).await;
+        api.release();
         assert!(first.await.unwrap().is_ok());
+        assert!(second.await.unwrap().is_ok());
         assert_eq!(api.count(LIST), 2, "a later decision needs its own read");
     }
 
@@ -927,24 +930,7 @@ mod tests {
     /// answer. The removed false controls prove the same barriers still resume.
     async fn removal_while_deciding(pacing: bool, removed: bool) {
         let ws = Centrifugo::spawn().await;
-        let ok = respond(vec![SUB_ID]);
-        let gate = Arc::new((Mutex::new(!pacing), std::sync::Condvar::new()));
-        let held = gate.clone();
-        let api = ApiMock::spawn(move |path| {
-            if path == LIST {
-                let (closed, opened) = &*held;
-                let mut closed = closed.lock().unwrap();
-                while *closed {
-                    closed = opened.wait(closed).unwrap();
-                }
-            }
-            ok(path)
-        })
-        .await;
-        let open_gate = || {
-            *gate.0.lock().unwrap() = false;
-            gate.1.notify_all();
-        };
+        let api = ApiMock::spawn(respond(vec![SUB_ID])).await;
         let timing = if pacing {
             ResubscribeTiming {
                 attempt_spacing: Duration::from_millis(400),
@@ -966,6 +952,9 @@ mod tests {
             client.access.reserve_attempt();
             lock_unpoisoned(&client.access.state).next_attempt_at
         });
+        if !pacing {
+            api.hold(LIST);
+        }
 
         end(&ws, &channel);
         tokio::time::timeout(WAIT, async {
@@ -1008,7 +997,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        open_gate();
+        api.release();
 
         if removed {
             assert_eq!(
@@ -1023,22 +1012,22 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn removal_during_the_list_stops_before_any_token() {
         removal_while_deciding(false, true).await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn still_granted_during_the_list_resumes() {
         removal_while_deciding(false, false).await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn removal_during_pacing_stops_before_any_token() {
         removal_while_deciding(true, true).await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn still_granted_during_pacing_resumes() {
         removal_while_deciding(true, false).await;
     }
