@@ -193,6 +193,7 @@ impl TriggersService {
     /// 25 ms, doubles up to 500 ms and gives up after about 2 s, returning
     /// the last error.
     pub async fn list(&self, req: ListTriggersRequest) -> Result<TriggersList> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -243,6 +244,7 @@ impl TriggersService {
     /// trigger as changed: it retries `unavailable` (HTTP 503) with the same
     /// request, as [`Self::list`] does, and never falls back to a cached copy.
     pub async fn get(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -777,6 +779,7 @@ impl TriggersService {
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::cancel_by_id`] to apply it.
     pub async fn cancel(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -806,6 +809,7 @@ impl TriggersService {
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::pause_by_id`] to apply it.
     pub async fn pause(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -835,6 +839,7 @@ impl TriggersService {
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::resume_with`] to apply it.
     pub async fn resume(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -908,6 +913,7 @@ impl TriggersService {
     }
 
     pub async fn list_events(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,

@@ -9556,3 +9556,128 @@ async fn explicit_subaccount_zero_is_refused_before_sending() {
     }
     assert_eq!(server.requests.load(Ordering::SeqCst), 1);
 }
+
+// Request-object wrappers forward the caller's request; an explicit
+// subaccount_id of Some(0) is refused before sending, None still means none.
+async fn zero_scope_request_client() -> (MockHttpServer, Client) {
+    use polyester::proto::ledger::read::v1::GetBalancesResponse;
+    let server = MockHttpServer::spawn(|request| {
+        if request.path == GET_BALANCES_PATH {
+            return connect_proto_ok(&GetBalancesResponse::default());
+        }
+        hardening_support::HttpScript::NotFound
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scope-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    (server, client)
+}
+
+#[tokio::test]
+async fn request_object_without_subaccount_is_still_sent() {
+    use polyester::proto::ledger::read::v1::GetBalancesRequest;
+    let (server, client) = zero_scope_request_client().await;
+    client
+        .balances
+        .list(GetBalancesRequest::default())
+        .await
+        .unwrap();
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+}
+
+macro_rules! request_object_refuses_subaccount_zero {
+    ($($name:ident: |$client:ident| $call:expr;)+) => {$(
+        #[tokio::test]
+        async fn $name() {
+            let (server, $client) = zero_scope_request_client().await;
+            let err = $call
+                .await
+                .map(|_| ())
+                .expect_err("sub-account 0 must be refused");
+            assert!(matches!(err, Error::Validation(_)), "{err:?}");
+            assert!(err.to_string().contains("not 0"), "{err}");
+            assert_eq!(server.requests.load(Ordering::SeqCst), 0);
+        }
+    )+};
+}
+
+request_object_refuses_subaccount_zero! {
+    balances_list_refuses_subaccount_zero: |client| client.balances.list(
+        polyester::proto::ledger::read::v1::GetBalancesRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_get_balance_history_refuses_subaccount_zero: |client| client.balances.get_balance_history(
+        polyester::proto::ledger::read::v1::GetBalanceHistoryRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_get_equity_history_refuses_subaccount_zero: |client| client.balances.get_equity_history(
+        polyester::proto::ledger::read::v1::GetEquityHistorySeriesRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    balances_list_transfers_refuses_subaccount_zero: |client| client.balances.list_transfers(
+        polyester::proto::ledger::read::v1::ListTransfersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    transfers_list_refuses_subaccount_zero: |client| client.transfers.list(
+        polyester::proto::ledger::read::v1::ListTransfersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    orders_cancel_refuses_subaccount_zero: |client| client.orders.cancel(
+        polyester::proto::orders::v1::CancelOrderRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_list_refuses_subaccount_zero: |client| client.triggers.list(
+        polyester::proto::triggers::v1::ListTriggersRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_get_refuses_subaccount_zero: |client| client.triggers.get(
+        polyester::proto::triggers::v1::GetTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_cancel_refuses_subaccount_zero: |client| client.triggers.cancel(
+        polyester::proto::triggers::v1::CancelTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_pause_refuses_subaccount_zero: |client| client.triggers.pause(
+        polyester::proto::triggers::v1::PauseTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_resume_refuses_subaccount_zero: |client| client.triggers.resume(
+        polyester::proto::triggers::v1::ResumeTriggerRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+    triggers_list_events_refuses_subaccount_zero: |client| client.triggers.list_events(
+        polyester::proto::triggers::v1::ListTriggerEventsRequest {
+            subaccount_id: Some(0),
+            ..Default::default()
+        },
+    );
+}

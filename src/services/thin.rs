@@ -888,6 +888,7 @@ impl TransfersService {
         req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> crate::errors::Result<crate::models::TransfersList> {
         use crate::codecs::decode::transfers_list_from_proto;
+        super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
