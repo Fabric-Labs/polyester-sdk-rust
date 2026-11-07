@@ -17,8 +17,8 @@ use crate::models::{
     BatchReplaceOrdersResult, BatchReplaceStatusItem, BatchReplaceStatusResult,
     CancelAllAfterResult, CancelAllOrdersResult, CancelledOrder, CreateOrderType,
     DeadManSwitchScope, GetOrderResult, MaxSlippage, ModifyOrderResult, Order, OrderErrorDetail,
-    OrderFeeTotal, OrderFieldViolation, OrderLineage, OrderMutationResult, OrderTransfer,
-    OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop,
+    OrderFeeTotal, OrderFieldViolation, OrderLineage, OrderMutationResult, OrderOrigin,
+    OrderTransfer, OrdersList, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop,
     TriggerPriceSourceKind, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
@@ -28,10 +28,11 @@ use crate::proto::orders::v1::{
     CancelAllAfterResponse, CancelAllOrdersResponse, CancelOrderResponse, CreateOrderResponse,
     ErrorDetail, GetBatchReplaceStatusResponse, GetOpenOrdersResponse, GetOrderHistoryResponse,
     GetOrderResponse, GetUserTradesResponse, ModifyOrderResponse, Order as ProtoOrder,
-    OrderLineage as ProtoOrderLineage, OrderTransfer as ProtoOrderTransfer, PreviewOrderResponse,
-    RiskExecution, TrailingStopPolicy, TriggerPriceSource, UserTrade as ProtoUserTrade,
-    batch_cancel_result_item, batch_create_result_item, cancel_all_after_response,
-    cancel_all_orders_response, cancel_order_response, risk_execution, trailing_stop_policy,
+    OrderLineage as ProtoOrderLineage, OrderOrigin as ProtoOrderOrigin,
+    OrderTransfer as ProtoOrderTransfer, PreviewOrderResponse, RiskExecution, TrailingStopPolicy,
+    TriggerPriceSource, UserTrade as ProtoUserTrade, batch_cancel_result_item,
+    batch_create_result_item, cancel_all_after_response, cancel_all_orders_response,
+    cancel_order_response, risk_execution, trailing_stop_policy,
 };
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
@@ -70,6 +71,8 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             qty: decode_qty_scaled_allow_zero(fee.qty_scaled, None, None, symbol_id_opt),
         }),
         created_ts_ns: TsNs::from_wire(msg.created_ts_ns, "Order.created_ts_ns")?.optional_string(),
+        terminal_ts_ns: TsNs::from_wire(msg.terminal_ts_ns, "Order.terminal_ts_ns")?
+            .optional_string(),
         version: msg.version,
         post_only: msg.post_only,
         fee_asset: enum_value_fee_asset(msg.fee_asset),
@@ -84,10 +87,47 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             .transpose()?
             .flatten(),
         lineage: order_lineage_from_proto(msg.lineage.as_option()),
+        origin: msg.origin.as_option().and_then(order_origin_from_proto),
+        market_client_ref_price: positive_price_ticks(msg.market_client_ref_price_ticks),
+        market_max_slippage: positive_price_ticks(msg.market_max_slippage_ticks),
+        market_max_slippage_bps: msg.market_max_slippage_bps,
         expire_at: expire_at_rfc3339(msg.expire_at.as_option()),
         reject_reason: order_reject_reason(msg.reject_reason),
         cancel_reason: order_cancel_reason(msg.cancel_reason),
     })
+}
+
+/// A price that zero (or less) leaves unset.
+fn positive_price_ticks(ticks: i64) -> Option<crate::types::Price> {
+    (ticks > 0)
+        .then(|| decode_price_ticks(ticks, None))
+        .flatten()
+}
+
+/// An origin enum as a lowercase label: empty when unset, and
+/// `UNKNOWN(<number>)` for a value newer than this SDK.
+fn origin_label<T: Enumeration>(value: buffa::EnumValue<T>) -> String {
+    if value.to_i32() == 0 {
+        return String::new();
+    }
+    value
+        .as_known()
+        .map(|known| known.proto_name().to_ascii_lowercase())
+        .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
+}
+
+fn order_origin_from_proto(msg: &ProtoOrderOrigin) -> Option<OrderOrigin> {
+    let origin = OrderOrigin {
+        scope: origin_label(msg.scope),
+        trigger_type: origin_label(msg.trigger_type),
+        trigger_id: msg.trigger_id.map(format_uint64_id).unwrap_or_default(),
+        parent_order_id: msg
+            .parent_order_id
+            .map(format_uint64_id)
+            .unwrap_or_default(),
+        child_seq: msg.child_seq,
+    };
+    (origin != OrderOrigin::default()).then_some(origin)
 }
 
 fn expire_at_rfc3339(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option<String> {
@@ -1035,7 +1075,8 @@ mod tests {
     use super::*;
     use crate::codecs::scalars::format_uint64_id;
     use crate::proto::orders::v1::{
-        GetOpenOrdersResponse, GetOrderResponse, OrderStatus, OrderType, Side, TimeInForce,
+        GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, OrderStatus, OrderType,
+        Side, TimeInForce,
     };
 
     #[test]
@@ -2097,6 +2138,165 @@ mod tests {
         ];
         for (wire, want) in cases {
             assert_eq!(risk_trigger_price_source(wire), want);
+        }
+    }
+
+    /// Every typed order read (GetOrder, open orders, history and the order
+    /// stream) decodes through `order_from_proto`.
+    fn order_read_paths(msg: ProtoOrder) -> Vec<(&'static str, Order)> {
+        let get = get_order_from_proto(&GetOrderResponse {
+            order: Some(msg.clone()).into(),
+            ..Default::default()
+        })
+        .unwrap()
+        .order
+        .unwrap();
+        let open = orders_list_from_open(&GetOpenOrdersResponse {
+            orders: vec![msg.clone()],
+            ..Default::default()
+        })
+        .unwrap()
+        .orders
+        .remove(0);
+        let history = orders_list_from_history(&GetOrderHistoryResponse {
+            orders: vec![msg.clone()],
+            ..Default::default()
+        })
+        .unwrap()
+        .orders
+        .remove(0);
+        let stream = order_from_proto(&msg).unwrap();
+        vec![
+            ("get", get),
+            ("open orders", open),
+            ("history", history),
+            ("order stream", stream),
+        ]
+    }
+
+    type ReadFields = (String, Option<OrderOrigin>, Option<i64>, Option<i64>, i32);
+
+    fn read_fields(order: &Order) -> ReadFields {
+        (
+            order.terminal_ts_ns.clone(),
+            order.origin.clone(),
+            order.market_client_ref_price.as_ref().map(|p| p.as_ticks()),
+            order.market_max_slippage.as_ref().map(|p| p.as_ticks()),
+            order.market_max_slippage_bps,
+        )
+    }
+
+    #[test]
+    fn order_reads_keep_terminal_time_origin_and_market_slippage() {
+        use crate::proto::orders::v1::{
+            OrderOrigin as ProtoOrigin, OrderOriginScope, OrderTriggerType,
+        };
+        let cases: Vec<(&str, ProtoOrder, ReadFields)> = vec![
+            (
+                "filled TWAP child with bps slippage",
+                ProtoOrder {
+                    order_id: 11,
+                    symbol_id: 1,
+                    status: OrderStatus::Filled.into(),
+                    terminal_ts_ns: 1_700_000_000_250_000_000,
+                    origin: Some(ProtoOrigin {
+                        scope: OrderOriginScope::StandaloneTrigger.into(),
+                        trigger_type: OrderTriggerType::Twap.into(),
+                        trigger_id: Some(77),
+                        child_seq: 3,
+                        ..Default::default()
+                    })
+                    .into(),
+                    market_max_slippage_bps: 100,
+                    ..Default::default()
+                },
+                (
+                    "1700000000250000000".into(),
+                    Some(OrderOrigin {
+                        scope: "standalone_trigger".into(),
+                        trigger_type: "twap".into(),
+                        trigger_id: format_uint64_id(77),
+                        parent_order_id: String::new(),
+                        child_seq: 3,
+                    }),
+                    None,
+                    None,
+                    100,
+                ),
+            ),
+            (
+                "attached-risk market child with a tick cap",
+                ProtoOrder {
+                    order_id: 12,
+                    symbol_id: 1,
+                    status: OrderStatus::Canceled.into(),
+                    terminal_ts_ns: 1_700_000_001_000_000_000,
+                    origin: Some(ProtoOrigin {
+                        scope: OrderOriginScope::AttachedRisk.into(),
+                        trigger_type: OrderTriggerType::StopLoss.into(),
+                        trigger_id: Some(78),
+                        parent_order_id: Some(10),
+                        ..Default::default()
+                    })
+                    .into(),
+                    market_client_ref_price_ticks: 50_000_000_000,
+                    market_max_slippage_ticks: 2_500_000,
+                    ..Default::default()
+                },
+                (
+                    "1700000001000000000".into(),
+                    Some(OrderOrigin {
+                        scope: "attached_risk".into(),
+                        trigger_type: "stop_loss".into(),
+                        trigger_id: format_uint64_id(78),
+                        parent_order_id: format_uint64_id(10),
+                        child_seq: 0,
+                    }),
+                    Some(50_000_000_000),
+                    Some(2_500_000),
+                    0,
+                ),
+            ),
+            (
+                "direct order",
+                ProtoOrder {
+                    order_id: 13,
+                    symbol_id: 1,
+                    status: OrderStatus::Filled.into(),
+                    terminal_ts_ns: 1_700_000_002_000_000_000,
+                    origin: Some(ProtoOrigin {
+                        scope: OrderOriginScope::Direct.into(),
+                        ..Default::default()
+                    })
+                    .into(),
+                    ..Default::default()
+                },
+                (
+                    "1700000002000000000".into(),
+                    Some(OrderOrigin {
+                        scope: "direct".into(),
+                        ..Default::default()
+                    }),
+                    None,
+                    None,
+                    0,
+                ),
+            ),
+            (
+                "open order without any of them",
+                ProtoOrder {
+                    order_id: 14,
+                    symbol_id: 1,
+                    status: OrderStatus::Working.into(),
+                    ..Default::default()
+                },
+                (String::new(), None, None, None, 0),
+            ),
+        ];
+        for (name, msg, want) in cases {
+            for (path, order) in order_read_paths(msg.clone()) {
+                assert_eq!(read_fields(&order), want, "{name} via {path}");
+            }
         }
     }
 

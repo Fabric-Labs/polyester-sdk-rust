@@ -254,8 +254,8 @@ fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChanges
         action_required: opts.action_required,
         surfaces: labels_to_enums::<Surface>(&opts.surfaces, "surfaces")?,
         audiences: labels_to_enums::<Audience>(&opts.audiences, "audiences")?,
-        start_time: timestamp_field(opts.start_time, "start_time")?,
-        end_time: timestamp_field(opts.end_time, "end_time")?,
+        start_time: timestamp_field(opts.start_time),
+        end_time: timestamp_field(opts.end_time),
         post_slug: opts.post_slug.unwrap_or_default(),
         sort: sort_direction(opts.sort.as_deref())?.into(),
         limit: opts.limit.unwrap_or(0),
@@ -294,22 +294,29 @@ fn sort_direction(sort: Option<&str>) -> Result<SortDirection> {
     }
 }
 
-fn timestamp_field(
-    time: Option<SystemTime>,
-    field: &str,
-) -> Result<buffa::MessageField<Timestamp>> {
+/// An exact protobuf `Timestamp`, as protobuf's own conversions write one:
+/// `seconds` rounds toward negative infinity and `nanos` is never negative.
+fn timestamp_field(time: Option<SystemTime>) -> buffa::MessageField<Timestamp> {
     let Some(time) = time else {
-        return Ok(buffa::MessageField::none());
+        return buffa::MessageField::none();
     };
-    let since_epoch = time
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| Error::validation(format!("list_changes {field} is before 1970")))?;
-    Ok(Timestamp {
-        seconds: since_epoch.as_secs() as i64,
-        nanos: since_epoch.subsec_nanos() as i32,
+    let (seconds, nanos) = match time.duration_since(UNIX_EPOCH) {
+        Ok(after) => (after.as_secs() as i64, after.subsec_nanos() as i32),
+        Err(before) => {
+            let before = before.duration();
+            let seconds = -(before.as_secs() as i64);
+            match before.subsec_nanos() {
+                0 => (seconds, 0),
+                nanos => (seconds - 1, (1_000_000_000 - nanos) as i32),
+            }
+        }
+    };
+    Timestamp {
+        seconds,
+        nanos,
         ..Default::default()
     }
-    .into())
+    .into()
 }
 
 #[cfg(test)]
@@ -348,6 +355,48 @@ mod tests {
         assert!(req.end_time.as_option().is_none());
         assert_eq!(req.sort, SortDirection::SORT_ASC);
         assert_eq!(req.limit, 50);
+    }
+
+    /// Time bounds are sent as exact protobuf timestamps across its range:
+    /// `seconds` rounds toward negative infinity and `nanos` is never
+    /// negative, as protobuf's own conversions do.
+    #[test]
+    fn list_changes_request_sends_exact_time_bounds() {
+        let cases = [
+            (
+                "half a second before the epoch",
+                UNIX_EPOCH - Duration::from_millis(500),
+                (-1, 500_000_000),
+            ),
+            (
+                "one nanosecond before the epoch",
+                UNIX_EPOCH - Duration::from_nanos(1),
+                (-1, 999_999_999),
+            ),
+            (
+                "the first second of year 1",
+                UNIX_EPOCH - Duration::from_secs(62_135_596_800),
+                (-62_135_596_800, 0),
+            ),
+            ("the epoch", UNIX_EPOCH, (0, 0)),
+            (
+                "the last microsecond of year 9999",
+                UNIX_EPOCH + Duration::new(253_402_300_799, 999_999_000),
+                (253_402_300_799, 999_999_000),
+            ),
+        ];
+        for (name, time, want) in cases {
+            let req = list_changes_request(ListChangelogChangesOptions {
+                start_time: Some(time),
+                end_time: Some(time),
+                ..Default::default()
+            })
+            .unwrap_or_else(|err| panic!("{name}: {err}"));
+            for ts in [req.start_time.as_option(), req.end_time.as_option()] {
+                let ts = ts.unwrap();
+                assert_eq!((ts.seconds, ts.nanos), want, "{name}");
+            }
+        }
     }
 
     #[test]

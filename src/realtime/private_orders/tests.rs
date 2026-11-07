@@ -196,6 +196,19 @@ impl FakeServer {
         self.ws.send(Message::Binary(bytes.into())).await.unwrap();
     }
 
+    /// Sends a heartbeat, as a server does until it sees the socket closed.
+    /// Returns false once the client has dropped the socket.
+    async fn heartbeat(&mut self) -> bool {
+        let msg = ServerMessage {
+            frame: Some(crate::proto::privatews::v1::Heartbeat::default().into()),
+            ..Default::default()
+        };
+        self.ws
+            .send(Message::Binary(msg.encode_to_vec().into()))
+            .await
+            .is_ok()
+    }
+
     async fn close(&mut self, code: u16) {
         self.ws
             .close(Some(CloseFrame {
@@ -1100,7 +1113,8 @@ async fn a_broken_write_path_reconnects(writes: Writes) {
     // The client answers this with a write: a subscribeRefresh.
     server.send("s1", 0, SubscribeExpiring::default()).await;
 
-    let heartbeat = crate::proto::privatews::v1::Heartbeat::default();
+    // The old socket keeps getting heartbeats until the client drops it.
+    let mut old_socket_open = true;
     let mut replacement = None;
     let mut disconnected = false;
     while started.elapsed() < WRITE_TIMEOUT + Duration::from_secs(2) {
@@ -1111,14 +1125,24 @@ async fn a_broken_write_path_reconnects(writes: Writes) {
             }
             event = consumer.recv() => {
                 match event.expect("stream open") {
-                    PrivateOrdersEvent::Disconnected => disconnected = true,
+                    PrivateOrdersEvent::Disconnected => {
+                        disconnected = true;
+                        // A heartbeat that lands once the client dropped the
+                        // socket: the 1 s heartbeat when the reconnect backoff
+                        // draws its 1 s maximum.
+                        if old_socket_open {
+                            old_socket_open = server.heartbeat().await;
+                        }
+                    }
                     PrivateOrdersEvent::Error(error) => panic!("unexpected error: {error}"),
                     other => panic!("unexpected event: {other:?}"),
                 }
             }
             _ = tokio::time::sleep(Duration::from_secs(1)) => {
                 // The old socket stays alive from the server's side.
-                server.send("", 0, heartbeat.clone()).await;
+                if old_socket_open {
+                    old_socket_open = server.heartbeat().await;
+                }
             }
         }
     }

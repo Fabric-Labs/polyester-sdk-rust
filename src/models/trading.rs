@@ -51,6 +51,9 @@ pub struct Order {
     /// history and private stream updates leave it `None`.
     pub fee_total: Option<OrderFeeTotal>,
     pub created_ts_ns: String,
+    /// When the order became terminal, in Unix nanoseconds (UTC) as a decimal
+    /// string. Empty while the order is open.
+    pub terminal_ts_ns: String,
     pub version: u32,
     pub post_only: bool,
     /// Asset selected to pay fees: `quote`, `base`, or an
@@ -67,6 +70,17 @@ pub struct Order {
     /// Attached risk policy when requested via `include_attached_risk`.
     pub attached_risk: Option<AttachedRisk>,
     pub lineage: Option<OrderLineage>,
+    /// How the order was created; `None` when the read does not say.
+    pub origin: Option<OrderOrigin>,
+    /// Reference price a MARKET order's slippage protection was measured
+    /// from; `None` when none was supplied.
+    pub market_client_ref_price: Option<Price>,
+    /// A MARKET order's maximum slippage as an absolute price distance;
+    /// `None` when it has no cap of that form.
+    pub market_max_slippage: Option<Price>,
+    /// A MARKET order's maximum slippage in basis points; 0 when it has no cap
+    /// of that form.
+    pub market_max_slippage_bps: i32,
     /// RFC3339 UTC expiry for GTD orders. `None` for every other TIF.
     pub expire_at: Option<String>,
     /// Why a `rejected` order was refused: the order error code the Orders
@@ -221,6 +235,25 @@ impl Order {
             .checked_sub(rescale(used, used_scale, scale)?)?;
         exact_decimal(unspent, scale)
     }
+}
+
+/// How an order was created.
+///
+/// `scope` is `direct`, `attached_risk`, `standalone_trigger` or `system`
+/// (`UNKNOWN(<number>)` for a scope newer than this SDK). `trigger_type` names
+/// the trigger strategy that placed the order (`stop_loss`, `take_profit`,
+/// `trailing_stop`, `twap` or `ladder`) and is empty for a direct order.
+/// `trigger_id` is that trigger, `parent_order_id` the parent order of an
+/// attached-risk child, and `child_seq` the child's sequence number in a
+/// multi-child strategy such as a TWAP; each is empty or 0 when it does not
+/// apply.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct OrderOrigin {
+    pub scope: String,
+    pub trigger_type: String,
+    pub trigger_id: String,
+    pub parent_order_id: String,
+    pub child_seq: u32,
 }
 
 /// Stable replacement-chain identity. `id` is the first generation's public
