@@ -254,8 +254,8 @@ fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChanges
         action_required: opts.action_required,
         surfaces: labels_to_enums::<Surface>(&opts.surfaces, "surfaces")?,
         audiences: labels_to_enums::<Audience>(&opts.audiences, "audiences")?,
-        start_time: timestamp_field(opts.start_time, "start_time")?,
-        end_time: timestamp_field(opts.end_time, "end_time")?,
+        start_time: timestamp_field(opts.start_time),
+        end_time: timestamp_field(opts.end_time),
         post_slug: opts.post_slug.unwrap_or_default(),
         sort: sort_direction(opts.sort.as_deref())?.into(),
         limit: opts.limit.unwrap_or(0),
@@ -294,22 +294,29 @@ fn sort_direction(sort: Option<&str>) -> Result<SortDirection> {
     }
 }
 
-fn timestamp_field(
-    time: Option<SystemTime>,
-    field: &str,
-) -> Result<buffa::MessageField<Timestamp>> {
+/// An exact protobuf `Timestamp`, as protobuf's own conversions write one:
+/// `seconds` rounds toward negative infinity and `nanos` is never negative.
+fn timestamp_field(time: Option<SystemTime>) -> buffa::MessageField<Timestamp> {
     let Some(time) = time else {
-        return Ok(buffa::MessageField::none());
+        return buffa::MessageField::none();
     };
-    let since_epoch = time
-        .duration_since(UNIX_EPOCH)
-        .map_err(|_| Error::validation(format!("list_changes {field} is before 1970")))?;
-    Ok(Timestamp {
-        seconds: since_epoch.as_secs() as i64,
-        nanos: since_epoch.subsec_nanos() as i32,
+    let (seconds, nanos) = match time.duration_since(UNIX_EPOCH) {
+        Ok(after) => (after.as_secs() as i64, after.subsec_nanos() as i32),
+        Err(before) => {
+            let before = before.duration();
+            let seconds = -(before.as_secs() as i64);
+            match before.subsec_nanos() {
+                0 => (seconds, 0),
+                nanos => (seconds - 1, (1_000_000_000 - nanos) as i32),
+            }
+        }
+    };
+    Timestamp {
+        seconds,
+        nanos,
         ..Default::default()
     }
-    .into())
+    .into()
 }
 
 #[cfg(test)]

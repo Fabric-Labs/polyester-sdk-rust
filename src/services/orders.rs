@@ -315,6 +315,12 @@ impl OrdersService {
     /// GetOrder can report `cum_qty` before every fill is visible on the trades
     /// list. Prefer this helper after fills
     /// instead of treating a single get as final trade projection.
+    ///
+    /// Each poll reads every execution page; the result holds the last poll's
+    /// order, trades and transfers with that read's `executions_complete`.
+    /// `timeout` (15 s when zero) bounds the whole wait, page reads included.
+    /// A `next_page_token` that repeats a page token of the same poll returns
+    /// [`Error::ResponseContract`].
     pub async fn wait_for_order_trades_complete(
         &self,
         key: OrderKey,
@@ -352,6 +358,7 @@ impl OrdersService {
 
     async fn get_order_execution_pages(&self, mut key: OrderKey) -> Result<GetOrderResult> {
         let mut page_token = None;
+        let mut requested = std::collections::HashSet::new();
         let mut trades = Vec::new();
         let mut transfers = Vec::new();
         let mut order = None;
@@ -383,6 +390,12 @@ impl OrdersService {
                     next_page_token: String::new(),
                     executions_complete: page.executions_complete,
                 });
+            }
+            if !requested.insert(page.next_page_token.clone()) {
+                return Err(Error::response_contract(
+                    "GetOrder",
+                    "next_page_token repeats an earlier page token",
+                ));
             }
             page_token = Some(page.next_page_token);
         }
@@ -3284,6 +3297,7 @@ mod tests {
                 cum_notional: "0".into(),
                 fee_total: None,
                 created_ts_ns: String::new(),
+                terminal_ts_ns: String::new(),
                 version: 1,
                 post_only: false,
                 fee_asset: "quote".into(),
@@ -3294,6 +3308,10 @@ mod tests {
                 reject_reason: None,
                 cancel_reason: None,
                 lineage: None,
+                origin: None,
+                market_client_ref_price: None,
+                market_max_slippage: None,
+                market_max_slippage_bps: 0,
             }),
             trades: vec![],
             transfers: vec![],
