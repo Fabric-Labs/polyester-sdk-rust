@@ -65,14 +65,28 @@ pub struct ChangelogSection {
 }
 
 /// A changelog post without its sections, with change counts by kind.
+///
+/// A published post can be republished, for example to correct its copy or
+/// withdraw a change. Its `slug`, `published_at` and its changes' `id`
+/// values stay the same; `revision` and `updated_at` tell the versions
+/// apart. To follow edits, read a post again when its `revision` differs
+/// from the one you hold.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangelogPostSummary {
     /// The post's coverage cutoff date, `YYYY-MM-DD`, with a `-2` or `-3`
-    /// suffix for a later post on the same day.
+    /// suffix for a later post on the same day. It never changes when the
+    /// post is republished.
     pub slug: String,
     pub title: String,
     pub introduction: String,
+    /// Time of first publication. A republication does not move it.
     pub published_at: Option<Timestamp>,
+    /// When the current revision was published; equal to `published_at` for
+    /// revision 1. `None` from a server that predates revisions.
+    pub updated_at: Option<Timestamp>,
+    /// Published revision, starting at 1 and increasing with each
+    /// republication. 0 from a server that predates revisions.
+    pub revision: u32,
     pub coverage_cutoff: Option<Timestamp>,
     pub change_count: u32,
     pub breaking_change_count: u32,
@@ -82,7 +96,7 @@ pub struct ChangelogPostSummary {
     pub bug_fix_count: u32,
 }
 
-/// One full changelog post.
+/// One full changelog post at its current revision.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangelogPost {
     pub summary: ChangelogPostSummary,

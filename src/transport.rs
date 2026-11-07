@@ -160,6 +160,11 @@ pub(crate) const GATEWAY_REJECTION_TYPE: &str = "polyester.sdk.GatewayRejection"
 /// Connect error. The error's HTTP status is the response's.
 pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 
+/// Type URL of the SDK-local Connect error detail that carries the
+/// `rate_limit` object of a REST rate-limit problem, as sent, in `debug`.
+/// [`crate::errors::map_connect_error`] reads it into the error's detail.
+pub(crate) const RATE_LIMIT_PROBLEM_TYPE: &str = "polyester.sdk.rate_limit_problem";
+
 /// Longest body excerpt kept in a bare HTTP error message.
 const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 
@@ -296,6 +301,7 @@ fn classify_failed_response_inner(
         detail: Option<String>,
         message: Option<String>,
         details: Option<Vec<BodyDetail>>,
+        rate_limit: Option<serde_json::Value>,
     }
     let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
@@ -389,21 +395,29 @@ fn classify_failed_response_inner(
             use crate::proto::orders::v1::{
                 ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
             };
+            let rate_limit = parsed.as_ref().and_then(|body| body.rate_limit.clone());
             let message = parsed
                 .and_then(|body| body.detail.or(body.title))
                 .filter(|m| !m.is_empty())
                 .unwrap_or_else(|| code.clone());
-            return Some(
-                ConnectError::new(ErrorCode::ResourceExhausted, message)
-                    .with_http_status(status)
-                    .with_detail(ErrorDetail::from_message(
-                        "orders.v1.ErrorDetail",
-                        &OrderErrorDetail {
-                            code: OrderErrorCode::from_proto_name(&order_name)?.into(),
-                            ..Default::default()
-                        },
-                    )),
-            );
+            let mut err = ConnectError::new(ErrorCode::ResourceExhausted, message)
+                .with_http_status(status)
+                .with_detail(ErrorDetail::from_message(
+                    "orders.v1.ErrorDetail",
+                    &OrderErrorDetail {
+                        code: OrderErrorCode::from_proto_name(&order_name)?.into(),
+                        ..Default::default()
+                    },
+                ));
+            if let Some(rate_limit) = rate_limit {
+                // A rate-limit problem's `rate_limit`, whichever side refused.
+                err = err.with_detail(ErrorDetail {
+                    type_url: RATE_LIMIT_PROBLEM_TYPE.into(),
+                    value: None,
+                    debug: Some(rate_limit),
+                });
+            }
+            return Some(err);
         }
         if let Some((connect_code, auth_code)) = rest_auth_problem(&code) {
             let message = parsed

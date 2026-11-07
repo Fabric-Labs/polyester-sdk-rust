@@ -60,6 +60,8 @@ fn post_summary_from_proto(msg: &PostSummary) -> ChangelogPostSummary {
         title: msg.title.clone(),
         introduction: msg.introduction.clone(),
         published_at: clone_timestamp(msg.published_at.as_option()),
+        updated_at: clone_timestamp(msg.updated_at.as_option()),
+        revision: msg.revision,
         coverage_cutoff: clone_timestamp(msg.coverage_cutoff.as_option()),
         change_count: msg.change_count,
         breaking_change_count: msg.breaking_change_count,
@@ -167,6 +169,52 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(change.surfaces, vec!["market_data", "rewards"]);
+    }
+
+    /// A republished post keeps its slug and first publication time, and
+    /// reports its current revision and when that revision was published.
+    #[test]
+    fn post_summary_reads_revision_and_updated_at() {
+        use buffa_types::google::protobuf::Timestamp;
+        let published = Timestamp {
+            seconds: 1_793_786_400,
+            ..Default::default()
+        };
+        let updated = Timestamp {
+            seconds: 1_793_957_400,
+            ..Default::default()
+        };
+        let page = changelog_posts_page_from_proto(&ListPostsResponse {
+            posts: vec![PostSummary {
+                slug: "2026-11-04".into(),
+                published_at: published.clone().into(),
+                updated_at: updated.clone().into(),
+                revision: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let summary = &page.posts[0];
+        assert_eq!(summary.revision, 2);
+        assert_eq!(
+            summary.updated_at.as_ref().map(|t| t.seconds),
+            Some(updated.seconds)
+        );
+        assert_eq!(
+            summary.published_at.as_ref().map(|t| t.seconds),
+            Some(published.seconds)
+        );
+
+        // A server before revisions sends neither.
+        let older = changelog_posts_page_from_proto(&ListPostsResponse {
+            posts: vec![PostSummary {
+                slug: "2026-10-01".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        assert_eq!(older.posts[0].revision, 0);
+        assert!(older.posts[0].updated_at.is_none());
     }
 
     #[test]

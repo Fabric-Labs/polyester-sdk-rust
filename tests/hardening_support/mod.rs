@@ -52,6 +52,14 @@ pub enum HttpScript {
         headers: Vec<(String, String)>,
         body: Vec<u8>,
     },
+    /// `Raw`, then a lingering close: the server stops writing and reads
+    /// the rest of the request until the client is done, as an HTTP server
+    /// that refuses a request before reading its body does.
+    RawLingering {
+        status: u16,
+        headers: Vec<(String, String)>,
+        body: Vec<u8>,
+    },
     /// `Raw`, answered after `delay`: a slow server.
     RawAfter {
         delay: Duration,
@@ -174,6 +182,25 @@ impl MockHttpServer {
                             head.push_str("Connection: close\r\n\r\n");
                             let _ = stream.write_all(head.as_bytes()).await;
                             let _ = stream.write_all(&body).await;
+                        }
+                        HttpScript::RawLingering {
+                            status,
+                            headers,
+                            body,
+                        } => {
+                            let mut head = format!("HTTP/1.1 {status} OK\r\n");
+                            for (k, v) in headers {
+                                head.push_str(&format!("{k}: {v}\r\n"));
+                            }
+                            head.push_str("Connection: close\r\n\r\n");
+                            let _ = stream.write_all(head.as_bytes()).await;
+                            let _ = stream.write_all(&body).await;
+                            let _ = stream.shutdown().await;
+                            let mut sink = vec![0u8; 64 * 1024];
+                            let _ = tokio::time::timeout(Duration::from_secs(5), async {
+                                while matches!(stream.read(&mut sink).await, Ok(n) if n > 0) {}
+                            })
+                            .await;
                         }
                         HttpScript::Raw {
                             status,

@@ -149,7 +149,22 @@ impl ChangelogService {
 
     /// Every change matching `opts` from `opts.page_token` on, fetching pages
     /// as the stream is polled.
+    ///
+    /// When a post is republished during the walk, the next page restarts at
+    /// that post's first change, so changes already yielded can come again.
+    /// Each change `id` is yielded once per stream, as first received; read
+    /// the post with [`Self::get_post`] for its current wording.
     pub fn changes(
+        &self,
+        opts: ListChangelogChangesOptions,
+    ) -> impl Stream<Item = Result<ChangelogChangeEntry>> + Send + 'static {
+        let mut seen = HashSet::new();
+        self.change_walk(opts)
+            .try_filter(move |entry| std::future::ready(seen.insert(entry.change.id.clone())))
+    }
+
+    /// Every `list_changes` entry of one walk, repeats included.
+    fn change_walk(
         &self,
         opts: ListChangelogChangesOptions,
     ) -> impl Stream<Item = Result<ChangelogChangeEntry>> + Send + 'static {
@@ -168,35 +183,60 @@ impl ChangelogService {
     }
 
     /// All breaking changes published at or after `since`, newest post first.
+    ///
+    /// It filters on the post's first publication time, which a
+    /// republication does not move, so an edit to an older post is not
+    /// reported: compare the `revision` of [`Self::posts`] summaries to find
+    /// edited posts. A change met again because its post was republished
+    /// during the call is returned once, at its first position, with the
+    /// wording last received.
     pub async fn breaking_changes_since(
         &self,
         since: SystemTime,
     ) -> Result<Vec<ChangelogChangeEntry>> {
-        self.changes(ListChangelogChangesOptions {
+        collect_changes(self.change_walk(ListChangelogChangesOptions {
             categories: vec![CHANGELOG_CATEGORY_BREAKING_CHANGE.to_owned()],
             start_time: Some(since),
             limit: Some(SINCE_PAGE_SIZE),
             ..Default::default()
-        })
-        .try_collect()
+        }))
         .await
     }
 
     /// All changes that require action, published at or after `since`, newest
-    /// post first.
+    /// post first. Republished posts are handled as in
+    /// [`Self::breaking_changes_since`].
     pub async fn action_required_since(
         &self,
         since: SystemTime,
     ) -> Result<Vec<ChangelogChangeEntry>> {
-        self.changes(ListChangelogChangesOptions {
+        collect_changes(self.change_walk(ListChangelogChangesOptions {
             action_required: Some(true),
             start_time: Some(since),
             limit: Some(SINCE_PAGE_SIZE),
             ..Default::default()
-        })
-        .try_collect()
+        }))
         .await
     }
+}
+
+/// Collect one walk, keeping one entry per change `id`: a repeat replaces the
+/// earlier entry in place, so the latest revision's wording wins.
+async fn collect_changes(
+    walk: impl Stream<Item = Result<ChangelogChangeEntry>>,
+) -> Result<Vec<ChangelogChangeEntry>> {
+    let mut index = std::collections::HashMap::new();
+    walk.try_fold(Vec::new(), |mut changes, entry| {
+        match index.get(&entry.change.id) {
+            Some(&position) => changes[position] = entry,
+            None => {
+                index.insert(entry.change.id.clone(), changes.len());
+                changes.push(entry);
+            }
+        }
+        std::future::ready(Ok(changes))
+    })
+    .await
 }
 
 /// Flatten token-paged results into one item stream. A next page token this
