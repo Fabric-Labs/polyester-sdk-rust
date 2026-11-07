@@ -6,10 +6,16 @@ pub struct GuardSignerStatus {
     pub status: String,
 }
 
+/// A signed protected-action approval. Submit `nonce_space` and
+/// `deadline_unix` unchanged with `signature`; they are the signed values.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GuardApproval {
     pub approval_id: String,
     pub signature: String,
+    /// Nonce space the approval was signed in. Normal flows use 0.
+    pub nonce_space: u64,
+    /// Approval deadline as a unix time in seconds.
+    pub deadline_unix: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +31,9 @@ pub struct ExportGuardSignerWalletResult {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RotateGuardSignerWalletResult {
     pub signer_wallet: String,
+    /// Signed approval needed to submit the rotation; `None` when the API
+    /// returns none.
+    pub approval: Option<GuardApproval>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

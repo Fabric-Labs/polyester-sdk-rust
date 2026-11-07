@@ -38,6 +38,8 @@ pub fn guard_approval_from_proto(msg: &ProtoApproval) -> GuardApproval {
     GuardApproval {
         approval_id: String::new(),
         signature: hex::encode(&msg.signature),
+        nonce_space: msg.nonce_space,
+        deadline_unix: msg.deadline_unix,
     }
 }
 
@@ -64,6 +66,7 @@ pub fn rotate_wallet_from_proto(
 ) -> RotateGuardSignerWalletResult {
     RotateGuardSignerWalletResult {
         signer_wallet: msg.new_signer_address.clone(),
+        approval: msg.approval.as_option().map(guard_approval_from_proto),
     }
 }
 

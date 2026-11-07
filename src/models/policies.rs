@@ -13,6 +13,16 @@ pub struct SubaccountPolicy {
     pub name: String,
     pub description: String,
     pub spot_markets: Vec<SpotMarketRule>,
+    /// `"ALL"` or `"ALLOWLIST"`, empty when unspecified. With `"ALL"`,
+    /// `spot_markets` is for display only and is not enforced.
+    pub spot_market_scope: String,
+    /// Largest notional for one order, in quote microunits (0.000001 USDT).
+    /// 0 means no explicit cap.
+    pub max_order_notional: u64,
+    /// Most resting orders at any time. 0 means no explicit cap.
+    pub max_open_orders: u32,
+    /// When true, new orders and exposure-increasing changes are refused.
+    pub trading_halted: bool,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
 }
@@ -28,6 +38,9 @@ pub struct ApiPolicy {
     pub name: String,
     pub description: String,
     pub spot_markets: Vec<SpotMarketRule>,
+    /// `"ALL"` or `"ALLOWLIST"`, empty when unspecified. With `"ALL"`,
+    /// `spot_markets` is for display only and is not enforced.
+    pub spot_market_scope: String,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
 }

@@ -8606,3 +8606,331 @@ async fn raw_write_requests_are_sent_as_built() {
         assert_eq!(got, expected);
     }
 }
+
+// A quantity scale of 0 is a real scale. The published config omits a zero
+// `quantityScale`, so BONK and SHIB arrive without one; their supplies are
+// whole units. Scale 6, 8 and 18 assets are controls.
+#[test]
+fn zero_scale_zipped_supply_reads_whole_units() {
+    use polyester::catalogs::Manager;
+    use polyester::codecs::decode::{
+        deposit_withdraw_config_from_proto, zipped_asset_supply_batch_from_bytes,
+    };
+    use polyester::codecs::format_ledger_u64;
+    use polyester::proto::chain::zipper::v1::{
+        GetDepositWithdrawConfigResponse, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
+    };
+
+    let config: GetDepositWithdrawConfigResponse = serde_json::from_value(json!({
+        "chains": [{"chainId": 1, "code": "ethereum", "name": "Ethereum"}],
+        "assets": [
+            {"asset": "BONK", "ledgerId": 45, "variants": [{"zippedAssetId": 245, "chainId": 1}]},
+            {"asset": "SHIB", "ledgerId": 47, "variants": [{"zippedAssetId": 247, "chainId": 1}]},
+            {"asset": "USDT", "ledgerId": 11, "quantityScale": 6,
+             "variants": [{"zippedAssetId": 3, "chainId": 1}]},
+            {"asset": "BTC", "ledgerId": 12, "quantityScale": 8,
+             "variants": [{"zippedAssetId": 1, "chainId": 1}]},
+            {"asset": "ETH", "ledgerId": 13, "quantityScale": 18,
+             "variants": [{"zippedAssetId": 13, "chainId": 1}]}
+        ]
+    }))
+    .unwrap();
+    let catalogs = Manager::new();
+    catalogs
+        .hydrate_zipper_config(&deposit_withdraw_config_from_proto(&config))
+        .unwrap();
+    assert_eq!(catalogs.quantity_scale_for_zipped_asset_id(245), Some(0));
+
+    let updates = [
+        (245, 3_582_802, "3582802"),
+        (247, 2_232_802, "2232802"),
+        (3, 1_500_000, "1.5"),
+        (1, 150_000_000, "1.5"),
+        (13, 1_500_000_000_000_000_000, "1.5"),
+    ];
+    let batch = ZippedAssetSupplyBatch {
+        updates: updates
+            .iter()
+            .map(|(id, q, _)| ZippedAssetSupplyUpdate {
+                zipped_asset_id: *id,
+                supply_q: *q,
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    let decoded = zipped_asset_supply_batch_from_bytes(&batch.encode_to_vec(), |id| {
+        catalogs.quantity_scale_for_zipped_asset_id(id)
+    })
+    .unwrap();
+    let got: Vec<(u32, String)> = decoded
+        .updates
+        .into_iter()
+        .map(|u| (u.zipped_asset_id, u.supply))
+        .collect();
+    let want: Vec<(u32, String)> = updates
+        .iter()
+        .map(|(id, _, s)| (*id, (*s).to_owned()))
+        .collect();
+    assert_eq!(got, want);
+
+    let unknown = ZippedAssetSupplyBatch {
+        updates: vec![ZippedAssetSupplyUpdate {
+            zipped_asset_id: 999,
+            supply_q: 3_582_802,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    assert!(
+        zipped_asset_supply_batch_from_bytes(&unknown.encode_to_vec(), |id| {
+            catalogs.quantity_scale_for_zipped_asset_id(id)
+        })
+        .is_err(),
+        "an asset missing from the catalog must not decode with a guessed scale"
+    );
+
+    assert_eq!(format_ledger_u64(3_582_802, 0).unwrap(), "3582802");
+    assert_eq!(format_ledger_u128("3582802", 0).unwrap(), "3582802");
+    assert_eq!(
+        format_ledger_u128("340282366920938463463374607431768211455", 0).unwrap(),
+        "340282366920938463463374607431768211455"
+    );
+    assert_eq!(format_ledger_u128("1500000", 6).unwrap(), "1.5");
+    assert_eq!(format_ledger_u128("150000000", 8).unwrap(), "1.5");
+    assert_eq!(
+        format_ledger_u128("1500000000000000000", 18).unwrap(),
+        "1.5"
+    );
+}
+
+// Guard approvals keep the exact signed nonce space and deadline, in both
+// codecs, including values above 2^53, and rotation keeps its optional approval.
+#[tokio::test]
+async fn guard_signer_approvals_keep_nonce_and_deadline_in_both_codecs() {
+    use polyester::models::GuardApproval;
+    use polyester::proto::chain::guard::v1::{
+        BatchSignProtectedActionsRequest, BatchSignProtectedActionsResponse,
+        GuardApproval as ProtoApproval, RotateGuardSignerWalletRequest,
+        RotateGuardSignerWalletResponse, SignProtectedActionRequest, SignProtectedActionResponse,
+    };
+    use polyester::transport::WireFormat;
+
+    const NONCE_SPACE: u64 = u64::MAX;
+    const DEADLINE_UNIX: u64 = 9_007_199_254_740_993;
+    fn approval(sig: u8) -> ProtoApproval {
+        ProtoApproval {
+            nonce_space: NONCE_SPACE,
+            deadline_unix: DEADLINE_UNIX,
+            signature: vec![0xab, sig],
+            ..Default::default()
+        }
+    }
+    fn expected(sig: &str) -> GuardApproval {
+        GuardApproval {
+            approval_id: String::new(),
+            signature: sig.into(),
+            nonce_space: NONCE_SPACE,
+            deadline_unix: DEADLINE_UNIX,
+        }
+    }
+
+    for json_wire in [false, true] {
+        for rotate_approval in [true, false] {
+            let server = MockHttpServer::spawn(move |req| {
+                let reply = |body: Vec<u8>, json: Vec<u8>| {
+                    if json_wire {
+                        hardening_support::HttpScript::Json {
+                            status: 200,
+                            body: json,
+                        }
+                    } else {
+                        hardening_support::HttpScript::Raw {
+                            status: 200,
+                            headers: vec![("Content-Type".into(), "application/proto".into())],
+                            body,
+                        }
+                    }
+                };
+                macro_rules! respond {
+                    ($msg:expr) => {{
+                        let msg = $msg;
+                        reply(msg.encode_to_vec(), serde_json::to_vec(&msg).unwrap())
+                    }};
+                }
+                if req.path.ends_with("/SignProtectedAction") {
+                    respond!(SignProtectedActionResponse {
+                        approval: approval(0x01).into(),
+                        ..Default::default()
+                    })
+                } else if req.path.ends_with("/BatchSignProtectedActions") {
+                    respond!(BatchSignProtectedActionsResponse {
+                        approvals: vec![
+                            approval(0x02),
+                            ProtoApproval {
+                                signature: vec![0xab, 0x03],
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    })
+                } else if req.path.ends_with("/RotateGuardSignerWallet") {
+                    respond!(RotateGuardSignerWalletResponse {
+                        new_signer_address: "0x2222222222222222222222222222222222222222".into(),
+                        approval: if rotate_approval {
+                            approval(0x04).into()
+                        } else {
+                            Default::default()
+                        },
+                        ..Default::default()
+                    })
+                } else {
+                    panic!("unexpected path {}", req.path)
+                }
+            })
+            .await;
+            let client = Client::new(Config {
+                api_url: server.base_url(),
+                api_key_id: Some("guard-test".into()),
+                api_private_key: Some(TEST_KEY.into()),
+                hydrate_catalogs: false,
+                wire_format: if json_wire {
+                    WireFormat::Json
+                } else {
+                    WireFormat::Binary
+                },
+                ..Default::default()
+            })
+            .unwrap();
+
+            let single = client
+                .guard_signer
+                .sign_protected_action(SignProtectedActionRequest::default())
+                .await
+                .unwrap();
+            assert_eq!(single, Some(expected("ab01")), "json={json_wire}");
+
+            let batch = client
+                .guard_signer
+                .batch_sign_protected_actions(BatchSignProtectedActionsRequest::default())
+                .await
+                .unwrap();
+            assert_eq!(
+                batch.approvals,
+                vec![
+                    expected("ab02"),
+                    GuardApproval {
+                        approval_id: String::new(),
+                        signature: "ab03".into(),
+                        nonce_space: 0,
+                        deadline_unix: 0,
+                    },
+                ],
+                "json={json_wire}"
+            );
+
+            let rotated = client
+                .guard_signer
+                .rotate_wallet(RotateGuardSignerWalletRequest::default())
+                .await
+                .unwrap();
+            assert_eq!(
+                rotated.signer_wallet,
+                "0x2222222222222222222222222222222222222222"
+            );
+            assert_eq!(
+                rotated.approval,
+                rotate_approval.then(|| expected("ab04")),
+                "json={json_wire} rotate_approval={rotate_approval}"
+            );
+        }
+    }
+}
+
+// Realtime policy updates keep the market scope on both policy types, and the
+// order caps and trading halt on sub-account policies.
+#[test]
+fn realtime_policy_updates_keep_scope_caps_and_halt() {
+    use polyester::codecs::decode::{api_policy_from_bytes, subaccount_policy_from_bytes};
+    use polyester::proto::auth::v1::{
+        ApiPolicyView, SpotMarketRule as ProtoRule, SubaccountPolicyView, market_scope,
+    };
+
+    let rules = || {
+        vec![
+            ProtoRule {
+                symbol_id: 1,
+                ..Default::default()
+            },
+            ProtoRule {
+                symbol_id: 2,
+                ..Default::default()
+            },
+        ]
+    };
+
+    // ALL with a populated display list, caps set and trading halted.
+    let all = SubaccountPolicyView {
+        id: 7,
+        spot_markets: rules(),
+        spot_market_scope: market_scope::Value::ALL.into(),
+        max_order_notional: 9_007_199_254_740_993,
+        max_open_orders: 250,
+        trading_halted: true,
+        ..Default::default()
+    };
+    let got = subaccount_policy_from_bytes(&all.encode_to_vec()).unwrap();
+    assert_eq!(got.spot_market_scope, "ALL");
+    assert_eq!(got.spot_markets.len(), 2);
+    assert_eq!(got.max_order_notional, 9_007_199_254_740_993);
+    assert_eq!(got.max_open_orders, 250);
+    assert!(got.trading_halted);
+
+    let allowlist = SubaccountPolicyView {
+        id: 8,
+        spot_markets: rules(),
+        spot_market_scope: market_scope::Value::ALLOWLIST.into(),
+        ..Default::default()
+    };
+    let got = subaccount_policy_from_bytes(&allowlist.encode_to_vec()).unwrap();
+    assert_eq!(got.spot_market_scope, "ALLOWLIST");
+    assert_eq!(got.max_order_notional, 0, "0 means no explicit cap");
+    assert_eq!(got.max_open_orders, 0, "0 means no explicit cap");
+    assert!(!got.trading_halted);
+
+    // Only an id: every scope, cap and halt field is at its default.
+    let defaults = SubaccountPolicyView {
+        id: 10,
+        ..Default::default()
+    };
+    let defaults = subaccount_policy_from_bytes(&defaults.encode_to_vec()).unwrap();
+    assert_eq!(defaults.spot_market_scope, "");
+    assert_eq!(defaults.max_order_notional, 0);
+    assert_eq!(defaults.max_open_orders, 0);
+    assert!(!defaults.trading_halted);
+
+    for (scope, label) in [
+        (market_scope::Value::ALL, "ALL"),
+        (market_scope::Value::ALLOWLIST, "ALLOWLIST"),
+        (market_scope::Value::UNSPECIFIED, ""),
+    ] {
+        let view = ApiPolicyView {
+            id: 9,
+            spot_markets: rules(),
+            spot_market_scope: scope.into(),
+            ..Default::default()
+        };
+        let got = api_policy_from_bytes(&view.encode_to_vec()).unwrap();
+        assert_eq!(got.spot_market_scope, label);
+        assert_eq!(got.spot_markets.len(), 2);
+    }
+
+    // A scope newer than this SDK stays visible instead of reading as unspecified.
+    let newer = ApiPolicyView {
+        id: 11,
+        spot_market_scope: buffa::EnumValue::Unknown(7),
+        ..Default::default()
+    };
+    let got = api_policy_from_bytes(&newer.encode_to_vec()).unwrap();
+    assert_eq!(got.spot_market_scope, "UNKNOWN(7)");
+}
