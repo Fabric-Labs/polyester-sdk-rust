@@ -3,8 +3,9 @@ use super::unary;
 use crate::codecs::decode::{
     candles_columns_from_proto, candles_from_proto, currency_conversion_config_from_proto,
     currency_conversion_rates_from_proto, depth_enum_for_levels, market_overview_list_from_proto,
-    market_trades_from_proto, orderbook_from_proto, orderbook_stream_tier,
-    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
+    market_trades_from_proto, orderbook_from_proto, orderbook_snapshot_depth,
+    orderbook_stream_tier, require_published_stream_depth, spot_config_from_proto,
+    spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -748,19 +749,15 @@ impl OrderbookService {
         Self { ctx }
     }
 
-    /// Snapshot orderbook for `symbol`. `depth` maps like Go (`None` / `0` → depth 5 bucket).
+    /// Snapshot orderbook for `symbol`. `depth` is a snapshot depth (1, 5, 10, 20,
+    /// 50, 100, 200, 500 or 1000); any other depth up to 1000 requests the smallest
+    /// one covering it, and `None` or 0 means 50. The result's `depth` is the depth
+    /// requested. A depth above 1000 is a validation error before any request.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
-        let depth_levels = depth.unwrap_or(0);
-        let depth_enum = if depth_levels == 0 {
-            crate::proto::orderbook::v1::Depth::DepthUnspecified
-        } else {
-            depth_enum_for_levels(depth_levels)
-        };
-        // Record the requested depth for the model; unspecified defaults to 50 server-side.
-        let reported_depth = if depth_levels == 0 { 50 } else { depth_levels };
+        let depth = orderbook_snapshot_depth(depth.unwrap_or(0))?;
         let req = GetOrderBookRequest {
             symbol_id: self.ctx.catalogs.require_symbol_id(symbol)?,
-            depth: depth_enum.into(),
+            depth: depth_enum_for_levels(depth).into(),
             ..Default::default()
         };
         let quantity_scale = self
@@ -780,7 +777,7 @@ impl OrderbookService {
         let resp = unary::await_public(client.get_order_book(req))
             .await?
             .into_owned();
-        orderbook_from_proto(&resp, symbol, reported_depth, quantity_scale)
+        orderbook_from_proto(&resp, symbol, depth, quantity_scale)
     }
 
     /// Subscribe to the raw orderbook deltas of one published stream depth,

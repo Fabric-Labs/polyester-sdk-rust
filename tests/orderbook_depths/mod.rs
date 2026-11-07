@@ -662,22 +662,21 @@ async fn coarse_bucket_above_the_price_shows_the_zero_bid_at_a_trimmed_depth() {
     assert_eq!(ticks(&view.asks), [100000 * UNIT]);
 }
 
+// Refused before it reaches the book: rebuilt from a fresh tier snapshot, still open.
 #[tokio::test]
-async fn zero_price_outside_the_trimmed_view_still_closes_the_stream() {
+async fn zero_price_outside_the_trimmed_view_resyncs_at_the_tier() {
     let market = Market::spawn(600).await;
     let client = market.client();
     let mut sub = book(&client, Some(10), None).await;
     market.await_subscribed(20).await;
-    next_view(&mut sub, "first view").await;
+    let first = next_view(&mut sub, "first view").await;
 
     market.send(20, 100, 101, &Side::from([(0, 5)]), &Side::new(), false);
-    let closed = tokio::time::timeout(WAIT, sub.updates().recv()).await;
-    assert!(matches!(closed, Ok(None)), "stream stayed open: {closed:?}");
-    let error = sub
-        .err()
-        .expect("the stream reports why it ended")
-        .to_string();
-    assert!(error.contains("invalid or missing price"), "{error}");
+    let refreshed = next_view(&mut sub, "view after the refused delta").await;
+    assert_eq!(refreshed.book_seq, first.book_seq);
+    assert_eq!(ticks(&refreshed.bids), ticks(&first.bids));
+    assert_eq!(market.snapshots(), [20, 20]);
+    assert!(sub.err().is_none(), "{:?}", sub.err());
 }
 
 #[tokio::test]
@@ -753,5 +752,54 @@ async fn raw_snapshot_serves_every_enum_depth() {
         assert_eq!(snapshot.bids.len(), depth as usize);
         assert_eq!(snapshot.asks.len(), depth as usize);
         assert_eq!(market.connections(), 0);
+    }
+}
+
+// POLY-8586: a snapshot reports the depth it requested on the wire. A depth
+// between snapshot depths rides the smallest one covering it, `None` and 0 are
+// the default 50, and a depth above 1000 is refused before any request.
+#[tokio::test]
+async fn snapshot_reports_the_depth_requested_on_the_wire() {
+    for (depth, want) in [
+        (Some(1), 1),
+        (Some(2), 5),
+        (Some(5), 5),
+        (Some(10), 10),
+        (Some(11), 20),
+        (Some(15), 20),
+        (Some(20), 20),
+        (None, 50),
+        (Some(0), 50),
+        (Some(21), 50),
+        (Some(101), 200),
+        (Some(501), 1000),
+        (Some(1000), 1000),
+    ] {
+        let market = Market::spawn(1100).await;
+        let client = market.client();
+        let snapshot = client.orderbook.get("BTC-USDT", depth).await.unwrap();
+        assert_eq!(market.snapshots(), [want], "depth {depth:?}");
+        assert_eq!(snapshot.depth, want, "depth {depth:?}");
+        assert_eq!(snapshot.bids.len(), want as usize, "depth {depth:?}");
+        // POLY-8588 parity: snapshot levels keep the market they were read for.
+        let price = snapshot.bids[0].price.as_ref().unwrap();
+        assert_eq!(price.symbol(), Some("BTC-USDT"));
+        assert_eq!(
+            snapshot.asks[0].qty.as_ref().unwrap().symbol(),
+            Some("BTC-USDT")
+        );
+    }
+    for depth in [1001, 5000, u32::MAX] {
+        let market = Market::spawn(10).await;
+        let client = market.client();
+        let refused = client.orderbook.get("BTC-USDT", Some(depth)).await;
+        assert!(
+            matches!(refused, Err(Error::Validation(_))),
+            "depth {depth}: {refused:?}"
+        );
+        assert!(
+            market.snapshots().is_empty(),
+            "depth {depth} reached the server"
+        );
     }
 }

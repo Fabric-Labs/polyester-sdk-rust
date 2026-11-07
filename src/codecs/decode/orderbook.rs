@@ -9,7 +9,30 @@ use crate::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
 /// It also accepts a subscribe at any other depth, and then never sends anything on it.
 pub const ORDERBOOK_STREAM_DEPTHS: [u32; 5] = [1, 20, 50, 200, 500];
 
+/// Depths `orderbook.get` can request, ascending.
+pub const ORDERBOOK_SNAPSHOT_DEPTHS: [u32; 9] = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+
 const ORDERBOOK_SNAPSHOT_MAX_DEPTH: u32 = 1000;
+const ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH: u32 = 50;
+
+/// Snapshot depth `orderbook.get` requests for `depth`: `depth` itself when it is
+/// a snapshot depth, else the smallest one covering it, so a snapshot never holds
+/// fewer levels than asked. 0 is the default 50. A depth above 1000 is a
+/// validation error.
+pub fn orderbook_snapshot_depth(depth: u32) -> Result<u32> {
+    if depth == 0 {
+        return Ok(ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH);
+    }
+    ORDERBOOK_SNAPSHOT_DEPTHS
+        .into_iter()
+        .find(|supported| *supported >= depth)
+        .ok_or_else(|| {
+            Error::validation(format!(
+                "orderbook snapshot depth {depth} is above the deepest snapshot depth \
+                 ({ORDERBOOK_SNAPSHOT_MAX_DEPTH})"
+            ))
+        })
+}
 
 fn deepest_stream_depth() -> u32 {
     ORDERBOOK_STREAM_DEPTHS[ORDERBOOK_STREAM_DEPTHS.len() - 1]

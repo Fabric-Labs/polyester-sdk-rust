@@ -1315,6 +1315,10 @@ if let Some(snapshot) = book.updates().recv().await {
 ```
 
 `orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
+Any other depth up to 1000 requests the smallest of them that covers it, 20 for
+`Some(11)`, and `None` or `Some(0)` means 50; the result's `depth` is the depth
+requested (`polyester::codecs::decode::orderbook_snapshot_depth`). A depth above
+1000 is an `Error::Validation` before any request.
 The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
 (`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
 subscribe at any other depth and then sends nothing on it, so the SDK does not
