@@ -127,12 +127,13 @@ pub fn apply_delta(
 ) -> (u64, bool) {
     // Reject the whole update atomically. Skipping only corrupt rows while
     // advancing the sequence leaves a stale book that can no longer self-heal.
-    if delta
-        .bids
-        .iter()
-        .chain(&delta.asks)
-        .any(|pair| pair.price_ticks < 0 || pair.qty_scaled < 0)
-    {
+    // A positive quantity at price zero is a level `bucket_side` refuses to
+    // render, so it is as malformed as a negative row.
+    if delta.bids.iter().chain(&delta.asks).any(|pair| {
+        pair.price_ticks < 0
+            || pair.qty_scaled < 0
+            || (pair.price_ticks == 0 && pair.qty_scaled > 0)
+    }) {
         return (current_seq, true);
     }
     // Keep seq as u64 end-to-end. Never coerce parse failures to 0 (that disables
@@ -267,6 +268,62 @@ mod tests {
                     qty_scaled,
                 })
                 .collect(),
+        }
+    }
+
+    // POLY-8583: a positive quantity at price zero can't be rendered, so the
+    // whole delta fails closed like any malformed delta.
+    #[test]
+    fn ticket_8583_apply_delta_refuses_zero_price_level() {
+        let valid = (103, 7);
+        let zero = (0, 4);
+        for (name, delta) in [
+            ("bid", delta(11, 11, &[zero], &[], false)),
+            ("ask", delta(11, 11, &[], &[zero], false)),
+            ("mixed bid", delta(11, 11, &[valid, zero], &[], false)),
+            ("mixed ask", delta(11, 11, &[valid], &[zero], false)),
+            ("reset", delta(11, 12, &[valid], &[zero], true)),
+        ] {
+            let mut bids = BookSide::from([(100, 5)]);
+            let mut asks = BookSide::from([(200, 3)]);
+            assert_eq!(
+                apply_delta(&mut bids, &mut asks, 10, &delta),
+                (10, true),
+                "{name}"
+            );
+            assert_eq!(bids, BookSide::from([(100, 5)]), "{name}");
+            assert_eq!(asks, BookSide::from([(200, 3)]), "{name}");
+            build_orderbook_data("BTC-USDT", 10, 10, &bids, &asks, 0, 8, true).unwrap();
+        }
+    }
+
+    #[test]
+    fn ticket_8583_apply_delta_keeps_valid_deletions_and_inserts() {
+        let mut bids = BookSide::from([(100, 5), (99, 1)]);
+        let mut asks = BookSide::from([(200, 3)]);
+        let update = delta(11, 11, &[(99, 0), (0, 0)], &[(201, 2)], false);
+        assert_eq!(apply_delta(&mut bids, &mut asks, 10, &update), (11, false));
+        assert_eq!(bids, BookSide::from([(100, 5)]));
+        assert_eq!(asks, BookSide::from([(200, 3), (201, 2)]));
+        build_orderbook_data("BTC-USDT", 10, 11, &bids, &asks, 10, 8, true).unwrap();
+    }
+
+    // POLY-8588 parity: rendered levels keep the market they were built for.
+    #[test]
+    fn ticket_8588_rendered_levels_are_bound_to_their_market() {
+        let bids = BookSide::from([(52_320_000_000, 5)]);
+        let asks = BookSide::from([(52_330_000_000, 6)]);
+        for bucket in [0, 10] {
+            let data =
+                build_orderbook_data("LTC-USDT", 10, 1, &bids, &asks, bucket, 8, true).unwrap();
+            for level in data.bids.iter().chain(&data.asks) {
+                let price = level.price.as_ref().unwrap();
+                let qty = level.qty.as_ref().unwrap();
+                assert_eq!(price.symbol(), Some("LTC-USDT"));
+                assert_eq!(qty.symbol(), Some("LTC-USDT"));
+                assert!(price.compatible_with(Some("BTC-USDT")).is_err());
+                assert!(price.compatible_with(Some("LTC-USDT")).is_ok());
+            }
         }
     }
 

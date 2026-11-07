@@ -7934,27 +7934,21 @@ async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, de
         })
         .await;
     if quantity > 0 {
-        match result {
-            Err(error) => assert!(
-                error.to_string().contains("invalid or missing price"),
-                "{error}"
-            ),
-            Ok(mut subscription) => {
-                while let Some(view) =
-                    tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
-                        .await
-                        .expect("invalid raw price must terminate the receiver")
-                {
-                    assert_eq!(view.book_seq, "1", "corrupt delta was emitted: {view:?}");
-                }
-                let error = subscription.err().expect("missing terminal error");
-                assert!(
-                    error.to_string().contains("invalid or missing price"),
-                    "{error}"
-                );
-                subscription.close();
-            }
+        // Refused like any malformed delta: never shown, the book is rebuilt from a
+        // fresh snapshot, and the stream stays open.
+        let mut subscription = result.unwrap();
+        for what in ["snapshot view", "view after the refreshed snapshot"] {
+            let view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                .await
+                .unwrap_or_else(|_| panic!("no {what}"))
+                .expect("a raw zero price must not close the stream");
+            assert_eq!(view.book_seq, "1", "corrupt delta was emitted: {view:?}");
+            assert_eq!(view.bids.len(), 1);
+            assert_eq!(view.asks.len(), 1);
         }
+        assert!(subscription.err().is_none(), "{:?}", subscription.err());
+        assert_eq!(http.requests.load(Ordering::SeqCst), 2);
+        subscription.close();
     } else {
         let mut subscription = result.unwrap();
         let mut view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
@@ -7984,21 +7978,21 @@ async fn raw_zero_delta_subscription(side: &str, bucket: &str, quantity: i64, de
         assert_eq!(view.bids[0].qty.as_ref().unwrap().as_scaled(), 3);
         assert_eq!(view.asks[0].qty.as_ref().unwrap().as_scaled(), 4);
         assert!(subscription.err().is_none());
+        assert_eq!(http.requests.load(Ordering::SeqCst), 1);
         subscription.close();
     }
-    assert_eq!(http.requests.load(Ordering::SeqCst), 1);
     assert_eq!(ws.connects.load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
-async fn l2_raw_zero_bid_delta_is_refused_before_aggregation() {
+async fn l2_raw_zero_bid_delta_is_refused_and_resyncs() {
     for bucket in ["", "0.001", "0.1"] {
         raw_zero_delta_subscription("bids", bucket, 9, 50).await;
     }
 }
 
 #[tokio::test]
-async fn l2_raw_zero_ask_delta_is_refused_before_aggregation() {
+async fn l2_raw_zero_ask_delta_is_refused_and_resyncs() {
     for bucket in ["", "0.001", "0.1"] {
         raw_zero_delta_subscription("asks", bucket, 9, 50).await;
     }
