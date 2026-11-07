@@ -3,8 +3,8 @@ use super::unary;
 use crate::codecs::decode::{
     candles_columns_from_proto, candles_from_proto, currency_conversion_config_from_proto,
     currency_conversion_rates_from_proto, depth_enum_for_levels, market_overview_list_from_proto,
-    market_trades_from_proto, orderbook_from_proto, spot_config_from_proto,
-    spot_volume_history_from_proto,
+    market_trades_from_proto, orderbook_from_proto, orderbook_stream_tier,
+    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -783,14 +783,17 @@ impl OrderbookService {
         orderbook_from_proto(&resp, symbol, reported_depth, quantity_scale)
     }
 
-    /// Subscribe to public orderbook delta updates (requires `realtime` feature).
+    /// Subscribe to the raw orderbook deltas of one published stream depth,
+    /// [`crate::codecs::decode::ORDERBOOK_STREAM_DEPTHS`]; any other depth is a
+    /// validation error (requires `realtime` feature).
     pub async fn subscribe_deltas(
         &self,
         symbol_id: u32,
         depth: Option<u32>,
     ) -> Result<crate::realtime::TypedSubscription<OrderBookDeltaUpdate>> {
-        let ws_depth = depth.unwrap_or(50).clamp(1, 500);
-        let channel = format!("public:spot:orderbook:deltas:depth:{ws_depth}:{symbol_id}:proto");
+        let stream_depth = require_published_stream_depth(depth.unwrap_or(50))?;
+        let channel =
+            format!("public:spot:orderbook:deltas:depth:{stream_depth}:{symbol_id}:proto");
         self.ctx
             .realtime
             .subscribe_proto(&channel, crate::codecs::decode::orderbook_delta_from_bytes)
@@ -798,6 +801,11 @@ impl OrderbookService {
     }
 
     /// Snapshot-then-stream orderbook merging (requires `realtime` feature).
+    ///
+    /// `depth` is any level count from 1 to the deepest published stream tier,
+    /// 50 when `None`. The book rides the smallest tier covering it, snapshot
+    /// included, and each view is trimmed to it; a depth no tier covers is a
+    /// validation error before connecting.
     pub async fn create_subscription(
         &self,
         opts: CreateSubscriptionOptions,
@@ -813,7 +821,7 @@ impl OrderbookService {
 
         let symbol = opts.symbol;
         let depth = opts.depth.unwrap_or(50);
-        let ws_depth = depth.clamp(1, 500);
+        let stream_depth = orderbook_stream_tier(depth)?;
         let resolved_symbol_id = opts
             .symbol_id
             .or_else(|| self.ctx.catalogs.symbol_id_for_symbol(&symbol));
@@ -829,7 +837,8 @@ impl OrderbookService {
                 "orderbook symbol {symbol:?} does not match symbol_id {symbol_id}"
             )));
         }
-        let channel = format!("public:spot:orderbook:deltas:depth:{ws_depth}:{symbol_id}:proto");
+        let channel =
+            format!("public:spot:orderbook:deltas:depth:{stream_depth}:{symbol_id}:proto");
         let quantity_scale = self
             .ctx
             .catalogs
@@ -887,7 +896,7 @@ impl OrderbookService {
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = match build_orderbook_data(
                     &symbol,
-                    ws_depth,
+                    depth,
                     book_seq,
                     &bids,
                     &asks,
@@ -1005,7 +1014,9 @@ impl OrderbookService {
             fetch_snapshot: Arc::new(move || {
                 let svc = svc.clone();
                 let symbol = fetch_symbol.clone();
-                Box::pin(async move { svc.get(&symbol, Some(ws_depth)).await })
+                // At the tier, not the requested depth: deltas diff the tier's whole
+                // view, and a level promoted into a trimmed view must already be known.
+                Box::pin(async move { svc.get(&symbol, Some(stream_depth)).await })
             }),
             read_publication: Arc::new(|delta: OrderBookDeltaUpdate| vec![delta]),
             apply_snapshot: {
