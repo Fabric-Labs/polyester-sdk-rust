@@ -666,11 +666,26 @@ impl TriggersService {
                 .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?,
             ..Default::default()
         };
+        // Zero targets the trigger's own market, which is not known here; a
+        // known market refuses a price bound to another one.
+        let market = self.ctx.catalogs.symbol_for_symbol_id(req.symbol_id);
+        // A market that can't be named can't be checked against a bound
+        // price, so the price is refused rather than sent unchecked.
+        let bound = [&params.trigger_price, &params.activation_price]
+            .into_iter()
+            .flatten()
+            .find_map(|price| price.symbol());
+        if let (Some(bound), None, true) = (bound, market.as_ref(), req.symbol_id != 0) {
+            return Err(Error::validation(format!(
+                "triggers.modify cannot check a price bound to {bound} against symbol_id {}: the market is not in the catalogs; hydrate catalogs or pass an unbound price",
+                req.symbol_id
+            )));
+        }
         if let Some(price) = params.trigger_price.as_ref() {
-            req.trigger_price_ticks = Some(resolve_price_ticks(price, None)?);
+            req.trigger_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
         }
         if let Some(price) = params.activation_price.as_ref() {
-            req.activation_price_ticks = Some(resolve_price_ticks(price, None)?);
+            req.activation_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
         }
         if params.trailing_distance_ticks.is_some() && params.trailing_distance_bps.is_some() {
             return Err(Error::validation(
@@ -867,9 +882,16 @@ impl TriggersService {
         .await
     }
 
-    /// Modify a trigger. Price fields must be `Price` wrappers.
+    /// Modify a trigger. Price fields must be `Price` wrappers. When `symbol`
+    /// or `symbol_id` is given, a price bound to another market is refused.
     pub async fn modify(&self, params: ModifyTriggerParams) -> Result<TriggerMutationResult> {
-        if params.symbol.is_some() {
+        // A symbol is resolved through the catalogs; a symbol ID needs them to
+        // check a price bound to a market.
+        let bound_price = [&params.trigger_price, &params.activation_price]
+            .into_iter()
+            .flatten()
+            .any(|price| price.symbol().is_some());
+        if params.symbol.is_some() || (params.symbol_id.is_some() && bound_price) {
             self.ctx.wait_for_catalogs().await?;
         }
         let req = self.encode_modify_params(&params)?;
@@ -1771,5 +1793,112 @@ mod tests {
         let decimal_wire = client.triggers.encode_modify_params(&decimal).unwrap();
         let scaled_wire = client.triggers.encode_modify_params(&scaled).unwrap();
         assert_eq!(decimal_wire.encode_to_vec(), scaled_wire.encode_to_vec());
+    }
+
+    // A price bound to another market is refused when the trigger's market is
+    // given, as trigger creation and order writes do.
+    #[test]
+    fn modify_refuses_a_price_for_another_market() {
+        let client = client();
+        let sol = || crate::Price::from_ticks(46_000_000_000_000, Some("SOL-USDT".into())).unwrap();
+        for (symbol, symbol_id) in [(Some("BTC-USDT".to_owned()), None), (None, Some(7))] {
+            for params in [
+                modify_params(Some(sol()), None),
+                modify_params(None, Some(sol())),
+            ] {
+                let params = ModifyTriggerParams {
+                    symbol: symbol.clone(),
+                    symbol_id,
+                    ..params
+                };
+                let err = client
+                    .triggers
+                    .encode_modify_params(&params)
+                    .expect_err("a SOL-USDT price must not modify a BTC-USDT trigger");
+                assert!(
+                    err.to_string().contains(
+                        "price symbol mismatch: value is for SOL-USDT, destination is BTC-USDT"
+                    ),
+                    "{err}"
+                );
+            }
+        }
+    }
+
+    // An explicit symbol ID the catalogs don't know can't be checked against
+    // a bound price, so the price is refused; an unbound one is still sent.
+    #[test]
+    fn modify_refuses_a_bound_price_it_cannot_check() {
+        let client = client();
+        for bound_to in ["BTC-USDT", "SOL-USDT"] {
+            let price =
+                || crate::Price::from_ticks(47_000_000_000_000, Some(bound_to.into())).unwrap();
+            for params in [
+                modify_params(Some(price()), None),
+                modify_params(None, Some(price())),
+            ] {
+                let params = ModifyTriggerParams {
+                    symbol: None,
+                    symbol_id: Some(8),
+                    ..params
+                };
+                let err = client
+                    .triggers
+                    .encode_modify_params(&params)
+                    .expect_err("an unknown market can't be checked");
+                assert!(
+                    err.to_string().contains(&format!(
+                        "cannot check a price bound to {bound_to} against symbol_id 8"
+                    )),
+                    "{err}"
+                );
+            }
+        }
+        let unbound = crate::Price::from_ticks(46_000_000_000_000, None).unwrap();
+        let params = ModifyTriggerParams {
+            symbol: None,
+            symbol_id: Some(8),
+            ..modify_params(Some(unbound.clone()), Some(unbound))
+        };
+        let wire = client.triggers.encode_modify_params(&params).unwrap();
+        assert_eq!(wire.symbol_id, 8);
+        assert_eq!(wire.trigger_price_ticks, Some(46_000_000_000_000));
+        assert_eq!(wire.activation_price_ticks, Some(46_000_000_000_000));
+        // A known symbol ID still checks against its market.
+        let btc = crate::Price::from_ticks(47_000_000_000_000, Some("BTC-USDT".into())).unwrap();
+        let params = ModifyTriggerParams {
+            symbol: None,
+            symbol_id: Some(7),
+            ..modify_params(None, Some(btc))
+        };
+        assert_eq!(
+            client
+                .triggers
+                .encode_modify_params(&params)
+                .unwrap()
+                .activation_price_ticks,
+            Some(47_000_000_000_000)
+        );
+    }
+
+    #[test]
+    fn modify_sends_a_price_for_its_market_or_an_unknown_one() {
+        let client = client();
+        let btc = crate::Price::from_ticks(47_000_000_000_000, Some("BTC-USDT".into())).unwrap();
+        let wire = client
+            .triggers
+            .encode_modify_params(&modify_params(Some(btc), None))
+            .unwrap();
+        assert_eq!(wire.trigger_price_ticks, Some(47_000_000_000_000));
+        assert_eq!(wire.symbol_id, 7);
+        // Without a symbol or symbol ID the trigger's market is not known.
+        let sol = crate::Price::from_ticks(46_000_000_000_000, Some("SOL-USDT".into())).unwrap();
+        let unknown = ModifyTriggerParams {
+            symbol: None,
+            ..modify_params(Some(sol), None)
+        };
+        let wire = client.triggers.encode_modify_params(&unknown).unwrap();
+        assert_eq!(wire.trigger_price_ticks, Some(46_000_000_000_000));
+        assert_eq!(wire.symbol_id, 0);
     }
 }

@@ -131,7 +131,11 @@ pub struct OrdersService {
 }
 
 impl OrdersService {
-    const MAX_BATCH_ITEMS: usize = 20;
+    // Items each batch operation accepts: the `max_items` validation rule the
+    // public contract sets on the request's `items` field.
+    const MAX_BATCH_CREATE_ITEMS: usize = 20;
+    const MAX_BATCH_CANCEL_ITEMS: usize = 50;
+    const MAX_BATCH_REPLACE_ITEMS: usize = 50;
 
     pub fn new(ctx: ServiceContext) -> Self {
         Self { ctx }
@@ -437,16 +441,15 @@ impl OrdersService {
         })
     }
 
-    fn validate_batch_size(operation: &str, len: usize) -> Result<()> {
+    fn validate_batch_size(operation: &str, len: usize, max_items: usize) -> Result<()> {
         if len == 0 {
             return Err(Error::validation(format!(
                 "{operation} requires at least one item"
             )));
         }
-        if len > Self::MAX_BATCH_ITEMS {
+        if len > max_items {
             return Err(Error::validation(format!(
-                "{operation} accepts at most {} items; received {len}",
-                Self::MAX_BATCH_ITEMS
+                "{operation} accepts at most {max_items} items; received {len}"
             )));
         }
         Ok(())
@@ -1078,7 +1081,7 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
-        Self::validate_batch_size("batch_create", items.len())?;
+        Self::validate_batch_size("batch_create", items.len(), Self::MAX_BATCH_CREATE_ITEMS)?;
         if items.iter().any(|item| item.subaccount_id.is_some()) {
             return Err(Error::validation(
                 "batch_create item scope is unsupported; use the batch-level subaccount_id",
@@ -1118,7 +1121,7 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchCancelOrdersResult> {
-        Self::validate_batch_size("batch_cancel", items.len())?;
+        Self::validate_batch_size("batch_cancel", items.len(), Self::MAX_BATCH_CANCEL_ITEMS)?;
         let mut proto_items = Vec::with_capacity(items.len());
         for item in items {
             let mut proto = ProtoBatchCancelItem::default();
@@ -1176,7 +1179,7 @@ impl OrdersService {
         subaccount_id: Option<u64>,
         request_id: Option<String>,
     ) -> Result<BatchReplaceOrdersResult> {
-        Self::validate_batch_size("batch_replace", items.len())?;
+        Self::validate_batch_size("batch_replace", items.len(), Self::MAX_BATCH_REPLACE_ITEMS)?;
         self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
@@ -3099,20 +3102,24 @@ mod tests {
     }
 
     #[test]
-    fn batch_size_guard_rejects_empty_and_more_than_twenty() {
-        assert!(OrdersService::validate_batch_size("batch_create", 1).is_ok());
-        assert!(OrdersService::validate_batch_size("batch_create", 20).is_ok());
+    fn batch_size_guard_follows_each_operation_limit() {
+        let create = OrdersService::MAX_BATCH_CREATE_ITEMS;
+        assert_eq!(create, 20);
+        assert_eq!(OrdersService::MAX_BATCH_CANCEL_ITEMS, 50);
+        assert_eq!(OrdersService::MAX_BATCH_REPLACE_ITEMS, 50);
+        assert!(OrdersService::validate_batch_size("batch_create", 1, create).is_ok());
+        assert!(OrdersService::validate_batch_size("batch_create", 20, create).is_ok());
         assert!(
-            OrdersService::validate_batch_size("batch_create", 0)
+            OrdersService::validate_batch_size("batch_create", 0, create)
                 .unwrap_err()
                 .to_string()
                 .contains("at least one")
         );
         assert!(
-            OrdersService::validate_batch_size("batch_create", 21)
+            OrdersService::validate_batch_size("batch_create", 21, create)
                 .unwrap_err()
                 .to_string()
-                .contains("at most 20")
+                .contains("batch_create accepts at most 20 items; received 21")
         );
     }
 

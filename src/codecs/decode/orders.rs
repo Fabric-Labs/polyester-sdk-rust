@@ -827,8 +827,9 @@ pub fn batch_replace_from_proto(
         results.push(BatchReplaceAdmissionItem {
             item_index: item.item_index,
             status: item_status.to_owned(),
-            old_order_id: format_uint64_id(item.old_order_id),
-            replacement_order_id: format_uint64_id(item.replacement_order_id),
+            // Zero is no order: an absent ID stays empty instead of "0".
+            old_order_id: optional_order_id(item.old_order_id).unwrap_or_default(),
+            replacement_order_id: optional_order_id(item.replacement_order_id).unwrap_or_default(),
             client_order_id: item.client_order_id.clone(),
             action_taken: modify_action_name(item.action_taken),
             code: item.code.clone(),
@@ -3063,5 +3064,79 @@ mod tests {
                 cancel_all_after_from_proto(&bad).expect_err("unknown cancel-all-after status");
             assert!(err.to_string().contains("unknown status"));
         }
+    }
+
+    // An admission item the server sent without a successor or predecessor
+    // ID keeps it absent (empty), as status reads and the Python SDK do.
+    #[test]
+    fn batch_replace_admission_keeps_absent_ids_absent() {
+        use crate::proto::orders::v1::{
+            BatchReplaceAdmissionItem as ProtoAdmission, ModifyActionTaken,
+        };
+
+        let msg = BatchReplaceOrdersResponse {
+            batch_request_id: 42,
+            status: BatchReplaceAdmissionStatus::PartiallyAdmitted.into(),
+            results: vec![
+                ProtoAdmission {
+                    item_index: 0,
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 11,
+                    action_taken: ModifyActionTaken::Amended.into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 1,
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 12,
+                    replacement_order_id: 99,
+                    action_taken: ModifyActionTaken::Replaced.into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 2,
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    old_order_id: 13,
+                    code: "ERROR_CODE_ORDER_ALREADY_TERMINAL".into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 3,
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    client_order_id: "missing".into(),
+                    code: "ERROR_CODE_ORDER_UNKNOWN".into(),
+                    ..Default::default()
+                },
+            ],
+            accepted_count: 2,
+            rejected_count: 2,
+            ..Default::default()
+        };
+        let result = batch_replace_from_proto(&msg).unwrap();
+        let ids: Vec<(&str, &str)> = result
+            .results
+            .iter()
+            .map(|item| {
+                (
+                    item.old_order_id.as_str(),
+                    item.replacement_order_id.as_str(),
+                )
+            })
+            .collect();
+        let (c11, c12, c13, c99) = (
+            format_uint64_id(11),
+            format_uint64_id(12),
+            format_uint64_id(13),
+            format_uint64_id(99),
+        );
+        assert_eq!(
+            ids,
+            [
+                (c11.as_str(), ""),
+                (c12.as_str(), c99.as_str()),
+                (c13.as_str(), ""),
+                ("", ""),
+            ]
+        );
     }
 }

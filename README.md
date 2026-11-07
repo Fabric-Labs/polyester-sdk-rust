@@ -323,7 +323,8 @@ is rejected (`CONFLICT_DUPLICATE_CLIENT_ORDER_ID`) even when the payload
 matches. Only create again with that id if reconciliation shows the first
 attempt did not admit.
 Client order ids accept 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/`, and
-`-`. Batch create accepts at most 20 orders. Treat a cancel response as an
+`-`. Batch create accepts at most 20 orders; batch cancel and replace accept at
+most 50 items. Treat a cancel response as an
 admission acknowledgement and reconcile with `list_open` before releasing local
 state. Within one batch, non-empty client order IDs must be unique; omitted and
 blank IDs remain allowed.
