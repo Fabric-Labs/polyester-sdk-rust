@@ -394,8 +394,45 @@ fn is_placeholder_detail(detail: &ErrorDetail) -> bool {
     false
 }
 
-/// Whether a detail is a service detail that says something. One that is empty
-/// or undecodable proves nothing.
+/// Whether a service detail has a code this SDK's enum can't name. Its type shows
+/// that a service sent it, not what the code means: it could be a future refusal
+/// or a future unknown outcome.
+pub(crate) fn has_future_code(detail: &ErrorDetail) -> bool {
+    future_code_label(detail).is_some()
+}
+
+/// The label a code from [`has_future_code`] is reported under.
+fn future_code_label(detail: &ErrorDetail) -> Option<String> {
+    let raw = if let Some(auth) = decode_auth_error_detail(detail) {
+        auth.code.as_known().is_none().then(|| auth.code.to_i32())
+    } else if let Some(order) = decode_order_error_detail(detail) {
+        order.code.as_known().is_none().then(|| order.code.to_i32())
+    } else if let Some(withdraw) = decode_withdraw_error_detail(detail) {
+        withdraw
+            .code
+            .as_known()
+            .is_none()
+            .then(|| withdraw.code.to_i32())
+    } else if let Some(ledger) = decode_ledger_error_detail(detail) {
+        ledger
+            .code
+            .as_known()
+            .is_none()
+            .then(|| ledger.code.to_i32())
+    } else if let Some(transfer) = decode_transfer_error_detail(detail) {
+        transfer
+            .code
+            .as_known()
+            .is_none()
+            .then(|| transfer.code.to_i32())
+    } else {
+        None
+    };
+    raw.map(|raw| known_or_unknown_code(None, raw))
+}
+
+/// Whether a detail is a service detail with a code this SDK can name. One that
+/// is empty or undecodable proves nothing.
 pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
     let decodes = decode_auth_error_detail(detail).is_some()
         || decode_rate_limit_detail(detail).is_some()
@@ -403,7 +440,7 @@ pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
         || decode_withdraw_error_detail(detail).is_some()
         || decode_ledger_error_detail(detail).is_some()
         || decode_transfer_error_detail(detail).is_some();
-    decodes && !is_placeholder_detail(detail)
+    decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
 }
 
 /// Contract REST codes that no generated error enum names.
@@ -963,6 +1000,16 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     // A detail with no code says nothing about the outcome, but its field
     // violations still name what to fix on a recognised Connect code.
     let mut placeholder_violations = Vec::new();
+    let mut future_code = None;
+    let server_failure = matches!(
+        err.code,
+        ErrorCode::Internal
+            | ErrorCode::Unknown
+            | ErrorCode::DataLoss
+            | ErrorCode::Canceled
+            | ErrorCode::Unavailable
+            | ErrorCode::DeadlineExceeded
+    );
     for detail in details {
         if is_placeholder_detail(detail) {
             if let Some(order) = decode_order_error_detail(detail) {
@@ -974,6 +1021,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     }
                 }));
             }
+            continue;
+        }
+        // A code this SDK can't name stands only behind a recognised refusal.
+        if server_failure && has_future_code(detail) {
+            future_code = future_code.or_else(|| future_code_label(detail));
             continue;
         }
         if let Some(auth_detail) = decode_auth_error_detail(detail) {
@@ -1216,7 +1268,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         | ErrorCode::Internal
         | ErrorCode::Unknown
         | ErrorCode::DataLoss
-        | ErrorCode::Canceled => Error::Server(message),
+        | ErrorCode::Canceled => Error::Server(match future_code {
+            // Kept for diagnosis only; this variant has no code field.
+            Some(label) => format!("{message} ({label})"),
+            None => message,
+        }),
         ErrorCode::DeadlineExceeded => Error::Transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented { message },
         _ => Error::Api {

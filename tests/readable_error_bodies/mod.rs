@@ -657,3 +657,109 @@ async fn body_the_client_cannot_decode_is_not_a_known_failure() {
         }
     }
 }
+
+/// Code 999999 in the first field of every coded detail: an enum this SDK can't
+/// name. It could be a future refusal or a future unknown outcome.
+const FUTURE_CODE: [u8; 4] = [0x08, 0xBF, 0x84, 0x3D];
+const CODED_DETAIL_TYPES: [&str; 5] = [
+    "orders.v1.ErrorDetail",
+    "auth.v1.AuthErrorDetail",
+    "chain.withdraw.v1.ErrorDetail",
+    "transfer.v1.ErrorDetail",
+    "ledger.read.v1.ErrorDetail",
+];
+
+#[tokio::test(flavor = "multi_thread")]
+async fn future_typed_code_with_no_connect_code_proves_nothing() {
+    for detail_type in CODED_DETAIL_TYPES {
+        let body = detail_body(detail_type, &FUTURE_CODE, None);
+        for status in [400, 404, 409, 500, 501, 520] {
+            for op in OPS {
+                let case = format!("{detail_type}/{status}/{op}");
+                expect_server(op, status, JSON, &body, &case).await;
+                let (err, _) = call(op, status, JSON, &body, None).await;
+                let err = err.expect("error");
+                assert!(err.to_string().contains("999999"), "{case}: {err}");
+            }
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn read_of_a_future_typed_code_on_a_server_failure() {
+    for detail_type in CODED_DETAIL_TYPES {
+        for code in ["internal", "unknown", "data_loss"] {
+            let body = detail_body(detail_type, &FUTURE_CODE, Some(code));
+            let case = format!("{detail_type}/{code}");
+            expect_server("read", 500, JSON, &body, &case).await;
+        }
+        let body = detail_body(detail_type, &FUTURE_CODE, Some("unavailable"));
+        let (err, calls) = call("read", 503, JSON, &body, Some(2)).await;
+        assert!(err.is_none(), "{detail_type}: {err:?}");
+        assert_eq!(calls, 3, "{detail_type}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn future_typed_code_does_not_turn_a_server_failure_into_a_refusal() {
+    for detail_type in CODED_DETAIL_TYPES {
+        for (status, code) in [
+            (500, "internal"),
+            (500, "unknown"),
+            (500, "data_loss"),
+            (500, "canceled"),
+            (503, "unavailable"),
+            (504, "deadline_exceeded"),
+        ] {
+            let body = detail_body(detail_type, &FUTURE_CODE, Some(code));
+            let case = format!("{detail_type}/{code}");
+            let (err, calls) = call("write", status, JSON, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert!(!matches!(err, Error::Api { .. }), "{case}: {err:?}");
+            if matches!(err, Error::Server(_)) {
+                assert!(err.to_string().contains("999999"), "{case}: {err}");
+            }
+            assert_flags(&err, false, true, &case);
+            assert_eq!(calls, 1, "{case}");
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn future_typed_code_with_backoff_is_not_retryable_on_a_server_failure() {
+    let backoff = RateLimitDetail {
+        retry_after_ms: Some(1250),
+        ..Default::default()
+    }
+    .encode_to_bytes();
+    // Field 3 of orders.v1.ErrorDetail carries the backoff.
+    let mut raw = FUTURE_CODE.to_vec();
+    raw.extend([0x1A, backoff.len() as u8]);
+    raw.extend_from_slice(&backoff);
+    for code in [None, Some("internal")] {
+        let body = detail_body("orders.v1.ErrorDetail", &raw, code);
+        expect_server("write", 500, JSON, &body, &format!("backoff/{code:?}")).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn future_typed_code_keeps_its_label_on_a_recognised_refusal_control() {
+    for detail_type in CODED_DETAIL_TYPES {
+        for (status, code) in [
+            (400, "failed_precondition"),
+            (400, "invalid_argument"),
+            (409, "already_exists"),
+        ] {
+            let body = detail_body(detail_type, &FUTURE_CODE, Some(code));
+            let case = format!("{detail_type}/{code}");
+            let (err, calls) = call("write", status, JSON, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert!(
+                matches!(&err, Error::Api { code, .. } if code.contains("999999")),
+                "{case}: {err:?}"
+            );
+            assert_flags(&err, false, false, &case);
+            assert_eq!(calls, 1, "{case}");
+        }
+    }
+}

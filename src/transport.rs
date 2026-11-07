@@ -304,18 +304,23 @@ fn classify_failed_response_inner(
         .as_ref()
         .and_then(|body| body.code.clone())
         .filter(|code| !code.is_empty() && !crate::errors::is_placeholder_code(code));
-    let has_service_detail = parsed
+    let body_details: Vec<ErrorDetail> = parsed
         .as_ref()
         .and_then(|body| body.details.as_ref())
-        .is_some_and(|details| {
-            details.iter().any(|detail| {
-                crate::errors::carries_contract_code(&ErrorDetail {
+        .map(|details| {
+            details
+                .iter()
+                .map(|detail| ErrorDetail {
                     type_url: detail.type_url.clone().unwrap_or_default(),
                     value: detail.value.clone(),
                     debug: None,
                 })
-            })
-        });
+                .collect()
+        })
+        .unwrap_or_default();
+    let has_service_detail = body_details
+        .iter()
+        .any(crate::errors::carries_contract_code);
     let body_message = parsed
         .as_ref()
         .and_then(|body| {
@@ -479,7 +484,14 @@ fn classify_failed_response_inner(
             BARE_HTTP_ERROR_TYPE,
         ));
     }
-    Some(no_recognised_code_error(status, body_message))
+    let mut err = no_recognised_code_error(status, body_message);
+    // The error mapping names a typed code this SDK can't name, for diagnosis.
+    for detail in body_details {
+        if crate::errors::has_future_code(&detail) {
+            err = err.with_detail(detail);
+        }
+    }
+    Some(err)
 }
 
 /// An answer with no recognised code, by its status. A gateway or an edge can
