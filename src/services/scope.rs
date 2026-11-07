@@ -1,5 +1,5 @@
 use super::ServiceContext;
-use crate::codecs::scalars::id_to_u64;
+use crate::codecs::scalars::parse_account_id;
 use crate::errors::{Error, Result};
 
 /// Refuse sub-account ID 0: on the wire 0 means unset (the main account), so
@@ -29,8 +29,9 @@ pub fn optional_subaccount(ctx: &ServiceContext, explicit: Option<u64>) -> Resul
         }
         // Configured defaults use the same canonical public base58
         // representation returned by subaccount APIs. Digit-only base58 IDs
-        // are valid and must not be interpreted as decimal first.
-        return Ok(Some(id_to_u64(s, "subaccount_id")?));
+        // are valid and must not be interpreted as decimal first. One that
+        // decodes to 0, such as "1", is refused like an explicit 0.
+        return Ok(Some(parse_account_id(s, "subaccount_id")?));
     }
     Ok(None)
 }
@@ -42,12 +43,14 @@ pub fn require_account_id(ctx: &ServiceContext) -> Result<String> {
         .ok_or_else(|| Error::validation("default_account_id is required for this call"))
 }
 
+/// Resolve the account ID from `explicit`, or else the configured default.
+/// One that decodes to 0, such as `"1"`, `"0"` or `"00"`, or doesn't decode,
+/// is refused: it would name the channel of account 0, or of no account.
 pub fn resolve_account_id(ctx: &ServiceContext, explicit: Option<&str>) -> Result<String> {
-    if let Some(value) = explicit {
-        let trimmed = value.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_owned());
-        }
-    }
-    require_account_id(ctx)
+    let account = match explicit.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(value) => value.to_owned(),
+        None => require_account_id(ctx)?,
+    };
+    parse_account_id(&account, "account_id")?;
+    Ok(account)
 }

@@ -250,7 +250,7 @@ impl InternalTransfersService {
         use super::scope;
         use super::unary;
         use crate::codecs::decode::internal_transfer_from_proto;
-        use crate::codecs::scalars::id_to_u64;
+        use crate::codecs::scalars::parse_account_id;
         use crate::errors::Error;
         use crate::proto::transfer::v1::{
             CreateInternalTransferRequest, create_internal_transfer_request::Destination,
@@ -290,12 +290,12 @@ impl InternalTransfersService {
         };
         *req.amount_e18.get_or_insert_default() = amount_e18;
         if has_account {
-            req.destination = Some(Destination::DestinationAccountId(id_to_u64(
+            req.destination = Some(Destination::DestinationAccountId(parse_account_id(
                 params.destination_account_id.as_deref().unwrap(),
                 "destination_account_id",
             )?));
         } else if has_sub {
-            req.destination = Some(Destination::DestinationSubaccountId(id_to_u64(
+            req.destination = Some(Destination::DestinationSubaccountId(parse_account_id(
                 params.destination_subaccount_id.as_deref().unwrap(),
                 "destination_subaccount_id",
             )?));
@@ -1120,6 +1120,7 @@ impl LifecycleService {
         crate::realtime::TypedSubscription<crate::models::LifecycleFlowSummary>,
     > {
         if let Some(account) = account_id.filter(|s| !s.trim().is_empty()) {
+            let account = super::scope::resolve_account_id(&self.ctx, Some(account))?;
             let channel = format!("private:chain:lifecycle:flows:{account}:proto");
             self.ctx
                 .realtime

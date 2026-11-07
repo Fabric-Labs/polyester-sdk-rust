@@ -9681,3 +9681,369 @@ request_object_refuses_subaccount_zero! {
         },
     );
 }
+
+// A sub-account or account ID that decodes to 0 is refused before anything is
+// sent. On the wire 0 is unset: sub-account 0 is the main account, and account
+// 0 names no account. "1" is the public ID of 0, and "0" and "00" read as 0.
+const ZERO_ID_STRINGS: [&str; 4] = ["0", "00", "1", " 1 "];
+
+async fn zero_id_client(
+    default_sub_account_id: Option<&str>,
+    default_account_id: Option<&str>,
+) -> (Client, MockHttpServer) {
+    let server = MockHttpServer::spawn(|_| hardening_support::HttpScript::NotFound).await;
+    let ws_url = format!(
+        "ws{}/connection/websocket",
+        server.base_url().trim_start_matches("http")
+    );
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        ws_url,
+        api_key_id: Some("zero-ids".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: default_sub_account_id.map(str::to_owned),
+        default_account_id: Some(default_account_id.unwrap_or("8").to_owned()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [{
+                "symbol": "BTC-USDT",
+                "symbol_id": 1,
+                "base_quantity_scale": 8
+            }]
+        }))
+        .unwrap();
+    (client, server)
+}
+
+/// Records why `result` is not a `label` validation error sent nowhere.
+fn check_zero_id_refused(
+    failures: &mut Vec<String>,
+    name: &str,
+    label: &str,
+    result: Result<(), Error>,
+    server: &MockHttpServer,
+) {
+    let sent = server.requests.swap(0, Ordering::SeqCst);
+    let refused = matches!(&result, Err(Error::Validation(message)) if message.contains(label));
+    if !refused || sent != 0 {
+        failures.push(format!("{name}: {result:?} after {sent} requests"));
+    }
+}
+
+fn assert_no_zero_id_failures(failures: Vec<String>) {
+    assert!(
+        failures.is_empty(),
+        "{} sent or not refused:\n{}",
+        failures.len(),
+        failures.join("\n")
+    );
+}
+
+#[tokio::test]
+async fn zero_default_subaccount_is_refused_before_sending() {
+    let mut failures = Vec::new();
+    use polyester::models::{
+        BatchCancelItem, CancelAllOpts, CreateOrderParams, CreateOrderType, CreateSide,
+        CreateTimeInForce, ListTriggersOpts, OrderKey,
+    };
+    use polyester::{Price, Quantity};
+
+    let order = || {
+        let mut p = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        p.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .unwrap(),
+        );
+        p.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
+        p.time_in_force = Some(CreateTimeInForce::Gtc);
+        p.client_order_id = Some("zero-default".into());
+        p
+    };
+    let id = "j";
+    for zero in ZERO_ID_STRINGS {
+        let (client, server) = zero_id_client(Some(zero), None).await;
+        let calls: Vec<(&str, Result<(), Error>)> = vec![
+            (
+                "orders.create",
+                client.orders.create(order()).await.map(drop),
+            ),
+            (
+                "orders.list_open",
+                client.orders.list_open(None).await.map(drop),
+            ),
+            (
+                "orders.list_history",
+                client.orders.list_history(None, None).await.map(drop),
+            ),
+            (
+                "orders.get_batch_replace_status",
+                client
+                    .orders
+                    .get_batch_replace_status(id, None)
+                    .await
+                    .map(drop),
+            ),
+            (
+                "orders.cancel_all_after",
+                client
+                    .orders
+                    .cancel_all_after(10, None, None, None)
+                    .await
+                    .map(drop),
+            ),
+            (
+                "orders.cancel_all_with",
+                client
+                    .orders
+                    .cancel_all_with(CancelAllOpts {
+                        dry_run: true,
+                        ..Default::default()
+                    })
+                    .await
+                    .map(drop),
+            ),
+            (
+                "orders.batch_cancel",
+                client
+                    .orders
+                    .batch_cancel(
+                        vec![BatchCancelItem {
+                            key: OrderKey::OrderId(id.into()),
+                            symbol_id: Some(1),
+                        }],
+                        None,
+                        None,
+                    )
+                    .await
+                    .map(drop),
+            ),
+            ("api_keys.list", client.api_keys.list(None).await.map(drop)),
+            (
+                "triggers.list_with",
+                client
+                    .triggers
+                    .list_with(ListTriggersOpts::default())
+                    .await
+                    .map(drop),
+            ),
+            (
+                "triggers.get_by_id",
+                client.triggers.get_by_id(id, None).await.map(drop),
+            ),
+            (
+                "triggers.cancel_by_id",
+                client.triggers.cancel_by_id(id, None).await.map(drop),
+            ),
+            (
+                "triggers.pause_by_id",
+                client.triggers.pause_by_id(id, None).await.map(drop),
+            ),
+            (
+                "fees.get_spot_fee_rates",
+                client
+                    .fees
+                    .get_spot_fee_rates(None, Vec::new())
+                    .await
+                    .map(drop),
+            ),
+            (
+                "rate_limits.get_trading_rate_limits",
+                client
+                    .rate_limits
+                    .get_trading_rate_limits(None)
+                    .await
+                    .map(drop),
+            ),
+        ];
+        for (name, result) in calls {
+            check_zero_id_refused(
+                &mut failures,
+                &format!("{name} default {zero:?}"),
+                "subaccount_id",
+                result,
+                &server,
+            );
+        }
+    }
+    assert_no_zero_id_failures(failures);
+}
+
+#[tokio::test]
+async fn omitted_and_non_zero_default_subaccounts_still_send() {
+    for default in [None, Some(""), Some("j")] {
+        let (client, server) = zero_id_client(default, None).await;
+        let result = client.orders.list_open(None).await;
+        assert!(
+            !matches!(result, Err(Error::Validation(_))),
+            "{default:?}: {result:?}"
+        );
+        assert_eq!(server.requests.load(Ordering::SeqCst), 1, "{default:?}");
+    }
+}
+
+macro_rules! zero_account_subscribes {
+    ($client:expr, $account:expr) => {
+        vec![
+            (
+                "api_keys.subscribe",
+                $client.api_keys.subscribe($account).await.map(drop),
+            ),
+            (
+                "balances.subscribe",
+                $client.balances.subscribe($account).await.map(drop),
+            ),
+            (
+                "orders.subscribe",
+                $client.orders.subscribe($account).await.map(drop),
+            ),
+            (
+                "trades.subscribe",
+                $client.trades.subscribe($account).await.map(drop),
+            ),
+            (
+                "transfers.subscribe",
+                $client.transfers.subscribe($account).await.map(drop),
+            ),
+            (
+                "triggers.subscribe",
+                $client.triggers.subscribe($account).await.map(drop),
+            ),
+            (
+                "triggers.subscribe_events",
+                $client.triggers.subscribe_events($account).await.map(drop),
+            ),
+            (
+                "policies.subscribe",
+                $client.policies.subscribe($account).await.map(drop),
+            ),
+            (
+                "policies.subscribe_subaccount_policies",
+                $client
+                    .policies
+                    .subscribe_subaccount_policies($account)
+                    .await
+                    .map(drop),
+            ),
+            (
+                "policies.subscribe_api_policies",
+                $client
+                    .policies
+                    .subscribe_api_policies($account)
+                    .await
+                    .map(drop),
+            ),
+            (
+                "sub_accounts.subscribe",
+                $client.sub_accounts.subscribe($account).await.map(drop),
+            ),
+            (
+                "sub_accounts.subscribe_api_keys",
+                $client
+                    .sub_accounts
+                    .subscribe_api_keys($account)
+                    .await
+                    .map(drop),
+            ),
+            (
+                "address_book.subscribe",
+                $client.address_book.subscribe($account).await.map(drop),
+            ),
+        ]
+    };
+}
+
+#[tokio::test]
+async fn zero_account_id_is_refused_before_subscribing() {
+    let mut failures = Vec::new();
+    for zero in ZERO_ID_STRINGS {
+        let (client, server) = zero_id_client(None, None).await;
+        let mut calls = zero_account_subscribes!(client, Some(zero));
+        calls.push((
+            "lifecycle.subscribe_open_flows",
+            client
+                .lifecycle
+                .subscribe_open_flows(Some(zero))
+                .await
+                .map(drop),
+        ));
+        calls.push((
+            "realtime.subscribe_private_orders",
+            client
+                .realtime
+                .subscribe_private_orders(zero)
+                .await
+                .map(drop),
+        ));
+        for (name, result) in calls {
+            check_zero_id_refused(
+                &mut failures,
+                &format!("{name} {zero:?}"),
+                "account_id",
+                result,
+                &server,
+            );
+        }
+
+        let (client, server) = zero_id_client(None, Some(zero)).await;
+        for (name, result) in zero_account_subscribes!(client, None) {
+            check_zero_id_refused(
+                &mut failures,
+                &format!("{name} default {zero:?}"),
+                "account_id",
+                result,
+                &server,
+            );
+        }
+    }
+    assert_no_zero_id_failures(failures);
+}
+
+#[tokio::test]
+async fn zero_internal_transfer_destination_is_refused_before_sending() {
+    let mut failures = Vec::new();
+    use polyester::AssetAmount;
+    use polyester::models::CreateInternalTransferParams;
+
+    let amount = AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
+    let (client, server) = zero_id_client(None, None).await;
+    for zero in ZERO_ID_STRINGS {
+        for (label, account, sub) in [
+            ("destination_account_id", Some(zero.to_owned()), None),
+            ("destination_subaccount_id", None, Some(zero.to_owned())),
+        ] {
+            let result = client
+                .internal_transfers
+                .create(CreateInternalTransferParams {
+                    asset_id: 7,
+                    quantity: amount.clone(),
+                    idempotency_key: "zero-destination".into(),
+                    subaccount_id: None,
+                    destination_account_id: account,
+                    destination_subaccount_id: sub,
+                    destination_smart_account_address: None,
+                    quantity_scale: Some(18),
+                })
+                .await
+                .map(drop);
+            check_zero_id_refused(
+                &mut failures,
+                &format!("internal_transfers.create {label} {zero:?}"),
+                label,
+                result,
+                &server,
+            );
+        }
+    }
+    assert_no_zero_id_failures(failures);
+}
