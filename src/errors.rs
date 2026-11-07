@@ -981,7 +981,13 @@ fn rate_limit_detail_from_json(value: &serde_json::Value) -> Option<RateLimitDet
     };
     let integer = |snake: &str, camel: &str| match field(snake, camel)? {
         serde_json::Value::Number(number) => number.as_u64(),
-        serde_json::Value::String(text) => text.trim().parse::<u64>().ok(),
+        // Only ASCII digits within uint64: `str::parse` also accepts a `+`.
+        serde_json::Value::String(text) => {
+            let text = text.trim();
+            (!text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
+                .then(|| text.parse::<u64>().ok())
+                .flatten()
+        }
         _ => None,
     };
     Some(RateLimitDetail {
