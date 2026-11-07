@@ -1044,7 +1044,7 @@ An HTTP error with no code the contract defines can come from a gateway or an ed
 prove a request was refused. Only a 401 or 403 is a refusal on its status alone (`Error::Auth` or
 `Error::ApiKeyRejected`). Every other status returns `Error::Server` with
 `mutation_outcome_unknown()` true and `is_retryable()` false, and names any code it did send in its
-message; read back before sending a mutation again. Reads retry 429, 502, 503 and 504 for you. A
+message; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 
