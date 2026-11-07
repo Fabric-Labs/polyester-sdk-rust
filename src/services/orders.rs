@@ -326,34 +326,10 @@ impl OrdersService {
         key: OrderKey,
         timeout: Duration,
     ) -> Result<GetOrderResult> {
-        let timeout = if timeout.is_zero() {
-            Duration::from_secs(15)
-        } else {
-            timeout
-        };
-        let deadline = tokio::time::Instant::now() + timeout;
-        loop {
-            let last =
-                tokio::time::timeout_at(deadline, self.get_order_execution_pages(key.clone()))
-                    .await
-                    .map_err(|_| {
-                        Error::transport(format!(
-                            "timed out waiting for order trades to match cum_qty (key={key:?})"
-                        ))
-                    })??;
-            if order_trades_projection_complete(&last) {
-                return Ok(last);
-            }
-            if tokio::time::Instant::now() >= deadline {
-                return Err(Error::transport(format!(
-                    "timed out waiting for order trades to match cum_qty (key={key:?})"
-                )));
-            }
-            tokio::time::sleep_until(
-                deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
-            )
-            .await;
-        }
+        wait_for_trades_complete(&key, timeout, || {
+            self.get_order_execution_pages(key.clone())
+        })
+        .await
     }
 
     async fn get_order_execution_pages(&self, mut key: OrderKey) -> Result<GetOrderResult> {
@@ -1754,6 +1730,45 @@ fn risk_trigger_price_source(
         }
     }
     .into())
+}
+
+/// The loop of [`OrdersService::wait_for_order_trades_complete`]: `poll`
+/// reads the order with every execution page once.
+async fn wait_for_trades_complete<F, Fut>(
+    key: &OrderKey,
+    timeout: Duration,
+    mut poll: F,
+) -> Result<GetOrderResult>
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = Result<GetOrderResult>>,
+{
+    let timeout = if timeout.is_zero() {
+        Duration::from_secs(15)
+    } else {
+        timeout
+    };
+    let deadline = tokio::time::Instant::now() + timeout;
+    let timed_out = || {
+        Error::transport(format!(
+            "timed out waiting for order trades to match cum_qty (key={key:?})"
+        ))
+    };
+    loop {
+        let last = tokio::time::timeout_at(deadline, poll())
+            .await
+            .map_err(|_| timed_out())??;
+        if order_trades_projection_complete(&last) {
+            return Ok(last);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return Err(timed_out());
+        }
+        tokio::time::sleep_until(
+            deadline.min(tokio::time::Instant::now() + Duration::from_millis(100)),
+        )
+        .await;
+    }
 }
 
 fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
@@ -3265,6 +3280,71 @@ mod tests {
             OrdersService::coalesce_request_id(Some("same-retry".into()), "batch-create").unwrap(),
             "same-retry"
         );
+    }
+
+    fn complete_trades_read() -> GetOrderResult {
+        use crate::proto::orders::v1::{
+            GetOrderResponse, Order as ProtoOrder, OrderStatus, UserTrade as ProtoUserTrade,
+        };
+        crate::codecs::decode::get_order_from_proto(&GetOrderResponse {
+            order: Some(ProtoOrder {
+                order_id: 1,
+                symbol_id: 1,
+                status: OrderStatus::Filled.into(),
+                cum_qty_scaled: 100,
+                ..Default::default()
+            })
+            .into(),
+            trades: vec![ProtoUserTrade {
+                symbol_id: 1,
+                order_id: 1,
+                match_id: 1,
+                qty_scaled: 100,
+                ..Default::default()
+            }],
+            executions_complete: true,
+            ..Default::default()
+        })
+        .unwrap()
+    }
+
+    /// A read that completes in the poll where the deadline has already
+    /// passed (it decodes synchronously, so the timer cannot fire first) is
+    /// no success: the wait times out.
+    #[tokio::test]
+    async fn wait_refuses_a_read_finished_after_its_timeout() {
+        let timeout = Duration::from_millis(50);
+        let key = OrderKey::OrderId("1".into());
+        let result = wait_for_trades_complete(&key, timeout, || async move {
+            std::thread::sleep(timeout + Duration::from_millis(30));
+            Ok(complete_trades_read())
+        })
+        .await;
+        match result {
+            Ok(read) => panic!(
+                "a read finished after the timeout was a success: {} trades",
+                read.trades.len()
+            ),
+            Err(error) => assert!(
+                error
+                    .to_string()
+                    .contains("timed out waiting for order trades"),
+                "{error}"
+            ),
+        }
+    }
+
+    /// The same complete read within the timeout is a success.
+    #[tokio::test]
+    async fn wait_accepts_a_read_finished_within_its_timeout() {
+        let key = OrderKey::OrderId("1".into());
+        let read = wait_for_trades_complete(&key, Duration::from_secs(1), || async {
+            Ok(complete_trades_read())
+        })
+        .await
+        .expect("a read within the timeout");
+        assert!(read.executions_complete);
+        assert_eq!(read.trades.len(), 1);
     }
 
     #[test]
