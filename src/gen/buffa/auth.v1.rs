@@ -36973,6 +36973,10 @@ pub enum AuthErrorCode {
     /// This API does not accept API keys; authenticate with a session token. The REST problem
     /// code is API_KEY_NOT_ACCEPTED.
     AUTH_API_KEY_NOT_ACCEPTED = 54i32,
+    /// The wallet that signed this login is already linked to another account, so the
+    /// submitted account address cannot be registered with it. Wallets are not moved between
+    /// accounts. Log in with the account address this wallet already uses.
+    AUTH_WALLET_ALREADY_LINKED = 55i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37137,6 +37141,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_API_KEY_NOT_ACCEPTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthApiKeyNotAccepted: Self = Self::AUTH_API_KEY_NOT_ACCEPTED;
+    ///Idiomatic alias for [`Self::AUTH_WALLET_ALREADY_LINKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthWalletAlreadyLinked: Self = Self::AUTH_WALLET_ALREADY_LINKED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37306,6 +37313,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             52i32 => ::core::option::Option::Some(Self::AUTH_KEY_DISABLED),
             53i32 => ::core::option::Option::Some(Self::AUTH_IP_NOT_ALLOWED),
             54i32 => ::core::option::Option::Some(Self::AUTH_API_KEY_NOT_ACCEPTED),
+            55i32 => ::core::option::Option::Some(Self::AUTH_WALLET_ALREADY_LINKED),
             _ => ::core::option::Option::None,
         }
     }
@@ -37384,6 +37392,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_KEY_DISABLED => "AUTH_KEY_DISABLED",
             Self::AUTH_IP_NOT_ALLOWED => "AUTH_IP_NOT_ALLOWED",
             Self::AUTH_API_KEY_NOT_ACCEPTED => "AUTH_API_KEY_NOT_ACCEPTED",
+            Self::AUTH_WALLET_ALREADY_LINKED => "AUTH_WALLET_ALREADY_LINKED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37546,6 +37555,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_API_KEY_NOT_ACCEPTED" => {
                 ::core::option::Option::Some(Self::AUTH_API_KEY_NOT_ACCEPTED)
             }
+            "AUTH_WALLET_ALREADY_LINKED" => {
+                ::core::option::Option::Some(Self::AUTH_WALLET_ALREADY_LINKED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37605,6 +37617,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_KEY_DISABLED,
             Self::AUTH_IP_NOT_ALLOWED,
             Self::AUTH_API_KEY_NOT_ACCEPTED,
+            Self::AUTH_WALLET_ALREADY_LINKED,
         ]
     }
 }

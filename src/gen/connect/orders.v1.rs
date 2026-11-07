@@ -2079,7 +2079,9 @@ pub trait OrdersReadService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Retrieve durable execution status for one admitted batch replacement.
+    /// Retrieve the execution status of one accepted batch replacement, retained
+    /// for 60 seconds from its acceptance. Retry UNAVAILABLE with the same
+    /// request; NOT_FOUND means no retained batch, never a rejected replacement.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

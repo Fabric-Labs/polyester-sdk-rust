@@ -9435,7 +9435,7 @@ pub struct CancelTriggerResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub trigger_id: u64,
-    /// Final status (should be STATUS_CANCELED).
+    /// The trigger's status after the cancel, which is always canceled.
     ///
     /// Field 2: `status`
     #[serde(
@@ -23594,7 +23594,7 @@ pub mod __buffa {
             ///
             /// Field 1: `trigger_id`
             pub trigger_id: u64,
-            /// Final status (should be STATUS_CANCELED).
+            /// The trigger's status after the cancel, which is always canceled.
             ///
             /// Field 2: `status`
             pub status: ::buffa::EnumValue<super::super::TriggerStatus>,
@@ -23940,7 +23940,7 @@ pub mod __buffa {
             pub fn trigger_id(&self) -> u64 {
                 self.0.reborrow().trigger_id
             }
-            /// Final status (should be STATUS_CANCELED).
+            /// The trigger's status after the cancel, which is always canceled.
             ///
             /// Field 2: `status`
             #[must_use]

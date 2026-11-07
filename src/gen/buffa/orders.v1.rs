@@ -15789,6 +15789,8 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
 /// each item is amended in place or replaced as ModifyOrder decides by default.
 /// Identical retries replay the admission result for 60 seconds from acceptance;
 /// a different payload under the same key conflicts. Use a fresh key for a new batch.
+/// Read the batch's status with GetBatchReplaceStatus within the same window;
+/// after it, reconcile the individual orders and never resubmit an accepted batch.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -25375,9 +25377,16 @@ pub const __GET_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<GetOrderResponse>,
     is_wkt: false,
 };
-/// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
-/// Batch admission replay lasts 60 seconds from acceptance. If status is
-/// unavailable, reconcile the individual orders; absence does not prove rejection.
+/// GetBatchReplaceStatusRequest retrieves one accepted batch by server identity.
+/// A batch's status is retained for 60 seconds from its acceptance, the same
+/// time-limited window in which an identical retry replays its admission. It
+/// is readable as soon as BatchReplaceOrders returns; each item's execution
+/// phase then advances asynchronously. UNAVAILABLE means the status cannot be
+/// established yet: retry the same request within the window. NOT_FOUND means
+/// the account has no retained batch with this identity: none was accepted for
+/// it, or the window ended. NOT_FOUND never proves that a replacement was
+/// rejected. After the window, reconcile the individual orders, and never
+/// submit an accepted batch again because its status is not found.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -25606,7 +25615,11 @@ pub struct BatchReplaceStatusItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
-    /// Latest status timestamp in nanoseconds since epoch.
+    /// Latest status timestamp in nanoseconds since epoch. For an item refused
+    /// after its admission, this is when the refusal was recorded, or a later
+    /// time at which the service recovered and observed it, so two reads may
+    /// show different times for the same refusal. Do not use it to identify the
+    /// refusal.
     ///
     /// Field 7: `updated_ts_ns`
     #[serde(
@@ -25869,7 +25882,8 @@ pub const __BATCH_REPLACE_STATUS_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<BatchReplaceStatusItem>,
     is_wkt: false,
 };
-/// GetBatchReplaceStatusResponse returns durable batch and per-item finality.
+/// GetBatchReplaceStatusResponse returns a batch's admission and each item's
+/// current execution phase.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -25933,7 +25947,9 @@ pub struct GetBatchReplaceStatusResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub accepted_ts_ns: u64,
-    /// Latest batch status timestamp in nanoseconds since epoch.
+    /// Latest batch status timestamp in nanoseconds since epoch: the latest of
+    /// its acceptance and its items' update times, so it can show a recovery
+    /// time as an item's can.
     ///
     /// Field 7: `updated_ts_ns`
     #[serde(
@@ -42266,6 +42282,8 @@ pub mod __buffa {
         /// each item is amended in place or replaced as ModifyOrder decides by default.
         /// Identical retries replay the admission result for 60 seconds from acceptance;
         /// a different payload under the same key conflicts. Use a fresh key for a new batch.
+        /// Read the batch's status with GetBatchReplaceStatus within the same window;
+        /// after it, reconcile the individual orders and never resubmit an accepted batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -55550,9 +55568,16 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetBatchReplaceStatusRequest retrieves one admitted batch by server identity.
-        /// Batch admission replay lasts 60 seconds from acceptance. If status is
-        /// unavailable, reconcile the individual orders; absence does not prove rejection.
+        /// GetBatchReplaceStatusRequest retrieves one accepted batch by server identity.
+        /// A batch's status is retained for 60 seconds from its acceptance, the same
+        /// time-limited window in which an identical retry replays its admission. It
+        /// is readable as soon as BatchReplaceOrders returns; each item's execution
+        /// phase then advances asynchronously. UNAVAILABLE means the status cannot be
+        /// established yet: retry the same request within the window. NOT_FOUND means
+        /// the account has no retained batch with this identity: none was accepted for
+        /// it, or the window ended. NOT_FOUND never proves that a replacement was
+        /// rejected. After the window, reconcile the individual orders, and never
+        /// submit an accepted batch again because its status is not found.
         #[derive(Clone, Debug, Default)]
         pub struct GetBatchReplaceStatusRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -55899,7 +55924,11 @@ pub mod __buffa {
             ///
             /// Field 6: `code`
             pub code: &'a str,
-            /// Latest status timestamp in nanoseconds since epoch.
+            /// Latest status timestamp in nanoseconds since epoch. For an item refused
+            /// after its admission, this is when the refusal was recorded, or a later
+            /// time at which the service recovered and observed it, so two reads may
+            /// show different times for the same refusal. Do not use it to identify the
+            /// refusal.
             ///
             /// Field 7: `updated_ts_ns`
             pub updated_ts_ns: u64,
@@ -56347,7 +56376,11 @@ pub mod __buffa {
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
             }
-            /// Latest status timestamp in nanoseconds since epoch.
+            /// Latest status timestamp in nanoseconds since epoch. For an item refused
+            /// after its admission, this is when the refusal was recorded, or a later
+            /// time at which the service recovered and observed it, so two reads may
+            /// show different times for the same refusal. Do not use it to identify the
+            /// refusal.
             ///
             /// Field 7: `updated_ts_ns`
             #[must_use]
@@ -56401,7 +56434,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetBatchReplaceStatusResponse returns durable batch and per-item finality.
+        /// GetBatchReplaceStatusResponse returns a batch's admission and each item's
+        /// current execution phase.
         #[derive(Clone, Debug, Default)]
         pub struct GetBatchReplaceStatusResponseView<'a> {
             /// Server-issued batch identity.
@@ -56433,7 +56467,9 @@ pub mod __buffa {
             ///
             /// Field 6: `accepted_ts_ns`
             pub accepted_ts_ns: u64,
-            /// Latest batch status timestamp in nanoseconds since epoch.
+            /// Latest batch status timestamp in nanoseconds since epoch: the latest of
+            /// its acceptance and its items' update times, so it can show a recovery
+            /// time as an item's can.
             ///
             /// Field 7: `updated_ts_ns`
             pub updated_ts_ns: u64,
@@ -56879,7 +56915,9 @@ pub mod __buffa {
             pub fn accepted_ts_ns(&self) -> u64 {
                 self.0.reborrow().accepted_ts_ns
             }
-            /// Latest batch status timestamp in nanoseconds since epoch.
+            /// Latest batch status timestamp in nanoseconds since epoch: the latest of
+            /// its acceptance and its items' update times, so it can show a recovery
+            /// time as an item's can.
             ///
             /// Field 7: `updated_ts_ns`
             #[must_use]
