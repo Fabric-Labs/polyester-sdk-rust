@@ -166,7 +166,8 @@ pub const CHANGELOG_SERVICE_LIST_CHANGES_SPEC: ::connectrpc::Spec = ::connectrpc
 #[allow(clippy::type_complexity)]
 pub trait ChangelogService: Send + Sync + 'static {
     /// List published post summaries, newest first. Use limit 1 to poll for the
-    /// latest post.
+    /// latest post. To follow edits to published posts, compare each post's
+    /// revision.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -189,7 +190,7 @@ pub trait ChangelogService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Get one complete published post by slug.
+    /// Get one complete published post by slug, at its current revision.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

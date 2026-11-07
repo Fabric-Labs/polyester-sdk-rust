@@ -707,12 +707,13 @@ impl ::buffa::Enumeration for SortDirection {
         &[Self::SORT_DIRECTION_UNSPECIFIED, Self::SORT_ASC, Self::SORT_DESC]
     }
 }
-/// Change is one announced change. Published content never changes.
+/// Change is one announced change. A republished post may reword or withdraw it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Change {
-    /// Stable opaque 64-bit identifier, identical across environments.
+    /// Stable opaque 64-bit identifier, identical across environments and across
+    /// revisions of a post.
     ///
     /// Field 1: `id`
     #[serde(
@@ -1383,7 +1384,8 @@ pub const __SECTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct PostSummary {
-    /// Stable post identifier, unique within this environment.
+    /// Stable post identifier, unique within this environment. It never changes
+    /// when the post is republished.
     ///
     /// Field 1: `slug`
     #[serde(
@@ -1410,7 +1412,7 @@ pub struct PostSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub introduction: ::buffa::alloc::string::String,
-    /// Publication time.
+    /// Time of first publication. It never changes when the post is republished.
     ///
     /// Field 4: `published_at`
     #[serde(
@@ -1490,6 +1492,25 @@ pub struct PostSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub bug_fix_count: u32,
+    /// When the current revision was published; equals published_at for revision 1.
+    ///
+    /// Field 12: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Published revision, starting at 1. Each republication of the post, for
+    /// example to correct its copy or withdraw a change, increments it.
+    ///
+    /// Field 13: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1508,6 +1529,8 @@ impl ::core::fmt::Debug for PostSummary {
             .field("new_feature_count", &self.new_feature_count)
             .field("improvement_count", &self.improvement_count)
             .field("bug_fix_count", &self.bug_fix_count)
+            .field("updated_at", &self.updated_at)
+            .field("revision", &self.revision)
             .finish()
     }
 }
@@ -1589,6 +1612,17 @@ impl ::buffa::Message for PostSummary {
         if self.bug_fix_count != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.bug_fix_count) as u32;
         }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.revision != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.revision) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1633,6 +1667,13 @@ impl ::buffa::Message for PostSummary {
         }
         if self.bug_fix_count != 0u32 {
             ::buffa::types::put_uint32_field(11u32, self.bug_fix_count, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
+            self.updated_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(13u32, self.revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1732,6 +1773,24 @@ impl ::buffa::Message for PostSummary {
                 )?;
                 self.bug_fix_count = ::buffa::types::decode_uint32(buf)?;
             }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1751,6 +1810,8 @@ impl ::buffa::Message for PostSummary {
         self.new_feature_count = 0u32;
         self.improvement_count = 0u32;
         self.bug_fix_count = 0u32;
+        self.updated_at = ::buffa::MessageField::none();
+        self.revision = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1783,7 +1844,7 @@ pub const __POST_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buff
     from_json: ::buffa::type_registry::any_from_json::<PostSummary>,
     is_wkt: false,
 };
-/// Post is one complete published post.
+/// Post is one complete published post at its current revision.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -2617,7 +2678,10 @@ pub struct ListChangesRequest {
     )]
     pub limit: u32,
     /// Opaque, keyset-backed, exclusive cursor from a previous response. Reuse
-    /// it only with the same filters, time bounds and sort.
+    /// it only with the same filters, time bounds and sort. When the post it
+    /// points into was republished since, paging restarts at the first change of
+    /// that post's current revision, so changes of that post can appear again;
+    /// match them by id.
     ///
     /// Field 10: `page_token`
     #[serde(
@@ -3070,7 +3134,7 @@ pub struct ChangeEntry {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub post_slug: ::buffa::alloc::string::String,
-    /// Publication time of the announcing post.
+    /// Time of first publication of the announcing post.
     ///
     /// Field 3: `published_at`
     #[serde(
@@ -3448,10 +3512,11 @@ pub mod __buffa {
     pub mod view {
         #[allow(unused_imports)]
         use super::*;
-        /// Change is one announced change. Published content never changes.
+        /// Change is one announced change. A republished post may reword or withdraw it.
         #[derive(Clone, Debug, Default)]
         pub struct ChangeView<'a> {
-            /// Stable opaque 64-bit identifier, identical across environments.
+            /// Stable opaque 64-bit identifier, identical across environments and across
+            /// revisions of a post.
             ///
             /// Field 1: `id`
             pub id: u64,
@@ -3948,7 +4013,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Stable opaque 64-bit identifier, identical across environments.
+            /// Stable opaque 64-bit identifier, identical across environments and across
+            /// revisions of a post.
             ///
             /// Field 1: `id`
             #[must_use]
@@ -4432,7 +4498,8 @@ pub mod __buffa {
         /// PostSummary describes one published post without its changes.
         #[derive(Clone, Debug, Default)]
         pub struct PostSummaryView<'a> {
-            /// Stable post identifier, unique within this environment.
+            /// Stable post identifier, unique within this environment. It never changes
+            /// when the post is republished.
             ///
             /// Field 1: `slug`
             pub slug: &'a str,
@@ -4444,7 +4511,7 @@ pub mod __buffa {
             ///
             /// Field 3: `introduction`
             pub introduction: &'a str,
-            /// Publication time.
+            /// Time of first publication. It never changes when the post is republished.
             ///
             /// Field 4: `published_at`
             pub published_at: ::buffa::MessageFieldView<
@@ -4480,6 +4547,17 @@ pub mod __buffa {
             ///
             /// Field 11: `bug_fix_count`
             pub bug_fix_count: u32,
+            /// When the current revision was published; equals published_at for revision 1.
+            ///
+            /// Field 12: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Published revision, starting at 1. Each republication of the post, for
+            /// example to correct its copy or withdraw a change, increments it.
+            ///
+            /// Field 13: `revision`
+            pub revision: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PostSummaryView<'a> {
@@ -4634,6 +4712,38 @@ pub mod __buffa {
                         )?;
                         view.bug_fix_count = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4688,6 +4798,15 @@ pub mod __buffa {
                     new_feature_count: self.new_feature_count,
                     improvement_count: self.improvement_count,
                     bug_fix_count: self.bug_fix_count,
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    revision: self.revision,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4769,6 +4888,19 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.bug_fix_count)
                                 as u32;
                 }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -4830,6 +4962,17 @@ pub mod __buffa {
                 }
                 if self.bug_fix_count != 0u32 {
                     ::buffa::types::put_uint32_field(11u32, self.bug_fix_count, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(13u32, self.revision, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -4931,6 +5074,21 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.bug_fix_count),
                         )?;
                 }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
                 __map.end()
             }
         }
@@ -5025,7 +5183,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Stable post identifier, unique within this environment.
+            /// Stable post identifier, unique within this environment. It never changes
+            /// when the post is republished.
             ///
             /// Field 1: `slug`
             #[must_use]
@@ -5046,7 +5205,7 @@ pub mod __buffa {
             pub fn introduction(&self) -> &'_ str {
                 self.0.reborrow().introduction
             }
-            /// Publication time.
+            /// Time of first publication. It never changes when the post is republished.
             ///
             /// Field 4: `published_at`
             #[must_use]
@@ -5110,6 +5269,25 @@ pub mod __buffa {
             pub fn bug_fix_count(&self) -> u32 {
                 self.0.reborrow().bug_fix_count
             }
+            /// When the current revision was published; equals published_at for revision 1.
+            ///
+            /// Field 12: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+            /// Published revision, starting at 1. Each republication of the post, for
+            /// example to correct its copy or withdraw a change, increments it.
+            ///
+            /// Field 13: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<PostSummaryView<'static>>>
         for PostSummaryOwnedView {
@@ -5141,7 +5319,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Post is one complete published post.
+        /// Post is one complete published post at its current revision.
         #[derive(Clone, Debug, Default)]
         pub struct PostView<'a> {
             /// Post summary.
@@ -6756,7 +6934,10 @@ pub mod __buffa {
             /// Field 9: `limit`
             pub limit: u32,
             /// Opaque, keyset-backed, exclusive cursor from a previous response. Reuse
-            /// it only with the same filters, time bounds and sort.
+            /// it only with the same filters, time bounds and sort. When the post it
+            /// points into was republished since, paging restarts at the first change of
+            /// that post's current revision, so changes of that post can appear again;
+            /// match them by id.
             ///
             /// Field 10: `page_token`
             pub page_token: &'a str,
@@ -7449,7 +7630,10 @@ pub mod __buffa {
                 self.0.reborrow().limit
             }
             /// Opaque, keyset-backed, exclusive cursor from a previous response. Reuse
-            /// it only with the same filters, time bounds and sort.
+            /// it only with the same filters, time bounds and sort. When the post it
+            /// points into was republished since, paging restarts at the first change of
+            /// that post's current revision, so changes of that post can appear again;
+            /// match them by id.
             ///
             /// Field 10: `page_token`
             #[must_use]
@@ -7500,7 +7684,7 @@ pub mod __buffa {
             ///
             /// Field 2: `post_slug`
             pub post_slug: &'a str,
-            /// Publication time of the announcing post.
+            /// Time of first publication of the announcing post.
             ///
             /// Field 3: `published_at`
             pub published_at: ::buffa::MessageFieldView<
@@ -7880,7 +8064,7 @@ pub mod __buffa {
             pub fn post_slug(&self) -> &'_ str {
                 self.0.reborrow().post_slug
             }
-            /// Publication time of the announcing post.
+            /// Time of first publication of the announcing post.
             ///
             /// Field 3: `published_at`
             #[must_use]
