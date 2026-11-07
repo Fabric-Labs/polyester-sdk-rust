@@ -4,6 +4,7 @@ use super::correlation_id::{
 };
 use super::scope;
 use super::unary;
+use crate::catalogs::Market;
 use crate::codecs::decode::{
     batch_cancel_from_proto, batch_create_from_proto, batch_replace_from_proto,
     batch_replace_status_from_proto, cancel_all_after_from_proto, cancel_all_from_proto,
@@ -427,30 +428,13 @@ impl OrdersService {
         }
     }
 
-    /// Build the transport-independent [`OrderIntent`] shared by single and batch
-    /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
-    /// are mapped onto the appropriate execution variant.
-    fn require_quantity_scale(&self, symbol: &str, qty_scale: Option<u32>) -> Result<u32> {
-        if let Some(scale) = self.ctx.catalogs.base_quantity_scale_for_symbol(symbol) {
-            return Ok(scale);
-        }
-        if let Some(scale) = qty_scale {
-            return Ok(scale);
-        }
-        Err(Error::validation(format!(
-            "quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before placing orders, or pass a scaled Quantity"
-        )))
-    }
-
-    fn require_quote_quantity_scale(&self, symbol: &str) -> Result<u32> {
-        self.ctx
-            .catalogs
-            .quote_quantity_scale_for_symbol(symbol)
-            .ok_or_else(|| {
-                Error::validation(format!(
-                    "quote quantity scale for {symbol:?} is unavailable; await client.wait_for_catalogs() before using a quote-debit budget"
-                ))
-            })
+    fn require_quote_quantity_scale(market: &Market) -> Result<u32> {
+        market.quote_quantity_scale.ok_or_else(|| {
+            Error::validation(format!(
+                "quote quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before using a quote-debit budget",
+                market.symbol
+            ))
+        })
     }
 
     fn validate_batch_size(operation: &str, len: usize) -> Result<()> {
@@ -483,10 +467,24 @@ impl OrdersService {
         Ok(())
     }
 
+    /// Build the transport-independent [`OrderIntent`] shared by single and batch
+    /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
+    /// are mapped onto the appropriate execution variant.
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
-        let symbol_id = self.ctx.catalogs.require_symbol_id(&params.symbol)?;
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        self.order_intent_for_market(params, &market)
+    }
+
+    /// [`Self::order_intent_from_params`] for a market already resolved: the
+    /// ID sent, every scale and every symbol check come from `pair`.
+    fn order_intent_for_market(
+        &self,
+        params: &CreateOrderParams,
+        pair: &Market,
+    ) -> Result<OrderIntent> {
+        let symbol = pair.symbol.as_str();
         let mut intent = OrderIntent {
-            symbol_id,
+            symbol_id: pair.symbol_id,
             side: match params.side {
                 CreateSide::Buy => Side::Buy.into(),
                 CreateSide::Sell => Side::Sell.into(),
@@ -498,22 +496,18 @@ impl OrdersService {
             intent.client_order_id = client_order_id;
         }
         intent.sizing = Some(match (&params.quantity, &params.max_quote_debit_scaled) {
-            (Some(quantity), None) => {
-                let scale = self.require_quantity_scale(&params.symbol, quantity.scale())?;
-                order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
-                    quantity,
-                    scale,
-                    Some(&params.symbol),
-                    self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
-                )?)
-            }
+            (Some(quantity), None) => order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
+                quantity,
+                pair.base_quantity_scale,
+                Some(symbol),
+                Some(pair.symbol_id),
+            )?),
             (None, Some(max_quote_debit)) => {
-                let scale = self.require_quote_quantity_scale(&params.symbol)?;
                 order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
                     max_quote_debit,
-                    scale,
-                    Some(&params.symbol),
-                    self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+                    Self::require_quote_quantity_scale(pair)?,
+                    Some(symbol),
+                    Some(pair.symbol_id),
                 )?)
             }
             (Some(_), Some(_)) | (None, None) => {
@@ -561,8 +555,7 @@ impl OrdersService {
                 }
                 let mut market = MarketIoc::default();
                 if let Some(ref_price) = params.market_client_ref_price.as_ref() {
-                    market.client_ref_price_ticks =
-                        resolve_price_ticks(ref_price, Some(&params.symbol))?;
+                    market.client_ref_price_ticks = resolve_price_ticks(ref_price, Some(symbol))?;
                 }
                 market.max_slippage = match params.market_max_slippage {
                     Some(MaxSlippage::Ticks(value)) if value > 0 => {
@@ -594,7 +587,7 @@ impl OrdersService {
                         "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
                     )
                 })?;
-                let price_ticks = resolve_price_ticks(price, Some(&params.symbol))?;
+                let price_ticks = resolve_price_ticks(price, Some(symbol))?;
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
                         if post_only {
@@ -660,7 +653,7 @@ impl OrdersService {
         if let Some(risk) = params.attached_risk.as_ref() {
             *intent.attached_risk.get_or_insert_default() = self.encode_attached_risk(
                 risk,
-                Some(&params.symbol),
+                Some(symbol),
                 Some(params.side),
                 "order.attached_risk",
             )?;
@@ -668,8 +661,18 @@ impl OrdersService {
         Ok(intent)
     }
 
+    #[cfg(test)]
     fn encode_create_params(&self, params: &CreateOrderParams) -> Result<CreateOrderRequest> {
-        let order = self.order_intent_from_params(params)?;
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        self.encode_create_for_market(params, &market)
+    }
+
+    fn encode_create_for_market(
+        &self,
+        params: &CreateOrderParams,
+        market: &Market,
+    ) -> Result<CreateOrderRequest> {
+        let order = self.order_intent_for_market(params, market)?;
         let mut req = CreateOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
@@ -938,31 +941,29 @@ impl OrdersService {
                 "modify requires new_price, new_qty, and/or new_attached_risk",
             ));
         }
-        let scale = self.require_quantity_scale(
-            &params.symbol,
-            params.new_qty.as_ref().and_then(Quantity::scale),
-        )?;
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let symbol = market.symbol.as_str();
         let mut req = ModifyOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             request_id: Self::coalesce_request_id(params.request_id, "mod")?,
             key: Some(Self::encode_modify_order_key(&params.key)?),
-            symbol_id: self.ctx.catalogs.require_symbol_id(&params.symbol)?,
+            symbol_id: market.symbol_id,
             ..Default::default()
         };
         if let Some(price) = params.new_price.as_ref() {
-            req.new_price_ticks = Some(resolve_price_ticks(price, Some(&params.symbol))?);
+            req.new_price_ticks = Some(resolve_price_ticks(price, Some(symbol))?);
         }
         if let Some(qty) = params.new_qty.as_ref() {
             req.new_qty_scaled = Some(resolve_qty_scaled(
                 qty,
-                scale,
-                Some(&params.symbol),
-                self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+                market.base_quantity_scale,
+                Some(symbol),
+                Some(market.symbol_id),
             )?);
         }
         if let Some(risk) = params.new_attached_risk.as_ref() {
             *req.new_attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(&params.symbol), None, "new_attached_risk")?;
+                self.encode_attached_risk(risk, Some(symbol), None, "new_attached_risk")?;
         }
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
@@ -976,9 +977,8 @@ impl OrdersService {
     /// Place an order. Quantity and price must be `Quantity` / `Price` wrappers.
     pub async fn create(&self, params: CreateOrderParams) -> Result<OrderMutationResult> {
         self.ctx.wait_for_catalogs().await?;
-        let req = self.encode_create_params(&params)?;
-        let base_scale = self.require_quantity_scale(&params.symbol, None)?;
-        let symbol_id = self.ctx.catalogs.require_symbol_id(&params.symbol)?;
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let req = self.encode_create_for_market(&params, &market)?;
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -991,9 +991,9 @@ impl OrdersService {
         let mut result = order_mutation_from_create(&resp)?;
         result.resolved_base_qty = crate::codecs::decode::decode_qty_scaled(
             resp.resolved_base_qty_scaled,
-            Some(base_scale),
-            Some(params.symbol),
-            Some(symbol_id),
+            Some(market.base_quantity_scale),
+            Some(market.symbol),
+            Some(market.symbol_id),
         );
         Ok(result)
     }
@@ -1007,7 +1007,8 @@ impl OrdersService {
     /// create always evaluates the intent again.
     pub async fn preview(&self, params: PreviewOrderParams) -> Result<PreviewOrderResult> {
         self.ctx.wait_for_catalogs().await?;
-        let req = self.encode_preview_params(&params)?;
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let req = self.encode_preview_for_market(&params, &market)?;
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1018,16 +1019,25 @@ impl OrdersService {
         .await?
         .into_owned();
         // Base scale is only needed when the host resolved a base quantity.
-        let base_scale = self.require_quantity_scale(&params.symbol, None)?;
         preview_order_from_proto(
             &resp,
-            base_scale,
-            &params.symbol,
-            self.ctx.catalogs.symbol_id_for_symbol(&params.symbol),
+            market.base_quantity_scale,
+            &market.symbol,
+            Some(market.symbol_id),
         )
     }
 
+    #[cfg(test)]
     fn encode_preview_params(&self, params: &PreviewOrderParams) -> Result<PreviewOrderRequest> {
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        self.encode_preview_for_market(params, &market)
+    }
+
+    fn encode_preview_for_market(
+        &self,
+        params: &PreviewOrderParams,
+        market: &Market,
+    ) -> Result<PreviewOrderRequest> {
         // Preview uses the same OrderIntent contract as CreateOrder. The host
         // runs an admissibility check only — no hold is placed and any
         // client_order_id is accepted but not claimed.
@@ -1049,7 +1059,7 @@ impl OrdersService {
             attached_risk: params.attached_risk.clone(),
             expire_at: params.expire_at,
         };
-        let order = self.order_intent_from_params(&create)?;
+        let order = self.order_intent_for_market(&create, market)?;
         let mut req = PreviewOrderRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()

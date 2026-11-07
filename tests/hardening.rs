@@ -5292,6 +5292,73 @@ async fn l2_stop_all_trading_cancels_live_triggers_before_the_orders() {
     assert_eq!(cancel_all.request_id, "stop-all-1");
 }
 
+// A page token seen earlier in the run, not only the one just sent, is a
+// pagination cycle: stop_all_trading stops listing and cancels nothing.
+#[tokio::test]
+async fn l2_stop_all_trading_refuses_a_page_token_cycle_before_canceling() {
+    use polyester::models::StopAllTradingScope;
+    use polyester::proto::triggers::v1::{ListTriggersResponse, Trigger, TriggerStatus};
+
+    for (name, cycle) in [
+        ("A,A", vec!["A", "A"]),
+        ("A,B,A", vec!["A", "B", "A"]),
+        ("A,B,C,A", vec!["A", "B", "C", "A"]),
+        ("A,B,C,D,B", vec!["A", "B", "C", "D", "B"]),
+    ] {
+        // The server keeps answering the cycle; a twelfth listing fails so a
+        // missed cycle cannot hang the test.
+        let first = cycle
+            .iter()
+            .position(|t| *t == cycle[cycle.len() - 1])
+            .unwrap();
+        let mut tokens: Vec<String> = cycle.iter().map(|t| (*t).to_owned()).collect();
+        while tokens.len() < 24 {
+            tokens.extend(cycle[first + 1..].iter().map(|t| (*t).to_owned()));
+        }
+        let paths = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        let seen = paths.clone();
+        let http = MockHttpServer::spawn(move |request| {
+            let mut paths = seen.lock().unwrap();
+            paths.push(request.path.clone());
+            if request.path != LIST_TRIGGERS_PATH {
+                return hardening_support::HttpScript::NotFound;
+            }
+            let listed = paths.len();
+            if listed > 11 {
+                return json_body(
+                    409,
+                    "application/json",
+                    r#"{"code":"aborted","message":"loop"}"#,
+                );
+            }
+            connect_proto_ok(&ListTriggersResponse {
+                triggers: vec![Trigger {
+                    trigger_id: listed as u64,
+                    status: TriggerStatus::STATUS_ARMED.into(),
+                    ..Default::default()
+                }],
+                next_page_token: tokens[listed - 1].clone(),
+                ..Default::default()
+            })
+        })
+        .await;
+        let client = api_key_client(&http);
+        let result = client
+            .stop_all_trading(StopAllTradingScope::default())
+            .await;
+        assert!(
+            matches!(result, Err(Error::ResponseContract { ref message, .. }) if message.contains("repeats an earlier page_token")),
+            "{name}: {result:?}"
+        );
+        let paths = paths.lock().unwrap();
+        assert_eq!(
+            *paths,
+            vec![LIST_TRIGGERS_PATH.to_owned(); cycle.len()],
+            "{name}: a cancel began, or the cycle was read past its first repeat"
+        );
+    }
+}
+
 // A JSON-wire response naming an enum value newer than this SDK reads it as
 // unknown instead of rejecting the whole response (changelog sections and
 // change surfaces gain product areas over time).
@@ -8100,6 +8167,227 @@ async fn batch_create_refuses_item_subaccount_instead_of_using_default() {
             );
         }
     }
+}
+
+// A batch item's quantity scale is checked against the market its symbol
+// resolves to. A padded symbol used to resolve the market (trimmed) but miss
+// the scale lookup (untrimmed), so an unbound scaled Quantity was checked
+// against its own scale: 1 BTC at scale 6 or 10 went out as 0.01 or 100 BTC
+// on a scale-8 market. Every order and trigger write now resolves the market
+// once and refuses a mismatch before sending anything.
+#[tokio::test]
+async fn order_writes_check_quantity_scale_against_the_resolved_market() {
+    use polyester::Price;
+    use polyester::models::{
+        CreateOrderParams, CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType,
+        ModifyOrderParams, OrderKey, PreviewOrderParams,
+    };
+    use polyester::proto::orders::v1::{
+        BatchCreateOrdersRequest, BatchCreateOrdersResponse, CreateOrderRequest,
+        ModifyOrderRequest, OrderIntent, PreviewOrderRequest, order_intent,
+    };
+    use polyester::proto::triggers::v1::CreateTriggerRequest;
+    use std::sync::Mutex;
+
+    // (path, symbol_id, base quantity sent) of every write that reached the wire.
+    let seen = Arc::new(Mutex::new(Vec::<(String, u32, i64)>::new()));
+    let captured = seen.clone();
+    let intent_qty = |intent: &OrderIntent| match intent.sizing {
+        Some(order_intent::Sizing::BaseQtyScaled(qty)) => qty,
+        _ => -1,
+    };
+    let server = MockHttpServer::spawn(move |request| {
+        let path = request
+            .path
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .to_owned();
+        let body = &request.body;
+        let sent: Vec<(u32, i64)> = match path.as_str() {
+            "BatchCreateOrders" => BatchCreateOrdersRequest::decode_from_slice(body)
+                .unwrap()
+                .items
+                .iter()
+                .map(|item| (item.symbol_id, intent_qty(item)))
+                .collect(),
+            "CreateOrder" => {
+                let req = CreateOrderRequest::decode_from_slice(body).unwrap();
+                vec![(req.order.symbol_id, intent_qty(&req.order))]
+            }
+            "PreviewOrder" => {
+                let req = PreviewOrderRequest::decode_from_slice(body).unwrap();
+                vec![(req.order.symbol_id, intent_qty(&req.order))]
+            }
+            "ModifyOrder" => {
+                let req = ModifyOrderRequest::decode_from_slice(body).unwrap();
+                vec![(req.symbol_id, req.new_qty_scaled.unwrap_or(-1))]
+            }
+            "CreateTrigger" => {
+                let req = CreateTriggerRequest::decode_from_slice(body).unwrap();
+                vec![(req.trigger.symbol_id, req.trigger.qty_scaled)]
+            }
+            _ => return hardening_support::HttpScript::NotFound,
+        };
+        let mut log = captured.lock().unwrap();
+        for (symbol_id, qty) in sent {
+            log.push((path.clone(), symbol_id, qty));
+        }
+        connect_proto_ok(&BatchCreateOrdersResponse::default())
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("scale-test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({"pairs": [{
+            "symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8, "quote_quantity_scale": 6
+        }]}))
+        .unwrap();
+    // 1 BTC written at `scale`, bound to no market.
+    let one_btc = |scale: u32| {
+        Quantity::from_scaled(
+            10_i64.pow(scale),
+            Some(scale),
+            QuantityDomain::OrderBase,
+            None,
+            None,
+        )
+        .unwrap()
+    };
+    let bound_one_btc = || {
+        Quantity::from_scaled(
+            100_000_000,
+            Some(8),
+            QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(1),
+        )
+        .unwrap()
+    };
+    fn order(symbol: &str, quantity: Quantity) -> CreateOrderParams {
+        let mut params = CreateOrderParams::new(symbol, CreateSide::Buy, CreateOrderType::Limit);
+        params.quantity = Some(quantity);
+        params.price = Some(Price::from_ticks(1, None).unwrap());
+        params
+    }
+    fn preview(symbol: &str, quantity: Quantity) -> PreviewOrderParams {
+        let mut params = PreviewOrderParams::new(symbol, CreateSide::Buy, CreateOrderType::Limit);
+        params.quantity = Some(quantity);
+        params.price = Some(Price::from_ticks(1, None).unwrap());
+        params
+    }
+    fn modify(symbol: &str, quantity: Quantity) -> ModifyOrderParams {
+        ModifyOrderParams {
+            symbol: symbol.into(),
+            key: OrderKey::OrderId(polyester::codecs::scalars::format_id(9)),
+            subaccount_id: None,
+            request_id: None,
+            new_price: None,
+            new_qty: Some(quantity),
+            new_attached_risk: None,
+            behavior: None,
+            new_client_order_id: None,
+        }
+    }
+    fn trigger(symbol: &str, quantity: Quantity) -> CreateTriggerParams {
+        let mut params = CreateTriggerParams::new(
+            symbol,
+            CreateTriggerType::StopLoss,
+            CreateSide::Sell,
+            CreateOrderType::Market,
+            quantity,
+        );
+        params.trigger_price = Some(Price::from_ticks(1, None).unwrap());
+        params.client_trigger_id = "scale-trigger".into();
+        params
+    }
+    // Every write path with one symbol and quantity; the batch puts a
+    // correct item first, so a refusal must stop the whole batch.
+    async fn write(
+        client: &Client,
+        call: &str,
+        symbol: &str,
+        quantity: Quantity,
+        good: Quantity,
+    ) -> polyester::Result<()> {
+        match call {
+            "batch_create" => client
+                .orders
+                .batch_create(
+                    vec![order("BTC-USDT", good), order(symbol, quantity)],
+                    None,
+                    None,
+                )
+                .await
+                .map(drop),
+            "create" => client
+                .orders
+                .create(order(symbol, quantity))
+                .await
+                .map(drop),
+            "preview" => client
+                .orders
+                .preview(preview(symbol, quantity))
+                .await
+                .map(drop),
+            "modify" => client
+                .orders
+                .modify(modify(symbol, quantity))
+                .await
+                .map(drop),
+            "trigger" => client
+                .triggers
+                .create(trigger(symbol, quantity))
+                .await
+                .map(drop),
+            _ => unreachable!(),
+        }
+    }
+    let calls = ["batch_create", "create", "preview", "modify", "trigger"];
+    let mut failures = Vec::new();
+    for call in calls {
+        for symbol in [" BTC-USDT ", "BTC-USDT ", " BTC-USDT", "BTC-USDT"] {
+            for scale in [6, 10] {
+                let before = seen.lock().unwrap().len();
+                let result = write(&client, call, symbol, one_btc(scale), one_btc(8)).await;
+                let sent = seen.lock().unwrap()[before..].to_vec();
+                let refused = matches!(result, Err(Error::Validation(ref message)) if message.contains("scale mismatch"));
+                if !refused || !sent.is_empty() {
+                    failures.push(format!(
+                        "{call} {symbol:?} at scale {scale}: got {result:?}, sent {sent:?}"
+                    ));
+                }
+            }
+        }
+    }
+    // A padded symbol names the same market: the market's scale, and a
+    // Quantity bound to it, are accepted and sent unchanged.
+    for call in calls {
+        for symbol in [" BTC-USDT ", "BTC-USDT"] {
+            for quantity in [one_btc(8), bound_one_btc()] {
+                let before = seen.lock().unwrap().len();
+                let _ = write(&client, call, symbol, quantity, one_btc(8)).await;
+                let sent: Vec<(u32, i64)> = seen.lock().unwrap()[before..]
+                    .iter()
+                    .map(|(_, symbol_id, qty)| (*symbol_id, *qty))
+                    .collect();
+                let expected = if call == "batch_create" { 2 } else { 1 };
+                if sent != vec![(1, 100_000_000); expected] {
+                    failures.push(format!(
+                        "{call} {symbol:?} sent {sent:?}, want 1 BTC on market 1"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
 // Each public order and trigger write, captured on the wire: the subaccount it
