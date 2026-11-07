@@ -84,6 +84,10 @@ fn assert_request_too_large(err: &Error) {
         "{err:?}"
     );
     assert!(!matches!(err, Error::RateLimit { .. }));
+    assert!(err.is_request_too_large());
+    assert!(
+        matches!(err, Error::Api { code, .. } if code == polyester::problem_codes::REQUEST_TOO_LARGE)
+    );
     let problem = err.http_problem().expect("problem");
     assert_eq!(problem.status, 413);
     assert_eq!(problem.code, "REQUEST_TOO_LARGE");
@@ -156,6 +160,16 @@ fn rate_limit_problem(rate_limit: serde_json::Value) -> String {
     )
 }
 
+/// A REST rate-limit problem: its name, body and headers, and the detail and
+/// delay it must read as.
+type RateLimitCase = (
+    &'static str,
+    String,
+    Vec<(&'static str, &'static str)>,
+    RateLimitDetail,
+    Option<f64>,
+);
+
 /// The gateway's own refusal names only the reason and the scope.
 fn gateway_detail() -> RateLimitDetail {
     RateLimitDetail {
@@ -173,13 +187,7 @@ fn gateway_detail() -> RateLimitDetail {
 
 #[tokio::test]
 async fn rate_limit_problem_carries_its_detail() {
-    let cases: Vec<(
-        &str,
-        String,
-        Vec<(&str, &str)>,
-        RateLimitDetail,
-        Option<f64>,
-    )> = vec![
+    let cases: Vec<RateLimitCase> = vec![
         (
             "service quota",
             rate_limit_problem(json!({
@@ -397,7 +405,34 @@ async fn wallet_already_linked_is_a_terminal_auth_refusal() {
             Some(AuthErrorCode::AUTH_WALLET_ALREADY_LINKED)
         );
         assert!(err.to_string().ends_with(WALLET_LINKED), "{err}");
+        assert!(err.is_wallet_already_linked());
+        assert_eq!(
+            err.auth_error_code(),
+            Some(polyester::auth_codes::WALLET_ALREADY_LINKED)
+        );
         assert!(!err.is_retryable(), "{err:?}");
         assert!(!err.mutation_outcome_unknown(), "{err:?}");
     }
+}
+
+#[test]
+fn request_size_and_wallet_predicates_read_only_their_codes() {
+    let api = |code: &str| Error::Api {
+        message: "m".into(),
+        code: code.into(),
+        metadata: Vec::new(),
+        violations: Vec::new(),
+    };
+    assert!(!api("PAYLOAD_TOO_LARGE").is_request_too_large());
+    assert!(
+        !Error::RateLimit {
+            code: Some("REQUEST_TOO_LARGE".into()),
+            message: "m".into(),
+            retry_after: None,
+            detail: None,
+        }
+        .is_request_too_large()
+    );
+    assert!(!api("AUTH_WALLET_LOGIN_FAILED").is_wallet_already_linked());
+    assert!(api("AUTH_WALLET_ALREADY_LINKED").is_wallet_already_linked());
 }

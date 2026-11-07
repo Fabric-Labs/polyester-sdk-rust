@@ -59,7 +59,16 @@ pub enum Error {
         code: Option<String>,
         message: String,
         retry_after: Option<f64>,
-        /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached.
+        /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached:
+        /// ConnectRPC details, an in-band order rejection, or the
+        /// `rate_limit` object of a REST `RATE_LIMIT_EXCEEDED` problem, whose
+        /// fields are all optional. The gateway's own refusal names only
+        /// `reason` and `scope` (`CLIENT_IP`, no `operation_id`); a service's
+        /// also names the operation, the policy class and the remaining quota.
+        /// `retry_after` prefers its `retry_after_ms`, then the `Retry-After`
+        /// header, and is `None` when the server gave no hint, as for a
+        /// refusal of too many concurrent requests: back off on your own
+        /// schedule then.
         /// Boxed so `Error` stays small enough for Clippy's `result_large_err`.
         detail: Option<Box<RateLimitDetail>>,
     },
@@ -235,6 +244,13 @@ pub mod auth_codes {
     pub const IP_NOT_ALLOWED: &str = "AUTH_IP_NOT_ALLOWED";
     /// The API does not accept API keys.
     pub const API_KEY_NOT_ACCEPTED: &str = "AUTH_API_KEY_NOT_ACCEPTED";
+    /// A valid signed wallet login named an account address no account uses,
+    /// and the signing wallet is already linked to another account
+    /// (ConnectRPC `already_exists`, REST 409). Wallets are not moved between
+    /// accounts and nothing changed. Terminal: the same request is refused
+    /// again. Log in with the account address the wallet already uses; see
+    /// [`super::Error::is_wallet_already_linked`].
+    pub const WALLET_ALREADY_LINKED: &str = "AUTH_WALLET_ALREADY_LINKED";
 
     /// The `auth.v1.AuthErrorCode` of a REST problem `code` or an API-gateway
     /// rejection code: the code with the `AUTH_` prefix added
@@ -254,6 +270,17 @@ pub mod auth_codes {
             .or_else(|| AuthErrorCode::from_proto_name(&format!("AUTH_{code}")))
             .filter(|value| value.to_i32() != 0)
     }
+}
+
+/// Stable REST problem codes that every service answers alike.
+pub mod problem_codes {
+    /// A request body over the endpoint's size limit (HTTP 413). The API
+    /// refuses it before reading or authenticating the request, so nothing
+    /// changed, and the same body is refused again: reduce it to fit the
+    /// limit. It is an [`super::Error::Api`] with this code and the problem
+    /// in [`super::Error::http_problem`]; see
+    /// [`super::Error::is_request_too_large`].
+    pub const REQUEST_TOO_LARGE: &str = "REQUEST_TOO_LARGE";
 }
 
 /// Stable orders.v1.ErrorDetail codes used for retry control flow.
@@ -666,6 +693,20 @@ impl Error {
         self.auth_error_code() == Some(order_codes::ORDER_ALREADY_TERMINAL)
     }
 
+    /// True when a request body over the endpoint's size limit was refused
+    /// ([`problem_codes::REQUEST_TOO_LARGE`], HTTP 413). Nothing changed;
+    /// reduce the body to fit the limit.
+    pub fn is_request_too_large(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == problem_codes::REQUEST_TOO_LARGE)
+    }
+
+    /// True when a wallet login was refused because the wallet is already
+    /// linked to another account ([`auth_codes::WALLET_ALREADY_LINKED`]).
+    /// Terminal: log in with the account address the wallet already uses.
+    pub fn is_wallet_already_linked(&self) -> bool {
+        self.auth_error_code() == Some(auth_codes::WALLET_ALREADY_LINKED)
+    }
+
     /// True for [`Self::NotImplemented`] and its narrower case
     /// [`Self::RouteNotFound`]: the server does not offer this call.
     pub fn is_not_implemented(&self) -> bool {
@@ -924,7 +965,45 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     }
 }
 
+/// The `rate_limit` object of a REST rate-limit problem. Every field is
+/// optional: the gateway's own refusal sends only `reason` and `scope`.
+/// Integers arrive as JSON strings or numbers; enum names are kept as sent,
+/// including ones newer than this SDK. Anything that is not an object reads as
+/// no detail, and a field of the wrong type reads as absent.
+fn rate_limit_detail_from_json(value: &serde_json::Value) -> Option<RateLimitDetail> {
+    let fields = value.as_object()?;
+    let field = |snake: &str, camel: &str| fields.get(snake).or_else(|| fields.get(camel));
+    let text = |snake: &str, camel: &str| {
+        field(snake, camel)
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    let integer = |snake: &str, camel: &str| match field(snake, camel)? {
+        serde_json::Value::Number(number) => number.as_u64(),
+        serde_json::Value::String(text) => text.trim().parse::<u64>().ok(),
+        _ => None,
+    };
+    Some(RateLimitDetail {
+        reason: text("reason", "reason"),
+        limit: integer("limit", "limit"),
+        remaining: integer("remaining", "remaining"),
+        retry_after_ms: integer("retry_after_ms", "retryAfterMs"),
+        policy_version: integer("policy_version", "policyVersion"),
+        operation_id: text("operation_id", "operationId"),
+        policy_class: text("policy_class", "policyClass"),
+        scope: text("scope", "scope"),
+        refill_model: text("refill_model", "refillModel"),
+    })
+}
+
 fn map_connect_error_inner(err: ConnectError) -> Error {
+    let problem_rate_limit = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::RATE_LIMIT_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(rate_limit_detail_from_json);
     let fallback_message = {
         let message = err.to_string();
         if message.trim().is_empty() {
@@ -1089,7 +1168,8 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 let detail = order_detail
                     .rate_limit
                     .as_option()
-                    .map(rate_limit_detail_from_proto_local);
+                    .map(rate_limit_detail_from_proto_local)
+                    .or(problem_rate_limit);
                 return rate_limit_error(
                     fallback_message.clone(),
                     detail,
