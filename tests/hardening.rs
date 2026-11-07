@@ -3,6 +3,10 @@
 //! These exercise production paths (subscribe_raw, JsonRpcClient, wait_for_catalogs,
 //! Quantity::format, SnapshotThenStream) against in-process servers — not private helpers.
 
+#[path = "batch_replace_status_errors/mod.rs"]
+mod batch_replace_status_errors;
+#[path = "changelog_revisions/mod.rs"]
+mod changelog_revisions;
 mod hardening_support;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
@@ -10,6 +14,8 @@ mod order_trades_wait;
 mod orderbook_depths;
 #[path = "readable_error_bodies/mod.rs"]
 mod readable_error_bodies;
+#[path = "request_size_rate_limit/mod.rs"]
+mod request_size_rate_limit;
 
 use buffa::Message;
 use futures_util::future::FutureExt;
