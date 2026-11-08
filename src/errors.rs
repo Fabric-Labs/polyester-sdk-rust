@@ -922,9 +922,17 @@ fn rate_limit_detail_from_proto_local(msg: &ProtoRateLimitDetail) -> RateLimitDe
     }
 }
 
-fn order_error_code_from_name(code: &str) -> String {
+/// A REST problem code as its typed ConnectRPC detail names it:
+/// `SAME_SOURCE_DESTINATION` reads `ERROR_CODE_SAME_SOURCE_DESTINATION` when any
+/// service's `ErrorCode` (orders, withdraw, transfer, ledger) names it. A code
+/// none of them names is kept unchanged.
+fn error_code_from_name(code: &str) -> String {
     let prefixed = format!("ERROR_CODE_{code}");
-    if OrderErrorCode::from_proto_name(&prefixed).is_some() {
+    if OrderErrorCode::from_proto_name(&prefixed).is_some()
+        || WithdrawErrorCode::from_proto_name(&prefixed).is_some()
+        || TransferErrorCode::from_proto_name(&prefixed).is_some()
+        || LedgerErrorCode::from_proto_name(&prefixed).is_some()
+    {
         prefixed
     } else {
         code.to_owned()
@@ -1176,7 +1184,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     {
         return Error::Api {
             message: fallback_message,
-            code: order_error_code_from_name(raw_message),
+            code: error_code_from_name(raw_message),
             metadata: Vec::new(),
             violations: Vec::new(),
         };
@@ -1421,7 +1429,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     } else {
         named_code
     };
-    let normalized_code = order_error_code_from_name(named_code);
+    let normalized_code = error_code_from_name(named_code);
     if err.code == ErrorCode::Unavailable
         && status == 503
         && normalized_code != "ERROR_CODE_UNAVAILABLE"
@@ -1444,7 +1452,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     {
         return Error::Api {
             message: fallback_message,
-            code: order_error_code_from_name(named_code),
+            code: error_code_from_name(named_code),
             metadata: Vec::new(),
             violations: Vec::new(),
         };
@@ -1457,7 +1465,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     match code {
         ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
         ErrorCode::ResourceExhausted => {
-            let code = order_error_code_from_name(named_code);
+            let code = error_code_from_name(named_code);
             let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
             rate_limit_error(message, None, header_retry, code)
         }
@@ -1477,7 +1485,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         _ => Error::Api {
             message,
             code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) {
-                order_error_code_from_name(named_code)
+                error_code_from_name(named_code)
             } else {
                 format!("{code:?}")
             },
