@@ -95,6 +95,19 @@ pub fn host_is_loopback(url: &url::Url) -> bool {
     }
 }
 
+/// `raw` without its userinfo (user name and password), for errors and
+/// diagnostics. A URL with an `@` that does not parse becomes
+/// `[REDACTED INVALID URL]`, since its userinfo cannot be told apart from the
+/// rest of it.
+pub(crate) fn url_without_userinfo(raw: &str) -> String {
+    match url::Url::parse(raw) {
+        Ok(parsed) if parsed.username().is_empty() && parsed.password().is_none() => raw.to_owned(),
+        Ok(parsed) => redact_url_for_log(&parsed),
+        Err(_) if !raw.contains('@') => raw.to_owned(),
+        Err(_) => "[REDACTED INVALID URL]".to_owned(),
+    }
+}
+
 fn redact_url_for_log(url: &url::Url) -> String {
     let mut redacted = url.clone();
     let _ = redacted.set_username("");
@@ -980,5 +993,33 @@ mod tests {
             None,
         )
         .expect("explicit insecure opt-in");
+    }
+}
+
+#[cfg(test)]
+mod url_userinfo_tests {
+    use super::url_without_userinfo;
+
+    #[test]
+    fn url_without_userinfo_drops_only_userinfo() {
+        for (raw, want) in [
+            ("https://api.example.test/v1", "https://api.example.test/v1"),
+            (
+                "https://fake-user:fake-password-marker@api.example.test/v1",
+                "https://api.example.test/v1",
+            ),
+            (
+                "wss://fake-user@ws.example.test/c?x=1",
+                "wss://ws.example.test/c?x=1",
+            ),
+            ("", ""),
+            ("not a url", "not a url"),
+            (
+                "http://fake-user:fake-password-marker@127.0.0.1:notaport",
+                "[REDACTED INVALID URL]",
+            ),
+        ] {
+            assert_eq!(url_without_userinfo(raw), want, "{raw}");
+        }
     }
 }

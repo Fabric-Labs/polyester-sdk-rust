@@ -61,8 +61,14 @@ impl std::fmt::Debug for Config {
                 "api_private_key",
                 &self.api_private_key.as_ref().map(|_| "[REDACTED]"),
             )
-            .field("api_url", &self.api_url)
-            .field("ws_url", &self.ws_url)
+            .field(
+                "api_url",
+                &crate::transport::url_without_userinfo(&self.api_url),
+            )
+            .field(
+                "ws_url",
+                &crate::transport::url_without_userinfo(&self.ws_url),
+            )
             .field("default_sub_account_id", &self.default_sub_account_id)
             .field("default_account_id", &self.default_account_id)
             .field("timeout", &self.timeout)

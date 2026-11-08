@@ -188,7 +188,12 @@ pub(super) async fn signed_get(
         if is_cloudflare_browser_ban(&text) {
             return Err(Error::Transport(cloudflare_1010_message()));
         }
-        return Err(map_permission_denied(label, url, status_code, &body));
+        return Err(map_permission_denied(
+            label,
+            &crate::transport::url_without_userinfo(url),
+            status_code,
+            &body,
+        ));
     }
     if !status.is_success() {
         return Err(Error::realtime(format!(
