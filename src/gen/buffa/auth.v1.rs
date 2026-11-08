@@ -36957,8 +36957,10 @@ pub enum AuthErrorCode {
     /// The API key request signature does not verify against the request, or the key is unknown.
     /// The REST problem code is SIGNATURE_INVALID.
     AUTH_SIGNATURE_INVALID = 48i32,
-    /// The API key request timestamp is malformed or too far from the server clock. Sync the
-    /// clock, then sign the request again. The REST problem code is TIMESTAMP_SKEW.
+    /// The API key request timestamp is malformed, more than 10 seconds ahead of the server
+    /// clock, or older than the request's receive window (X-API-RECV-WINDOW, 10 seconds when
+    /// omitted) when the request arrived. The request was not processed. Sync the clock, then
+    /// sign the request again with a fresh timestamp. The REST problem code is TIMESTAMP_SKEW.
     AUTH_TIMESTAMP_SKEW = 49i32,
     /// The API key request lacks its timestamp or signature header. The REST problem code is
     /// MISSING_HEADERS.
@@ -36977,6 +36979,16 @@ pub enum AuthErrorCode {
     /// submitted account address cannot be registered with it. Wallets are not moved between
     /// accounts. Log in with the account address this wallet already uses.
     AUTH_WALLET_ALREADY_LINKED = 55i32,
+    /// The API key request's X-API-RECV-WINDOW header is not a single whole number of
+    /// milliseconds from 1 to 60000. The request was not processed. The REST problem code is
+    /// RECV_WINDOW_INVALID.
+    AUTH_RECV_WINDOW_INVALID = 56i32,
+    /// Too many of this API key's signed requests are still within their receive windows,
+    /// or too many of every key's, for another to be accepted. The request was not
+    /// processed. Retry shortly; a shorter receive window lets requests make room sooner.
+    /// ConnectRPC answers resource_exhausted. The REST problem code is
+    /// REPLAY_CAPACITY_EXHAUSTED, with HTTP 429.
+    AUTH_REPLAY_CAPACITY_EXHAUSTED = 57i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37144,6 +37156,12 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_WALLET_ALREADY_LINKED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthWalletAlreadyLinked: Self = Self::AUTH_WALLET_ALREADY_LINKED;
+    ///Idiomatic alias for [`Self::AUTH_RECV_WINDOW_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthRecvWindowInvalid: Self = Self::AUTH_RECV_WINDOW_INVALID;
+    ///Idiomatic alias for [`Self::AUTH_REPLAY_CAPACITY_EXHAUSTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthReplayCapacityExhausted: Self = Self::AUTH_REPLAY_CAPACITY_EXHAUSTED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37314,6 +37332,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             53i32 => ::core::option::Option::Some(Self::AUTH_IP_NOT_ALLOWED),
             54i32 => ::core::option::Option::Some(Self::AUTH_API_KEY_NOT_ACCEPTED),
             55i32 => ::core::option::Option::Some(Self::AUTH_WALLET_ALREADY_LINKED),
+            56i32 => ::core::option::Option::Some(Self::AUTH_RECV_WINDOW_INVALID),
+            57i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_CAPACITY_EXHAUSTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -37393,6 +37413,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_IP_NOT_ALLOWED => "AUTH_IP_NOT_ALLOWED",
             Self::AUTH_API_KEY_NOT_ACCEPTED => "AUTH_API_KEY_NOT_ACCEPTED",
             Self::AUTH_WALLET_ALREADY_LINKED => "AUTH_WALLET_ALREADY_LINKED",
+            Self::AUTH_RECV_WINDOW_INVALID => "AUTH_RECV_WINDOW_INVALID",
+            Self::AUTH_REPLAY_CAPACITY_EXHAUSTED => "AUTH_REPLAY_CAPACITY_EXHAUSTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37558,6 +37580,12 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_WALLET_ALREADY_LINKED" => {
                 ::core::option::Option::Some(Self::AUTH_WALLET_ALREADY_LINKED)
             }
+            "AUTH_RECV_WINDOW_INVALID" => {
+                ::core::option::Option::Some(Self::AUTH_RECV_WINDOW_INVALID)
+            }
+            "AUTH_REPLAY_CAPACITY_EXHAUSTED" => {
+                ::core::option::Option::Some(Self::AUTH_REPLAY_CAPACITY_EXHAUSTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37618,6 +37646,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_IP_NOT_ALLOWED,
             Self::AUTH_API_KEY_NOT_ACCEPTED,
             Self::AUTH_WALLET_ALREADY_LINKED,
+            Self::AUTH_RECV_WINDOW_INVALID,
+            Self::AUTH_REPLAY_CAPACITY_EXHAUSTED,
         ]
     }
 }

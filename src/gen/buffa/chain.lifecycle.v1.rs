@@ -2187,6 +2187,167 @@ impl ::buffa::Enumeration for ListOrderBy {
         ]
     }
 }
+/// FlowParticipation says how an account takes part in a lifecycle flow.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum FlowParticipation {
+    /// Participation was not specified. As a ListFlows filter it matches every
+    /// flow the selected account owns or receives.
+    PARTICIPATION_UNSPECIFIED = 0i32,
+    /// The account owns the flow: it made the deposit, withdrawal, or transfer.
+    /// For a transfer this is the sending account, including a move between the
+    /// account's own Funding and Trading balances.
+    PARTICIPATION_OWNER = 1i32,
+    /// The account receives a transfer that another account owns, such as a
+    /// transfer from another user, a transfer from another subaccount of the same
+    /// main account, or a reward payout.
+    PARTICIPATION_RECIPIENT = 2i32,
+}
+impl FlowParticipation {
+    ///Idiomatic alias for [`Self::PARTICIPATION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ParticipationUnspecified: Self = Self::PARTICIPATION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::PARTICIPATION_OWNER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ParticipationOwner: Self = Self::PARTICIPATION_OWNER;
+    ///Idiomatic alias for [`Self::PARTICIPATION_RECIPIENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ParticipationRecipient: Self = Self::PARTICIPATION_RECIPIENT;
+}
+impl ::core::default::Default for FlowParticipation {
+    fn default() -> Self {
+        Self::PARTICIPATION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for FlowParticipation {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FlowParticipation {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = FlowParticipation;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(FlowParticipation)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<FlowParticipation, E> {
+                <FlowParticipation as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<FlowParticipation, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <FlowParticipation as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<FlowParticipation, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <FlowParticipation as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<FlowParticipation, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FlowParticipation {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for FlowParticipation {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PARTICIPATION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::PARTICIPATION_OWNER),
+            2i32 => ::core::option::Option::Some(Self::PARTICIPATION_RECIPIENT),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PARTICIPATION_UNSPECIFIED => "PARTICIPATION_UNSPECIFIED",
+            Self::PARTICIPATION_OWNER => "PARTICIPATION_OWNER",
+            Self::PARTICIPATION_RECIPIENT => "PARTICIPATION_RECIPIENT",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PARTICIPATION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PARTICIPATION_UNSPECIFIED)
+            }
+            "PARTICIPATION_OWNER" => {
+                ::core::option::Option::Some(Self::PARTICIPATION_OWNER)
+            }
+            "PARTICIPATION_RECIPIENT" => {
+                ::core::option::Option::Some(Self::PARTICIPATION_RECIPIENT)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::PARTICIPATION_UNSPECIFIED,
+            Self::PARTICIPATION_OWNER,
+            Self::PARTICIPATION_RECIPIENT,
+        ]
+    }
+}
 /// FlowStep is the public lifecycle step shown in API and realtime read
 /// models. It is business-facing and intentionally hides the lower-level
 /// technical milestone taxonomy.
@@ -3337,8 +3498,10 @@ pub struct ListFlowsRequest {
     )]
     pub unified_asset_ids: ::buffa::alloc::vec::Vec<u32>,
     /// Opaque keyset cursor returned by a previous response. The cursor is
-    /// exclusive and bound to the caller, filters, account selector, sort
-    /// direction, and ordering timestamp.
+    /// exclusive and bound to the request it was returned for: the account
+    /// selector, participation, every filter including scope, sort direction,
+    /// and ordering timestamp. Send it with that same request; only `limit` may
+    /// change. A cursor sent with any other request is rejected as invalid.
     ///
     /// Field 12: `page_token`
     #[serde(
@@ -3358,6 +3521,19 @@ pub struct ListFlowsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub order_by: ::buffa::EnumValue<ListOrderBy>,
+    /// Optional participation filter for the selected account. Unspecified
+    /// returns the flows the account owns and the transfers it receives.
+    /// `PARTICIPATION_OWNER` returns only the flows it owns, and
+    /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
+    /// account. Requires `owner_account_id` or `smart_account_address`.
+    ///
+    /// Field 14: `participation`
+    #[serde(
+        rename = "participation",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub participation: ::buffa::EnumValue<FlowParticipation>,
     #[serde(flatten)]
     pub account_selector: ::core::option::Option<
         __buffa::oneof::list_flows_request::AccountSelector,
@@ -3380,6 +3556,7 @@ impl ::core::fmt::Debug for ListFlowsRequest {
             .field("unified_asset_ids", &self.unified_asset_ids)
             .field("page_token", &self.page_token)
             .field("order_by", &self.order_by)
+            .field("participation", &self.participation)
             .field("account_selector", &self.account_selector)
             .finish()
     }
@@ -3489,6 +3666,12 @@ impl ::buffa::Message for ListFlowsRequest {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3583,6 +3766,12 @@ impl ::buffa::Message for ListFlowsRequest {
             let val = self.order_by.to_i32();
             if val != 0 {
                 ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(14u32, val, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -3777,6 +3966,15 @@ impl ::buffa::Message for ListFlowsRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.participation = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3797,6 +3995,7 @@ impl ::buffa::Message for ListFlowsRequest {
         self.unified_asset_ids.clear();
         self.page_token.clear();
         self.order_by = ::buffa::EnumValue::from(0);
+        self.participation = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3852,6 +4051,9 @@ impl<'de> serde::Deserialize<'de> for ListFlowsRequest {
                 > = None;
                 let mut __f_order_by: ::core::option::Option<
                     ::buffa::EnumValue<ListOrderBy>,
+                > = None;
+                let mut __f_participation: ::core::option::Option<
+                    ::buffa::EnumValue<FlowParticipation>,
                 > = None;
                 let mut __oneof_account_selector: ::core::option::Option<
                     __buffa::oneof::list_flows_request::AccountSelector,
@@ -4053,6 +4255,24 @@ impl<'de> serde::Deserialize<'de> for ListFlowsRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "participation" => {
+                            __f_participation = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::EnumValue<FlowParticipation>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::EnumValue<FlowParticipation>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_enum::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "ownerAccountId" | "owner_account_id" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
@@ -4147,6 +4367,9 @@ impl<'de> serde::Deserialize<'de> for ListFlowsRequest {
                 }
                 if let ::core::option::Option::Some(v) = __f_order_by {
                     __r.order_by = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_participation {
+                    __r.participation = v;
                 }
                 __r.account_selector = __oneof_account_selector;
                 Ok(__r)
@@ -5554,6 +5777,20 @@ pub struct FlowSummaryView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_delayed: bool,
+    /// How the account selected by a ListFlows request takes part in this flow:
+    /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+    /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
+    /// Each flow appears once with one participation. Unspecified when the
+    /// response is not scoped to an account, such as ListFlows without an account
+    /// selector, flow detail, and realtime updates.
+    ///
+    /// Field 37: `participation`
+    #[serde(
+        rename = "participation",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub participation: ::buffa::EnumValue<FlowParticipation>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5591,6 +5828,7 @@ impl ::core::fmt::Debug for FlowSummaryView {
             .field("progress_timeline", &self.progress_timeline)
             .field("estimated_completion_unix_ms", &self.estimated_completion_unix_ms)
             .field("is_delayed", &self.is_delayed)
+            .field("participation", &self.participation)
             .finish()
     }
 }
@@ -5790,6 +6028,12 @@ impl ::buffa::Message for FlowSummaryView {
         if self.is_delayed {
             size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5917,6 +6161,12 @@ impl ::buffa::Message for FlowSummaryView {
         }
         if self.is_delayed {
             ::buffa::types::put_bool_field(36u32, self.is_delayed, buf);
+        }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(37u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6175,6 +6425,15 @@ impl ::buffa::Message for FlowSummaryView {
                 )?;
                 self.is_delayed = ::buffa::types::decode_bool(buf)?;
             }
+            37u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.participation = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6213,6 +6472,7 @@ impl ::buffa::Message for FlowSummaryView {
         self.smart_account_address.clear();
         self.zipper_reason = ::buffa::MessageField::none();
         self.is_delayed = false;
+        self.participation = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10138,8 +10398,10 @@ pub mod __buffa {
             /// Field 11: `unified_asset_ids`
             pub unified_asset_ids: ::buffa::RepeatedView<'a, u32>,
             /// Opaque keyset cursor returned by a previous response. The cursor is
-            /// exclusive and bound to the caller, filters, account selector, sort
-            /// direction, and ordering timestamp.
+            /// exclusive and bound to the request it was returned for: the account
+            /// selector, participation, every filter including scope, sort direction,
+            /// and ordering timestamp. Send it with that same request; only `limit` may
+            /// change. A cursor sent with any other request is rejected as invalid.
             ///
             /// Field 12: `page_token`
             pub page_token: &'a str,
@@ -10147,6 +10409,14 @@ pub mod __buffa {
             ///
             /// Field 13: `order_by`
             pub order_by: ::buffa::EnumValue<super::super::ListOrderBy>,
+            /// Optional participation filter for the selected account. Unspecified
+            /// returns the flows the account owns and the transfers it receives.
+            /// `PARTICIPATION_OWNER` returns only the flows it owns, and
+            /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
+            /// account. Requires `owner_account_id` or `smart_account_address`.
+            ///
+            /// Field 14: `participation`
+            pub participation: ::buffa::EnumValue<super::super::FlowParticipation>,
             pub account_selector: ::core::option::Option<
                 super::super::__buffa::view::oneof::list_flows_request::AccountSelector<
                     'a,
@@ -10248,6 +10518,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.order_by = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.participation = ::buffa::EnumValue::from(
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
@@ -10388,6 +10667,7 @@ pub mod __buffa {
                     unified_asset_ids: self.unified_asset_ids.to_vec(),
                     page_token: self.page_token.to_string(),
                     order_by: self.order_by,
+                    participation: self.participation,
                     account_selector: self
                         .account_selector
                         .as_ref()
@@ -10509,6 +10789,12 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -10606,6 +10892,12 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(13u32, val, buf);
                     }
                 }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(14u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -10683,6 +10975,11 @@ pub mod __buffa {
                     &self.order_by,
                 ) {
                     __map.serialize_entry("orderBy", &self.order_by)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.participation,
+                ) {
+                    __map.serialize_entry("participation", &self.participation)?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.account_selector {
                     match __ov {
@@ -10865,8 +11162,10 @@ pub mod __buffa {
                 &self.0.reborrow().unified_asset_ids
             }
             /// Opaque keyset cursor returned by a previous response. The cursor is
-            /// exclusive and bound to the caller, filters, account selector, sort
-            /// direction, and ordering timestamp.
+            /// exclusive and bound to the request it was returned for: the account
+            /// selector, participation, every filter including scope, sort direction,
+            /// and ordering timestamp. Send it with that same request; only `limit` may
+            /// change. A cursor sent with any other request is rejected as invalid.
             ///
             /// Field 12: `page_token`
             #[must_use]
@@ -10879,6 +11178,19 @@ pub mod __buffa {
             #[must_use]
             pub fn order_by(&self) -> ::buffa::EnumValue<super::super::ListOrderBy> {
                 self.0.reborrow().order_by
+            }
+            /// Optional participation filter for the selected account. Unspecified
+            /// returns the flows the account owns and the transfers it receives.
+            /// `PARTICIPATION_OWNER` returns only the flows it owns, and
+            /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
+            /// account. Requires `owner_account_id` or `smart_account_address`.
+            ///
+            /// Field 14: `participation`
+            #[must_use]
+            pub fn participation(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::FlowParticipation> {
+                self.0.reborrow().participation
             }
             /// Oneof `account_selector`.
             #[must_use]
@@ -12874,6 +13186,15 @@ pub mod __buffa {
             ///
             /// Field 36: `is_delayed`
             pub is_delayed: bool,
+            /// How the account selected by a ListFlows request takes part in this flow:
+            /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+            /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
+            /// Each flow appears once with one participation. Unspecified when the
+            /// response is not scoped to an account, such as ListFlows without an account
+            /// selector, flow detail, and realtime updates.
+            ///
+            /// Field 37: `participation`
+            pub participation: ::buffa::EnumValue<super::super::FlowParticipation>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for FlowSummaryViewView<'a> {
@@ -13232,6 +13553,15 @@ pub mod __buffa {
                         )?;
                         view.is_delayed = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    37u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.participation = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     26u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -13345,6 +13675,7 @@ pub mod __buffa {
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     estimated_completion_unix_ms: self.estimated_completion_unix_ms,
                     is_delayed: self.is_delayed,
+                    participation: self.participation,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -13545,6 +13876,12 @@ pub mod __buffa {
                 if self.is_delayed {
                     size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -13729,6 +14066,12 @@ pub mod __buffa {
                 }
                 if self.is_delayed {
                     ::buffa::types::put_bool_field(36u32, self.is_delayed, buf);
+                }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(37u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13950,6 +14293,11 @@ pub mod __buffa {
                 }
                 if self.is_delayed {
                     __map.serialize_entry("isDelayed", &self.is_delayed)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.participation,
+                ) {
+                    __map.serialize_entry("participation", &self.participation)?;
                 }
                 __map.end()
             }
@@ -14310,6 +14658,20 @@ pub mod __buffa {
             #[must_use]
             pub fn is_delayed(&self) -> bool {
                 self.0.reborrow().is_delayed
+            }
+            /// How the account selected by a ListFlows request takes part in this flow:
+            /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+            /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
+            /// Each flow appears once with one participation. Unspecified when the
+            /// response is not scoped to an account, such as ListFlows without an account
+            /// selector, flow detail, and realtime updates.
+            ///
+            /// Field 37: `participation`
+            #[must_use]
+            pub fn participation(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::FlowParticipation> {
+                self.0.reborrow().participation
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<FlowSummaryViewView<'static>>>
@@ -18028,7 +18390,9 @@ pub mod __buffa {
             #[allow(unused_imports)]
             use super::*;
             /// Optional account selector. Omit to list across accounts the caller is
-            /// allowed to inspect.
+            /// allowed to inspect. A selected account matches the flows it owns and the
+            /// transfers it receives from other accounts; use `participation` to narrow
+            /// to one of them.
             #[derive(Clone, PartialEq, Debug)]
             pub enum AccountSelector {
                 OwnerAccountId(u64),
