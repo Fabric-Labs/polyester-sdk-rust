@@ -763,3 +763,101 @@ async fn future_typed_code_keeps_its_label_on_a_recognised_refusal_control() {
         }
     }
 }
+
+/// POLY-8757: a REST 403 that names a service refusal denies the operation,
+/// so it is a permission refusal, not a rejected API key.
+#[tokio::test(flavor = "multi_thread")]
+async fn poly_8757_rest_service_refusal_is_a_permission_refusal() {
+    for code in ["SUBACCOUNT_READ_FORBIDDEN", "QUICKSWAP_NOT_PERMITTED"] {
+        for op in OPS {
+            let case = format!("{code}/{op}");
+            let body = json!({"code": code, "detail": "not allowed"}).to_string();
+            let (err, calls) = call(op, 403, PROBLEM, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            let path = if op == "read" { READ_PATH } else { WRITE_PATH };
+            match &err {
+                Error::PermissionDenied {
+                    status,
+                    code: denied,
+                    message,
+                    context,
+                    endpoint,
+                    ..
+                } => {
+                    assert_eq!(
+                        (*status, denied.as_str(), message.as_str()),
+                        (403, code, "not allowed"),
+                        "{case}"
+                    );
+                    assert_eq!(endpoint, path, "{case}");
+                    assert_eq!(context, path.trim_start_matches('/'), "{case}");
+                }
+                other => panic!("{case}: expected PermissionDenied, got {other:?}"),
+            }
+            assert_eq!(err.auth_code(), None, "{case}");
+            assert_eq!(
+                err.http_problem().map(|problem| problem.code),
+                Some(code.to_owned()),
+                "{case}"
+            );
+            assert_flags(&err, false, false, &case);
+            assert_eq!(calls, 1, "{case}");
+        }
+    }
+}
+
+/// POLY-8757 control: a credential refusal stays a rejected API key, at 401
+/// or 403.
+#[tokio::test(flavor = "multi_thread")]
+async fn poly_8757_credential_refusal_stays_api_key_rejected_control() {
+    for (status, code) in [
+        (401, "IP_NOT_ALLOWED"),
+        (403, "IP_NOT_ALLOWED"),
+        (401, "SIGNATURE_INVALID"),
+        (403, "KEY_DISABLED"),
+    ] {
+        let case = format!("{status}/{code}");
+        let body = json!({"code": code, "detail": "d"}).to_string();
+        let (err, calls) = call("write", status, PROBLEM, &body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+        assert!(
+            matches!(&err, Error::ApiKeyRejected { status: s, code: c, .. } if *s == status && c == code),
+            "{case}: {err:?}"
+        );
+        assert_eq!(
+            err.auth_code(),
+            polyester::errors::auth_codes::from_rest_code(code),
+            "{case}"
+        );
+        assert_flags(&err, false, false, &case);
+        assert_eq!(calls, 1, "{case}");
+    }
+}
+
+/// POLY-8756: the documented HTTP 400 `MISSING_HEADERS` problem keeps its
+/// auth reason, as the HTTP 401 one does.
+#[tokio::test(flavor = "multi_thread")]
+async fn poly_8756_missing_headers_keeps_its_auth_reason_at_400() {
+    use polyester::proto::auth::v1::AuthErrorCode;
+
+    for status in [400, 401] {
+        for op in OPS {
+            let case = format!("{status}/{op}");
+            let body = json!({"code": "MISSING_HEADERS", "detail": "d"}).to_string();
+            let (err, calls) = call(op, status, PROBLEM, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert_eq!(
+                err.auth_code(),
+                Some(AuthErrorCode::AUTH_MISSING_HEADERS),
+                "{case}: {err:?}"
+            );
+            assert_flags(&err, false, false, &case);
+            assert_eq!(calls, 1, "{case}");
+        }
+    }
+    // Control: the documented 400 skew problem keeps its typed reason too.
+    let body = json!({"code": "TIMESTAMP_SKEW", "detail": "d"}).to_string();
+    let (err, _) = call("write", 400, PROBLEM, &body, None).await;
+    let err = err.expect("skew error");
+    assert_eq!(err.auth_code(), Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW));
+}

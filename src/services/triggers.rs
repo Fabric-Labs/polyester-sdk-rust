@@ -1907,4 +1907,145 @@ mod tests {
         assert_eq!(wire.trigger_price_ticks, Some(46_000_000_000_000));
         assert_eq!(wire.symbol_id, 0);
     }
+
+    fn twap_create(order_type: CreateOrderType) -> CreateTriggerParams {
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.01", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::Twap;
+        params.side = CreateSide::Sell;
+        params.order_type = order_type;
+        params.trigger_price = None;
+        params.time_in_force = None;
+        params.twap_duration_ms = Some(60_000);
+        params.twap_slice_interval_ms = Some(10_000);
+        if order_type == CreateOrderType::Market {
+            params.limit_price = None;
+        }
+        params
+    }
+
+    fn ladder_create() -> CreateTriggerParams {
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        params.trigger_type = CreateTriggerType::Ladder;
+        params.trigger_price = None;
+        params.limit_price = None;
+        params.time_in_force = None;
+        params.ladder_price_min =
+            Some(crate::Price::from_decimal_str("48000", Some("BTC-USDT".into())).unwrap());
+        params.ladder_price_max =
+            Some(crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap());
+        params.ladder_levels = Some(4);
+        params
+    }
+
+    /// POLY-8758: no trigger child has a GTD execution, so a selected Gtd is
+    /// refused for every strategy instead of being sent as IOC or GTC.
+    #[test]
+    fn poly_8758_gtd_is_refused_for_every_trigger_strategy() {
+        let client = client();
+        let limit_stop = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        let cases = [
+            ("market stop", market_stop(CreateSide::Sell)),
+            ("limit stop", limit_stop),
+            ("twap market", twap_create(CreateOrderType::Market)),
+            ("twap limit", twap_create(CreateOrderType::Limit)),
+            ("trailing stop", trailing_create(None)),
+            ("ladder", ladder_create()),
+        ];
+        for (label, params) in cases {
+            // Control: the strategy encodes without a time in force.
+            client
+                .triggers
+                .encode_create_params(&params)
+                .unwrap_or_else(|e| panic!("{label} without time_in_force: {e}"));
+            let gtd = CreateTriggerParams {
+                time_in_force: Some(CreateTimeInForce::Gtd),
+                ..params
+            };
+            match client.triggers.encode_create_params(&gtd) {
+                Err(Error::Validation(message)) => {
+                    assert!(message.contains("Gtd"), "{label}: {message}")
+                }
+                other => panic!("{label} with Gtd: expected a validation error, got {other:?}"),
+            }
+        }
+
+        // The selections each strategy supports still encode.
+        for (label, params, tif) in [
+            (
+                "market stop ioc",
+                market_stop(CreateSide::Sell),
+                CreateTimeInForce::Ioc,
+            ),
+            (
+                "twap limit gtc",
+                twap_create(CreateOrderType::Limit),
+                CreateTimeInForce::Gtc,
+            ),
+            ("ladder gtc", ladder_create(), CreateTimeInForce::Gtc),
+        ] {
+            let params = CreateTriggerParams {
+                time_in_force: Some(tif),
+                ..params
+            };
+            client
+                .triggers
+                .encode_create_params(&params)
+                .unwrap_or_else(|e| panic!("{label}: {e}"));
+        }
+    }
+
+    /// POLY-8748: a TWAP market child's tick cap is positive, as every other
+    /// create-time tick cap is.
+    #[test]
+    fn poly_8748_twap_market_refuses_nonpositive_slippage_ticks() {
+        let client = client();
+        for ticks in [-5, 0] {
+            let mut params = twap_create(CreateOrderType::Market);
+            params.max_slippage_ticks = Some(ticks);
+            match client.triggers.encode_create_params(&params) {
+                Err(Error::Validation(message)) => {
+                    assert!(message.contains("max_slippage_ticks"), "{ticks}: {message}")
+                }
+                other => {
+                    panic!("max_slippage_ticks={ticks}: expected a validation error, got {other:?}")
+                }
+            }
+        }
+
+        let mut params = twap_create(CreateOrderType::Market);
+        params.max_slippage_ticks = Some(1);
+        let req = client.triggers.encode_create_params(&params).unwrap();
+        let Some(trigger_intent::Strategy::Twap(twap)) =
+            req.trigger.as_option().and_then(|t| t.strategy.as_ref())
+        else {
+            panic!("expected twap strategy");
+        };
+        let Some(twap_trigger::Execution::MarketIoc(ioc)) = twap.execution.as_ref() else {
+            panic!("expected market_ioc");
+        };
+        assert_eq!(
+            ioc.max_slippage,
+            Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(1))
+        );
+
+        // Controls: no cap sends none, and two caps are still refused.
+        let params = twap_create(CreateOrderType::Market);
+        client.triggers.encode_create_params(&params).unwrap();
+        let mut both = twap_create(CreateOrderType::Market);
+        both.max_slippage_ticks = Some(1);
+        both.max_slippage_bps = Some(1);
+        assert!(client.triggers.encode_create_params(&both).is_err());
+    }
 }

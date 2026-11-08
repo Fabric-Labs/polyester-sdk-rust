@@ -144,6 +144,7 @@ pub fn internal_transfer_from_proto(
 mod tests {
     use super::*;
     use crate::proto::polyester::r#type::v1::U128;
+    use crate::proto::transfer::v1::InternalTransferStatus;
 
     #[test]
     fn deposit_addresses_list_maps_rows() {
@@ -191,6 +192,36 @@ mod tests {
             result.quantity.as_ref().unwrap().as_scaled(),
             1_000_000_000_000_000_000
         );
+    }
+
+    fn one_token_receipt(status: InternalTransferStatus) -> CreateInternalTransferResponse {
+        CreateInternalTransferResponse {
+            request_id: "req".into(),
+            transfer_id: "xfer".into(),
+            asset_id: 7,
+            asset_code: "USDT".into(),
+            amount_e18: U128 {
+                hi: 0,
+                lo: 1_000_000_000_000_000_000,
+                ..Default::default()
+            }
+            .into(),
+            status: status.into(),
+            ..Default::default()
+        }
+    }
+
+    /// POLY-8824: receipts that differ only in their status decode to
+    /// different results.
+    #[test]
+    fn poly_8824_internal_transfer_receipt_keeps_its_status() {
+        let decode = |status| internal_transfer_from_proto(&one_token_receipt(status)).unwrap();
+        let accepted = decode(InternalTransferStatus::Accepted);
+        let rejected = decode(InternalTransferStatus::Rejected);
+        let failed = decode(InternalTransferStatus::Failed);
+        assert_ne!(accepted, rejected);
+        assert_ne!(accepted, failed);
+        assert_ne!(rejected, failed);
     }
 
     #[test]
