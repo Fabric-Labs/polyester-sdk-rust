@@ -54,6 +54,10 @@ pub struct Config {
     /// Allow non-loopback `http://` / `ws://` endpoints. Loopback plaintext
     /// stays allowed without this flag.
     pub allow_insecure_http: bool,
+    /// Receive window of every signed request, in milliseconds (1 to 60000),
+    /// sent as the signed `X-API-RECV-WINDOW` header. `None` sends none, and
+    /// the server applies 10000.
+    pub recv_window_ms: Option<u32>,
 }
 
 impl Default for Config {
@@ -64,6 +68,7 @@ impl Default for Config {
             timeout: Duration::from_secs(10),
             wire_format: WireFormat::Binary,
             allow_insecure_http: false,
+            recv_window_ms: None,
         }
     }
 }
@@ -633,6 +638,10 @@ fn rest_auth_problem(code: &str) -> Option<(ErrorCode, crate::proto::auth::v1::A
             ErrorCode::PermissionDenied,
             AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED,
         )),
+        "REPLAY_CAPACITY_EXHAUSTED" | auth_codes::REPLAY_CAPACITY_EXHAUSTED => Some((
+            ErrorCode::ResourceExhausted,
+            AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED,
+        )),
         _ => None,
     }
 }
@@ -685,6 +694,7 @@ pub struct Factory {
 
 impl Factory {
     pub fn new(config: Config, credentials: Option<Credentials>) -> Result<Self> {
+        auth::validate_recv_window_ms(config.recv_window_ms)?;
         let parsed = validate_http_url(&config.api_url, config.allow_insecure_http)?;
         if parsed.query().is_some() || parsed.fragment().is_some() {
             return Err(Error::validation(
@@ -749,7 +759,13 @@ impl Factory {
             WireFormat::Json => connectrpc::JsonCodec::encode(request).map_err(Self::map_error)?,
         };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
-        let headers = creds.sign_request("POST", &sign_url, &body, None)?;
+        let headers = creds.sign_request_with_recv_window(
+            "POST",
+            &sign_url,
+            &body,
+            None,
+            self.config.recv_window_ms,
+        )?;
         let mut opts = CallOptions::default().with_header(USER_AGENT, user_agent());
         for (k, v) in headers {
             opts = opts.with_header(k, v);
@@ -771,7 +787,13 @@ impl Factory {
         };
         let sign_url = auth::request_url(&self.config.api_url, procedure);
         let headers = creds
-            .sign_request_async("POST", &sign_url, &body, None)
+            .sign_request_with_recv_window_async(
+                "POST",
+                &sign_url,
+                &body,
+                None,
+                self.config.recv_window_ms,
+            )
             .await?;
         let mut opts = CallOptions::default().with_header(USER_AGENT, user_agent());
         for (k, v) in headers {

@@ -251,6 +251,25 @@ pub mod auth_codes {
     pub const IP_NOT_ALLOWED: &str = "AUTH_IP_NOT_ALLOWED";
     /// The API does not accept API keys.
     pub const API_KEY_NOT_ACCEPTED: &str = "AUTH_API_KEY_NOT_ACCEPTED";
+    /// The `X-API-RECV-WINDOW` header is not one whole number of milliseconds
+    /// from 1 to 60000, is empty, or is repeated (REST `RECV_WINDOW_INVALID`,
+    /// HTTP 401; ConnectRPC `unauthenticated`). An
+    /// [`super::Error::ApiKeyRejected`]: the request was not processed and
+    /// the same header is refused again, so fix `Config::recv_window_ms`. See
+    /// [`super::Error::is_recv_window_invalid`].
+    pub const RECV_WINDOW_INVALID: &str = "AUTH_RECV_WINDOW_INVALID";
+    /// The API key, or its account, holds its full share of the record that
+    /// keeps signed requests from being replayed until their receive windows
+    /// end (REST `REPLAY_CAPACITY_EXHAUSTED`, HTTP 429; ConnectRPC
+    /// `resource_exhausted` with `auth.v1.AuthErrorDetail`). It is an
+    /// [`super::Error::RateLimit`] with this code, not an authentication
+    /// failure: the credentials are valid, the request was not processed, and
+    /// the share frees as earlier windows end, so it is retryable. It carries
+    /// no `Retry-After`: back off briefly and send again, which signs again
+    /// with a fresh timestamp. A shorter `Config::recv_window_ms` makes room
+    /// sooner. See
+    /// [`super::Error::is_replay_capacity_exhausted`].
+    pub const REPLAY_CAPACITY_EXHAUSTED: &str = "AUTH_REPLAY_CAPACITY_EXHAUSTED";
     /// A valid signed wallet login named an account address no account uses,
     /// and the signing wallet is already linked to another account
     /// (ConnectRPC `already_exists`, REST 409). Wallets are not moved between
@@ -314,6 +333,13 @@ pub mod order_codes {
     /// order's. A cancel by client order ID more than a minute after the
     /// order ended can answer this once the ID no longer names the order.
     pub const ORDER_UNKNOWN: &str = "ERROR_CODE_ORDER_UNKNOWN";
+    /// An order or trigger write whose receive window ended before it was
+    /// sent on for admission (308; REST 400 `REQUEST_DEADLINE_EXCEEDED`,
+    /// ConnectRPC `failed_precondition`). It passed authentication, but
+    /// nothing changed and it is never an unknown outcome: it is retryable,
+    /// and sending it again signs it with a fresh timestamp. See
+    /// [`super::Error::is_request_deadline_exceeded`].
+    pub const REQUEST_DEADLINE_EXCEEDED: &str = "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED";
 
     /// A mutation that was sent but not confirmed in time; it may still
     /// apply. The server returns these as Connect `deadline_exceeded` with
@@ -358,13 +384,14 @@ pub mod order_codes {
 /// API-key credential refusals a service answers with an
 /// `auth.v1.AuthErrorDetail`. They map to [`Error::ApiKeyRejected`], as the
 /// API gateway's answers for the same reasons do.
-const API_KEY_REJECTIONS: [AuthErrorCode; 6] = [
+const API_KEY_REJECTIONS: [AuthErrorCode; 7] = [
     AuthErrorCode::AUTH_SIGNATURE_INVALID,
     AuthErrorCode::AUTH_MISSING_HEADERS,
     AuthErrorCode::AUTH_KEY_EXPIRED,
     AuthErrorCode::AUTH_KEY_DISABLED,
     AuthErrorCode::AUTH_IP_NOT_ALLOWED,
     AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
+    AuthErrorCode::AUTH_RECV_WINDOW_INVALID,
 ];
 
 /// Whether a REST or API-gateway `code` refuses the API key's credentials,
@@ -602,8 +629,9 @@ impl Error {
     /// Unknown mutation outcomes always return false, including bare server
     /// and transport failures. Read back before sending a mutation again;
     /// safe reads may retry explicitly. A client order ID enables lookup,
-    /// not exact replay. Explicit admission refusals, timestamp skew and
-    /// account repairing may retry.
+    /// not exact replay. Explicit admission refusals, rate refusals
+    /// (including replay capacity), timestamp skew, a request deadline
+    /// exceeded before admission and account repairing may retry.
     pub fn is_retryable(&self) -> bool {
         if self.mutation_outcome_unknown() {
             return false;
@@ -615,6 +643,7 @@ impl Error {
             Self::Api { code, .. } => {
                 code == auth_codes::TEMPORARILY_UNAVAILABLE
                     || code == order_codes::ACCOUNT_REPAIRING
+                    || code == order_codes::REQUEST_DEADLINE_EXCEEDED
             }
             _ => false,
         }
@@ -653,11 +682,16 @@ impl Error {
 
     /// Structured error code: the auth.v1.AuthErrorDetail (or other service)
     /// code of an [`Error::Api`], the code of an [`Error::ApiKeyRejected`],
-    /// `TIMESTAMP_SKEW` for [`Error::TimestampSkew`] and
-    /// `AUTH_SESSION_KIND_NOT_ALLOWED` for [`Error::SessionRequired`].
+    /// `TIMESTAMP_SKEW` for [`Error::TimestampSkew`],
+    /// `AUTH_SESSION_KIND_NOT_ALLOWED` for [`Error::SessionRequired`], and the
+    /// auth code of an [`Error::RateLimit`], such as
+    /// `AUTH_REPLAY_CAPACITY_EXHAUSTED`.
     pub fn auth_error_code(&self) -> Option<&str> {
         match self {
             Self::Api { code, .. } | Self::ApiKeyRejected { code, .. } => Some(code.as_str()),
+            Self::RateLimit {
+                code: Some(code), ..
+            } if code.starts_with("AUTH_") => Some(code.as_str()),
             Self::TimestampSkew { .. } => Some(auth_codes::TIMESTAMP_SKEW),
             Self::SessionRequired { .. } => Some(auth_codes::SESSION_KIND_NOT_ALLOWED),
             _ => None,
@@ -680,6 +714,9 @@ impl Error {
             Self::Api { code, .. }
             | Self::ApiKeyRejected { code, .. }
             | Self::PermissionDenied { code, .. } => auth_codes::from_rest_code(code),
+            Self::RateLimit {
+                code: Some(code), ..
+            } => AuthErrorCode::from_proto_name(code),
             Self::TimestampSkew { .. } => Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW),
             Self::SessionRequired { .. } => Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED),
             _ => None,
@@ -715,6 +752,27 @@ impl Error {
     /// reduce the body to fit the limit.
     pub fn is_request_too_large(&self) -> bool {
         matches!(self, Self::Api { code, .. } if code == problem_codes::REQUEST_TOO_LARGE)
+    }
+
+    /// True when the request's `X-API-RECV-WINDOW` header was refused
+    /// ([`auth_codes::RECV_WINDOW_INVALID`]). Not retryable without fixing
+    /// the window.
+    pub fn is_recv_window_invalid(&self) -> bool {
+        self.auth_code() == Some(AuthErrorCode::AUTH_RECV_WINDOW_INVALID)
+    }
+
+    /// True when the API key's or account's share of the replay record is
+    /// full ([`auth_codes::REPLAY_CAPACITY_EXHAUSTED`]). Retryable after a
+    /// short backoff.
+    pub fn is_replay_capacity_exhausted(&self) -> bool {
+        matches!(self, Self::RateLimit { code: Some(code), .. } if code == auth_codes::REPLAY_CAPACITY_EXHAUSTED)
+    }
+
+    /// True when a write's receive window ended before admission
+    /// ([`order_codes::REQUEST_DEADLINE_EXCEEDED`]). Nothing changed;
+    /// retryable.
+    pub fn is_request_deadline_exceeded(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == order_codes::REQUEST_DEADLINE_EXCEEDED)
     }
 
     /// True when a wallet login was refused because the wallet is already
@@ -1161,6 +1219,20 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         status,
                         problem: None,
                     };
+                }
+                Some(AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED) => {
+                    // Valid credentials, not processed: a retryable rate refusal.
+                    let message = if auth_detail.message.is_empty() {
+                        fallback_message
+                    } else {
+                        auth_detail.message
+                    };
+                    return rate_limit_error(
+                        message,
+                        None,
+                        header_retry,
+                        Some(auth_codes::REPLAY_CAPACITY_EXHAUSTED.to_owned()),
+                    );
                 }
                 Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED) => {
                     return Error::SessionRequired {

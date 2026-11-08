@@ -47,6 +47,17 @@ pub struct Config {
     pub hydrate_catalogs: bool,
     /// Allow non-loopback `http://` / `ws://` endpoints.
     pub allow_insecure_http: bool,
+    /// Receive window of every signed API request, in milliseconds, sent as
+    /// the signed `X-API-RECV-WINDOW` header: the server processes a request
+    /// only until its signing timestamp plus the window, and refuses it after
+    /// that, having changed nothing, as the retryable
+    /// [`crate::Error::TimestampSkew`], or
+    /// [`crate::order_codes::REQUEST_DEADLINE_EXCEEDED`] once authenticated.
+    /// It must be from 1 to 60000; [`Client::new`] refuses any other value
+    /// with [`crate::Error::Validation`]. `None`, the default, sends no header,
+    /// and the server applies 10000. Realtime token requests always use the
+    /// default.
+    pub recv_window_ms: Option<u32>,
 }
 
 impl std::fmt::Debug for Config {
@@ -75,6 +86,7 @@ impl std::fmt::Debug for Config {
             .field("wire_format", &self.wire_format)
             .field("hydrate_catalogs", &self.hydrate_catalogs)
             .field("allow_insecure_http", &self.allow_insecure_http)
+            .field("recv_window_ms", &self.recv_window_ms)
             .finish()
     }
 }
@@ -93,6 +105,7 @@ impl Default for Config {
             wire_format: WireFormat::Binary,
             hydrate_catalogs: true,
             allow_insecure_http: false,
+            recv_window_ms: None,
         }
     }
 }
@@ -178,6 +191,7 @@ impl Client {
             timeout: config.timeout,
             wire_format: config.wire_format,
             allow_insecure_http: config.allow_insecure_http,
+            recv_window_ms: config.recv_window_ms,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());
@@ -281,6 +295,7 @@ impl Client {
             timeout: config.timeout,
             wire_format: config.wire_format,
             allow_insecure_http: config.allow_insecure_http,
+            recv_window_ms: config.recv_window_ms,
         };
         let factory = Factory::new(transport_cfg, credentials.clone())?;
         let catalogs = Arc::new(CatalogManager::new());

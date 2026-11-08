@@ -5,8 +5,8 @@ use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{LifecycleFlowSummary, LifecycleFlowsList, ZipperReasonDetails};
 use crate::proto::chain::lifecycle::v1::{
-    FlowKind as FlowKindEnum, FlowStep, FlowSummaryView, FlowTxMatchView, GetFlowResponse,
-    LifecycleReason, ListFlowsByTxResponse, ListFlowsResponse,
+    FlowKind as FlowKindEnum, FlowParticipation, FlowStep, FlowSummaryView, FlowTxMatchView,
+    GetFlowResponse, LifecycleReason, ListFlowsByTxResponse, ListFlowsResponse,
 };
 use crate::proto::chain::zipper::v1::ZipperReasonDetails as ProtoZipperReasonDetails;
 
@@ -94,6 +94,17 @@ fn flow_step_label(value: &buffa::EnumValue<FlowStep>) -> String {
     }
 }
 
+/// Names a `FlowParticipation` the way REST spells it, lowercased. A value
+/// newer than this SDK reads `unknown_participation_<n>`, never unspecified.
+fn flow_participation_label(value: &buffa::EnumValue<FlowParticipation>) -> String {
+    match value.as_known() {
+        Some(FlowParticipation::PARTICIPATION_UNSPECIFIED) => "unspecified".to_owned(),
+        Some(FlowParticipation::PARTICIPATION_OWNER) => "owner".to_owned(),
+        Some(FlowParticipation::PARTICIPATION_RECIPIENT) => "recipient".to_owned(),
+        None => format!("unknown_participation_{}", value.to_i32()),
+    }
+}
+
 fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
     LifecycleFlowSummary {
         intent_id: msg.flow_id.clone(),
@@ -106,6 +117,9 @@ fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
         zipper_reason: msg.zipper_reason.as_option().map(zipper_reason_from_proto),
+        participation: flow_participation_label(&msg.participation),
+        source_address: msg.source_address.clone(),
+        destination_address: msg.destination_address.clone(),
     }
 }
 
@@ -133,6 +147,10 @@ fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
         zipper_reason: msg.zipper_reason.as_option().map(zipper_reason_from_proto),
+        // Transaction lookups do not report participation.
+        participation: String::new(),
+        source_address: msg.source_address.clone(),
+        destination_address: msg.destination_address.clone(),
     }
 }
 

@@ -27,6 +27,19 @@ pub struct LifecycleFlowSummary {
     /// `unknown_reason_<n>` for open-enum forward compatibility).
     pub lifecycle_reason: String,
     pub zipper_reason: Option<ZipperReasonDetails>,
+    /// How the selected account takes part in the flow, on a `list_flows` row
+    /// of a list that selects an account: `owner` (its deposit, withdrawal or
+    /// a transfer it sent, including a move between its own balances) or
+    /// `recipient` (a transfer another account sent to it). `unspecified` on
+    /// an unscoped list, a flow detail and a realtime update; empty on a
+    /// transaction lookup. A value newer than this SDK reads
+    /// `unknown_participation_<n>`.
+    pub participation: String,
+    /// For a transfer, the counterparty is `destination_address` when the
+    /// account sent it and `source_address` (with `owner_account_id`) when it
+    /// received it.
+    pub source_address: String,
+    pub destination_address: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
