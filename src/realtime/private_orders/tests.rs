@@ -1062,18 +1062,20 @@ async fn ready_is_delivered_again_after_a_reconnect() {
     let retry = server.subscribe().await;
     assert_eq!(retry.cursor, "c2");
     let mut late = harness.connect(ACCOUNT);
-    expect_disconnected_free_catch_up(&mut late).await;
+    expect_quiet(&mut late, Duration::from_millis(1)).await;
     server.confirm(&retry, "s3").await;
     expect_connected(&mut consumer).await;
     expect_connected(&mut late).await;
+    expect_view_only_catch_up(&mut late).await;
     server.send("s3", 1, Ready::default()).await;
     expect_ready(&mut consumer).await;
     expect_ready(&mut late).await;
 }
 
-/// A consumer that joins while the subscription is between server
-/// subscriptions catches up on the view only: no Connected and no Ready.
-async fn expect_disconnected_free_catch_up(consumer: &mut PrivateOrdersSubscription) {
+/// A consumer that joined while the subscription was between server
+/// subscriptions catches up on the view after its Connected: no Ready until
+/// the new subscription's.
+async fn expect_view_only_catch_up(consumer: &mut PrivateOrdersSubscription) {
     assert_eq!(expect_snapshot(consumer).await, vec![order(1, 2)]);
     expect_quiet(consumer, Duration::from_millis(1)).await;
 }
@@ -1186,6 +1188,7 @@ async fn a_frame_queued_on_a_closed_outgoing_channel_reconnects() {
             id: 1,
             tx,
             ended: Arc::default(),
+            catch_up: false,
         },
     });
     // A connected subscription on a socket whose writer has already ended.
@@ -1392,4 +1395,167 @@ async fn a_confirmed_subscribe_is_not_expired() {
     }
     expect_quiet(&mut consumer, Duration::from_millis(100)).await;
     assert_eq!(harness.connect_tokens(), 1);
+}
+
+/// SplitMix64, drawn from one seed so a failing schedule replays.
+struct Schedule(u64);
+
+impl Schedule {
+    fn below(&mut self, n: u64) -> u64 {
+        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        (z ^ (z >> 31)) % n
+    }
+}
+
+fn event_kind(event: &PrivateOrdersEvent) -> &'static str {
+    match event {
+        PrivateOrdersEvent::Connected => "Connected",
+        PrivateOrdersEvent::Disconnected => "Disconnected",
+        PrivateOrdersEvent::Snapshot(_) => "Snapshot",
+        PrivateOrdersEvent::Unit(_) => "Unit",
+        PrivateOrdersEvent::Ready => "Ready",
+        PrivateOrdersEvent::Stale(_) => "Stale",
+        PrivateOrdersEvent::Error(_) => "Error",
+        #[allow(unreachable_patterns)]
+        _ => "Other",
+    }
+}
+
+/// A consumer that joins an order stream gets Connected first. Joining while
+/// the stream is disconnected, it waits for the reconnect and then gets
+/// Connected before the cached snapshot, ready and stale state, as a consumer
+/// joining a connected stream does.
+///
+/// Each schedule draws, from one seed, the cached view (orders, ready, stale),
+/// the close code, when the consumer joins (before the new socket, before its
+/// subscription is confirmed, or once reconnected), the pauses around the join,
+/// and what the resumed subscription sends next. Set
+/// `POLYESTER_INTERLEAVING_SEED` to replay a failing run and
+/// `POLYESTER_INTERLEAVINGS` to run more schedules.
+#[tokio::test(start_paused = true)]
+async fn a_consumer_joining_during_a_disconnection_gets_connected_first() {
+    use rand_core::RngCore;
+    let base = std::env::var("POLYESTER_INTERLEAVING_SEED")
+        .ok()
+        .map(|raw| {
+            raw.parse::<u64>()
+                .expect("POLYESTER_INTERLEAVING_SEED is a u64")
+        })
+        .unwrap_or_else(|| rand_core::OsRng.next_u64());
+    let count = std::env::var("POLYESTER_INTERLEAVINGS")
+        .ok()
+        .map(|raw| {
+            raw.parse::<u64>()
+                .expect("POLYESTER_INTERLEAVINGS is a u64")
+        })
+        .unwrap_or(32);
+    for offset in 0..count {
+        late_joiner_schedule(base.wrapping_add(offset)).await;
+    }
+}
+
+async fn late_joiner_schedule(seed: u64) {
+    let mut rng = Schedule(seed);
+    let cached: Vec<u64> = (1..=rng.below(4)).collect();
+    let ready = rng.below(2) == 0;
+    let stale = rng.below(2) == 0;
+    let close = [4408u16, 1001, 4401][rng.below(3) as usize];
+    let join = [
+        "before_socket",
+        "before_confirm",
+        "before_confirm",
+        "reconnected",
+    ][rng.below(4) as usize];
+    let pause = Duration::from_micros(rng.below(20_000));
+    let after = ["nothing", "ready", "snapshot", "available"][rng.below(4) as usize];
+    let detail = format!(
+        "seed={seed} orders={} ready={ready} stale={stale} close={close} join={join} after={after}: replay with POLYESTER_INTERLEAVING_SEED",
+        cached.len()
+    );
+
+    let mut harness = Harness::new();
+    let mut first = harness.connect(ACCOUNT);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut first).await;
+    let mut seq = server.snapshot("s1", 1, "c1", &cached).await;
+    expect_snapshot(&mut first).await;
+    if ready {
+        server.send("s1", seq, Ready::default()).await;
+        seq += 1;
+        expect_ready(&mut first).await;
+    }
+    if stale {
+        server
+            .send(
+                "s1",
+                seq,
+                Unavailable {
+                    reason: UnavailableReason::VIEW_BEHIND.into(),
+                    ..Default::default()
+                },
+            )
+            .await;
+        expect_stale(&mut first).await;
+    }
+    server.close(close).await;
+    expect_disconnected(&mut first).await;
+
+    let mut late = None;
+    if join == "before_socket" {
+        tokio::time::sleep(pause).await;
+        late = Some(harness.connect(ACCOUNT));
+    }
+    let mut second = harness.server().await;
+    assert!(second.auth().await.starts_with("connect-"), "{detail}");
+    let request = second.subscribe().await;
+    if join == "before_confirm" {
+        tokio::time::sleep(pause).await;
+        late = Some(harness.connect(ACCOUNT));
+        tokio::time::sleep(Duration::from_micros(rng.below(20_000))).await;
+    }
+    second.confirm(&request, "s2").await;
+    expect_connected(&mut first).await;
+    if join == "reconnected" {
+        tokio::time::sleep(pause).await;
+        late = Some(harness.connect(ACCOUNT));
+    }
+    match after {
+        "ready" => second.send("s2", 1, Ready::default()).await,
+        "snapshot" => {
+            second.snapshot("s2", 1, "c2", &[9]).await;
+        }
+        "available" => second.send("s2", 1, Available::default()).await,
+        _ => {}
+    }
+    let mut late = late.expect("joined");
+    let mut events = Vec::new();
+    while let Ok(Some(event)) = tokio::time::timeout(Duration::from_millis(100), late.recv()).await
+    {
+        events.push(event);
+    }
+    let kinds: Vec<_> = events.iter().map(event_kind).collect();
+
+    assert!(
+        matches!(events.first(), Some(PrivateOrdersEvent::Connected)),
+        "first event of {kinds:?}; expected Connected first ({detail})"
+    );
+    assert_eq!(
+        kinds.iter().filter(|kind| **kind == "Connected").count(),
+        1,
+        "{kinds:?} ({detail})"
+    );
+    let want: Vec<Order> = cached.iter().map(|id| order(*id, 1)).collect();
+    assert!(
+        matches!(events.get(1), Some(PrivateOrdersEvent::Snapshot(orders)) if *orders == want),
+        "{kinds:?}; expected the cached snapshot second ({detail})"
+    );
+    if after == "snapshot" {
+        assert!(
+            matches!(events.last(), Some(PrivateOrdersEvent::Snapshot(orders)) if *orders == vec![order(9, 1)]),
+            "{kinds:?}; expected the new snapshot last ({detail})"
+        );
+    }
 }
