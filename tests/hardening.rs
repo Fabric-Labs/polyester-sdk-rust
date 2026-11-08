@@ -5,6 +5,9 @@
 
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
+#[allow(dead_code)]
+#[path = "hardening_support/centrifugo.rs"]
+mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
 mod hardening_support;

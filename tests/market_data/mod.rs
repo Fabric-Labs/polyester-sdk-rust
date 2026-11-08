@@ -1,13 +1,9 @@
 //! Heatmap and market overview reads and streams, through public paths against
 //! real local sockets.
 
-#[allow(dead_code)]
-#[path = "../hardening_support/centrifugo.rs"]
-mod centrifugo;
-
+use super::centrifugo::{Centrifugo, centrifugo_publication};
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::{Enumeration as _, Message as _};
-use centrifugo::{Centrifugo, centrifugo_publication};
 use polyester::proto::chain::zipper::v1::{
     AssetConfig as ZipperAsset, GetDepositWithdrawConfigResponse,
 };
