@@ -392,3 +392,87 @@ mod problem_contract_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod userinfo_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// An obviously fake password placed in URL userinfo.
+    const FAKE_URL_PASSWORD: &str = "fake-url-password-marker";
+
+    /// Answers every request with `status` and a JSON refusal body.
+    async fn refusing_server(status: u16) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 16 * 1024];
+                    let _ = stream.read(&mut buf).await;
+                    let body = r#"{"code":"permission_denied","message":"refused"}"#;
+                    let head = format!(
+                        "HTTP/1.1 {status} Refused\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(head.as_bytes()).await;
+                    let _ = stream.write_all(body.as_bytes()).await;
+                });
+            }
+        });
+        addr.to_string()
+    }
+
+    fn credentials() -> Credentials {
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        Credentials::new("key_userinfo", &secret_hex).unwrap()
+    }
+
+    /// Both token paths refuse with 401 and 403. Neither the error text nor a
+    /// structured endpoint may carry the password from the API URL's userinfo,
+    /// and the endpoint keeps the URL without it.
+    #[tokio::test]
+    async fn token_errors_redact_url_userinfo() {
+        for status in [401u16, 403] {
+            let host = refusing_server(status).await;
+            for userinfo in [true, false] {
+                let api_url = if userinfo {
+                    format!("http://fake-user:{FAKE_URL_PASSWORD}@{host}")
+                } else {
+                    format!("http://{host}")
+                };
+                let creds = credentials();
+                for (path, endpoint) in [
+                    ("connection", format!("http://{host}/v1/rt/token")),
+                    (
+                        "subscription",
+                        format!("http://{host}/v1/rt/subscribe?channel=orders%3A1"),
+                    ),
+                ] {
+                    let timeout = Duration::from_secs(5);
+                    let err = if path == "connection" {
+                        fetch_connection_token(&creds, &api_url, timeout, false).await
+                    } else {
+                        fetch_subscription_token(&creds, &api_url, "orders:1", timeout, false).await
+                    }
+                    .expect_err("the server refuses the token");
+                    let label = format!("{path} HTTP {status} userinfo={userinfo}");
+                    for rendered in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
+                        assert!(
+                            !rendered.contains(FAKE_URL_PASSWORD)
+                                && !rendered.contains("fake-user"),
+                            "{label}: error leaked URL userinfo: {rendered}"
+                        );
+                    }
+                    if let Error::PermissionDenied { endpoint: got, .. } = &err {
+                        assert_eq!(got, &endpoint, "{label}");
+                        assert!(
+                            err.to_string().contains(&format!("[{endpoint}]")),
+                            "{label}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

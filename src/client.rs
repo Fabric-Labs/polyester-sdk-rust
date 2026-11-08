@@ -576,6 +576,21 @@ mod tests {
     }
 
     #[test]
+    fn config_debug_redacts_url_userinfo() {
+        let config = Config {
+            api_url: "https://fake-user:fake-url-password-marker@api.example.test".into(),
+            ws_url: "wss://fake-user:fake-url-password-marker@ws.example.test".into(),
+            ..Default::default()
+        };
+        for rendered in [format!("{config:?}"), format!("{config:#?}")] {
+            assert!(!rendered.contains("fake-url-password-marker"), "{rendered}");
+            assert!(!rendered.contains("fake-user"), "{rendered}");
+            assert!(rendered.contains("api.example.test"), "{rendered}");
+            assert!(rendered.contains("ws.example.test"), "{rendered}");
+        }
+    }
+
+    #[test]
     fn ed25519_keypair_debug_redacts_secret() {
         let keypair = crate::models::Ed25519Keypair {
             public_key_hex: "abcd".into(),
