@@ -21,6 +21,8 @@ mod orderbook_depths;
 mod readable_error_bodies;
 #[path = "request_size_rate_limit/mod.rs"]
 mod request_size_rate_limit;
+#[path = "url_userinfo/mod.rs"]
+mod url_userinfo;
 
 use buffa::Message;
 use futures_util::future::FutureExt;

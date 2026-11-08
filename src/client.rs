@@ -61,8 +61,14 @@ impl std::fmt::Debug for Config {
                 "api_private_key",
                 &self.api_private_key.as_ref().map(|_| "[REDACTED]"),
             )
-            .field("api_url", &self.api_url)
-            .field("ws_url", &self.ws_url)
+            .field(
+                "api_url",
+                &crate::transport::url_without_userinfo(&self.api_url),
+            )
+            .field(
+                "ws_url",
+                &crate::transport::url_without_userinfo(&self.ws_url),
+            )
             .field("default_sub_account_id", &self.default_sub_account_id)
             .field("default_account_id", &self.default_account_id)
             .field("timeout", &self.timeout)
@@ -573,6 +579,21 @@ mod tests {
         assert!(rendered.contains("ak_test"));
         assert!(rendered.contains("[REDACTED]"));
         assert!(!rendered.contains("super-secret-private-key"));
+    }
+
+    #[test]
+    fn config_debug_redacts_url_userinfo() {
+        let config = Config {
+            api_url: "https://fake-user:fake-url-password-marker@api.example.test".into(),
+            ws_url: "wss://fake-user:fake-url-password-marker@ws.example.test".into(),
+            ..Default::default()
+        };
+        for rendered in [format!("{config:?}"), format!("{config:#?}")] {
+            assert!(!rendered.contains("fake-url-password-marker"), "{rendered}");
+            assert!(!rendered.contains("fake-user"), "{rendered}");
+            assert!(rendered.contains("api.example.test"), "{rendered}");
+            assert!(rendered.contains("ws.example.test"), "{rendered}");
+        }
     }
 
     #[test]

@@ -76,3 +76,34 @@ impl fmt::Debug for Ed25519Keypair {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keypair_debug_redacts_secret_key() {
+        let seed = [0xa0u8; 32];
+        let keypair = Ed25519Keypair {
+            public_key_hex: "ab".repeat(32),
+            secret_key_hex: hex::encode(seed),
+            public_key: vec![2; 32],
+            secret_key: seed.to_vec(),
+        };
+        let markers = [&hex::encode(&seed[..8])[..], "160, 160, 160, 160"];
+        for (path, rendered) in [
+            ("debug", format!("{keypair:?}")),
+            ("pretty debug", format!("{keypair:#?}")),
+            ("option", format!("{:?}", Some(&keypair))),
+            ("vec", format!("{:#?}", vec![keypair.clone()])),
+        ] {
+            for marker in markers {
+                assert!(
+                    !rendered.contains(marker),
+                    "{path} leaked key material: {rendered}"
+                );
+            }
+            assert!(rendered.contains("[REDACTED]"), "{path}: {rendered}");
+        }
+    }
+}
