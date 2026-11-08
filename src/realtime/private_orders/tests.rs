@@ -1062,18 +1062,20 @@ async fn ready_is_delivered_again_after_a_reconnect() {
     let retry = server.subscribe().await;
     assert_eq!(retry.cursor, "c2");
     let mut late = harness.connect(ACCOUNT);
-    expect_disconnected_free_catch_up(&mut late).await;
+    expect_quiet(&mut late, Duration::from_millis(1)).await;
     server.confirm(&retry, "s3").await;
     expect_connected(&mut consumer).await;
     expect_connected(&mut late).await;
+    expect_view_only_catch_up(&mut late).await;
     server.send("s3", 1, Ready::default()).await;
     expect_ready(&mut consumer).await;
     expect_ready(&mut late).await;
 }
 
-/// A consumer that joins while the subscription is between server
-/// subscriptions catches up on the view only: no Connected and no Ready.
-async fn expect_disconnected_free_catch_up(consumer: &mut PrivateOrdersSubscription) {
+/// A consumer that joined while the subscription was between server
+/// subscriptions catches up on the view after its Connected: no Ready until
+/// the new subscription's.
+async fn expect_view_only_catch_up(consumer: &mut PrivateOrdersSubscription) {
     assert_eq!(expect_snapshot(consumer).await, vec![order(1, 2)]);
     expect_quiet(consumer, Duration::from_millis(1)).await;
 }
@@ -1186,6 +1188,7 @@ async fn a_frame_queued_on_a_closed_outgoing_channel_reconnects() {
             id: 1,
             tx,
             ended: Arc::default(),
+            catch_up: false,
         },
     });
     // A connected subscription on a socket whose writer has already ended.

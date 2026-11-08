@@ -184,6 +184,7 @@ impl PrivateOrderStreams {
                 id,
                 tx,
                 ended: ended.clone(),
+                catch_up: false,
             },
         };
         let mut guard = super::lock_unpoisoned(&self.commands);
@@ -274,6 +275,9 @@ struct Consumer {
     id: u64,
     tx: mpsc::Sender<PrivateOrdersEvent>,
     ended: Arc<Mutex<Option<Error>>>,
+    /// Joined a subscription that was not connected: the cached view follows
+    /// its Connected.
+    catch_up: bool,
 }
 
 enum OpenFailure {
@@ -542,25 +546,21 @@ impl Actor {
         }
     }
 
-    fn add(&mut self, account: u64, consumer: Consumer) {
+    fn add(&mut self, account: u64, mut consumer: Consumer) {
         if let Some(s) = self.subs.get_mut(&account) {
-            // Give a consumer that joins a running subscription what the others already know.
-            let mut catch_up = Vec::new();
-            if s.state == State::Connected {
-                catch_up.push(PrivateOrdersEvent::Connected);
-            }
-            if let Some(orders) = &s.orders {
-                catch_up.push(PrivateOrdersEvent::Snapshot(
-                    orders.values().cloned().collect(),
-                ));
-            }
-            if s.ready {
-                catch_up.push(PrivateOrdersEvent::Ready);
-            }
-            if let Some(stale) = &s.stale {
-                catch_up.push(PrivateOrdersEvent::Stale(stale.clone()));
-            }
-            if catch_up.into_iter().all(|event| offer(&consumer, event)) {
+            // Give a consumer that joins a running subscription what the others
+            // already know: Connected first, then the cached view. A consumer
+            // joining while the subscription is not connected gets both once it
+            // reconnects.
+            let joined = if s.state == State::Connected {
+                std::iter::once(PrivateOrdersEvent::Connected)
+                    .chain(cached_view(s))
+                    .all(|event| offer(&consumer, event))
+            } else {
+                consumer.catch_up = true;
+                true
+            };
+            if joined {
                 s.consumers.push(consumer);
             }
             return;
@@ -1387,12 +1387,44 @@ impl Actor {
         let Some(s) = self.subs.get_mut(&account) else {
             return;
         };
-        s.consumers
-            .retain(|consumer| offer(consumer, event.clone()));
+        let connected = matches!(event, PrivateOrdersEvent::Connected);
+        let cached = if connected && s.consumers.iter().any(|consumer| consumer.catch_up) {
+            cached_view(s)
+        } else {
+            Vec::new()
+        };
+        s.consumers.retain_mut(|consumer| {
+            if !offer(consumer, event.clone()) {
+                return false;
+            }
+            if connected && consumer.catch_up {
+                consumer.catch_up = false;
+                return cached.iter().cloned().all(|event| offer(consumer, event));
+            }
+            true
+        });
         if s.consumers.is_empty() {
             self.idle.insert(account);
         }
     }
+}
+
+/// What a consumer joining the subscription is owed after its Connected: the
+/// live view, the read boundary and the stale report, as last delivered.
+fn cached_view(s: &Subscription) -> Vec<PrivateOrdersEvent> {
+    let mut events = Vec::new();
+    if let Some(orders) = &s.orders {
+        events.push(PrivateOrdersEvent::Snapshot(
+            orders.values().cloned().collect(),
+        ));
+    }
+    if s.ready {
+        events.push(PrivateOrdersEvent::Ready);
+    }
+    if let Some(stale) = &s.stale {
+        events.push(PrivateOrdersEvent::Stale(stale.clone()));
+    }
+    events
 }
 
 /// Queues an event for a consumer; false when the consumer must leave the stream.
