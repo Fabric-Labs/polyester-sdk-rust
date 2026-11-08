@@ -1017,6 +1017,12 @@ impl ChainAnalyticsService {
 }
 
 impl LifecycleService {
+    /// List lifecycle flows. A request that selects an account
+    /// (`account_selector`) returns the flows it owns and the transfers other
+    /// accounts sent to it; each row's `participation` says which, and
+    /// `participation` on the request narrows the list to one side (the server
+    /// refuses it without an account). A `page_token` is bound to the request
+    /// it was returned for: only `limit` may change between pages.
     pub async fn list_flows(
         &self,
         req: crate::proto::chain::lifecycle::v1::ListFlowsRequest,

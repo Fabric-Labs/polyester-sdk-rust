@@ -311,6 +311,7 @@ fn recv_window_payload_and_bounds() {
 /// request's participation filter reaches the wire.
 #[tokio::test]
 async fn flow_rows_carry_participation_and_the_filter_is_sent() {
+    use polyester::proto::chain::lifecycle::v1::__buffa::oneof::list_flows_request::AccountSelector;
     use polyester::proto::chain::lifecycle::v1::{
         FlowParticipation, FlowSummaryView, ListFlowsRequest, ListFlowsResponse,
     };
@@ -318,6 +319,10 @@ async fn flow_rows_carry_participation_and_the_filter_is_sent() {
     let record = seen.clone();
     let http = MockHttpServer::spawn(move |req| {
         let sent = ListFlowsRequest::decode_from_slice(&req.body).expect("request");
+        assert!(
+            sent.account_selector.is_some(),
+            "the account selector is sent"
+        );
         record.lock().unwrap().push(sent.participation.to_i32());
         let body = ListFlowsResponse {
             flows: vec![
@@ -363,6 +368,7 @@ async fn flow_rows_carry_participation_and_the_filter_is_sent() {
     let page = client
         .lifecycle
         .list_flows(ListFlowsRequest {
+            account_selector: Some(AccountSelector::OwnerAccountId(8)),
             participation: FlowParticipation::PARTICIPATION_RECIPIENT.into(),
             ..Default::default()
         })

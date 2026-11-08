@@ -202,6 +202,18 @@ reusing a signature, or drifting outside the API's 10-second freshness window. I
 capacity wait is exhausted, the call returns retryable `Error::RateLimit`. Direct low-level
 `Credentials::sign_request` calls never sleep; use `sign_request_async` in async applications.
 
+`Config::recv_window_ms` sets the receive window of every signed API request: the server processes
+a request only until its signing timestamp plus that many milliseconds, sent as the signed
+`X-API-RECV-WINDOW` header. It must be from 1 to 60000, and `Client::new` refuses any other value
+with `Error::Validation` before anything is sent. `None`, the default, sends no header, and the
+server applies 10000. A request that arrives after its window is the retryable
+`Error::TimestampSkew`; one that waited past it before admission is an `Error::Api` with code
+`order_codes::REQUEST_DEADLINE_EXCEEDED`, also retryable. Both changed nothing, and a retry signs
+again with a fresh timestamp. Realtime token requests always use the default window. To sign
+requests yourself, `Credentials::sign_request_with_recv_window` (and its async variant) and
+`auth::canonical_signing_string_with_recv_window` put the window's line right after the timestamp
+line.
+
 ## Authentication patterns
 
 **Recommended: explicit config**
@@ -958,7 +970,11 @@ in time fails with an `Error::Api` code from `errors::order_codes::OUTCOME_UNKNO
 still apply, so `mutation_outcome_unknown()` is true and `is_retryable()` is false: a blind retry
 can place a second order. Read the order or trigger back, and reuse the same idempotency key if you
 send it again. `AUTH_TEMPORARILY_UNAVAILABLE` and `ERROR_CODE_ACCOUNT_REPAIRING` are retryable and
-changed nothing, so `mutation_outcome_unknown()` is false for them.
+changed nothing, so `mutation_outcome_unknown()` is false for them. So is
+`order_codes::REQUEST_DEADLINE_EXCEEDED` (`ERROR_CODE_REQUEST_DEADLINE_EXCEEDED`, REST 400
+`REQUEST_DEADLINE_EXCEEDED`, ConnectRPC `failed_precondition`), which refuses an order or trigger
+write whose receive window ended before it was sent on for admission; sending it again signs it with
+a fresh timestamp, and `is_request_deadline_exceeded()` reports it.
 
 
 The retry flag is always false when the mutation outcome is unknown. This includes
@@ -1031,12 +1047,21 @@ account, sub-account role or policy does not allow this call. It is not retryabl
 Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
 `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,
 `AUTH_MISSING_HEADERS`, `AUTH_KEY_EXPIRED`, `AUTH_KEY_DISABLED`,
-`AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`); they map to the same
-`Error::TimestampSkew` and `Error::ApiKeyRejected`. `Error::auth_code()`
+`AUTH_IP_NOT_ALLOWED`, `AUTH_API_KEY_NOT_ACCEPTED`, `AUTH_RECV_WINDOW_INVALID`); they map to the
+same `Error::TimestampSkew` and `Error::ApiKeyRejected`. `Error::is_recv_window_invalid()` reports
+`AUTH_RECV_WINDOW_INVALID` (REST 401 `RECV_WINDOW_INVALID`), an `X-API-RECV-WINDOW` header that is
+not one whole number from 1 to 60000; fix `Config::recv_window_ms`. `Error::auth_code()`
 returns the typed `auth.v1.AuthErrorCode` whichever transport answered: the
 Connect detail, or a REST problem or gateway `code` with `AUTH_` added
 (`UNAUTHENTICATED` reads `AUTH_AUTHENTICATION_REQUIRED`). Only
-`AUTH_TIMESTAMP_SKEW` is retryable. `auth_codes::WALLET_ALREADY_LINKED`
+`AUTH_TIMESTAMP_SKEW` is retryable among these. `auth_codes::REPLAY_CAPACITY_EXHAUSTED`
+(`AUTH_REPLAY_CAPACITY_EXHAUSTED`, REST 429 `REPLAY_CAPACITY_EXHAUSTED`, ConnectRPC
+`resource_exhausted`) is not a credentials refusal: the server remembers every signed request until
+its receive window ends, so it cannot be replayed, and the key or its account holds its full share
+of that record. The request was not processed and the share frees as earlier windows end, so it is
+an `Error::RateLimit` with that code, and `is_retryable()` and `is_replay_capacity_exhausted()` are
+true. It carries no `Retry-After`: back off briefly and send again, which signs again. A shorter
+`Config::recv_window_ms` makes room sooner. `auth_codes::WALLET_ALREADY_LINKED`
 (`AUTH_WALLET_ALREADY_LINKED`, ConnectRPC `already_exists`, REST 409) refuses a
 wallet login whose wallet is already linked to another account; it is a
 terminal `Error::Api`, and `Error::is_wallet_already_linked()` reports it. Log
@@ -1537,6 +1562,34 @@ Headers: `X-API-KEY-ID`, `X-API-TIMESTAMP`, `X-API-SIGNATURE`.
 Use the high-level `Client` service methods for authenticated calls. Generated
 clients under `polyester::connect` are low-level protocol bindings and do not
 apply Polyester API-key signatures by themselves.
+
+## Lifecycle flow lists
+
+A flow list that selects an account (`owner_account_id` or `smart_account_address`) returns the
+flows it owns and the transfers other accounts sent to it, such as a transfer from another user or
+sub-account, or a reward payout. Each row's `participation` says which: `owner` (its deposit,
+withdrawal, or a transfer it sent, including a move between its own Funding and Trading balances)
+or `recipient`. For a transfer, the counterparty is `destination_address` when the account sent it
+and `source_address` (with `owner_account_id`) when it received it. `ListFlowsRequest::participation`
+narrows the list to one side; the server refuses it without an account.
+
+```rust,ignore
+use polyester::proto::chain::lifecycle::v1::__buffa::oneof::list_flows_request::AccountSelector;
+use polyester::proto::chain::lifecycle::v1::{FlowParticipation, ListFlowsRequest};
+
+let page = client
+    .lifecycle
+    .list_flows(ListFlowsRequest {
+        account_selector: Some(AccountSelector::OwnerAccountId(account_id)),
+        participation: FlowParticipation::PARTICIPATION_RECIPIENT.into(),
+        limit: 20,
+        ..Default::default()
+    })
+    .await?;
+```
+
+A page token is bound to the request it was returned for: continue with the same account,
+participation, scope and order; only `limit` may change.
 
 ## Lifecycle transaction lookups
 
