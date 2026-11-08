@@ -1,5 +1,7 @@
 //! Guard signer models (Go `models/guard_signer.go` thin parity).
 
+use std::fmt;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GuardSignerStatus {
     pub signer_wallet: String,
@@ -23,9 +25,22 @@ pub struct CreateGuardSignerWalletResult {
     pub signer_wallet: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// The exported guard signer wallet key.
+///
+/// [`Debug`] redacts `encrypted_private_key`, the private key exactly as the
+/// API returns it, so logging the result cannot leak it. Read the field
+/// explicitly when you need the key.
+#[derive(Clone, PartialEq, Eq)]
 pub struct ExportGuardSignerWalletResult {
     pub encrypted_private_key: String,
+}
+
+impl fmt::Debug for ExportGuardSignerWalletResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExportGuardSignerWalletResult")
+            .field("encrypted_private_key", &"[REDACTED]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
