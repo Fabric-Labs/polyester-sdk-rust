@@ -10062,3 +10062,107 @@ async fn zero_internal_transfer_destination_is_refused_before_sending() {
     }
     assert_no_zero_id_failures(failures);
 }
+
+// A refusal reads the same `ERROR_CODE_` code over REST and ConnectRPC: the REST
+// problem names it without the prefix, the typed detail by its enum value.
+// Transfer, withdraw and ledger codes read like order codes either way.
+#[tokio::test]
+async fn l2_refusal_code_is_the_same_over_rest_and_connect() {
+    use base64::Engine as _;
+    use buffa::Enumeration as _;
+    use polyester::proto::chain::withdraw::v1 as withdraw;
+    use polyester::proto::ledger::read::v1 as ledger;
+    use polyester::proto::orders::v1 as orders;
+    use polyester::proto::transfer::v1 as transfer;
+
+    let full = |name: &str| format!("ERROR_CODE_{name}");
+    let cases: Vec<(&str, &str, Vec<u8>)> = vec![
+        (
+            "SAME_SOURCE_DESTINATION",
+            "transfer.v1.ErrorDetail",
+            transfer::ErrorDetail {
+                code: transfer::ErrorCode::from_proto_name(&full("SAME_SOURCE_DESTINATION"))
+                    .unwrap()
+                    .into(),
+                ..Default::default()
+            }
+            .encode_to_bytes()
+            .to_vec(),
+        ),
+        (
+            "INSUFFICIENT_FUNDS",
+            "transfer.v1.ErrorDetail",
+            transfer::ErrorDetail {
+                code: transfer::ErrorCode::from_proto_name(&full("INSUFFICIENT_FUNDS"))
+                    .unwrap()
+                    .into(),
+                ..Default::default()
+            }
+            .encode_to_bytes()
+            .to_vec(),
+        ),
+        (
+            "AMOUNT_BELOW_MINIMUM",
+            "chain.withdraw.v1.ErrorDetail",
+            withdraw::ErrorDetail {
+                code: withdraw::ErrorCode::from_proto_name(&full("AMOUNT_BELOW_MINIMUM"))
+                    .unwrap()
+                    .into(),
+                ..Default::default()
+            }
+            .encode_to_bytes()
+            .to_vec(),
+        ),
+        (
+            "INVALID_SUBACCOUNT_ID",
+            "ledger.read.v1.ErrorDetail",
+            ledger::ErrorDetail {
+                code: ledger::ErrorCode::from_proto_name(&full("INVALID_SUBACCOUNT_ID"))
+                    .unwrap()
+                    .into(),
+                ..Default::default()
+            }
+            .encode_to_bytes()
+            .to_vec(),
+        ),
+        (
+            "QTY_STEP_SIZE",
+            "orders.v1.ErrorDetail",
+            orders::ErrorDetail {
+                code: orders::ErrorCode::from_proto_name(&full("QTY_STEP_SIZE"))
+                    .unwrap()
+                    .into(),
+                ..Default::default()
+            }
+            .encode_to_bytes()
+            .to_vec(),
+        ),
+    ];
+    for (name, detail_type, detail) in cases {
+        let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(&detail);
+        let connect = json!({
+            "code": "invalid_argument",
+            "message": "refused",
+            "details": [{"type": detail_type, "value": value}],
+        })
+        .to_string();
+        let rest = json!({"status": 400, "code": name, "detail": "refused"}).to_string();
+        for (content_type, body) in [
+            ("application/json", connect),
+            ("application/problem+json", rest),
+        ] {
+            let http = MockHttpServer::spawn(move |_| json_body(400, content_type, &body)).await;
+            let err = api_key_client(&http)
+                .orders
+                .list_open(None)
+                .await
+                .expect_err("refused");
+            match &err {
+                Error::Api { code, .. } => {
+                    assert_eq!(code, &full(name), "{content_type}: {err:?}")
+                }
+                other => panic!("{content_type}: {other:?}"),
+            }
+        }
+    }
+}
