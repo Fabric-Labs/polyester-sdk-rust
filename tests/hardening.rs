@@ -19,6 +19,8 @@ mod order_trades_wait;
 mod orderbook_depths;
 #[path = "readable_error_bodies/mod.rs"]
 mod readable_error_bodies;
+#[path = "recv_window_replay/mod.rs"]
+mod recv_window_replay;
 #[path = "request_size_rate_limit/mod.rs"]
 mod request_size_rate_limit;
 #[path = "url_userinfo/mod.rs"]
