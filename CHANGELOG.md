@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.14.0
+
+Package version: `0.14.0`. Git tag: `v0.14.0`. Released 2026-11-08. Built on public contract `c8d9827`.
 
 Built on public contract `c8d9827`. Its changes (received transfers in flow lists, receive windows, and the replay-capacity, receive-window and request-deadline refusals) are available on devnet with its next deployment, and on testnet with its next release.
 - **Breaking:** `triggers.create` refuses `time_in_force: Some(CreateTimeInForce::Gtd)` for every trigger type with `Error::Validation`, before anything is sent. No trigger child has a GTD execution, and the selection was replaced instead: a market stop or take-profit was sent as a market IOC child, and a TWAP, ladder or trailing stop sent its fixed GTC or IOC child. A limit stop already refused it. Migration: leave `time_in_force` unset, or choose `Gtc`, `Ioc` or `Fok` where the trigger type accepts it.
