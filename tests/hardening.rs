@@ -8,6 +8,8 @@ mod batch_replace_status_errors;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
 mod hardening_support;
+#[path = "market_data/mod.rs"]
+mod market_data;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]
