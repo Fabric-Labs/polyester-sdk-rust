@@ -20,6 +20,12 @@ const ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH: u32 = 50;
 /// fewer levels than asked. 0 is the default 50. A depth above 1000 is a
 /// validation error.
 pub fn orderbook_snapshot_depth(depth: u32) -> Result<u32> {
+    covering_snapshot_depth(depth, "orderbook snapshot depth")
+}
+
+/// `depth` when it is a snapshot depth, else the smallest one covering it; 0 is
+/// the default 50. `what` names the depth in the refusal.
+pub(crate) fn covering_snapshot_depth(depth: u32, what: &str) -> Result<u32> {
     if depth == 0 {
         return Ok(ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH);
     }
@@ -28,7 +34,7 @@ pub fn orderbook_snapshot_depth(depth: u32) -> Result<u32> {
         .find(|supported| *supported >= depth)
         .ok_or_else(|| {
             Error::validation(format!(
-                "orderbook snapshot depth {depth} is above the deepest snapshot depth \
+                "{what} {depth} is above the deepest snapshot depth \
                  ({ORDERBOOK_SNAPSHOT_MAX_DEPTH})"
             ))
         })

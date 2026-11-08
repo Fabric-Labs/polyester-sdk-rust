@@ -153,6 +153,18 @@ pub struct MarketOverviewEntry {
     pub volume_24h_base: Option<String>,
     pub volume_24h_quote_scaled: Option<String>,
     pub volume_24h_usd_scaled: Option<String>,
+    /// Change of the last price over 24 hours, in basis points.
+    pub change_24h_bps: i32,
+    /// Sparklines the server sent, only when `include_sparklines` was requested.
+    pub sparklines: Vec<MarketOverviewSparkline>,
+}
+
+/// A market's recent closing prices over `interval`, newest first.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarketOverviewSparkline {
+    /// `SPARKLINE_1H`, `SPARKLINE_24H`, `SPARKLINE_1W` or `SPARKLINE_1M`.
+    pub interval: String,
+    pub close_prices: Vec<Price>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

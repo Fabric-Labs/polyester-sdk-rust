@@ -19,7 +19,7 @@ use polyester::proto::marketoverview::v1::{
     ListMarketOverviewRequest, ListMarketOverviewResponse, MarketOverview, MarketOverviewBatch,
     Sparkline, SparklineInterval,
 };
-use polyester::services::MarketOverviewCreateSubscriptionOptions;
+use polyester::services::{ListMarketOverviewOptions, MarketOverviewCreateSubscriptionOptions};
 use polyester::{Client, Config, Error};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -318,6 +318,58 @@ fn overview_snapshot() -> ListMarketOverviewResponse {
     }
 }
 
+fn sparkline_ticks(row: &polyester::models::MarketOverviewEntry) -> Vec<(String, Vec<i64>)> {
+    row.sparklines
+        .iter()
+        .map(|s| {
+            (
+                s.interval.clone(),
+                s.close_prices.iter().map(|p| p.as_ticks()).collect(),
+            )
+        })
+        .collect()
+}
+
+fn expected_sparklines() -> Vec<(String, Vec<i64>)> {
+    vec![
+        ("SPARKLINE_24H".to_owned(), vec![101, 100, 99]),
+        ("SPARKLINE_1H".to_owned(), vec![]),
+    ]
+}
+
+// POLY-8789 and POLY-8786 parity: list exposes requested sparklines and the
+// 24-hour change.
+#[tokio::test]
+async fn overview_list_exposes_requested_sparklines_and_the_24h_change() {
+    let api = Api::spawn(overview_snapshot()).await;
+    let client = api.client("ws://127.0.0.1:9".into()).await;
+    let with = client
+        .market_overview
+        .list(ListMarketOverviewOptions {
+            include_sparklines: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let without = client
+        .market_overview
+        .list(ListMarketOverviewOptions::default())
+        .await
+        .unwrap();
+    let sent: Vec<bool> = api
+        .overview
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|r| r.include_sparklines)
+        .collect();
+    assert_eq!(sent, [true, false]);
+    assert_eq!(with.markets[0].change_24h_bps, -14);
+    assert_eq!(sparkline_ticks(&with.markets[0]), expected_sparklines());
+    assert!(without.markets[0].sparklines.is_empty());
+    assert_eq!(without.markets[0].change_24h_bps, -14);
+}
+
 // POLY-8783: a live update keeps the symbol and the formatted base volume, and
 // (POLY-8789) the snapshot's sparklines, which live publications never carry.
 #[tokio::test]
@@ -361,6 +413,8 @@ async fn managed_overview_live_updates_keep_symbol_volume_and_sparklines() {
     assert_eq!(row.last_price.as_ref().map(|p| p.as_ticks()), Some(102));
     assert_eq!(row.symbol, "BTC-USDT");
     assert_eq!(row.volume_24h_base.as_deref(), Some("0.000003"));
+    assert_eq!(row.change_24h_bps, 7);
+    assert_eq!(sparkline_ticks(row), expected_sparklines());
     sub.close();
 }
 

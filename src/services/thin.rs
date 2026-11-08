@@ -101,6 +101,12 @@ pub struct GetHeatmapOptions {
 
 impl HeatmapService {
     /// Historical orderbook heatmap (Go `HeatmapService.Get` → `ApiData`).
+    ///
+    /// `interval` is `1s`, `1m`, `5m` or `1h` (or `INTERVAL_1M`), `quantity_mode`
+    /// is `close` or `peak`. `depth` is requested as itself when it is a supported
+    /// depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else as the smallest supported
+    /// depth covering it, and 0 as 50; the response's `depth` names the depth
+    /// requested. A depth above 1000 is a validation error before any request.
     pub async fn get(
         &self,
         symbol: &str,
@@ -150,6 +156,7 @@ impl HeatmapService {
                 ))
             })?;
         let interval_enum = resolve_heatmap_interval(interval)?;
+        let depth_enum = heatmap_depth_for_levels(depth)?;
         let qty_mode = resolve_heatmap_quantity_mode(quantity_mode)?;
         let page_token = opts.page_token.unwrap_or_default();
         let time_range = opts.time_range.or_else(|| {
@@ -178,7 +185,7 @@ impl HeatmapService {
         let req = GetOrderbookHeatmapRequest {
             symbol_id,
             interval: interval_enum.into(),
-            depth: heatmap_depth_for_levels(depth).into(),
+            depth: depth_enum.into(),
             time_range: time_range.map_or_else(Default::default, Into::into),
             page_token,
             limit: if limit == 0 { 100 } else { limit },
@@ -192,7 +199,9 @@ impl HeatmapService {
         Ok(api_data_from_proto(&resp))
     }
 
-    /// Subscribe to live heatmap buckets (requires `realtime` feature + hydrated catalogs).
+    /// Subscribe to live heatmap buckets (requires `realtime` feature + hydrated catalogs)
+    /// on the channel the server publishes `interval` on (`1s`, `1m`, `5m` or `1h`,
+    /// or `INTERVAL_1S`). Any other interval is a validation error before connecting.
     pub async fn subscribe_live(
         &self,
         symbol: &str,
@@ -209,9 +218,7 @@ impl HeatmapService {
                     "unknown symbol {symbol}; call hydrate_catalogs / get_spot_config first"
                 ))
             })?;
-        // Validate interval aliases.
-        crate::codecs::heatmap::resolve_heatmap_interval(interval)?;
-        let interval_name = heatmap_interval_channel_name(interval);
+        let interval_name = heatmap_interval_channel_name(interval)?;
         let channel = format!("public:spot:market:heatmap:{interval_name}:{symbol_id}:proto");
         self.ctx
             .realtime

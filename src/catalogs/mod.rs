@@ -163,6 +163,15 @@ struct ZipperSnapshot {
     zipper_config: Value,
 }
 
+/// `n` as plain decimal text with every digit of its shortest round-trip form:
+/// `1e-9` reads `0.000000001` and `1.0` reads `1`, as in the Go and Python SDKs.
+fn plain_decimal(n: &serde_json::Number) -> String {
+    match n.as_f64() {
+        Some(value) if !n.is_u64() && !n.is_i64() => format!("{value}"),
+        _ => n.to_string(),
+    }
+}
+
 fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
     let mut snap = SpotSnapshot {
         max_open_orders_total: parse_open_orders_limit(
@@ -286,20 +295,20 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
         // block hydration of otherwise valid spot rows.
         id_to_symbol.insert(symbol_id, symbol.to_owned());
         snap.id_to_symbol.insert(symbol_id, symbol.to_owned());
+        // The API sends them under `marketdata`, as `orderbookPriceBuckets`.
+        let marketdata = m.get("marketdata").or_else(|| m.get("marketData"));
         let buckets = m
             .get("orderbook_price_buckets")
             .or_else(|| m.get("orderbookPriceBuckets"))
-            .or_else(|| {
-                m.get("marketdata")
-                    .and_then(|md| md.get("orderbook_price_buckets"))
-            })
+            .or_else(|| marketdata.and_then(|md| md.get("orderbook_price_buckets")))
+            .or_else(|| marketdata.and_then(|md| md.get("orderbookPriceBuckets")))
             .and_then(|b| b.as_array());
         if let Some(buckets) = buckets {
             let list: Vec<String> = buckets
                 .iter()
                 .filter_map(|b| match b {
                     Value::String(s) => Some(s.clone()),
-                    Value::Number(n) => Some(n.to_string()),
+                    Value::Number(n) => Some(plain_decimal(n)),
                     _ => None,
                 })
                 .collect();
@@ -883,7 +892,7 @@ mod tests {
         assert_eq!(mgr.quote_quantity_scale_for_symbol_id(1), Some(6));
         assert_eq!(
             mgr.orderbook_price_buckets_for_symbol("BTC-USDT"),
-            vec!["0.01".to_owned(), "0.1".to_owned(), "1.0".to_owned()]
+            vec!["0.01".to_owned(), "0.1".to_owned(), "1".to_owned()]
         );
     }
 
