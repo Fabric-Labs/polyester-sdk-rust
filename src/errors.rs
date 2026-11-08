@@ -924,12 +924,19 @@ fn rate_limit_detail_from_proto_local(msg: &ProtoRateLimitDetail) -> RateLimitDe
 
 /// A REST problem code as its typed ConnectRPC detail names it:
 /// `SAME_SOURCE_DESTINATION` reads `ERROR_CODE_SAME_SOURCE_DESTINATION` when any
-/// service's `ErrorCode` (orders, withdraw, transfer, ledger) names it. A code
-/// none of them names is kept unchanged.
+/// service's `ErrorCode` (orders, withdraw, transfer, ledger) names it. A
+/// non-order code the auth service also names, such as `INVALID_REQUEST`, can't
+/// be told apart over REST and is kept unchanged, so [`Error::auth_code`] still
+/// reads it. A code none of them names is kept unchanged.
 fn error_code_from_name(code: &str) -> String {
     let prefixed = format!("ERROR_CODE_{code}");
-    if OrderErrorCode::from_proto_name(&prefixed).is_some()
-        || WithdrawErrorCode::from_proto_name(&prefixed).is_some()
+    if OrderErrorCode::from_proto_name(&prefixed).is_some() {
+        return prefixed;
+    }
+    if AuthErrorCode::from_proto_name(&format!("AUTH_{code}")).is_some() {
+        return code.to_owned();
+    }
+    if WithdrawErrorCode::from_proto_name(&prefixed).is_some()
         || TransferErrorCode::from_proto_name(&prefixed).is_some()
         || LedgerErrorCode::from_proto_name(&prefixed).is_some()
     {

@@ -10166,3 +10166,23 @@ async fn l2_refusal_code_is_the_same_over_rest_and_connect() {
         }
     }
 }
+
+// `INVALID_REQUEST` is an auth, transfer and withdraw code; REST can't say which
+// service refused, so it stays as sent and still reads as an auth code.
+#[tokio::test]
+async fn l2_rest_code_the_auth_service_also_names_stays_as_sent() {
+    use polyester::proto::auth::v1::AuthErrorCode;
+    let rest = json!({"status": 400, "code": "INVALID_REQUEST", "detail": "refused"}).to_string();
+    let http =
+        MockHttpServer::spawn(move |_| json_body(400, "application/problem+json", &rest)).await;
+    let err = api_key_client(&http)
+        .orders
+        .list_open(None)
+        .await
+        .expect_err("refused");
+    assert!(
+        matches!(&err, Error::Api { code, .. } if code == "INVALID_REQUEST"),
+        "{err:?}"
+    );
+    assert_eq!(err.auth_code(), Some(AuthErrorCode::AUTH_INVALID_REQUEST));
+}
