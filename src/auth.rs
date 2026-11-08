@@ -15,6 +15,27 @@ pub const ACCOUNT_ID_ENV: &str = "POLYESTER_ACCOUNT_ID";
 pub const HEADER_KEY_ID: &str = "X-API-KEY-ID";
 pub const HEADER_TIMESTAMP: &str = "X-API-TIMESTAMP";
 pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
+/// The signed receive-window header: the server processes a request only
+/// until its timestamp plus this many milliseconds.
+pub const HEADER_RECV_WINDOW: &str = "X-API-RECV-WINDOW";
+
+/// Bounds of an API-key request's receive window, in milliseconds. Without
+/// the header the server applies 10000.
+pub const MIN_RECV_WINDOW_MS: u32 = 1;
+pub const MAX_RECV_WINDOW_MS: u32 = 60_000;
+
+/// Check a receive window before anything is signed: `None` sends no window
+/// header, and any value must be from [`MIN_RECV_WINDOW_MS`] to
+/// [`MAX_RECV_WINDOW_MS`]. The server refuses a header outside that range as
+/// `AUTH_RECV_WINDOW_INVALID`.
+pub fn validate_recv_window_ms(recv_window_ms: Option<u32>) -> Result<()> {
+    match recv_window_ms {
+        Some(ms) if !(MIN_RECV_WINDOW_MS..=MAX_RECV_WINDOW_MS).contains(&ms) => Err(
+            Error::validation("recv_window_ms must be from 1 to 60000 milliseconds, or None"),
+        ),
+        _ => Ok(()),
+    }
+}
 
 /// Maximum amount an automatically allocated signing timestamp may lead the
 /// local wall clock. The API accepts a 10-second freshness window; keeping the
@@ -186,16 +207,48 @@ impl Credentials {
         body: &[u8],
         timestamp_ms: Option<&str>,
     ) -> Result<BTreeMap<String, String>> {
+        self.sign_request_with_recv_window(method, raw_url, body, timestamp_ms, None)
+    }
+
+    /// [`Self::sign_request`] with a receive window: the server processes the
+    /// request only until its timestamp plus `recv_window_ms` milliseconds,
+    /// and the headers include [`HEADER_RECV_WINDOW`], which the signature
+    /// covers. `None` signs as [`Self::sign_request`] does; a value outside
+    /// [`validate_recv_window_ms`]'s range is refused before anything is
+    /// signed.
+    pub fn sign_request_with_recv_window(
+        &self,
+        method: &str,
+        raw_url: &str,
+        body: &[u8],
+        timestamp_ms: Option<&str>,
+        recv_window_ms: Option<u32>,
+    ) -> Result<BTreeMap<String, String>> {
+        validate_recv_window_ms(recv_window_ms)?;
         let ts = match timestamp_ms {
             Some(value) => value.to_owned(),
             None => self.timestamp_allocator.next()?.to_string(),
         };
-        let canonical = canonical_signing_bytes(&ts, method, raw_url, body)?;
+        self.signed_headers(ts, method, raw_url, body, recv_window_ms)
+    }
+
+    fn signed_headers(
+        &self,
+        ts: String,
+        method: &str,
+        raw_url: &str,
+        body: &[u8],
+        recv_window_ms: Option<u32>,
+    ) -> Result<BTreeMap<String, String>> {
+        let canonical = canonical_signing_bytes(&ts, recv_window_ms, method, raw_url, body)?;
         let sig = self.signing_key.sign(&canonical);
         let mut headers = BTreeMap::new();
         headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
         headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
         headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
+        if let Some(ms) = recv_window_ms {
+            headers.insert(HEADER_RECV_WINDOW.to_owned(), ms.to_string());
+        }
         Ok(headers)
     }
 
@@ -220,17 +273,26 @@ impl Credentials {
         body: &[u8],
         timestamp_ms: Option<&str>,
     ) -> Result<BTreeMap<String, String>> {
+        self.sign_request_with_recv_window_async(method, raw_url, body, timestamp_ms, None)
+            .await
+    }
+
+    /// [`Self::sign_request_async`] with a receive window, as
+    /// [`Self::sign_request_with_recv_window`].
+    pub async fn sign_request_with_recv_window_async(
+        &self,
+        method: &str,
+        raw_url: &str,
+        body: &[u8],
+        timestamp_ms: Option<&str>,
+        recv_window_ms: Option<u32>,
+    ) -> Result<BTreeMap<String, String>> {
+        validate_recv_window_ms(recv_window_ms)?;
         let ts = match timestamp_ms {
             Some(value) => value.to_owned(),
             None => self.timestamp_allocator.next_async().await?.to_string(),
         };
-        let canonical = canonical_signing_bytes(&ts, method, raw_url, body)?;
-        let sig = self.signing_key.sign(&canonical);
-        let mut headers = BTreeMap::new();
-        headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
-        headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
-        headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
-        Ok(headers)
+        self.signed_headers(ts, method, raw_url, body, recv_window_ms)
     }
 }
 
@@ -326,8 +388,23 @@ pub fn canonical_signing_string(
     raw_url: &str,
     body: &[u8],
 ) -> Result<String> {
+    canonical_signing_string_with_recv_window(timestamp_ms, None, method, raw_url, body)
+}
+
+/// The signing payload of a request that sends [`HEADER_RECV_WINDOW`]: the
+/// window's decimal string is its own line, right after the timestamp. `None`
+/// builds [`canonical_signing_string`]'s payload.
+pub fn canonical_signing_string_with_recv_window(
+    timestamp_ms: &str,
+    recv_window_ms: Option<u32>,
+    method: &str,
+    raw_url: &str,
+    body: &[u8],
+) -> Result<String> {
+    validate_recv_window_ms(recv_window_ms)?;
     String::from_utf8(canonical_signing_bytes(
         timestamp_ms,
+        recv_window_ms,
         method,
         raw_url,
         body,
@@ -339,6 +416,7 @@ pub fn canonical_signing_string(
 /// percent-escaped path signs the same as its plain form.
 fn canonical_signing_bytes(
     timestamp_ms: &str,
+    recv_window_ms: Option<u32>,
     method: &str,
     raw_url: &str,
     body: &[u8],
@@ -348,14 +426,21 @@ fn canonical_signing_bytes(
     let path: Vec<u8> = percent_encoding::percent_decode_str(parsed.path()).collect();
     let pathname: &[u8] = if path.is_empty() { b"/" } else { &path };
     let sum = Sha256::digest(body);
-    Ok([
-        timestamp_ms.as_bytes(),
-        method.to_uppercase().as_bytes(),
+    let window = recv_window_ms.map(|ms| ms.to_string());
+    let method = method.to_uppercase();
+    let query = canonical_query_from_url(&parsed);
+    let digest = hex::encode(sum);
+    let mut lines: Vec<&[u8]> = vec![timestamp_ms.as_bytes()];
+    if let Some(window) = &window {
+        lines.push(window.as_bytes());
+    }
+    lines.extend([
+        method.as_bytes(),
         pathname,
-        canonical_query_from_url(&parsed).as_bytes(),
-        hex::encode(sum).as_bytes(),
-    ]
-    .join(&b'\n'))
+        query.as_bytes(),
+        digest.as_bytes(),
+    ]);
+    Ok(lines.join(&b'\n'))
 }
 
 pub fn request_url(api_base: &str, procedure: &str) -> String {
