@@ -40,3 +40,37 @@ pub struct RotateGuardSignerWalletResult {
 pub struct BatchSignProtectedActionsResult {
     pub approvals: Vec<GuardApproval>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An obviously fake marker standing in for an exported private key.
+    const FAKE_EXPORTED_KEY: &str = "fake-exported-guard-key-marker";
+
+    fn assert_redacted(path: &str, rendered: &str, markers: &[&str]) {
+        for marker in markers {
+            assert!(
+                !rendered.contains(marker),
+                "{path} leaked key material: {rendered}"
+            );
+        }
+        assert!(rendered.contains("[REDACTED]"), "{path}: {rendered}");
+    }
+
+    #[test]
+    fn export_result_debug_redacts_private_key() {
+        let result = ExportGuardSignerWalletResult {
+            encrypted_private_key: FAKE_EXPORTED_KEY.into(),
+        };
+        assert_eq!(result.encrypted_private_key, FAKE_EXPORTED_KEY);
+        for (path, rendered) in [
+            ("debug", format!("{result:?}")),
+            ("pretty debug", format!("{result:#?}")),
+            ("option", format!("{:?}", Some(&result))),
+            ("vec", format!("{:#?}", vec![result.clone()])),
+        ] {
+            assert_redacted(path, &rendered, &[FAKE_EXPORTED_KEY]);
+        }
+    }
+}
