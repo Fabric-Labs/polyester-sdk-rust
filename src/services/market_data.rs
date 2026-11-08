@@ -372,6 +372,41 @@ fn newest_candle(result: CandlesResult) -> Option<Candle> {
     result.candles.into_iter().next()
 }
 
+/// Fills each row's symbol and formatted base volume from the catalogs, for
+/// list rows and live rows alike.
+fn enrich_market_overview_rows(
+    catalogs: &crate::catalogs::Manager,
+    rows: &mut [MarketOverviewEntry],
+) -> Result<()> {
+    for market in rows {
+        if market.symbol.is_empty() {
+            market.symbol = catalogs.display_symbol(market.symbol_id);
+        }
+        if let (Some(raw), Some(scale)) = (
+            market.volume_24h_base_scaled.as_deref(),
+            catalogs.market_data_volume_scale_for_symbol_id(market.symbol_id),
+        ) && let Ok(value) = raw.parse::<i64>()
+        {
+            market.volume_24h_base = Some(
+                crate::codecs::scalars::format_qty_scaled(value, scale).map_err(|e| {
+                    Error::validation(format!("market overview base volume scale invalid: {e}"))
+                })?,
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Decodes a live overview batch and enriches its rows like list rows.
+fn enriched_market_overview_batch(
+    catalogs: &crate::catalogs::Manager,
+    payload: &[u8],
+) -> Result<MarketOverviewList> {
+    let mut batch = crate::codecs::decode::market_overview_batch_from_bytes(payload)?;
+    enrich_market_overview_rows(catalogs, &mut batch.markets)?;
+    Ok(batch)
+}
+
 /// Options for [`MarketOverviewService::list`].
 #[derive(Debug, Clone, Default)]
 pub struct ListMarketOverviewOptions {
@@ -434,24 +469,7 @@ impl MarketOverviewService {
             .await?
             .into_owned();
         let mut list = market_overview_list_from_proto(&resp);
-        for market in &mut list.markets {
-            if market.symbol.is_empty() {
-                market.symbol = self.ctx.catalogs.display_symbol(market.symbol_id);
-            }
-            if let (Some(raw), Some(scale)) = (
-                market.volume_24h_base_scaled.as_deref(),
-                self.ctx
-                    .catalogs
-                    .market_data_volume_scale_for_symbol_id(market.symbol_id),
-            ) && let Ok(value) = raw.parse::<i64>()
-            {
-                market.volume_24h_base = Some(
-                    crate::codecs::scalars::format_qty_scaled(value, scale).map_err(|e| {
-                        Error::validation(format!("market overview base volume scale invalid: {e}"))
-                    })?,
-                );
-            }
-        }
+        enrich_market_overview_rows(&self.ctx.catalogs, &mut list.markets)?;
         Ok(list)
     }
 
@@ -564,10 +582,10 @@ impl MarketOverviewService {
     ) -> Result<crate::realtime::TypedSubscription<MarketOverviewList>> {
         self.ctx
             .realtime
-            .subscribe_proto(
-                "public:spot:market_overview:updates:proto",
-                crate::codecs::decode::market_overview_batch_from_bytes,
-            )
+            .subscribe_proto("public:spot:market_overview:updates:proto", {
+                let catalogs = self.ctx.catalogs.clone();
+                move |payload: &[u8]| enriched_market_overview_batch(&catalogs, payload)
+            })
             .await
     }
 
@@ -655,8 +673,14 @@ impl MarketOverviewService {
             let by_symbol_id = by_symbol_id.clone();
             Arc::new(move |rows: Vec<MarketOverviewEntry>| {
                 let mut map = crate::realtime::lock_unpoisoned(&by_symbol_id);
-                for row in rows {
+                for mut row in rows {
                     if symbol_ids.is_empty() || symbol_ids.contains(&row.symbol_id) {
+                        // Live publications carry no sparklines: keep the snapshot's.
+                        if row.sparklines.is_empty()
+                            && let Some(previous) = map.get(&row.symbol_id)
+                        {
+                            row.sparklines = previous.sparklines.clone();
+                        }
                         map.insert(row.symbol_id, row);
                     }
                 }
@@ -668,7 +692,10 @@ impl MarketOverviewService {
         let stream = SnapshotThenStream::new(SnapshotThenStreamConfig {
             client: self.ctx.realtime.clone(),
             channel,
-            decode: Arc::new(crate::codecs::decode::market_overview_batch_from_bytes),
+            decode: {
+                let catalogs = self.ctx.catalogs.clone();
+                Arc::new(move |payload: &[u8]| enriched_market_overview_batch(&catalogs, payload))
+            },
             fetch_snapshot: Arc::new(move || {
                 let svc = svc.clone();
                 let symbols = fetch_symbols.clone();

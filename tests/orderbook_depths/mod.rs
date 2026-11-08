@@ -5,13 +5,9 @@
 //! SET diff of that tier's own top-N view. Snapshots answer at any depth the
 //! snapshot enum names, up to 1000.
 
-#[allow(dead_code)]
-#[path = "../hardening_support/centrifugo.rs"]
-mod centrifugo;
-
+use super::centrifugo::{Centrifugo, centrifugo_publication};
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
-use centrifugo::{Centrifugo, centrifugo_publication};
 use polyester::models::{OrderbookData, OrderbookLevel};
 use polyester::orderbook::Subscription;
 use polyester::proto::orderbook::v1::{

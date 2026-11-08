@@ -1,16 +1,16 @@
 //! Market overview decoders.
 
-use super::money::decode_price_ticks;
+use super::money::{decode_price_ticks, decode_price_ticks_allow_zero};
 use crate::models::{
     CurrencyConversionConfig, CurrencyConversionRates, CurrencyMetadata, FiatConversionRate,
-    FiatConversionSnapshot, MarketOverviewEntry, MarketOverviewList, SpotPairVolumeSeries,
-    SpotVolumeHistory, StablecoinConversionRate,
+    FiatConversionSnapshot, MarketOverviewEntry, MarketOverviewList, MarketOverviewSparkline,
+    SpotPairVolumeSeries, SpotVolumeHistory, StablecoinConversionRate,
 };
 use crate::proto::marketoverview::v1::{
     CurrencyMetadata as ProtoCurrencyMetadata,
     FiatConversionSnapshot as ProtoFiatConversionSnapshot, GetCurrencyConversionConfigResponse,
     GetCurrencyConversionRatesResponse, GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
-    MarketOverview as ProtoMarketOverview, MarketOverviewBatch,
+    MarketOverview as ProtoMarketOverview, MarketOverviewBatch, Sparkline as ProtoSparkline,
 };
 
 pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOverviewEntry {
@@ -23,6 +23,29 @@ pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOver
         volume_24h_base: None,
         volume_24h_quote_scaled: msg.volume_24h_quote_scaled.map(|value| value.to_string()),
         volume_24h_usd_scaled: msg.volume_24h_usd_scaled.map(|value| value.to_string()),
+        change_24h_bps: msg.change_24h_bps,
+        sparklines: msg
+            .sparklines
+            .iter()
+            .map(market_overview_sparkline_from_proto)
+            .collect(),
+    }
+}
+
+/// A sparkline's interval name and close prices, newest first. A negative close
+/// price, which is not a price, is skipped.
+pub fn market_overview_sparkline_from_proto(msg: &ProtoSparkline) -> MarketOverviewSparkline {
+    use buffa::Enumeration as _;
+    MarketOverviewSparkline {
+        interval: msg.interval.as_known().map_or_else(
+            || msg.interval.to_i32().to_string(),
+            |known| known.proto_name().to_owned(),
+        ),
+        close_prices: msg
+            .close_ticks
+            .iter()
+            .filter_map(|ticks| decode_price_ticks_allow_zero(*ticks, None))
+            .collect(),
     }
 }
 

@@ -5,9 +5,14 @@
 
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
+#[allow(dead_code)]
+#[path = "hardening_support/centrifugo.rs"]
+mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
 mod hardening_support;
+#[path = "market_data/mod.rs"]
+mod market_data;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]
