@@ -25,6 +25,35 @@ pub struct ClientFrame {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub correlation_id: ::buffa::alloc::string::String,
+    /// Optional client time the command was sent, in milliseconds since the Unix
+    /// epoch. When set, the command is processed only until timestamp_ms plus
+    /// recv_window_ms: a command that arrives, or waits to be sent on for
+    /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
+    /// changes nothing, but it has taken its seq, so the next command uses the
+    /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+    /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
+    /// deadline. Ping ignores it.
+    ///
+    /// Field 3: `timestamp_ms`
+    #[serde(
+        rename = "timestampMs",
+        alias = "timestamp_ms",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub timestamp_ms: i64,
+    /// Optional receive window in milliseconds, from 1 to 60000, applied to
+    /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+    /// rejected with BAD_REQUEST.
+    ///
+    /// Field 4: `recv_window_ms`
+    #[serde(
+        rename = "recvWindowMs",
+        alias = "recv_window_ms",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub recv_window_ms: u32,
     #[serde(flatten)]
     pub payload: ::core::option::Option<__buffa::oneof::client_frame::Payload>,
     #[serde(skip)]
@@ -36,6 +65,8 @@ impl ::core::fmt::Debug for ClientFrame {
         f.debug_struct("ClientFrame")
             .field("seq", &self.seq)
             .field("correlation_id", &self.correlation_id)
+            .field("timestamp_ms", &self.timestamp_ms)
+            .field("recv_window_ms", &self.recv_window_ms)
             .field("payload", &self.payload)
             .finish()
     }
@@ -72,6 +103,13 @@ impl ::buffa::Message for ClientFrame {
             size
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.correlation_id) as u32;
+        }
+        if self.timestamp_ms != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.timestamp_ms) as u32;
+        }
+        if self.recv_window_ms != 0u32 {
+            size
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.recv_window_ms) as u32;
         }
         if let ::core::option::Option::Some(ref v) = self.payload {
             match v {
@@ -139,6 +177,14 @@ impl ::buffa::Message for ClientFrame {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::client_frame::Payload::CancelAllAfter(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -156,6 +202,12 @@ impl ::buffa::Message for ClientFrame {
         }
         if !self.correlation_id.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.correlation_id, buf);
+        }
+        if self.timestamp_ms != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.timestamp_ms, buf);
+        }
+        if self.recv_window_ms != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.recv_window_ms, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.payload {
             match v {
@@ -223,6 +275,14 @@ impl ::buffa::Message for ClientFrame {
                     );
                     x.write_to(__cache, buf);
                 }
+                __buffa::oneof::client_frame::Payload::CancelAllAfter(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        18u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -251,6 +311,20 @@ impl ::buffa::Message for ClientFrame {
                     ::buffa::encoding::WireType::LengthDelimited,
                 )?;
                 ::buffa::types::merge_string(&mut self.correlation_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.timestamp_ms = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.recv_window_ms = ::buffa::types::decode_uint32(buf)?;
             }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -420,6 +494,28 @@ impl ::buffa::Message for ClientFrame {
                     );
                 }
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::CancelAllAfter(
+                        ref mut existing,
+                    ),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::CancelAllAfter(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -430,6 +526,8 @@ impl ::buffa::Message for ClientFrame {
     fn clear(&mut self) {
         self.seq = 0u64;
         self.correlation_id.clear();
+        self.timestamp_ms = 0i64;
+        self.recv_window_ms = 0u32;
         self.payload = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -462,6 +560,8 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                 let mut __f_correlation_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
+                let mut __f_timestamp_ms: ::core::option::Option<i64> = None;
+                let mut __f_recv_window_ms: ::core::option::Option<u32> = None;
                 let mut __oneof_payload: ::core::option::Option<
                     __buffa::oneof::client_frame::Payload,
                 > = None;
@@ -495,6 +595,36 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                                         D::Error,
                                     > {
                                         ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "timestampMs" | "timestamp_ms" => {
+                            __f_timestamp_ms = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = i64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<i64, D::Error> {
+                                        ::buffa::json_helpers::int64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "recvWindowMs" | "recv_window_ms" => {
+                            __f_recv_window_ms = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
                                     }
                                 }
                                 map.next_value_seed(_S)?
@@ -706,6 +836,32 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                                 );
                             }
                         }
+                        "cancelAllAfter" | "cancel_all_after" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::CancelAllAfterRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::CancelAllAfterRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::CancelAllAfter(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
                         }
@@ -717,6 +873,12 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                 }
                 if let ::core::option::Option::Some(v) = __f_correlation_id {
                     __r.correlation_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_timestamp_ms {
+                    __r.timestamp_ms = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_recv_window_ms {
+                    __r.recv_window_ms = v;
                 }
                 __r.payload = __oneof_payload;
                 Ok(__r)
@@ -1652,6 +1814,14 @@ impl ::buffa::Message for AckResponse {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::ack_response::Result::CancelAllAfter(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1717,6 +1887,14 @@ impl ::buffa::Message for AckResponse {
                 __buffa::oneof::ack_response::Result::BatchCancelOrders(x) => {
                     ::buffa::types::put_len_delimited_header(
                         7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::CancelAllAfter(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -1880,6 +2058,28 @@ impl ::buffa::Message for AckResponse {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.result = ::core::option::Option::Some(
                         __buffa::oneof::ack_response::Result::BatchCancelOrders(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::CancelAllAfter(
+                        ref mut existing,
+                    ),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::CancelAllAfter(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -2103,6 +2303,32 @@ impl<'de> serde::Deserialize<'de> for AckResponse {
                                 }
                                 __oneof_result = Some(
                                     __buffa::oneof::ack_response::Result::BatchCancelOrders(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "cancelAllAfter" | "cancel_all_after" => {
+                            let v: ::core::option::Option<
+                                super::super::orders::v1::CancelAllAfterResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::orders::v1::CancelAllAfterResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::CancelAllAfter(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -2664,6 +2890,23 @@ pub mod __buffa {
             ///
             /// Field 2: `correlation_id`
             pub correlation_id: &'a str,
+            /// Optional client time the command was sent, in milliseconds since the Unix
+            /// epoch. When set, the command is processed only until timestamp_ms plus
+            /// recv_window_ms: a command that arrives, or waits to be sent on for
+            /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
+            /// changes nothing, but it has taken its seq, so the next command uses the
+            /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+            /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
+            /// deadline. Ping ignores it.
+            ///
+            /// Field 3: `timestamp_ms`
+            pub timestamp_ms: i64,
+            /// Optional receive window in milliseconds, from 1 to 60000, applied to
+            /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+            /// rejected with BAD_REQUEST.
+            ///
+            /// Field 4: `recv_window_ms`
+            pub recv_window_ms: u32,
             pub payload: ::core::option::Option<
                 super::super::__buffa::view::oneof::client_frame::Payload<'a>,
             >,
@@ -2713,6 +2956,20 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.correlation_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.timestamp_ms = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.recv_window_ms = ::buffa::types::decode_uint32(&mut cur)?;
                     }
                     10u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -2962,6 +3219,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::CancelAllAfterRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -2993,6 +3281,8 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::ClientFrame {
                     seq: self.seq,
                     correlation_id: self.correlation_id.to_string(),
+                    timestamp_ms: self.timestamp_ms,
+                    recv_window_ms: self.recv_window_ms,
                     payload: match self.payload.as_ref() {
                         ::core::option::Option::Some(v) => {
                             ::core::option::Option::Some(
@@ -3069,6 +3359,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::CancelAllAfter(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -3095,6 +3394,18 @@ pub mod __buffa {
                     size
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.correlation_id)
+                                as u32;
+                }
+                if self.timestamp_ms != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.timestamp_ms)
+                                as u32;
+                }
+                if self.recv_window_ms != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.recv_window_ms)
                                 as u32;
                 }
                 if let ::core::option::Option::Some(ref v) = self.payload {
@@ -3179,6 +3490,16 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -3197,6 +3518,12 @@ pub mod __buffa {
                 }
                 if !self.correlation_id.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.correlation_id, buf);
+                }
+                if self.timestamp_ms != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.timestamp_ms, buf);
+                }
+                if self.recv_window_ms != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.recv_window_ms, buf);
                 }
                 if let ::core::option::Option::Some(ref v) = self.payload {
                     match v {
@@ -3280,6 +3607,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                18u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -3312,6 +3649,20 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.correlation_id) {
                     __map.serialize_entry("correlationId", self.correlation_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.timestamp_ms) {
+                    __map
+                        .serialize_entry(
+                            "timestampMs",
+                            &::buffa::json_helpers::ProtoJson(&self.timestamp_ms),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.recv_window_ms) {
+                    __map
+                        .serialize_entry(
+                            "recvWindowMs",
+                            &::buffa::json_helpers::ProtoJson(&self.recv_window_ms),
+                        )?;
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.payload {
                     match __ov {
@@ -3354,6 +3705,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("batchCancelOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelAllAfter(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelAllAfter", v)?;
                         }
                     }
                 }
@@ -3464,6 +3820,29 @@ pub mod __buffa {
             #[must_use]
             pub fn correlation_id(&self) -> &'_ str {
                 self.0.reborrow().correlation_id
+            }
+            /// Optional client time the command was sent, in milliseconds since the Unix
+            /// epoch. When set, the command is processed only until timestamp_ms plus
+            /// recv_window_ms: a command that arrives, or waits to be sent on for
+            /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
+            /// changes nothing, but it has taken its seq, so the next command uses the
+            /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+            /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
+            /// deadline. Ping ignores it.
+            ///
+            /// Field 3: `timestamp_ms`
+            #[must_use]
+            pub fn timestamp_ms(&self) -> i64 {
+                self.0.reborrow().timestamp_ms
+            }
+            /// Optional receive window in milliseconds, from 1 to 60000, applied to
+            /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+            /// rejected with BAD_REQUEST.
+            ///
+            /// Field 4: `recv_window_ms`
+            #[must_use]
+            pub fn recv_window_ms(&self) -> u32 {
+                self.0.reborrow().recv_window_ms
             }
             /// Oneof `payload`.
             #[must_use]
@@ -4958,6 +5337,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::orders::v1::__buffa::view::CancelAllAfterResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5054,6 +5464,15 @@ pub mod __buffa {
                                             ),
                                         )
                                     }
+                                    super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::CancelAllAfter(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
                                 },
                             )
                         }
@@ -5136,6 +5555,16 @@ pub mod __buffa {
                                     + inner;
                         }
                         super::super::__buffa::view::oneof::ack_response::Result::BatchCancelOrders(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
                             x,
                         ) => {
                             let __slot = __cache.reserve();
@@ -5230,6 +5659,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                8u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -5289,6 +5728,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("batchCancelOrders", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelAllAfter(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelAllAfter", v)?;
                         }
                     }
                 }
@@ -6456,6 +6900,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    CancelAllAfter(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::CancelAllAfterRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod server_frame {
@@ -6554,6 +7005,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    CancelAllAfter(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::orders::v1::__buffa::view::CancelAllAfterResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -6600,6 +7058,11 @@ pub mod __buffa {
                 BatchCancelOrders(
                     ::buffa::alloc::boxed::Box<
                         super::super::super::super::super::orders::v1::BatchCancelOrdersRequest,
+                    >,
+                ),
+                CancelAllAfter(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::CancelAllAfterRequest,
                     >,
                 ),
             }
@@ -6735,6 +7198,24 @@ pub mod __buffa {
                     Self::Some(Payload::from(v))
                 }
             }
+            impl From<
+                super::super::super::super::super::orders::v1::CancelAllAfterRequest,
+            > for Payload {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::CancelAllAfterRequest,
+                ) -> Self {
+                    Self::CancelAllAfter(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::CancelAllAfterRequest,
+            > for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::CancelAllAfterRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
             impl serde::Serialize for Payload {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -6766,6 +7247,9 @@ pub mod __buffa {
                         }
                         Self::BatchCancelOrders(v) => {
                             map.serialize_entry("batchCancelOrders", v)?;
+                        }
+                        Self::CancelAllAfter(v) => {
+                            map.serialize_entry("cancelAllAfter", v)?;
                         }
                     }
                     map.end()
@@ -6911,6 +7395,11 @@ pub mod __buffa {
                         super::super::super::super::super::orders::v1::BatchCancelOrdersResponse,
                     >,
                 ),
+                CancelAllAfter(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::orders::v1::CancelAllAfterResponse,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Result {}
             impl From<super::super::super::super::super::orders::v1::CreateOrderResponse>
@@ -7033,6 +7522,24 @@ pub mod __buffa {
                     Self::Some(Result::from(v))
                 }
             }
+            impl From<
+                super::super::super::super::super::orders::v1::CancelAllAfterResponse,
+            > for Result {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::CancelAllAfterResponse,
+                ) -> Self {
+                    Self::CancelAllAfter(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<
+                super::super::super::super::super::orders::v1::CancelAllAfterResponse,
+            > for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::orders::v1::CancelAllAfterResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
             impl serde::Serialize for Result {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -7061,6 +7568,9 @@ pub mod __buffa {
                         }
                         Self::BatchCancelOrders(v) => {
                             map.serialize_entry("batchCancelOrders", v)?;
+                        }
+                        Self::CancelAllAfter(v) => {
+                            map.serialize_entry("cancelAllAfter", v)?;
                         }
                     }
                     map.end()

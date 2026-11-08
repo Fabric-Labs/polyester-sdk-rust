@@ -1316,6 +1316,12 @@ pub enum ErrorCode {
     /// The trigger's child order did not match the order the trigger requested,
     /// so the trigger failed and the child order was canceled.
     ERROR_CODE_CHILD_ORDER_INCONSISTENT = 94i32,
+    /// The request's receive window ended before it was sent on for admission:
+    /// the request was not processed and changed nothing. The window is the
+    /// request's timestamp plus its receive window: the X-API-RECV-WINDOW header
+    /// of a signed request, or recv_window_ms of a WebSocket command. Send a new
+    /// request with a fresh timestamp.
+    ERROR_CODE_REQUEST_DEADLINE_EXCEEDED = 308i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1906,6 +1912,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ChildOrderInconsistent: Self = Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RequestDeadlineExceeded: Self = Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2529,6 +2538,9 @@ impl ::buffa::Enumeration for ErrorCode {
             94i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
             }
+            308i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -2946,6 +2958,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_TWAP_CAPACITY_REACHED => "ERROR_CODE_TWAP_CAPACITY_REACHED",
             Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT => {
                 "ERROR_CODE_CHILD_ORDER_INCONSISTENT"
+            }
+            Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED => {
+                "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED"
             }
         }
     }
@@ -3639,6 +3654,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CHILD_ORDER_INCONSISTENT" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
             }
+            "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3840,6 +3858,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CONDITION_PARAMETER_SET,
             Self::ERROR_CODE_TWAP_CAPACITY_REACHED,
             Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT,
+            Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED,
         ]
     }
 }
