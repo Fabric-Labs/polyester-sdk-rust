@@ -15,7 +15,7 @@ use crate::proto::chain::withdraw::v1::{
     CreateTradingWithdrawResponse, CreateWalletTradingWithdrawResponse,
     ValidateWithdrawDestinationResponse, WithdrawDestinationValidationCode,
 };
-use crate::proto::transfer::v1::CreateInternalTransferResponse;
+use crate::proto::transfer::v1::{CreateInternalTransferResponse, InternalTransferStatus};
 use crate::types::QuantityDomain;
 
 fn withdraw_destination_validation_code_label(
@@ -113,6 +113,16 @@ pub fn withdraw_intent_from_wallet_proto(
     })
 }
 
+fn internal_transfer_status_label(status: &buffa::EnumValue<InternalTransferStatus>) -> String {
+    match status.as_known() {
+        Some(InternalTransferStatus::Accepted) => "accepted".to_owned(),
+        Some(InternalTransferStatus::Rejected) => "rejected".to_owned(),
+        Some(InternalTransferStatus::Failed) => "failed".to_owned(),
+        Some(InternalTransferStatus::Unspecified) => String::new(),
+        None => format!("UNKNOWN({})", status.to_i32()),
+    }
+}
+
 pub fn internal_transfer_from_proto(
     msg: &CreateInternalTransferResponse,
 ) -> Result<InternalTransferResult> {
@@ -137,6 +147,7 @@ pub fn internal_transfer_from_proto(
         asset_id,
         asset_code: msg.asset_code.clone(),
         quantity,
+        status: internal_transfer_status_label(&msg.status),
     })
 }
 
@@ -222,6 +233,28 @@ mod tests {
         assert_ne!(accepted, rejected);
         assert_ne!(accepted, failed);
         assert_ne!(rejected, failed);
+        assert_eq!(accepted.status, "accepted");
+        assert_eq!(rejected.status, "rejected");
+        assert_eq!(failed.status, "failed");
+        assert_eq!(decode(InternalTransferStatus::Unspecified).status, "");
+        let mut future = one_token_receipt(InternalTransferStatus::Accepted);
+        future.status = buffa::EnumValue::Unknown(42);
+        assert_eq!(
+            internal_transfer_from_proto(&future).unwrap().status,
+            "UNKNOWN(42)"
+        );
+        // The identity and quantity controls are unchanged.
+        assert_eq!(
+            (accepted.request_id.as_str(), accepted.transfer_id.as_str()),
+            ("req", "xfer")
+        );
+        assert_eq!(
+            rejected.quantity.as_ref().map(|q| q.as_scaled()),
+            Some(1_000_000_000_000_000_000)
+        );
+        let mut missing_id = one_token_receipt(InternalTransferStatus::Rejected);
+        missing_id.transfer_id.clear();
+        assert!(internal_transfer_from_proto(&missing_id).is_err());
     }
 
     #[test]

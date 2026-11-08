@@ -155,6 +155,13 @@ pub type SharedTransport = GatewayTransport;
 /// and [`crate::errors::map_connect_error`] reads it back.
 pub(crate) const GATEWAY_REJECTION_TYPE: &str = "polyester.sdk.GatewayRejection";
 
+/// Type URL of the SDK-local Connect error detail that marks a REST 403
+/// problem refusing the operation, not the API key's credentials: a contract
+/// code such as `SUBACCOUNT_READ_FORBIDDEN`. Its `debug` holds the `code` and
+/// the request path as `endpoint`; [`crate::errors::map_connect_error`] reads
+/// it into [`Error::PermissionDenied`].
+pub(crate) const PERMISSION_REFUSAL_TYPE: &str = "polyester.sdk.PermissionRefusal";
+
 /// Type URL of the SDK-local Connect error detail that marks a bare HTTP 404, a
 /// plain 504 or a contract code at 501: a failed response whose body is not a
 /// Connect error. The error's HTTP status is the response's.
@@ -176,6 +183,9 @@ const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 ///   `401 {"code":"TIMESTAMP_SKEW"}`. Connect would keep only the HTTP status
 ///   and drop the code. This transport reports the code, so the rejection
 ///   maps to [`Error::TimestampSkew`] or [`Error::ApiKeyRejected`].
+/// - A REST 403 problem whose contract code refuses the operation, such as
+///   `SUBACCOUNT_READ_FORBIDDEN`, maps to [`Error::PermissionDenied`] with its
+///   code and the request path: the key is valid, the operation is not allowed.
 /// - An answer with no recognised code is reported by its real status, because a
 ///   gateway or an edge can send it too and it proves nothing about a mutation:
 ///   [`Error::Server`], or [`Error::RouteNotFound`] for a bare 404, rather than
@@ -206,6 +216,7 @@ impl ClientTransport for GatewayTransport {
         &self,
         request: Request<ClientBody>,
     ) -> BoxFuture<'static, std::result::Result<Response<Self::ResponseBody>, ConnectError>> {
+        let path = request.uri().path().to_owned();
         let response = self.inner.send(request);
         let compression = self.compression.clone();
         Box::pin(async move {
@@ -235,7 +246,8 @@ impl ClientTransport for GatewayTransport {
                     )
                     .unwrap_or_default(),
             };
-            if let Some(mut err) = classify_failed_response(parts.status, is_json, &decoded) {
+            if let Some(mut err) = classify_failed_response(parts.status, is_json, &decoded, &path)
+            {
                 err.set_response_headers(parts.headers.clone());
                 return Err(err);
             }
@@ -271,8 +283,9 @@ fn classify_failed_response(
     status: StatusCode,
     is_json: bool,
     body: &[u8],
+    path: &str,
 ) -> Option<ConnectError> {
-    let mut err = classify_failed_response_inner(status, is_json, body)?;
+    let mut err = classify_failed_response_inner(status, is_json, body, path)?;
     if let Some(problem) = crate::problem::decode_http_problem(body, status.as_u16()) {
         err = err.with_detail(ErrorDetail {
             type_url: HTTP_PROBLEM_TYPE.into(),
@@ -287,6 +300,7 @@ fn classify_failed_response_inner(
     status: StatusCode,
     is_json: bool,
     body: &[u8],
+    path: &str,
 ) -> Option<ConnectError> {
     #[derive(Deserialize)]
     struct BodyDetail {
@@ -425,6 +439,26 @@ fn classify_failed_response_inner(
                 .filter(|message| !message.is_empty())
                 .unwrap_or_else(|| code.clone());
             return Some(auth_problem(status, connect_code, auth_code, message));
+        }
+        // A contract code that is no credential reason refuses the operation;
+        // the API key itself was accepted.
+        if status == StatusCode::FORBIDDEN
+            && crate::errors::is_recognised_rest_code(&code)
+            && !crate::errors::is_credential_refusal_code(&code)
+        {
+            let message = parsed
+                .and_then(|body| body.detail.or(body.title))
+                .filter(|message| !message.is_empty())
+                .unwrap_or_else(|| code.clone());
+            return Some(
+                ConnectError::new(ErrorCode::PermissionDenied, message)
+                    .with_http_status(status)
+                    .with_detail(ErrorDetail {
+                        type_url: PERMISSION_REFUSAL_TYPE.into(),
+                        value: None,
+                        debug: Some(serde_json::json!({"code": code, "endpoint": path})),
+                    }),
+            );
         }
         if let Some(err) = gateway_rejection(status, code.clone()) {
             return Some(err);
@@ -772,6 +806,7 @@ mod tests {
                 StatusCode::from_u16(status).unwrap(),
                 is_json,
                 body.as_bytes(),
+                "/orders.v1.OrdersService/CreateOrder",
             )
         };
         let marker = |err: &ConnectError| {

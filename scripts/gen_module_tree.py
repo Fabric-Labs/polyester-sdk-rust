@@ -74,6 +74,10 @@ SKIP_PACKAGES = {
     "gnostic.openapi.v3.rs",
     "buf.validate.rs",
     "google.api.rs",
+    # Quick Swap is served by the TypeScript SDK only. The contract
+    # publication generates it for every language, but this crate compiles
+    # neither its messages nor its Connect clients.
+    "swap.quickswap.v1.rs",
 }
 
 

@@ -137,6 +137,13 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
             "max_slippage_ticks and max_slippage_bps apply only to market children or trailing_stop",
         ));
     }
+    // No trigger child has a GTD execution: refuse it for every strategy
+    // rather than send a child with a lifetime the caller did not choose.
+    if p.time_in_force == Some(CreateTimeInForce::Gtd) {
+        return Err(Error::validation(
+            "time_in_force=Gtd is not valid for trigger child orders",
+        ));
+    }
     // None leaves execution unspecified. Retain explicit Gtc for compatibility;
     // fixed IOC executions also accept Ioc.
     if p.trigger_type == Ladder
@@ -470,6 +477,11 @@ impl TriggersService {
                                 ));
                             }
                             (Some(ticks), None) => {
+                                if ticks <= 0 {
+                                    return Err(Error::validation(
+                                        "max_slippage_ticks must be positive",
+                                    ));
+                                }
                                 ioc.max_slippage =
                                     Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(ticks));
                             }
@@ -625,12 +637,8 @@ impl TriggersService {
                             },
                         ))
                     }
-                    Some(CreateTimeInForce::Gtd) => {
-                        return Err(Error::validation(
-                            "tif=gtd is not valid for trigger child orders",
-                        ));
-                    }
-                    // gtc or unspecified
+                    // gtc or unspecified; validate_create_option_applicability
+                    // has already refused gtd
                     _ => conditional_child_execution::Execution::LimitGtc(Box::new(
                         TriggerLimitGtc {
                             price_ticks,

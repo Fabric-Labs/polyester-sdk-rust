@@ -1,0 +1,11 @@
+error[E0433]: failed to resolve: could not find `quickswap` in `swap`
+ --> tests/ui/no_quickswap_modules.rs:3:31
+  |
+3 | use polyester::connect::swap::quickswap::v1::QuickSwapServiceClient;
+  |                               ^^^^^^^^^ could not find `quickswap` in `swap`
+
+error[E0433]: failed to resolve: could not find `quickswap` in `swap`
+ --> tests/ui/no_quickswap_modules.rs:4:29
+  |
+4 | use polyester::proto::swap::quickswap::v1::GetQuickSwapResponse;
+  |                             ^^^^^^^^^ could not find `quickswap` in `swap`

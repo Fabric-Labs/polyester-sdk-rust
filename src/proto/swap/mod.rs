@@ -7,5 +7,4 @@
     unused_qualifications
 )]
 
-pub mod quickswap;
 pub mod v1;
