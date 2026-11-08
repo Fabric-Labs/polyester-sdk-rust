@@ -264,10 +264,10 @@ pub mod auth_codes {
     /// `resource_exhausted` with `auth.v1.AuthErrorDetail`). It is an
     /// [`super::Error::RateLimit`] with this code, not an authentication
     /// failure: the credentials are valid, the request was not processed, and
-    /// the share frees as earlier windows end, within at most 60 seconds, so
-    /// it is retryable. It carries no `Retry-After`: back off briefly and send
-    /// again, which signs again with a fresh timestamp. A shorter
-    /// `Config::recv_window_ms` makes room sooner. See
+    /// the share frees as earlier windows end, so it is retryable. It carries
+    /// no `Retry-After`: back off briefly and send again, which signs again
+    /// with a fresh timestamp. A shorter `Config::recv_window_ms` makes room
+    /// sooner. See
     /// [`super::Error::is_replay_capacity_exhausted`].
     pub const REPLAY_CAPACITY_EXHAUSTED: &str = "AUTH_REPLAY_CAPACITY_EXHAUSTED";
     /// A valid signed wallet login named an account address no account uses,
