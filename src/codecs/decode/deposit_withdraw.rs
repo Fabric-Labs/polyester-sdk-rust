@@ -15,7 +15,7 @@ use crate::proto::chain::withdraw::v1::{
     CreateTradingWithdrawResponse, CreateWalletTradingWithdrawResponse,
     ValidateWithdrawDestinationResponse, WithdrawDestinationValidationCode,
 };
-use crate::proto::transfer::v1::CreateInternalTransferResponse;
+use crate::proto::transfer::v1::{CreateInternalTransferResponse, InternalTransferStatus};
 use crate::types::QuantityDomain;
 
 fn withdraw_destination_validation_code_label(
@@ -113,6 +113,16 @@ pub fn withdraw_intent_from_wallet_proto(
     })
 }
 
+fn internal_transfer_status_label(status: &buffa::EnumValue<InternalTransferStatus>) -> String {
+    match status.as_known() {
+        Some(InternalTransferStatus::Accepted) => "accepted".to_owned(),
+        Some(InternalTransferStatus::Rejected) => "rejected".to_owned(),
+        Some(InternalTransferStatus::Failed) => "failed".to_owned(),
+        Some(InternalTransferStatus::Unspecified) => String::new(),
+        None => format!("UNKNOWN({})", status.to_i32()),
+    }
+}
+
 pub fn internal_transfer_from_proto(
     msg: &CreateInternalTransferResponse,
 ) -> Result<InternalTransferResult> {
@@ -137,6 +147,7 @@ pub fn internal_transfer_from_proto(
         asset_id,
         asset_code: msg.asset_code.clone(),
         quantity,
+        status: internal_transfer_status_label(&msg.status),
     })
 }
 
@@ -144,6 +155,7 @@ pub fn internal_transfer_from_proto(
 mod tests {
     use super::*;
     use crate::proto::polyester::r#type::v1::U128;
+    use crate::proto::transfer::v1::InternalTransferStatus;
 
     #[test]
     fn deposit_addresses_list_maps_rows() {
@@ -191,6 +203,58 @@ mod tests {
             result.quantity.as_ref().unwrap().as_scaled(),
             1_000_000_000_000_000_000
         );
+    }
+
+    fn one_token_receipt(status: InternalTransferStatus) -> CreateInternalTransferResponse {
+        CreateInternalTransferResponse {
+            request_id: "req".into(),
+            transfer_id: "xfer".into(),
+            asset_id: 7,
+            asset_code: "USDT".into(),
+            amount_e18: U128 {
+                hi: 0,
+                lo: 1_000_000_000_000_000_000,
+                ..Default::default()
+            }
+            .into(),
+            status: status.into(),
+            ..Default::default()
+        }
+    }
+
+    /// POLY-8824: receipts that differ only in their status decode to
+    /// different results.
+    #[test]
+    fn poly_8824_internal_transfer_receipt_keeps_its_status() {
+        let decode = |status| internal_transfer_from_proto(&one_token_receipt(status)).unwrap();
+        let accepted = decode(InternalTransferStatus::Accepted);
+        let rejected = decode(InternalTransferStatus::Rejected);
+        let failed = decode(InternalTransferStatus::Failed);
+        assert_ne!(accepted, rejected);
+        assert_ne!(accepted, failed);
+        assert_ne!(rejected, failed);
+        assert_eq!(accepted.status, "accepted");
+        assert_eq!(rejected.status, "rejected");
+        assert_eq!(failed.status, "failed");
+        assert_eq!(decode(InternalTransferStatus::Unspecified).status, "");
+        let mut future = one_token_receipt(InternalTransferStatus::Accepted);
+        future.status = buffa::EnumValue::Unknown(42);
+        assert_eq!(
+            internal_transfer_from_proto(&future).unwrap().status,
+            "UNKNOWN(42)"
+        );
+        // The identity and quantity controls are unchanged.
+        assert_eq!(
+            (accepted.request_id.as_str(), accepted.transfer_id.as_str()),
+            ("req", "xfer")
+        );
+        assert_eq!(
+            rejected.quantity.as_ref().map(|q| q.as_scaled()),
+            Some(1_000_000_000_000_000_000)
+        );
+        let mut missing_id = one_token_receipt(InternalTransferStatus::Rejected);
+        missing_id.transfer_id.clear();
+        assert!(internal_transfer_from_proto(&missing_id).is_err());
     }
 
     #[test]

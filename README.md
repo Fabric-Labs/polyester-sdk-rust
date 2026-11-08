@@ -450,7 +450,10 @@ Stop-loss and take-profit triggers with a market child accept a slippage cap,
 `max_slippage_ticks` or `max_slippage_bps` (at most one; a SELL child takes
 fewer than 10000 bps). Without one, the pair's default market slippage
 applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
-reads expose the cap as `Trigger.max_slippage`.
+reads expose the cap as `Trigger.max_slippage`. A TWAP market child takes the
+same cap; `max_slippage_ticks` is positive wherever a create sends it. No
+trigger child has a GTD execution, so `CreateTimeInForce::Gtd` fails locally
+with `Error::Validation` for every trigger type.
 
 Market orders are IOC and enforce a slippage-derived execution boundary. See
 [Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
@@ -1019,6 +1022,11 @@ window. It is retryable: the request did nothing, and a retry signs it again wit
 timestamp. If it persists, fix the local clock. Other gateway rejections (`SIGNATURE_INVALID`,
 `KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code }` and are not
 retryable. `Error::auth_error_code()` returns the code of either.
+
+A REST HTTP 403 problem that refuses the operation rather than the key, such as
+`SUBACCOUNT_READ_FORBIDDEN` or `QUICKSWAP_NOT_PERMITTED`, is
+`Error::PermissionDenied { code, message, endpoint, .. }`: the key works, but its
+account, sub-account role or policy does not allow this call. It is not retryable.
 
 Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
 `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,

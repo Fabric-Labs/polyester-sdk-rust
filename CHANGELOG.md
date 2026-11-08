@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `triggers.create` refuses `time_in_force: Some(CreateTimeInForce::Gtd)` for every trigger type with `Error::Validation`, before anything is sent. No trigger child has a GTD execution, and the selection was replaced instead: a market stop or take-profit was sent as a market IOC child, and a TWAP, ladder or trailing stop sent its fixed GTC or IOC child. A limit stop already refused it. Migration: leave `time_in_force` unset, or choose `Gtc`, `Ioc` or `Fok` where the trigger type accepts it.
+- **Breaking:** `triggers.create` refuses a TWAP with a market child whose `max_slippage_ticks` is zero or negative with `Error::Validation`, as every other create-time tick cap already did. Migration: send a positive tick cap, or leave `max_slippage_ticks` unset for the pair default.
+- **Breaking:** `Error::auth_code` reads the auth reason of an `Error::Api` from its REST problem code, as it does for `Error::ApiKeyRejected`. A REST HTTP 400 `MISSING_HEADERS` problem now reads `AUTH_MISSING_HEADERS`, as the HTTP 401 one does, instead of `None`. Migration: none, unless you relied on `None` for that answer.
+- **Breaking:** A REST HTTP 403 problem whose contract code refuses the operation rather than the key's credentials, such as `SUBACCOUNT_READ_FORBIDDEN` or `QUICKSWAP_NOT_PERMITTED`, is now `Error::PermissionDenied` with that `code`, the problem's `detail` as `message`, the request path as `endpoint` and the procedure as `context`, instead of `Error::ApiKeyRejected`. This applies to every `Client` service method. Credential refusals (`SIGNATURE_INVALID`, `MISSING_HEADERS`, `KEY_EXPIRED`, `KEY_DISABLED`, `IP_NOT_ALLOWED`, `API_KEY_NOT_ACCEPTED`), `TIMESTAMP_SKEW` and codes outside the contract keep their errors. `Error::auth_code` also reads the auth reason of an `Error::PermissionDenied` code. Migration: match `Error::PermissionDenied { code, .. }` for these refusals; `Error::auth_error_code` no longer returns their code.
+- **Breaking:** The crate no longer compiles the generated `proto::swap::quickswap` and `connect::swap::quickswap` modules. Quick Swap is served by the TypeScript SDK only; these modules had no `Client` wrapper, and their generated JSON client failed a whole read on a Quick Swap status newer than the crate. Migration: use the TypeScript SDK for Quick Swap.
+- **Breaking:** `InternalTransferResult`, returned by `internal_transfers.create`, gains `status`: `"accepted"`, `"rejected"` or `"failed"`, as the service answered the request; empty when the response names none, and `"UNKNOWN(n)"` for a status this version does not know. Receipts that differed only in their status read the same before. `"accepted"` means the transfer has a durable transfer ID, not that it has settled. Migration: a struct literal of `InternalTransferResult` must set `status`.
+
 ## 0.13.0
 
 Package version: `0.13.0`. Git tag: `v0.13.0`. Released 2026-11-07. Built on public contract `1bf038e`.

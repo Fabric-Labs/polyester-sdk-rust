@@ -1183,6 +1183,7 @@ pub enum CreateTimeInForce {
     Gtd,
 }
 
+/// The receipt of an internal transfer request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferResult {
     pub request_id: String,
@@ -1190,6 +1191,11 @@ pub struct InternalTransferResult {
     pub asset_id: u32,
     pub asset_code: String,
     pub quantity: Option<AssetAmount>,
+    /// How the service answered the request: `"accepted"`, `"rejected"` or
+    /// `"failed"`; empty when the response names none, and `"UNKNOWN(n)"` for
+    /// a status this SDK version does not know. `"accepted"` means the
+    /// transfer has a durable transfer ID, not that it has settled.
+    pub status: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

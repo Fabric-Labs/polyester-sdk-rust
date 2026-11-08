@@ -30,6 +30,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error("{0}")]
     Auth(String),
+    /// The credentials were accepted, but the operation is not allowed: a
+    /// REST 403 problem with a contract code such as
+    /// `SUBACCOUNT_READ_FORBIDDEN` or `QUICKSWAP_NOT_PERMITTED`, or a refused
+    /// realtime token. `code` is the code as sent, `endpoint` the request
+    /// path or URL and `context` what was refused. Not retryable: the same
+    /// request is refused until the account, sub-account or key policy allows
+    /// it. A refused credential is [`Error::ApiKeyRejected`] instead.
     #[error("{context}: permission denied (HTTP {status}, code {code}): {message} [{endpoint}]")]
     PermissionDenied {
         message: String,
@@ -360,6 +367,15 @@ const API_KEY_REJECTIONS: [AuthErrorCode; 6] = [
     AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
 ];
 
+/// Whether a REST or API-gateway `code` refuses the API key's credentials,
+/// as [`Error::ApiKeyRejected`] or [`Error::TimestampSkew`] reports it, rather
+/// than the operation.
+pub(crate) fn is_credential_refusal_code(code: &str) -> bool {
+    auth_codes::from_rest_code(code).is_some_and(|reason| {
+        reason == AuthErrorCode::AUTH_TIMESTAMP_SKEW || API_KEY_REJECTIONS.contains(&reason)
+    })
+}
+
 /// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
 const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
 
@@ -661,8 +677,9 @@ impl Error {
     /// returns its raw code.
     pub fn auth_code(&self) -> Option<AuthErrorCode> {
         match self {
-            Self::Api { code, .. } => AuthErrorCode::from_proto_name(code),
-            Self::ApiKeyRejected { code, .. } => auth_codes::from_rest_code(code),
+            Self::Api { code, .. }
+            | Self::ApiKeyRejected { code, .. }
+            | Self::PermissionDenied { code, .. } => auth_codes::from_rest_code(code),
             Self::TimestampSkew { .. } => Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW),
             Self::SessionRequired { .. } => Some(AuthErrorCode::AUTH_SESSION_KIND_NOT_ALLOWED),
             _ => None,
@@ -1024,6 +1041,30 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
     let has_marker = |marker: &str| err.details.iter().any(|detail| detail.type_url == marker);
     if has_marker(crate::transport::GATEWAY_REJECTION_TYPE) {
         return gateway_rejection_error(status, raw_message);
+    }
+    if let Some(refusal) = err
+        .details
+        .iter()
+        .find(|detail| detail.type_url == crate::transport::PERMISSION_REFUSAL_TYPE)
+    {
+        let field = |name: &str| {
+            refusal
+                .debug
+                .as_ref()
+                .and_then(|debug| debug.get(name))
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let endpoint = field("endpoint");
+        return Error::PermissionDenied {
+            message: raw_message.to_owned(),
+            status,
+            code: field("code"),
+            context: endpoint.trim_start_matches('/').to_owned(),
+            endpoint,
+            problem: None,
+        };
     }
     if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
         // A bare 404 means the route is missing; a contract code at 501 that
