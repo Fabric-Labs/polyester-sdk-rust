@@ -31,6 +31,42 @@ pub async fn accept_skipping_port_probes(listener: &TcpListener) -> TcpStream {
     }
 }
 
+/// A loopback address that refuses every connection for as long as this
+/// lives, for tests of a transport failure.
+///
+/// The socket stays bound to its port without listening: the kernel refuses a
+/// connection to it, and no other socket can bind the port, so a listener
+/// another test spawns in parallel can't take it and answer. A probe listener
+/// that is dropped frees its port for exactly that.
+pub struct RefusedPort {
+    _socket: tokio::net::TcpSocket,
+    addr: std::net::SocketAddr,
+}
+
+impl RefusedPort {
+    pub fn bind() -> Self {
+        let socket = tokio::net::TcpSocket::new_v4().expect("socket");
+        // Without SO_REUSEADDR, no other socket can bind this port.
+        socket.set_reuseaddr(false).expect("reuseaddr");
+        socket
+            .bind(std::net::SocketAddr::from(([127, 0, 0, 1], 0)))
+            .expect("bind");
+        let addr = socket.local_addr().expect("addr");
+        Self {
+            _socket: socket,
+            addr,
+        }
+    }
+
+    pub fn addr(&self) -> std::net::SocketAddr {
+        self.addr
+    }
+
+    pub fn http_url(&self) -> String {
+        format!("http://{}", self.addr)
+    }
+}
+
 pub struct ParsedRequest {
     #[allow(dead_code)]
     pub method: String,

@@ -4975,11 +4975,9 @@ async fn l2_trigger_reads_return_definite_rest_refusals_at_once() {
 // nothing: reconcile through the orders, and don't treat the batch as refused.
 #[tokio::test]
 async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-    let port = listener.local_addr().expect("addr").port();
-    drop(listener);
+    let refused = hardening_support::RefusedPort::bind();
     let client = Client::new(Config {
-        api_url: format!("http://127.0.0.1:{port}"),
+        api_url: refused.http_url(),
         api_key_id: Some("ak_test".into()),
         api_private_key: Some(TEST_KEY.into()),
         hydrate_catalogs: false,
@@ -5012,6 +5010,34 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
     assert!(!err.is_retryable(), "{err:?}");
     // It polled through the failure rather than returning on the first one.
     assert!(started.elapsed() >= Duration::from_millis(100), "{err:?}");
+}
+
+// A test of a transport failure dials an address nothing serves, and it must
+// stay that way for the whole test: tests run in parallel, and a listener
+// another test spawns must not take its port and answer its requests.
+#[tokio::test]
+async fn l2_refused_port_stays_refused_while_other_tests_listen() {
+    let refused = hardening_support::RefusedPort::bind();
+    let addr = refused.addr();
+    // A concurrent test's listener can't take the port, by number or by chance.
+    assert!(
+        std::net::TcpListener::bind(addr).is_err(),
+        "another listener took {addr}"
+    );
+    let others: Vec<_> = (0..256)
+        .map(|_| std::net::TcpListener::bind("127.0.0.1:0").expect("bind"))
+        .collect();
+    assert!(
+        others
+            .iter()
+            .all(|listener| listener.local_addr().expect("addr") != addr),
+        "another listener took {addr}"
+    );
+    drop(others);
+    let err = tokio::net::TcpStream::connect(addr)
+        .await
+        .expect_err("nothing serves the port");
+    assert_eq!(err.kind(), std::io::ErrorKind::ConnectionRefused, "{err}");
 }
 
 // A ledger refusal keeps its stable code, known and final.

@@ -1,6 +1,6 @@
 //! REST errors must not carry the userinfo (password) of the API URL.
 
-use super::hardening_support::{HttpScript, MockHttpServer};
+use super::hardening_support::{HttpScript, MockHttpServer, RefusedPort};
 use polyester::{Client, Config};
 
 /// An obviously fake password placed in URL userinfo.
@@ -51,9 +51,7 @@ async fn rest_errors_do_not_leak_url_userinfo() {
         let err = read_error(with_userinfo(&http.base_url())).await;
         assert_no_userinfo(&format!("HTTP {status}"), &err);
     }
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-    let addr = listener.local_addr().expect("addr");
-    drop(listener);
-    let err = read_error(with_userinfo(&format!("http://{addr}"))).await;
+    let refused = RefusedPort::bind();
+    let err = read_error(with_userinfo(&refused.http_url())).await;
     assert_no_userinfo("connection refused", &err);
 }
