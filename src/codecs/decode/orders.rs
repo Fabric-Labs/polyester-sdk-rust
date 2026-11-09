@@ -283,11 +283,14 @@ fn decode_trailing_stop(
         activation_price: policy
             .filter(|policy| policy.activation_price_ticks > 0)
             .and_then(|policy| decode_price_ticks(policy.activation_price_ticks, None)),
-        // Order reads do not return the buy-back limit price yet.
-        limit_price: None,
+        limit_price: policy
+            .filter(|policy| policy.limit_price_ticks > 0)
+            .and_then(|policy| decode_price_ticks(policy.limit_price_ticks, None)),
         trigger_price_source: policy
             .and_then(|policy| risk_trigger_price_source(policy.trigger_price_source)),
-        // The child is an implicit market execution.
+        // `order_type` is not on the trailing-stop policy wire. A buy-back
+        // limit makes the child a limit IOC at that price; without one it is
+        // a market execution.
         order_type: None,
         max_slippage,
         state: state.map(attached_risk_leg_state_from_proto).transpose()?,
@@ -3449,5 +3452,145 @@ mod tests {
                 ("", ""),
             ]
         );
+    }
+
+    /// A selling order's attached trailing stop buys back at most 85000 and a
+    /// buying order's sells with no limit, as the order reads return them.
+    fn trailing_limit_order(order_id: u64, side: Side, limit_price_ticks: i64) -> ProtoOrder {
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoAttachedRisk, AttachedRiskTrailingStop, TrailingStopPolicy,
+            attached_risk_leg_state::Status, trailing_stop_policy,
+        };
+        ProtoOrder {
+            order_id,
+            symbol_id: 1,
+            side: side.into(),
+            status: OrderStatus::Working.into(),
+            attached_risk: ProtoAttachedRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    policy: TrailingStopPolicy {
+                        trailing_distance: Some(
+                            trailing_stop_policy::TrailingDistance::TrailingDistanceBps(100),
+                        ),
+                        trigger_price_source: TriggerPriceSource::LastPrice.into(),
+                        limit_price_ticks,
+                        ..Default::default()
+                    }
+                    .into(),
+                    state: ProtoAttachedRiskLegState {
+                        status: Status::Created.into(),
+                        trigger_id: Some(order_id + 100),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }
+    }
+
+    /// Every order read and the order stream expose the buy-back limit that
+    /// GetOrder returns on an attached trailing stop, exactly, and leave it
+    /// unset when the server sends none.
+    #[test]
+    fn order_reads_expose_attached_trailing_stop_limit_price() {
+        use crate::codecs::decode::orders_unit_from_proto;
+        use crate::models::{AttachedRiskLegState, TrailingDistance};
+        use crate::proto::privatews::v1::Unit as ProtoUnit;
+
+        const LIMIT_TICKS: i64 = 85_000_000_000_000;
+        let orders = vec![
+            trailing_limit_order(7001, Side::Sell, LIMIT_TICKS),
+            trailing_limit_order(7002, Side::Buy, 0),
+        ];
+        let reads: Vec<(&str, Vec<Order>)> = vec![
+            (
+                "get",
+                orders
+                    .iter()
+                    .map(|order| {
+                        get_order_from_proto(&GetOrderResponse {
+                            order: order.clone().into(),
+                            ..Default::default()
+                        })
+                        .unwrap()
+                        .order
+                        .expect("order")
+                    })
+                    .collect(),
+            ),
+            (
+                "open orders",
+                orders_list_from_open(&GetOpenOrdersResponse {
+                    orders: orders.clone(),
+                    ..Default::default()
+                })
+                .unwrap()
+                .orders,
+            ),
+            (
+                "history",
+                orders_list_from_history(&GetOrderHistoryResponse {
+                    orders: orders.clone(),
+                    ..Default::default()
+                })
+                .unwrap()
+                .orders,
+            ),
+            (
+                "order stream",
+                orders_unit_from_proto(&ProtoUnit {
+                    orders: orders.clone(),
+                    ..Default::default()
+                })
+                .unwrap()
+                .orders,
+            ),
+        ];
+        for (path, orders) in reads {
+            let trailing: Vec<_> = orders
+                .into_iter()
+                .map(|order| {
+                    order
+                        .attached_risk
+                        .and_then(|risk| risk.trailing_stop)
+                        .unwrap_or_else(|| panic!("{path}: trailing stop missing"))
+                })
+                .collect();
+            let [sell, buy] = trailing.as_slice() else {
+                panic!("{path}: want two orders");
+            };
+            let limit = sell
+                .limit_price
+                .as_ref()
+                .unwrap_or_else(|| panic!("{path}: sell trailing stop lost its buy-back limit"));
+            assert_eq!(limit.as_ticks(), LIMIT_TICKS, "{path}");
+            assert_eq!(limit.format(), "85000", "{path}");
+            assert!(
+                buy.limit_price.is_none(),
+                "{path}: buy trailing stop reads a limit"
+            );
+            for (stop, id) in [(sell, 7001u64), (buy, 7002)] {
+                assert_eq!(stop.distance, Some(TrailingDistance::Bps(100)), "{path}");
+                assert!(stop.activation_price.is_none(), "{path}");
+                assert!(stop.max_slippage.is_none(), "{path}");
+                assert_eq!(
+                    stop.trigger_price_source,
+                    Some(TriggerPriceSourceKind::LastPrice),
+                    "{path}"
+                );
+                let state: &AttachedRiskLegState = stop.state.as_ref().expect("state");
+                assert_eq!(state.status, "created", "{path}");
+                assert_eq!(
+                    state.trigger_id.as_deref(),
+                    Some(format_uint64_id(id + 100).as_str()),
+                    "{path}"
+                );
+            }
+        }
     }
 }

@@ -529,7 +529,7 @@ pub enum TrailingDistance {
     Bps(i32),
 }
 
-/// Optional max slippage for trailing-stop MARKET children.
+/// Optional max slippage for a trailing stop's child.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaxSlippage {
     /// Absolute Q9 price ticks (proto field is int64).
@@ -539,9 +539,12 @@ pub enum MaxSlippage {
 
 /// Trailing-stop attached-risk leg.
 ///
-/// Distance and optional max slippage must be positive. The child is always a
-/// market-IOC execution; supplying [`order_type`](Self::order_type) is
-/// rejected.
+/// Distance and optional max slippage must be positive. When a trailing stop
+/// with a [`limit_price`](Self::limit_price) fires, its child is a limit IOC
+/// order at that price (lower when [`max_slippage`](Self::max_slippage) caps it
+/// below): it fills what it can at or below the limit and the rest is
+/// canceled, not left resting. Without one the child is a market order.
+/// Supplying [`order_type`](Self::order_type) is rejected.
 ///
 /// Fields may be added in minor releases, so code outside this crate builds it
 /// with a constructor and sets fields afterwards instead of a struct literal.
@@ -555,15 +558,17 @@ pub struct TrailingStop {
     /// Maximum price of a trailing stop that buys back, the most its exit pays
     /// per unit. Required when the parent order sells, so the trailing stop
     /// buys, and must be at least `activation_price` when that is set; must be
-    /// `None` when the parent order buys. Order reads do not return it yet.
+    /// `None` when the parent order buys. Order reads return it as the server
+    /// sends it, and `None` when it sends none, as for a parent order that buys.
     pub limit_price: Option<Price>,
     /// Price the trailing stop watches (activation, peak or trough, and
     /// fire); `None` watches the last trade price.
     pub trigger_price_source: Option<TriggerPriceSourceKind>,
     /// Deprecated for attached trailing: any supplied value is rejected because
-    /// the child is always an implicit market execution.
+    /// the child follows from `limit_price` (a limit IOC at that price, or a
+    /// market order without one).
     #[deprecated(
-        note = "attached trailing child is always market; supplying order_type is rejected"
+        note = "an attached trailing stop takes no order_type; supplying one is rejected"
     )]
     pub order_type: Option<CreateOrderType>,
     pub max_slippage: Option<MaxSlippage>,

@@ -362,8 +362,9 @@ impl TriggersService {
                 }
             }
             CreateTriggerType::TrailingStop => {
-                // The child is market-IOC. A BUY trailing stop carries its maximum
-                // price as `limit_price_ticks`; a SELL one has none.
+                // A BUY trailing stop carries its maximum price as
+                // `limit_price_ticks` and fires a limit IOC child at it; a SELL
+                // one has none and fires a market IOC child.
                 let mut trailing = TrailingStopTrigger {
                     side: side.into(),
                     trigger_price_source: trigger_price_source.into(),
