@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.15.1
+
+Package version: `0.15.1`. Git tag: `v0.15.1`. Released 2026-11-09. Built on public contract `c8d9827`.
 
 - Order reads now return an attached trailing stop's buy-back limit as `TrailingStop::limit_price`: the maximum price of a trailing stop on an order that sells, the most its exit pays per unit, exactly as the server returns it. It was always `None` on a read, though the server returned it, so a trailing stop read back without its cap and only `triggers.get` showed it. It stays `None` when the server sends none, as for the trailing stop of an order that buys. A `TrailingStop` read from an order and passed back to `orders.modify` now keeps its limit. Affected: `orders.get_with`, `orders.list_open_with` and `orders.list_history_with` with `include_attached_risk`, and `orders.subscribe`, and `codecs::decode::order_from_proto`, `get_order_from_proto`, `orders_list_from_open`, `orders_list_from_history` and `orders_unit_from_proto`.
 - The `TrailingStop` docs, its deprecated `order_type` note and the README's attached trailing stop section now say what the trailing stop sends when it fires: with a buy-back `limit_price`, a limit IOC child at that price, which fills what it can at or below the limit and cancels the rest instead of resting; without one, a market child. They said the child is always market. The README also said an attached BUY trailing leg reads as a market IOC trigger; `triggers.get` reads it as a limit IOC child with its maximum price as `limit_price`, as for a standalone BUY one. The `Error::Validation` for an `order_type` on an attached trailing stop now reads "attached trailing_stop takes no order_type: its child is a limit IOC at limit_price when the order sells, and a market order when it buys"; `order_type` there is still refused.
