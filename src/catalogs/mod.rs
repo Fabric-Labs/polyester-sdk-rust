@@ -522,6 +522,34 @@ impl Manager {
         }
     }
 
+    /// Refuse a market name given with a market ID when the two name different
+    /// markets: the catalog maps the name to another ID, or names the ID
+    /// differently. A name and an ID the catalog doesn't know pass, so the ID is
+    /// sent as before. An empty name passes.
+    pub(crate) fn require_symbol_matches_id(
+        &self,
+        symbol: Option<&str>,
+        symbol_id: u32,
+        label: &str,
+    ) -> Result<()> {
+        let Some(symbol) = Self::normalize_raw_symbol_filter(symbol) else {
+            return Ok(());
+        };
+        let canonical = self.symbol_for_symbol_id(symbol_id);
+        let named = self.symbol_id_for_symbol(&symbol);
+        if canonical.as_deref().is_none_or(|name| name == symbol)
+            && named.is_none_or(|id| id == symbol_id)
+        {
+            return Ok(());
+        }
+        let mut msg =
+            format!("{label} symbol mismatch: {symbol:?} does not match symbol_id {symbol_id}");
+        if let Some(canonical) = canonical {
+            msg.push_str(&format!(" ({canonical})"));
+        }
+        Err(Error::validation(msg))
+    }
+
     /// Required Connect `symbol_id` from display `symbol` and/or numeric id.
     pub fn required_symbol_id(
         &self,

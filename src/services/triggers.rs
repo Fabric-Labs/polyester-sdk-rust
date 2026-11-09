@@ -486,7 +486,13 @@ impl TriggersService {
                                     Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(ticks));
                             }
                             (None, Some(bps)) => {
-                                validate_bps("max_slippage_bps", bps, false)?;
+                                // A slice that sells takes no 100% cap: it
+                                // would leave no positive price to sell at.
+                                let max = match params.side {
+                                    CreateSide::Sell => MAX_SELLING_SLIPPAGE_BPS,
+                                    CreateSide::Buy => MAX_BPS,
+                                };
+                                validate_bps_at_most("max_slippage_bps", bps, false, max)?;
                                 ioc.max_slippage =
                                     Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(bps));
                             }

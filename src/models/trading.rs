@@ -408,6 +408,9 @@ pub struct BatchCreateResultItem {
     pub stop_loss_trigger_id: Option<String>,
     /// Public ID of the attached trailing-stop trigger, when an accepted order has one.
     pub trailing_stop_trigger_id: Option<String>,
+    /// Field violations a rejection names, in the order the server sent them;
+    /// empty for an accepted item or a rejection that names no field.
+    pub violations: Vec<OrderFieldViolation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -435,10 +438,15 @@ pub struct BatchCancelItem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCancelResultItem {
     pub status: String,
+    /// The order the item resolved to, empty when the server resolved none
+    /// (an `ORDER_UNKNOWN` rejection by client order ID).
     pub order_id: String,
     pub client_order_id: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Field violations a rejection names, in the order the server sent them;
+    /// empty for an accepted item or a rejection that names no field.
+    pub violations: Vec<OrderFieldViolation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -759,6 +767,9 @@ pub struct BatchReplaceAdmissionItem {
     pub action_taken: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Field violations a rejection names, in the order the server sent them;
+    /// empty for an accepted item or a rejection that names no field.
+    pub violations: Vec<OrderFieldViolation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

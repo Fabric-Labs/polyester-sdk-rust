@@ -531,6 +531,21 @@ fn timestamp_ms(ts: &buffa_types::google::protobuf::Timestamp) -> i64 {
     ts.seconds.saturating_mul(1000) + (ts.nanos as i64) / 1_000_000
 }
 
+/// The field violations of an order error detail, in the order sent; empty
+/// when there is no detail.
+fn field_violations_from_proto(msg: Option<&ErrorDetail>) -> Vec<OrderFieldViolation> {
+    msg.map_or_else(Vec::new, |msg| {
+        msg.violations
+            .iter()
+            .map(|v| OrderFieldViolation {
+                field_path: v.field_path.clone(),
+                rule_id: v.rule_id.clone(),
+                message: v.message.clone(),
+            })
+            .collect()
+    })
+}
+
 fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
     OrderErrorDetail {
         code: match msg.code.as_known() {
@@ -541,15 +556,7 @@ fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
                 .to_owned(),
             None => format!("UNKNOWN_ERROR_CODE({})", msg.code.to_i32()),
         },
-        violations: msg
-            .violations
-            .iter()
-            .map(|v| OrderFieldViolation {
-                field_path: v.field_path.clone(),
-                rule_id: v.rule_id.clone(),
-                message: v.message.clone(),
-            })
-            .collect(),
+        violations: field_violations_from_proto(Some(msg)),
         rate_limit: msg
             .rate_limit
             .as_option()
@@ -716,6 +723,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 take_profit_trigger_id: None,
                 stop_loss_trigger_id: None,
                 trailing_stop_trigger_id: None,
+                violations: Vec::new(),
             };
             match item.outcome.as_ref() {
                 Some(batch_create_result_item::Outcome::Accepted(value)) => {
@@ -747,6 +755,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                         .as_option()
                         .and_then(|err| err.existing_order_id)
                         .and_then(optional_order_id);
+                    out.violations = field_violations_from_proto(value.error.as_option());
                 }
                 None => {
                     return Err(Error::response_contract(
@@ -802,7 +811,8 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
         }
         results.push(BatchCancelResultItem {
             status: status.to_owned(),
-            order_id: format_uint64_id(item.order_id),
+            // Zero is no order: an unresolved item stays empty instead of "0".
+            order_id: optional_order_id(item.order_id).unwrap_or_default(),
             client_order_id: item.client_order_id.clone(),
             code: item.code.clone(),
             rate_limit: item.error.as_option().and_then(|err| {
@@ -810,6 +820,7 @@ pub fn batch_cancel_from_proto(msg: &BatchCancelOrdersResponse) -> Result<BatchC
                     .as_option()
                     .map(crate::codecs::decode::rate_limit_detail_from_proto)
             }),
+            violations: field_violations_from_proto(item.error.as_option()),
         });
     }
     if accepted != msg.accepted_count
@@ -878,6 +889,7 @@ pub fn batch_replace_from_proto(
                     .as_option()
                     .map(crate::codecs::decode::rate_limit_detail_from_proto)
             }),
+            violations: field_violations_from_proto(item.error.as_option()),
         });
     }
     if accepted != msg.accepted_count
@@ -2655,6 +2667,105 @@ mod tests {
         assert_eq!(result.results[0].status, "accepted");
         assert_eq!(result.results[0].order_id, format_uint64_id(9));
         assert_eq!(result.results[0].client_order_id, "c1");
+    }
+
+    #[test]
+    fn batch_rejections_keep_field_violations_in_order() {
+        use crate::proto::orders::v1::{
+            BatchCancelResultItem as CancelItem, BatchCreateRejected,
+            BatchCreateResultItem as CreateItem, BatchReplaceAdmissionItem as ReplaceItem,
+            BatchReplaceAdmissionStatus, BatchReplaceItemAdmissionStatus, ErrorCode,
+            FieldViolation, batch_cancel_result_item, batch_create_result_item,
+        };
+        let proto_violations = || {
+            vec![
+                FieldViolation {
+                    field_path: "order.base_qty_scaled".into(),
+                    rule_id: "minimum".into(),
+                    message: "below minimum".into(),
+                    ..Default::default()
+                },
+                FieldViolation {
+                    field_path: "order.price_ticks".into(),
+                    rule_id: "tick_size".into(),
+                    message: "off tick".into(),
+                    ..Default::default()
+                },
+            ]
+        };
+        let detail = || ErrorDetail {
+            code: ErrorCode::ERROR_CODE_MIN_QTY.into(),
+            violations: proto_violations(),
+            ..Default::default()
+        };
+        let want = vec![
+            OrderFieldViolation {
+                field_path: "order.base_qty_scaled".into(),
+                rule_id: "minimum".into(),
+                message: "below minimum".into(),
+            },
+            OrderFieldViolation {
+                field_path: "order.price_ticks".into(),
+                rule_id: "tick_size".into(),
+                message: "off tick".into(),
+            },
+        ];
+
+        let created = batch_create_from_proto(&BatchCreateOrdersResponse {
+            results: vec![CreateItem {
+                outcome: Some(batch_create_result_item::Outcome::Rejected(Box::new(
+                    BatchCreateRejected {
+                        error: detail().into(),
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .expect("batch create");
+        assert_eq!(created.results[0].violations, want);
+
+        let canceled = batch_cancel_from_proto(&BatchCancelOrdersResponse {
+            results: vec![
+                CancelItem {
+                    status: batch_cancel_result_item::Status::Rejected.into(),
+                    client_order_id: "missing".into(),
+                    error: detail().into(),
+                    ..Default::default()
+                },
+                CancelItem {
+                    status: batch_cancel_result_item::Status::Rejected.into(),
+                    order_id: 7,
+                    ..Default::default()
+                },
+            ],
+            rejected_count: 2,
+            ..Default::default()
+        })
+        .expect("batch cancel");
+        assert_eq!(canceled.results[0].violations, want);
+        assert_eq!(canceled.results[0].order_id, "");
+        assert!(canceled.results[1].violations.is_empty());
+        assert_eq!(canceled.results[1].order_id, format_uint64_id(7));
+
+        let replaced = batch_replace_from_proto(&BatchReplaceOrdersResponse {
+            batch_request_id: 1,
+            status: BatchReplaceAdmissionStatus::BATCH_REPLACE_ADMISSION_STATUS_REJECTED.into(),
+            results: vec![ReplaceItem {
+                status:
+                    BatchReplaceItemAdmissionStatus::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED
+                        .into(),
+                old_order_id: 3,
+                error: detail().into(),
+                ..Default::default()
+            }],
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .expect("batch replace");
+        assert_eq!(replaced.results[0].violations, want);
     }
 
     #[test]
