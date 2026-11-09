@@ -399,8 +399,9 @@ price, the most its child pays per unit, fixed at create. Attached
 trailing-stop risk takes the side opposite the parent. Trigger reads project
 `trigger_type`, `side` and `parent_order_id`. A standalone BUY trailing stop
 reads as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
-its maximum price as `limit_price`; a SELL one (and an attached BUY leg) reads
-as a market IOC child with any cap in `max_slippage`. The trailing details
+its maximum price as `limit_price`, and so does an attached BUY leg (the
+trailing stop of a SELL order); a SELL one reads as a market IOC child with
+any cap in `max_slippage`. The trailing details
 carry the trough (BUY) or peak (SELL) price.
 
 An attached trailing stop on a SELL order buys back, so it requires
@@ -408,8 +409,14 @@ An attached trailing stop on a SELL order buys back, so it requires
 `activation_price` when that is set. An attached trailing stop on a BUY order
 sells and takes no `limit_price`. Order creates check both locally with
 `Error::Validation`; a modify, which does not carry the order's side, checks
-the limit's price rules and leaves the side rule to the server. Order reads do
-not return the limit price yet; keep the value you sent.
+the limit's price rules and leaves the side rule to the server. When the
+trailing stop of a SELL order fires, its child is a limit IOC order at
+`limit_price` (lower when `max_slippage` caps it below): it fills what it can
+at or below the limit, and the rest is canceled instead of resting. The
+trailing stop of a BUY order exits with a market child. `orders.get_with`,
+`orders.list_open_with` and `orders.list_history_with` with
+`include_attached_risk`, and `orders.subscribe` updates, return the limit as
+`TrailingStop.limit_price`, `None` when there is none.
 
 `CreateOrderParams`, `PreviewOrderParams`, `CreateTriggerParams`, `RiskLeg` and
 `TrailingStop` are `#[non_exhaustive]`, so a new optional field is not a

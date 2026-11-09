@@ -283,11 +283,14 @@ fn decode_trailing_stop(
         activation_price: policy
             .filter(|policy| policy.activation_price_ticks > 0)
             .and_then(|policy| decode_price_ticks(policy.activation_price_ticks, None)),
-        // Order reads do not return the buy-back limit price yet.
-        limit_price: None,
+        limit_price: policy
+            .filter(|policy| policy.limit_price_ticks > 0)
+            .and_then(|policy| decode_price_ticks(policy.limit_price_ticks, None)),
         trigger_price_source: policy
             .and_then(|policy| risk_trigger_price_source(policy.trigger_price_source)),
-        // The child is an implicit market execution.
+        // `order_type` is not on the trailing-stop policy wire. A buy-back
+        // limit makes the child a limit IOC at that price; without one it is
+        // a market execution.
         order_type: None,
         max_slippage,
         state: state.map(attached_risk_leg_state_from_proto).transpose()?,

@@ -753,11 +753,12 @@ impl OrdersService {
         parent_side: Option<CreateSide>,
         risk_field: &str,
     ) -> Result<TrailingStopPolicy> {
-        // `order_type` is not on the trailing-stop policy wire; the child is an
-        // implicit market execution.
+        // `order_type` is not on the trailing-stop policy wire; the child
+        // follows from the buy-back limit.
         if stop.order_type.is_some() {
             return Err(Error::validation(
-                "attached trailing_stop child is always market; order_type cannot be supplied",
+                "attached trailing_stop takes no order_type: its child is a limit IOC at \
+                 limit_price when the order sells, and a market order when it buys",
             ));
         }
         let mut proto = TrailingStopPolicy {
@@ -1985,6 +1986,51 @@ mod tests {
         }
     }
 
+    /// An attached trailing stop read from an order and sent back on a modify
+    /// keeps the buy-back limit the server returned.
+    #[test]
+    fn trailing_stop_read_back_and_sent_to_modify_keeps_its_limit() {
+        use crate::codecs::decode::order_from_proto;
+        use crate::proto::orders::v1::{
+            AttachedRisk as ProtoAttachedRisk, AttachedRiskTrailingStop, Order as ProtoOrder,
+            TrailingStopPolicy, trailing_stop_policy,
+        };
+
+        let read = order_from_proto(&ProtoOrder {
+            order_id: 7001,
+            symbol_id: 7,
+            attached_risk: ProtoAttachedRisk {
+                trailing_stop: AttachedRiskTrailingStop {
+                    policy: TrailingStopPolicy {
+                        trailing_distance: Some(
+                            trailing_stop_policy::TrailingDistance::TrailingDistanceBps(100),
+                        ),
+                        limit_price_ticks: 85_000_000_000_000,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let mut modify = modify_params(None, None);
+        modify.new_attached_risk = read.attached_risk;
+        let wire = client().orders.encode_modify_params(modify).unwrap();
+        let policy = wire
+            .new_attached_risk
+            .as_option()
+            .expect("new_attached_risk");
+        let Some(risk_policy::StopLeg::TrailingStop(trailing)) = policy.stop_leg.as_ref() else {
+            panic!("trailing stop leg missing: {policy:?}");
+        };
+        assert_eq!(trailing.limit_price_ticks, 85_000_000_000_000);
+    }
+
     #[test]
     fn decimal_and_scaled_modify_encode_identically() {
         let client = client();
@@ -2355,7 +2401,7 @@ mod tests {
             .orders
             .encode_create_params(&with_order_type)
             .unwrap_err();
-        assert!(err.to_string().contains("always market"));
+        assert!(err.to_string().contains("takes no order_type"));
     }
 
     #[allow(deprecated)]

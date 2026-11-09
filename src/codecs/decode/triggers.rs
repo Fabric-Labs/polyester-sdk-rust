@@ -361,11 +361,10 @@ fn trigger_config_projection(
             }
         }
         Some(trigger::Configuration::TrailingStop(trailing)) => {
-            // A SELL trailing stop fires a market IOC child. A standalone BUY
-            // one fires an IOC limit child at its maximum price (or at its
-            // slippage cap above the fire price when that is lower). An
-            // attached BUY trailing leg has no maximum price; its child is
-            // market IOC like a SELL one.
+            // A SELL trailing stop fires a market IOC child. A BUY one,
+            // standalone or attached to an order that sells, fires an IOC
+            // limit child at its maximum price (or at its slippage cap above
+            // the fire price when that is lower).
             proj.trigger_type = "trailing_stop".to_owned();
             proj.side = enum_value_side(trailing.side).to_owned();
             if proj.side.is_empty() {
