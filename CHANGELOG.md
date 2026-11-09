@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `orders.create`, `orders.preview` and `orders.batch_create` refuse a limit order with `market_client_ref_price: Some(_)` with `Error::Validation` (`market_client_ref_price is only valid for market orders`), before anything is sent, as they already refuse `market_max_slippage` on a limit order. The public contract carries the reference price on market orders only. On a limit order the SDK accepted it, then dropped it, so the order was created without it and read back with `market_client_ref_price` `None`. Migration: set `market_client_ref_price` to `None` on limit orders; it never had an effect on them.
+
 ## 0.15.1
 
 Package version: `0.15.1`. Git tag: `v0.15.1`. Released 2026-11-09. Built on public contract `c8d9827`.

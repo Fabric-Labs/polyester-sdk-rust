@@ -587,6 +587,11 @@ impl OrdersService {
                         "market_max_slippage is only valid for market orders",
                     ));
                 }
+                if params.market_client_ref_price.is_some() {
+                    return Err(Error::validation(
+                        "market_client_ref_price is only valid for market orders",
+                    ));
+                }
                 let price = params.price.as_ref().ok_or_else(|| {
                     Error::validation(
                         "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
