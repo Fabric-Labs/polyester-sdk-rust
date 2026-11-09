@@ -17,6 +17,8 @@ mod market_data;
 mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]
 mod orderbook_depths;
+#[path = "orders_and_batches/mod.rs"]
+mod orders_and_batches;
 #[path = "readable_error_bodies/mod.rs"]
 mod readable_error_bodies;
 #[path = "recv_window_replay/mod.rs"]
