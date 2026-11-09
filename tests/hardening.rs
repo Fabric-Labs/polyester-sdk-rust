@@ -11,6 +11,8 @@ mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
 mod hardening_support;
+#[path = "limit_market_ref_price/mod.rs"]
+mod limit_market_ref_price;
 #[path = "market_data/mod.rs"]
 mod market_data;
 #[path = "order_trades_wait/mod.rs"]

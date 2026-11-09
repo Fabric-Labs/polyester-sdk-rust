@@ -1021,6 +1021,7 @@ pub struct CreateOrderParams {
     pub subaccount_id: Option<u64>,
     pub post_only: Option<bool>,
     /// Client reference price for MARKET order reservation (price ticks domain).
+    /// Rejected on limit orders.
     pub market_client_ref_price: Option<Price>,
     /// Fee asset. `Base` is valid only for BUY orders; SELL orders use `Quote`.
     pub fee_asset: Option<FeeAsset>,
