@@ -281,7 +281,10 @@ Public methods may still accept display `symbol` strings. Connect is
 `symbol_id`-only except `GetSpotConfig` (which still returns both `symbol`
 and `symbol_id`). The SDK trims display symbols, resolves them through the
 hydrated catalog, and fails closed on unknown values. It does not forward raw
-symbol strings onto Connect fields that no longer exist. Optional ListOpen
+symbol strings onto Connect fields that no longer exist. A read that takes
+both a `symbol` and a `symbol_id` (`market_data.get_trades_with`,
+`get_candles_with`, `orders.list_history_with`) refuses a name and an ID for
+different markets with `Error::Validation` before sending. Optional ListOpen
 limits reject an explicit `Some(0)`; other zero-means-default proto limits
 pass `0` through as the server default.
 
@@ -762,7 +765,8 @@ it. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
 or maximum-slippage cap. A trailing stop's `max_slippage_bps` (standalone or
 attached, buy or sell) and a modify's take 1–9999; modify still accepts `0`
-to clear. A buy market child and a TWAP slice take up to 10000.
+to clear. A buy market child and a buy TWAP slice take up to 10000; a sell
+market child and a sell TWAP slice take up to 9999.
 Standalone and attached `trailing_distance_bps` require 1–10000. A buy
 trailing stop's `limit_price` must be at least its `activation_price`.
 

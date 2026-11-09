@@ -51,6 +51,9 @@ impl MarketDataService {
         label: &str,
     ) -> Result<u32> {
         if let Some(id) = symbol_id.filter(|id| *id != 0) {
+            self.ctx
+                .catalogs
+                .require_symbol_matches_id(symbol, id, label)?;
             return Ok(id);
         }
         let Some(symbol) = symbol.filter(|s| !s.is_empty()) else {

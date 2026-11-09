@@ -204,11 +204,12 @@ impl OrdersService {
     }
 
     pub async fn list_history_with(&self, opts: ListOrderHistoryOpts) -> Result<OrdersList> {
-        if opts.symbol_id.is_none()
-            && opts
-                .symbol
-                .as_deref()
-                .is_some_and(|value| !value.trim().is_empty())
+        // A market name is resolved, or checked against the ID given with it,
+        // through the catalog.
+        if opts
+            .symbol
+            .as_deref()
+            .is_some_and(|value| !value.trim().is_empty())
         {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -219,6 +220,11 @@ impl OrdersService {
                     "symbol_id must be non-zero when explicitly supplied",
                 ));
             }
+            self.ctx.catalogs.require_symbol_matches_id(
+                opts.symbol.as_deref(),
+                sid,
+                "orders.list_history",
+            )?;
             symbol_ids.push(sid);
         } else if let Some(symbol) =
             crate::catalogs::Manager::normalize_raw_symbol_filter(opts.symbol.as_deref())
