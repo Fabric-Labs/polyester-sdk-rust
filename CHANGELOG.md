@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.15.0
+
+Package version: `0.15.0`. Git tag: `v0.15.0`. Released 2026-11-09. Built on public contract `c8d9827`.
 
 - **Breaking:** `BatchCreateResultItem`, `BatchCancelResultItem` and `BatchReplaceAdmissionItem` gain `violations: Vec<OrderFieldViolation>`, the field violations (`field_path`, `rule_id`, `message`) a rejected item carries, in the order the server sent them, as `orders.preview` already reports them. A batch create item refused for `ERROR_CODE_PRICE_TICK_SIZE` now names `order.attached_risk.take_profit.trigger_price_ticks` and rule `tick_size`, for example. They were dropped, so a caller could not tell which field to fix. `violations` is empty for an accepted item and for a rejection that names no field. Affected: `orders.batch_create`, `orders.batch_cancel` and `orders.batch_replace`, and `codecs::decode::batch_create_from_proto`, `batch_cancel_from_proto` and `batch_replace_from_proto`. Migration: a struct literal of these three types no longer compiles without `violations`; add `violations: Vec::new()`.
 - **Breaking:** A rejected `orders.batch_cancel` item that resolved no order, such as an `ORDER_UNKNOWN` rejection by client order ID, now reads `order_id` `""`. It read `"0"`, an order ID no order has. An item that resolved its order keeps that ID, accepted or rejected. Affected: `orders.batch_cancel` and `codecs::decode::batch_cancel_from_proto`. Migration: test `order_id` for `""` instead of `"0"`.
