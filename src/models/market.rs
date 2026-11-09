@@ -157,6 +157,24 @@ pub struct MarketOverviewEntry {
     pub change_24h_bps: i32,
     /// Sparklines the server sent, only when `include_sparklines` was requested.
     pub sparklines: Vec<MarketOverviewSparkline>,
+    /// Highest trade price over the last 24 hours; `None` when the server sent none.
+    pub high_24h: Option<Price>,
+    /// Lowest trade price over the last 24 hours; `None` when the server sent none.
+    pub low_24h: Option<Price>,
+    /// Best bid price; `None` when the bid side of the book is empty.
+    pub best_bid: Option<Price>,
+    /// Base quantity at the best bid, at the pair's base quantity scale when the
+    /// catalogs know it; `None` when the bid side is empty.
+    pub best_bid_qty: Option<Quantity>,
+    /// Best ask price; `None` when the ask side of the book is empty.
+    pub best_ask: Option<Price>,
+    /// Base quantity at the best ask, at the pair's base quantity scale when the
+    /// catalogs know it; `None` when the ask side is empty.
+    pub best_ask_qty: Option<Quantity>,
+    /// Time of the last trade, in epoch nanoseconds; empty when there was none.
+    pub last_trade_ts_ns: String,
+    /// Time the market was listed, in epoch nanoseconds; empty when unknown.
+    pub listed_ts_ns: String,
 }
 
 /// A market's recent closing prices over `interval`, newest first.

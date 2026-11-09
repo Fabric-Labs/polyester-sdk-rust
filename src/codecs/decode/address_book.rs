@@ -4,8 +4,8 @@ use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
 use crate::errors::{Error, Result};
 use crate::models::{
-    AddressBookEntriesList, AddressBookEntry, AddressBookTag, AddressBookViewInvalidation,
-    AddressBooksList,
+    AccountScope, AddressBookEntriesList, AddressBookEntry, AddressBookTag,
+    AddressBookViewInvalidation, AddressBooksList,
 };
 use crate::proto::auth::v1::{
     AddressBookEntry as ProtoAddressBookEntry, AddressBookTag as ProtoAddressBookTag,
@@ -87,12 +87,12 @@ pub fn tag_from_update_proto(msg: &UpdateAddressBookTagResponse) -> Result<Addre
 pub fn address_book_invalidation_from_proto(
     msg: &AddressBookViewInvalidated,
 ) -> AddressBookViewInvalidation {
-    let scope = msg
-        .scope
-        .as_option()
-        .filter(|s| s.root_account_id != 0)
-        .map(|s| format_id(s.root_account_id))
-        .unwrap_or_default();
+    let scope = msg.scope.as_option().map(|scope| AccountScope {
+        scope_type: enum_proto_name(&scope.scope_type),
+        root_account_id: nonzero_id(scope.root_account_id),
+        // A root scope sends sub-account 0, which is not an ID: name none.
+        sub_account_id: nonzero_id(scope.subaccount_id),
+    });
     let invalidated_at = msg
         .invalidated_at
         .as_option()
@@ -102,6 +102,14 @@ pub fn address_book_invalidation_from_proto(
         scope,
         invalidated_at,
         view_revision: msg.view_revision,
+    }
+}
+
+fn nonzero_id(id: u64) -> String {
+    if id == 0 {
+        String::new()
+    } else {
+        format_id(id)
     }
 }
 
@@ -299,7 +307,7 @@ mod tests {
             ..Default::default()
         };
         let out = address_book_invalidation_from_proto(&msg);
-        assert!(!out.scope.is_empty());
+        assert_eq!(out.scope.unwrap().root_account_id, format_id(42));
         assert_eq!(out.invalidated_at, "1970-01-01T00:00:00Z");
         assert_eq!(out.view_revision, 7);
     }

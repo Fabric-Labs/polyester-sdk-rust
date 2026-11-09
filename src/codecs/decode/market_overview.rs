@@ -1,6 +1,8 @@
 //! Market overview decoders.
 
-use super::money::{decode_price_ticks, decode_price_ticks_allow_zero};
+use super::money::{
+    decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled_allow_zero,
+};
 use crate::models::{
     CurrencyConversionConfig, CurrencyConversionRates, CurrencyMetadata, FiatConversionRate,
     FiatConversionSnapshot, MarketOverviewEntry, MarketOverviewList, MarketOverviewSparkline,
@@ -12,8 +14,13 @@ use crate::proto::marketoverview::v1::{
     GetCurrencyConversionRatesResponse, GetSpotVolumeHistoryResponse, ListMarketOverviewResponse,
     MarketOverview as ProtoMarketOverview, MarketOverviewBatch, Sparkline as ProtoSparkline,
 };
+use crate::types::money::{Price, Quantity};
 
 pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOverviewEntry {
+    let (best_bid, best_bid_qty) =
+        book_side(msg.best_bid_ticks, msg.best_bid_qty_scaled, msg.symbol_id);
+    let (best_ask, best_ask_qty) =
+        book_side(msg.best_ask_ticks, msg.best_ask_qty_scaled, msg.symbol_id);
     MarketOverviewEntry {
         symbol_id: msg.symbol_id,
         symbol: String::new(),
@@ -29,6 +36,34 @@ pub fn market_overview_entry_from_proto(msg: &ProtoMarketOverview) -> MarketOver
             .iter()
             .map(market_overview_sparkline_from_proto)
             .collect(),
+        high_24h: decode_price_ticks(msg.high_24h_ticks, None),
+        low_24h: decode_price_ticks(msg.low_24h_ticks, None),
+        best_bid,
+        best_bid_qty,
+        best_ask,
+        best_ask_qty,
+        last_trade_ts_ns: ts_ns_or_empty(msg.last_trade_ts_ns),
+        listed_ts_ns: ts_ns_or_empty(msg.listed_ts_ns),
+    }
+}
+
+/// The best price of one side of the book and the base quantity at it; both
+/// `None` when that side is empty.
+fn book_side(ticks: i64, qty_scaled: i64, symbol_id: u32) -> (Option<Price>, Option<Quantity>) {
+    match decode_price_ticks(ticks, None) {
+        Some(price) => (
+            Some(price),
+            decode_qty_scaled_allow_zero(qty_scaled, None, None, Some(symbol_id)),
+        ),
+        None => (None, None),
+    }
+}
+
+fn ts_ns_or_empty(ts_ns: u64) -> String {
+    if ts_ns == 0 {
+        String::new()
+    } else {
+        ts_ns.to_string()
     }
 }
 

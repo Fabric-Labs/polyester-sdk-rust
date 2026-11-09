@@ -25,6 +25,7 @@ use crate::proto::marketoverview::v1::{
     GetSpotVolumeHistoryRequest, ListMarketOverviewRequest,
 };
 use crate::proto::orderbook::v1::GetOrderBookRequest;
+use crate::types::money::Quantity;
 use buffa_types::google::protobuf::Timestamp;
 
 #[derive(Clone)]
@@ -384,6 +385,25 @@ fn enrich_market_overview_rows(
     for market in rows {
         if market.symbol.is_empty() {
             market.symbol = catalogs.display_symbol(market.symbol_id);
+        }
+        // Book sizes are base quantities: give them the pair's scale and symbol.
+        if let Some(scale) = catalogs.base_quantity_scale_for_symbol_id(market.symbol_id) {
+            for qty in [&mut market.best_bid_qty, &mut market.best_ask_qty] {
+                if let Some(raw) = qty.as_ref() {
+                    *qty = Some(
+                        Quantity::from_scaled(
+                            raw.as_scaled(),
+                            Some(scale),
+                            raw.domain(),
+                            Some(market.symbol.clone()).filter(|symbol| !symbol.is_empty()),
+                            Some(market.symbol_id),
+                        )
+                        .map_err(|e| {
+                            Error::validation(format!("market overview book size invalid: {e}"))
+                        })?,
+                    );
+                }
+            }
         }
         if let (Some(raw), Some(scale)) = (
             market.volume_24h_base_scaled.as_deref(),
