@@ -226,6 +226,61 @@ mod tests {
         assert!(tag_from_update_proto(&UpdateAddressBookTagResponse::default()).is_err());
     }
 
+    // POLY-9020: the Devnet account from the ticket, root Xiw8QFupu6d with
+    // sub-account 2nphEX67UQT.
+    const ROOT_ID: u64 = 13_235_591_962_976_289_070;
+    const SUB_ID: u64 = 771_156_649_032_427_868;
+
+    fn invalidation(scope: Option<AccountScopeRef>) -> AddressBookViewInvalidation {
+        let mut msg = AddressBookViewInvalidated {
+            view_revision: 1_004_932_554_200,
+            ..Default::default()
+        };
+        if let Some(scope) = scope {
+            msg.scope = scope.into();
+        }
+        address_book_invalidation_from_proto(&msg)
+    }
+
+    // POLY-9020: a sub-account's change names the sub-account and its scope type.
+    #[test]
+    fn invalidation_keeps_the_subaccount_scope() {
+        let out = invalidation(Some(AccountScopeRef {
+            scope_type: crate::proto::auth::v1::AccountScopeType::SCOPE_SUBACCOUNT.into(),
+            root_account_id: ROOT_ID,
+            subaccount_id: SUB_ID,
+            ..Default::default()
+        }));
+        assert_eq!(
+            out.scope,
+            Some(crate::models::AccountScope {
+                scope_type: "SCOPE_SUBACCOUNT".into(),
+                root_account_id: "Xiw8QFupu6d".into(),
+                sub_account_id: "2nphEX67UQT".into(),
+            })
+        );
+        assert_eq!(out.view_revision, 1_004_932_554_200);
+    }
+
+    // POLY-9020: a root change names only the root; no scope stays unset.
+    #[test]
+    fn invalidation_root_scope_has_no_subaccount() {
+        let out = invalidation(Some(AccountScopeRef {
+            scope_type: crate::proto::auth::v1::AccountScopeType::SCOPE_ROOT.into(),
+            root_account_id: ROOT_ID,
+            ..Default::default()
+        }));
+        assert_eq!(
+            out.scope,
+            Some(crate::models::AccountScope {
+                scope_type: "SCOPE_ROOT".into(),
+                root_account_id: "Xiw8QFupu6d".into(),
+                sub_account_id: String::new(),
+            })
+        );
+        assert_eq!(invalidation(None).scope, None);
+    }
+
     #[test]
     fn invalidation_formats_scope_and_time() {
         let msg = AddressBookViewInvalidated {

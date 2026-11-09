@@ -155,6 +155,91 @@ pub fn market_overview_batch_from_proto(msg: &MarketOverviewBatch) -> MarketOver
 mod tests {
     use super::*;
 
+    /// The Devnet BTC-USDT row from POLY-9019.
+    fn devnet_row() -> ProtoMarketOverview {
+        ProtoMarketOverview {
+            symbol_id: 1,
+            last_price_ticks: 74_900_000_000_000,
+            high_24h_ticks: 76_167_500_000_000,
+            low_24h_ticks: 73_621_960_000_000,
+            best_bid_ticks: 74_883_900_000_000,
+            best_bid_qty_scaled: 6_166_686,
+            best_ask_ticks: 74_921_360_000_000,
+            best_ask_qty_scaled: 5_532_396,
+            last_trade_ts_ns: 1_794_236_100_652_374_117,
+            listed_ts_ns: 1_792_404_511_505_163_000,
+            ..Default::default()
+        }
+    }
+
+    fn ticks(price: &Option<crate::types::money::Price>) -> Option<i64> {
+        price.as_ref().map(|price| price.as_ticks())
+    }
+
+    fn scaled(qty: &Option<crate::types::money::Quantity>) -> Option<i64> {
+        qty.as_ref().map(|qty| qty.as_scaled())
+    }
+
+    // POLY-9019: rows keep the 24h range, the top of book with sizes, and the
+    // last-trade and listing times, exactly as sent.
+    #[test]
+    fn overview_keeps_range_top_of_book_and_times() {
+        let list = market_overview_list_from_proto(&ListMarketOverviewResponse {
+            markets: vec![devnet_row()],
+            ..Default::default()
+        });
+        let batch = market_overview_batch_from_proto(&MarketOverviewBatch {
+            markets: vec![devnet_row()],
+            ..Default::default()
+        });
+        for row in [&list.markets[0], &batch.markets[0]] {
+            assert_eq!(ticks(&row.high_24h), Some(76_167_500_000_000));
+            assert_eq!(ticks(&row.low_24h), Some(73_621_960_000_000));
+            assert_eq!(ticks(&row.best_bid), Some(74_883_900_000_000));
+            assert_eq!(scaled(&row.best_bid_qty), Some(6_166_686));
+            assert_eq!(ticks(&row.best_ask), Some(74_921_360_000_000));
+            assert_eq!(scaled(&row.best_ask_qty), Some(5_532_396));
+            assert_eq!(row.last_trade_ts_ns, "1794236100652374117");
+            assert_eq!(row.listed_ts_ns, "1792404511505163000");
+            assert_eq!(ticks(&row.last_price), Some(74_900_000_000_000));
+        }
+    }
+
+    // POLY-9019: an empty book side and missing times decode as unset, not 0.
+    #[test]
+    fn overview_empty_side_and_missing_times_are_unset() {
+        for bid in [true, false] {
+            let mut msg = devnet_row();
+            msg.high_24h_ticks = 0;
+            msg.low_24h_ticks = 0;
+            msg.last_trade_ts_ns = 0;
+            msg.listed_ts_ns = 0;
+            if bid {
+                msg.best_bid_ticks = 0;
+                msg.best_bid_qty_scaled = 0;
+            } else {
+                msg.best_ask_ticks = 0;
+                msg.best_ask_qty_scaled = 0;
+            }
+            let row = market_overview_entry_from_proto(&msg);
+            assert!(row.high_24h.is_none() && row.low_24h.is_none());
+            assert!(row.last_trade_ts_ns.is_empty() && row.listed_ts_ns.is_empty());
+            let (empty, other) = if bid {
+                (
+                    (&row.best_bid, &row.best_bid_qty),
+                    (&row.best_ask, &row.best_ask_qty),
+                )
+            } else {
+                (
+                    (&row.best_ask, &row.best_ask_qty),
+                    (&row.best_bid, &row.best_bid_qty),
+                )
+            };
+            assert!(empty.0.is_none() && empty.1.is_none(), "{row:?}");
+            assert!(other.0.is_some() && other.1.is_some(), "{row:?}");
+        }
+    }
+
     #[test]
     fn overview_maps_last_price() {
         let msg = ListMarketOverviewResponse {
