@@ -400,8 +400,8 @@ trailing-stop risk takes the side opposite the parent. Trigger reads project
 `trigger_type`, `side` and `parent_order_id`. A standalone BUY trailing stop
 reads as an IOC limit child (`order_type` `limit`, `time_in_force` `ioc`) with
 its maximum price as `limit_price`, and so does an attached BUY leg (the
-trailing stop of a SELL order); a SELL one reads as a market IOC child with
-any cap in `max_slippage`. The trailing details
+trailing stop of a SELL order); a SELL one, standalone or the trailing stop of
+a BUY order, reads as a market IOC child with any cap in `max_slippage`. The trailing details
 carry the trough (BUY) or peak (SELL) price.
 
 An attached trailing stop on a SELL order buys back, so it requires
