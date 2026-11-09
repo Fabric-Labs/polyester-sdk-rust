@@ -31,6 +31,28 @@ pub async fn accept_skipping_port_probes(listener: &TcpListener) -> TcpStream {
     }
 }
 
+/// A loopback address that nothing serves, for tests of a transport failure.
+pub struct RefusedPort {
+    addr: std::net::SocketAddr,
+}
+
+impl RefusedPort {
+    pub fn bind() -> Self {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let addr = listener.local_addr().expect("addr");
+        drop(listener);
+        Self { addr }
+    }
+
+    pub fn addr(&self) -> std::net::SocketAddr {
+        self.addr
+    }
+
+    pub fn http_url(&self) -> String {
+        format!("http://{}", self.addr)
+    }
+}
+
 pub struct ParsedRequest {
     #[allow(dead_code)]
     pub method: String,
