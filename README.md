@@ -266,7 +266,15 @@ tests.
 
 `Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio
 runtime, the client starts spot and zipper catalog hydration in the background.
-Await readiness before decimal writes that depend on catalog scales:
+Every method that names a market by symbol, or needs a pair's catalog scales,
+waits for that hydration itself, so it can be called right after the client is
+created. When hydration failed, such a method returns `Error::CatalogHydration`,
+which holds the failure; a symbol the hydrated catalogs don't know returns the
+`Error::Validation` "unknown symbol". Methods that only label their results from
+the catalogs, such as `market_overview.subscribe` and `fees.get_spot_fee_rates`,
+wait too and leave the labels empty when hydration failed. With
+`hydrate_catalogs: false` nothing waits. Await readiness yourself to learn early
+whether hydration failed, or to hydrate again after a failure:
 
 ```rust,no_run
 let client = polyester::Client::from_env()?;

@@ -201,6 +201,8 @@ impl TriggersService {
     /// the last error.
     pub async fn list(&self, req: ListTriggersRequest) -> Result<TriggersList> {
         super::scope::request_subaccount(req.subaccount_id)?;
+        // Triggers are labelled with their symbol from the catalogs.
+        self.ctx.settle_catalogs().await;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -252,6 +254,8 @@ impl TriggersService {
     /// request, as [`Self::list`] does, and never falls back to a cached copy.
     pub async fn get(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
         super::scope::request_subaccount(req.subaccount_id)?;
+        // The trigger is labelled with its symbol from the catalogs.
+        self.ctx.settle_catalogs().await;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,

@@ -22,6 +22,15 @@ use crate::proto::transfer::v1::{
 };
 use crate::user_agent::{cloudflare_1010_message, is_cloudflare_browser_ban};
 
+fn catalog_hydration_message(failure: &Error) -> String {
+    let message = failure.to_string();
+    if message.starts_with("catalog hydration failed") {
+        message
+    } else {
+        format!("catalog hydration failed: {message}")
+    }
+}
+
 /// Root result alias for the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -48,6 +57,14 @@ pub enum Error {
     },
     #[error("{0}")]
     Validation(String),
+    /// A call that needs the catalogs found the client's construction-time
+    /// catalog hydration failed, instead of refusing the symbol. The boxed
+    /// error is that failure, the one [`crate::Client::wait_for_catalogs`]
+    /// returns and [`crate::Client::catalogs_last_error`] holds. Repeating the
+    /// call does not help until `wait_for_catalogs` or `hydrate_catalogs`
+    /// hydrates the catalogs again.
+    #[error("{}", catalog_hydration_message(.0))]
+    CatalogHydration(Box<Error>),
     #[error("{0}")]
     Transport(String),
     /// A successful RPC returned a payload that violates the documented
@@ -599,6 +616,14 @@ impl Error {
 
     pub fn auth(msg: impl Into<String>) -> Self {
         Self::Auth(msg.into())
+    }
+
+    /// [`Error::CatalogHydration`] for a hydration failure, unless it is one.
+    pub(crate) fn catalog_hydration(failure: Error) -> Self {
+        match failure {
+            Self::CatalogHydration(_) => failure,
+            other => Self::CatalogHydration(Box::new(other)),
+        }
     }
 
     pub fn validation(msg: impl Into<String>) -> Self {
