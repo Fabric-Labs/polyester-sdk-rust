@@ -43,7 +43,12 @@ pub struct CreateTriggerParams {
     pub client_trigger_id: String,
     pub post_only: bool,
     pub activation_price: Option<Price>,
+    /// Trailing distance as a price delta in 1e-9 quote-unit ticks, the scale
+    /// of every price tick: on BTC-USDT, 50 USDT is `50_000_000_000` and
+    /// 0.5 USDT is `500_000_000` (`Price::from_decimal_str("0.5", None)?.as_ticks()`).
+    /// It is not a count of the pair's tick size.
     pub trailing_distance_ticks: Option<i64>,
+    /// Trailing distance in basis points of the price, from 1 to 10000.
     pub trailing_distance_bps: Option<i32>,
     /// Slippage cap (at most one of ticks or bps) for a trailing stop, a
     /// TWAP market slice, or a stop-loss / take-profit market child. Without
@@ -120,6 +125,8 @@ pub struct ModifyTriggerParams {
     pub symbol_id: Option<u32>,
     pub trigger_price: Option<Price>,
     pub activation_price: Option<Price>,
+    /// New trailing distance as a price delta in 1e-9 quote-unit ticks, as on
+    /// [`CreateTriggerParams::trailing_distance_ticks`].
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
     /// Slippage cap of a trailing stop, or of a stop-loss or take-profit with
@@ -175,6 +182,8 @@ pub struct TriggerStopDetails {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TriggerTrailingDetails {
+    /// Trailing distance in quote units, decoded from 1e-9 quote-unit ticks
+    /// like every price.
     pub trailing_distance: Option<Price>,
     pub trailing_distance_bps: i32,
     pub activation_price: Option<Price>,

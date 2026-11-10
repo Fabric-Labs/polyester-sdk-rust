@@ -2,6 +2,7 @@
 
 mod subscription;
 
+pub(crate) use subscription::PublicationClock;
 pub use subscription::Subscription;
 
 use std::collections::BTreeMap;

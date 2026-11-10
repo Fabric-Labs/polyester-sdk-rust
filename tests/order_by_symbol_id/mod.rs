@@ -77,7 +77,8 @@ fn ltc_buy(params: &mut CreateOrderParams) {
 }
 
 fn by_id(symbol_id: u32) -> CreateOrderParams {
-    let mut params = CreateOrderParams::for_symbol_id(symbol_id, CreateSide::Buy, CreateOrderType::Limit);
+    let mut params =
+        CreateOrderParams::for_symbol_id(symbol_id, CreateSide::Buy, CreateOrderType::Limit);
     ltc_buy(&mut params);
     params
 }
@@ -95,7 +96,11 @@ fn preview_by_id(symbol_id: u32) -> PreviewOrderParams {
 #[tokio::test]
 async fn create_preview_and_batch_create_send_the_market_id_given() {
     let (client, sent, _http) = client().await;
-    client.orders.create(by_id(2)).await.expect("create by market ID");
+    client
+        .orders
+        .create(by_id(2))
+        .await
+        .expect("create by market ID");
     // The canned answers are minimal: only what was sent is checked.
     let _ = client.orders.preview(preview_by_id(2)).await;
     let _ = client.orders.batch_create(vec![by_id(2)], None, None).await;
@@ -103,7 +108,11 @@ async fn create_preview_and_batch_create_send_the_market_id_given() {
     // The name and the ID together, when they agree, are the same order.
     let mut both = by_id(2);
     both.symbol = "LTC-USDT".into();
-    client.orders.create(both).await.expect("create by name and ID");
+    client
+        .orders
+        .create(both)
+        .await
+        .expect("create by name and ID");
     assert_eq!(*sent.lock().unwrap(), vec![2, 2, 2, 2]);
 }
 
@@ -115,17 +124,33 @@ async fn a_market_id_the_name_or_catalog_contradicts_is_refused_before_sending()
     let mut preview_contradicted = preview_by_id(2);
     preview_contradicted.symbol = "BTC-USDT".into();
     for (label, result) in [
-        ("create, name contradicts ID", client.orders.create(contradicted).await.map(|_| ())),
+        (
+            "create, name contradicts ID",
+            client.orders.create(contradicted).await.map(|_| ()),
+        ),
         (
             "preview, name contradicts ID",
-            client.orders.preview(preview_contradicted).await.map(|_| ()),
+            client
+                .orders
+                .preview(preview_contradicted)
+                .await
+                .map(|_| ()),
         ),
-        ("create, unknown ID", client.orders.create(by_id(9)).await.map(|_| ())),
-        ("create, zero ID", client.orders.create(by_id(0)).await.map(|_| ())),
+        (
+            "create, unknown ID",
+            client.orders.create(by_id(9)).await.map(|_| ()),
+        ),
+        (
+            "create, zero ID",
+            client.orders.create(by_id(0)).await.map(|_| ()),
+        ),
     ] {
         let err = result.expect_err(label);
         assert!(matches!(err, Error::Validation(_)), "{label}: {err:?}");
         assert!(err.to_string().contains("symbol_id"), "{label}: {err}");
     }
-    assert!(sent.lock().unwrap().is_empty(), "a refused order reached the server");
+    assert!(
+        sent.lock().unwrap().is_empty(),
+        "a refused order reached the server"
+    );
 }

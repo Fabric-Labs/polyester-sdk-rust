@@ -1533,6 +1533,77 @@ mod tests {
         params
     }
 
+    /// POLY-5724: a trailing distance in ticks is a price delta in 1e-9
+    /// quote-unit ticks, the scale of every price tick, sent as given.
+    #[test]
+    fn trailing_distance_ticks_are_price_ticks() {
+        use crate::codecs::decode::trigger_from_proto;
+        use crate::models::TriggerDetails;
+        use crate::proto::triggers::v1::{
+            TrailingDetails, Trigger, modify_trigger_request, trailing_stop_trigger, trigger,
+            trigger_intent::Strategy,
+        };
+        let client = client();
+        for (distance, ticks) in [
+            ("50", 50_000_000_000_i64),
+            ("0.5", 500_000_000),
+            ("0.000000001", 1),
+        ] {
+            // The README's conversion.
+            let converted = crate::Price::from_decimal_str(distance, None)
+                .unwrap()
+                .as_ticks();
+            assert_eq!(converted, ticks, "{distance}");
+
+            let mut create = trailing_create(None);
+            create.trailing_distance_bps = None;
+            create.trailing_distance_ticks = Some(converted);
+            let intent = client
+                .triggers
+                .encode_create_params(&create)
+                .unwrap()
+                .trigger
+                .expect("trigger intent");
+            let Some(Strategy::TrailingStop(wire)) = intent.strategy.as_ref() else {
+                panic!("expected TrailingStop strategy, got {:?}", intent.strategy);
+            };
+            assert_eq!(
+                wire.trailing_distance,
+                Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks)),
+                "create {distance}"
+            );
+
+            let modify = ModifyTriggerParams {
+                trailing_distance_ticks: Some(converted),
+                ..modify_params(None, None)
+            };
+            let wire = client.triggers.encode_modify_params(&modify).unwrap();
+            assert_eq!(
+                wire.trailing_distance,
+                Some(modify_trigger_request::TrailingDistance::TrailingDistanceTicks(ticks)),
+                "modify {distance}"
+            );
+
+            let read = trigger_from_proto(&Trigger {
+                runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(
+                    TrailingDetails {
+                        trailing_distance_ticks: ticks,
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            });
+            let Some(TriggerDetails::Trailing(details)) = read.details else {
+                panic!("expected trailing details, got {:?}", read.details);
+            };
+            assert_eq!(
+                details.trailing_distance.map(|price| price.as_ticks()),
+                Some(ticks),
+                "read {distance}"
+            );
+        }
+    }
+
     #[test]
     fn trigger_slippage_bps_cap() {
         let client = client();

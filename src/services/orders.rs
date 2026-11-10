@@ -476,7 +476,10 @@ impl OrdersService {
     /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
     /// are mapped onto the appropriate execution variant.
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
-        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let market = self
+            .ctx
+            .catalogs
+            .require_order_market(&params.symbol, params.symbol_id)?;
         self.order_intent_for_market(params, &market)
     }
 
@@ -673,7 +676,10 @@ impl OrdersService {
 
     #[cfg(test)]
     fn encode_create_params(&self, params: &CreateOrderParams) -> Result<CreateOrderRequest> {
-        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let market = self
+            .ctx
+            .catalogs
+            .require_order_market(&params.symbol, params.symbol_id)?;
         self.encode_create_for_market(params, &market)
     }
 
@@ -988,7 +994,10 @@ impl OrdersService {
     /// Place an order. Quantity and price must be `Quantity` / `Price` wrappers.
     pub async fn create(&self, params: CreateOrderParams) -> Result<OrderMutationResult> {
         self.ctx.wait_for_catalogs().await?;
-        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let market = self
+            .ctx
+            .catalogs
+            .require_order_market(&params.symbol, params.symbol_id)?;
         let req = self.encode_create_for_market(&params, &market)?;
         let client = self.write_client();
         let resp = unary::await_auth(
@@ -1018,7 +1027,10 @@ impl OrdersService {
     /// create always evaluates the intent again.
     pub async fn preview(&self, params: PreviewOrderParams) -> Result<PreviewOrderResult> {
         self.ctx.wait_for_catalogs().await?;
-        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let market = self
+            .ctx
+            .catalogs
+            .require_order_market(&params.symbol, params.symbol_id)?;
         let req = self.encode_preview_for_market(&params, &market)?;
         let client = self.write_client();
         let resp = unary::await_auth(
@@ -1040,7 +1052,10 @@ impl OrdersService {
 
     #[cfg(test)]
     fn encode_preview_params(&self, params: &PreviewOrderParams) -> Result<PreviewOrderRequest> {
-        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let market = self
+            .ctx
+            .catalogs
+            .require_order_market(&params.symbol, params.symbol_id)?;
         self.encode_preview_for_market(params, &market)
     }
 
@@ -1054,6 +1069,7 @@ impl OrdersService {
         // client_order_id is accepted but not claimed.
         let create = CreateOrderParams {
             symbol: params.symbol.clone(),
+            symbol_id: params.symbol_id,
             side: params.side,
             order_type: params.order_type,
             quantity: params.quantity.clone(),
@@ -1932,9 +1948,50 @@ mod tests {
         assert!(err.to_string().contains("only valid for limit GTD"));
     }
 
+    /// POLY-5724: an attached trailing distance in ticks is a price delta in
+    /// 1e-9 quote-unit ticks, sent as given: 0.5 USDT is 500_000_000.
+    #[test]
+    fn attached_trailing_distance_ticks_are_price_ticks() {
+        use crate::proto::orders::v1::trailing_stop_policy;
+        let client = client();
+        for (distance, ticks) in [("50", 50_000_000_000_i64), ("0.5", 500_000_000)] {
+            let converted = Price::from_decimal_str(distance, None).unwrap().as_ticks();
+            let mut params = create_params(
+                Quantity::from_scaled(
+                    10_000_000,
+                    Some(8),
+                    crate::QuantityDomain::OrderBase,
+                    Some("BTC-USDT".into()),
+                    Some(7),
+                )
+                .unwrap(),
+                Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            );
+            params.attached_risk = Some(AttachedRisk {
+                trailing_stop: Some(TrailingStop::new(TrailingDistance::Ticks(converted))),
+                ..Default::default()
+            });
+            let req = client.orders.encode_create_params(&params).unwrap();
+            let risk = req
+                .order
+                .as_option()
+                .and_then(|order| order.attached_risk.as_option())
+                .expect("attached risk");
+            let Some(risk_policy::StopLeg::TrailingStop(policy)) = risk.stop_leg.as_ref() else {
+                panic!("expected a trailing stop leg, got {:?}", risk.stop_leg);
+            };
+            assert_eq!(
+                policy.trailing_distance,
+                Some(trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(ticks)),
+                "{distance}"
+            );
+        }
+    }
+
     fn create_params(quantity: Quantity, price: Price) -> CreateOrderParams {
         CreateOrderParams {
             symbol: "BTC-USDT".into(),
+            symbol_id: None,
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
             quantity: Some(quantity),
@@ -2998,6 +3055,7 @@ mod tests {
         );
         let preview = PreviewOrderParams {
             symbol: create.symbol.clone(),
+            symbol_id: None,
             side: create.side,
             order_type: create.order_type,
             quantity: create.quantity.clone(),

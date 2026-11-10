@@ -61,11 +61,15 @@ fn service_writes(body: &str) -> Vec<String> {
         if service.is_empty() || service_start == 0 || !owner[..service_start].ends_with('.') {
             continue;
         }
-        let writes_state = WRITE_PREFIXES.iter().any(|prefix| method.starts_with(prefix))
+        let writes_state = WRITE_PREFIXES
+            .iter()
+            .any(|prefix| method.starts_with(prefix))
             && !READS.contains(&method);
         let dry_run = match method {
             // cancel_all(symbol, dry_run, request_id)
-            "cancel_all" => call_args(&body[index..]).get(1).is_some_and(|arg| arg == "true"),
+            "cancel_all" => call_args(&body[index..])
+                .get(1)
+                .is_some_and(|arg| arg == "true"),
             _ => method.starts_with("cancel_all") && body.contains("dry_run: true"),
         };
         if writes_state && !dry_run {

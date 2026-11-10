@@ -17,10 +17,10 @@ mod limit_market_ref_price;
 mod live_write_gates;
 #[path = "market_data/mod.rs"]
 mod market_data;
-#[path = "order_trades_wait/mod.rs"]
-mod order_trades_wait;
 #[path = "order_by_symbol_id/mod.rs"]
 mod order_by_symbol_id;
+#[path = "order_trades_wait/mod.rs"]
+mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]
 mod orderbook_depths;
 #[path = "orders_and_batches/mod.rs"]
@@ -8014,11 +8014,9 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
                 .encode_to_vec()
             })
             .collect();
-        let ws = MockWsServer::spawn_centrifugo_publications_after_handshake(
-            Arc::default(),
-            deltas,
-        )
-        .await;
+        let ws =
+            MockWsServer::spawn_centrifugo_publications_after_handshake(Arc::default(), deltas)
+                .await;
         let http = MockHttpServer::spawn(move |request| {
             assert_eq!(request.path, "/orderbook.v1.OrderbookService/GetOrderBook");
             hardening_support::HttpScript::RawAfter {
@@ -8067,7 +8065,10 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
             .expect("the snapshot must emit a view")
             .expect("stream must remain open");
         assert_eq!(first.book_seq, last_seq, "buffered deltas {buffered}");
-        assert_eq!(first.bids[0].qty.as_ref().unwrap().as_scaled(), 1 + buffered as i64);
+        assert_eq!(
+            first.bids[0].qty.as_ref().unwrap().as_scaled(),
+            1 + buffered as i64
+        );
         let extra = tokio::time::timeout(Duration::from_millis(300), subscription.updates().recv())
             .await
             .ok()
@@ -8116,7 +8117,14 @@ async fn l2_orderbook_reports_time_since_last_publication() {
                 ..Default::default()
             }
             .encode_to_vec();
-            MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), delta).await
+            // Well after the start, so the publication's age and the
+            // subscription's age differ.
+            MockWsServer::spawn_centrifugo_publications_after_delay(
+                Arc::default(),
+                vec![delta],
+                Duration::from_millis(400),
+            )
+            .await
         } else {
             MockWsServer::spawn_centrifugo_public(Arc::default()).await
         };
@@ -8166,8 +8174,12 @@ async fn l2_orderbook_reports_time_since_last_publication() {
             }
         }
         if publishes {
-            // The publication just arrived.
-            assert!(subscription.since_last_publication() < Duration::from_millis(200));
+            // The publication just arrived, 400 ms after the start.
+            let age = subscription.since_last_publication();
+            assert!(
+                age < Duration::from_millis(200),
+                "age just after a publication {age:?}"
+            );
         }
 
         // Silence makes it grow; a bucket change is not a publication.
@@ -8178,9 +8190,15 @@ async fn l2_orderbook_reports_time_since_last_publication() {
             .expect("a view for the bucket change")
             .expect("stream must remain open");
         let age = subscription.since_last_publication();
-        assert!(age >= Duration::from_millis(300), "publishes={publishes}: age {age:?}");
+        assert!(
+            age >= Duration::from_millis(300),
+            "publishes={publishes}: age {age:?}"
+        );
         // With no publication at all, the age runs from the subscription's start.
-        assert!(age <= created.elapsed(), "publishes={publishes}: age {age:?}");
+        assert!(
+            age <= created.elapsed(),
+            "publishes={publishes}: age {age:?}"
+        );
         subscription.close();
     }
 }

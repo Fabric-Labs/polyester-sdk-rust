@@ -450,6 +450,16 @@ impl MockWsServer {
         active: Arc<AtomicUsize>,
         payloads: Vec<Vec<u8>>,
     ) -> Self {
+        Self::spawn_centrifugo_publications_after_delay(active, payloads, Duration::ZERO).await
+    }
+
+    /// Accept connect+subscribe, wait `delay`, then send each payload as a
+    /// publication, in order.
+    pub async fn spawn_centrifugo_publications_after_delay(
+        active: Arc<AtomicUsize>,
+        payloads: Vec<Vec<u8>>,
+        delay: Duration,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind ws");
         let addr = listener.local_addr().expect("addr").to_string();
         let connects = Arc::new(AtomicUsize::new(0));
@@ -483,6 +493,7 @@ impl MockWsServer {
                                 ))
                                 .await;
                             if replies == 2 {
+                                tokio::time::sleep(delay).await;
                                 for payload in &payloads {
                                     let _ = ws
                                         .send(Message::Binary(

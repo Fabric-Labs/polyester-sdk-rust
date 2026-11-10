@@ -464,6 +464,9 @@ async fn twap_market_ioc_accepts_slippage() {
 
 #[tokio::test]
 async fn social_verification_discord_without_handle() {
+    if !require_mutation() {
+        return;
+    }
     let Some(client) = require_live_client() else {
         return;
     };

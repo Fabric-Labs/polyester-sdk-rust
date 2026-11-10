@@ -3,8 +3,9 @@
 use crate::errors::{Error, Result};
 use crate::models::{OrderBookDeltaUpdate, OrderbookData};
 use crate::realtime::{SnapshotThenStream, lock_unpoisoned};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 /// Managed orderbook stream with snapshot prefetch and sequence-checked deltas.
@@ -19,6 +20,36 @@ pub struct Subscription {
     emit: Arc<dyn Fn() + Send + Sync>,
     last_error: Arc<Mutex<Option<Error>>>,
     tx_slot: Arc<Mutex<Option<mpsc::Sender<OrderbookData>>>>,
+    publications: PublicationClock,
+}
+
+/// When a managed stream last delivered a publication.
+#[derive(Clone)]
+pub(crate) struct PublicationClock {
+    started: Instant,
+    /// The latest publication, in nanoseconds after `started`.
+    last: Arc<AtomicU64>,
+}
+
+impl PublicationClock {
+    pub(crate) fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            last: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// Record a publication delivered now.
+    pub(crate) fn note(&self) {
+        let elapsed = u64::try_from(self.started.elapsed().as_nanos()).unwrap_or(u64::MAX);
+        self.last.fetch_max(elapsed, Ordering::SeqCst);
+    }
+
+    fn since_last(&self) -> Duration {
+        self.started
+            .elapsed()
+            .saturating_sub(Duration::from_nanos(self.last.load(Ordering::SeqCst)))
+    }
 }
 
 impl Subscription {
@@ -47,7 +78,31 @@ impl Subscription {
             emit,
             last_error,
             tx_slot,
+            publications: PublicationClock::new(),
         }
+    }
+
+    /// Report publications from `clock`, which the stream's reader notes.
+    pub(crate) fn with_publication_clock(mut self, clock: PublicationClock) -> Self {
+        self.publications = clock;
+        self
+    }
+
+    /// How long ago the stream last delivered a publication, or how long ago
+    /// the subscription started when none has arrived. Views from a snapshot
+    /// or a bucket change don't count.
+    ///
+    /// It tells a stalled publisher from a quiet market. The server
+    /// republishes each book's whole view, as a reset, about every 30 s even
+    /// when nothing changed: seen on every market and depth of devnet and
+    /// testnet, though the public contract does not promise a cadence. So a
+    /// quiet market stays well under that, and an age far above it, such as
+    /// 90 s, means the publisher or the path to it stalled while the socket
+    /// stayed open. The SDK sets no threshold and takes no action: poll it,
+    /// and on a stall call [`Self::refresh_snapshot`], or close and subscribe
+    /// again.
+    pub fn since_last_publication(&self) -> Duration {
+        self.publications.since_last()
     }
 
     /// Receiver for merged orderbook snapshots.
