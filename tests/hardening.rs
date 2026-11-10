@@ -33,6 +33,8 @@ mod readable_error_bodies;
 mod recv_window_replay;
 #[path = "request_size_rate_limit/mod.rs"]
 mod request_size_rate_limit;
+#[path = "signed_redirects/mod.rs"]
+mod signed_redirects;
 #[path = "url_userinfo/mod.rs"]
 mod url_userinfo;
 

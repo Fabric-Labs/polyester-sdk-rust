@@ -481,3 +481,82 @@ mod userinfo_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod redirect_tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    /// Answers every request with `answer`, counting the requests and those
+    /// that carry an API-key header.
+    async fn serve(
+        answer: impl Fn(&str) -> String + Send + Sync + 'static,
+    ) -> (String, Arc<AtomicUsize>, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let (requests, signed) = (Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0)));
+        let (requests_task, signed_task) = (requests.clone(), signed.clone());
+        let answer = Arc::new(answer);
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let (requests, signed, answer) =
+                    (requests_task.clone(), signed_task.clone(), answer.clone());
+                tokio::spawn(async move {
+                    let mut buf = vec![0u8; 16 * 1024];
+                    let Ok(n) = stream.read(&mut buf).await else {
+                        return;
+                    };
+                    let head = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
+                    requests.fetch_add(1, Ordering::SeqCst);
+                    if ["x-api-key-id:", "x-api-timestamp:", "x-api-signature:"]
+                        .iter()
+                        .any(|name| head.contains(name))
+                    {
+                        signed.fetch_add(1, Ordering::SeqCst);
+                    }
+                    let path = head.split_whitespace().nth(1).unwrap_or("/").to_owned();
+                    let _ = stream.write_all(answer(&path).as_bytes()).await;
+                });
+            }
+        });
+        (addr, requests, signed)
+    }
+
+    /// A signed token GET answered with any redirect status goes no further:
+    /// hyper does not follow redirects, so the destination receives nothing.
+    #[tokio::test]
+    async fn token_request_is_not_forwarded_across_origins() {
+        let body = r#"{"token":"captured"}"#;
+        let (destination, requests, signed) = serve(move |_| {
+            format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        })
+        .await;
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        let creds = Credentials::new("ak_redirect_test", &secret_hex).unwrap();
+        for status in [301u16, 302, 303, 307, 308] {
+            let target = destination.clone();
+            let (origin, _, _) = serve(move |path| {
+                format!(
+                    "HTTP/1.1 {status} Redirect\r\nLocation: http://{target}{path}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            })
+            .await;
+            let result = fetch_connection_token(
+                &creds,
+                &format!("http://{origin}"),
+                Duration::from_secs(5),
+                false,
+            )
+            .await;
+            assert!(result.is_err(), "{status}: {result:?}");
+            assert_eq!(signed.load(Ordering::SeqCst), 0, "{status}");
+            assert_eq!(requests.load(Ordering::SeqCst), 0, "{status}");
+        }
+    }
+}
