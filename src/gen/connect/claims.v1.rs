@@ -76,7 +76,8 @@ pub const CLAIMS_SERVICE_CLAIM_DAILY_REWARD_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// ClaimsService provides daily campaign rewards. A session JWT is required; API keys are not accepted.
+/// ClaimsService provides daily campaign rewards. It accepts a session token, or an API key
+/// scoped to the main account whose policy grants the call's account permission.
 ///
 /// # Implementing handlers
 ///
@@ -128,6 +129,7 @@ pub const CLAIMS_SERVICE_CLAIM_DAILY_REWARD_SPEC: ::connectrpc::Spec = ::connect
 #[allow(clippy::type_complexity)]
 pub trait ClaimsService: Send + Sync + 'static {
     /// Get today's reward and claim status for the authenticated root account. Future reward schedules are not returned.
+    /// An API key needs READ_DAILY_CLAIMS and must be scoped to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -151,6 +153,7 @@ pub trait ClaimsService: Send + Sync + 'static {
         >,
     > + Send;
     /// Claim today's reward once for the authenticated root account, paid to the root account or to a subaccount it owns. All reward assets are transferred together, and retries return the same claim.
+    /// An API key needs CLAIM_DAILY_REWARD and must be scoped to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

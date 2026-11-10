@@ -496,4 +496,73 @@ mod tests {
         assert_eq!(list.transfers.len(), 1);
         assert_eq!(list.next_page_token, "12345");
     }
+
+    fn system_adjustment_row(is_debit: bool) -> TransferRow {
+        TransferRow {
+            asset_id: 2,
+            amount_e18: U128 {
+                hi: 0,
+                lo: 5_000_000_000_000_000_000,
+                ..Default::default()
+            }
+            .into(),
+            transfer_code: crate::proto::ledger::v1::TransferCode::SYSTEM_ADJUSTMENT.into(),
+            account_code: buffa::EnumValue::from(1),
+            is_debit,
+            transfer_id: "1074".into(),
+            source: ProtoTransferSide {
+                kind: TransferSideKind::SystemAccount.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }
+    }
+
+    /// POLY-9102: seeding an account from a system account is a system
+    /// adjustment (1074) credit; `is_debit` alone gives its direction.
+    #[test]
+    fn poly_9102_system_adjustment_seeding_credit() {
+        let transfer = transfer_row_from_proto(&system_adjustment_row(false));
+        assert_eq!(transfer.transfer_type, 1074);
+        assert!(!transfer.is_debit, "a seeding credit is no debit");
+        assert_eq!(transfer.amount, "5000000000000000000");
+        assert_eq!(
+            transfer.source.as_ref().map(|side| side.kind.as_str()),
+            Some("system_account")
+        );
+    }
+
+    /// POLY-9102: a balance correction that takes value back is a system
+    /// adjustment (1074) debit, never counted as a credit.
+    #[test]
+    fn poly_9102_system_adjustment_debit_correction() {
+        let transfer = transfer_row_from_proto(&system_adjustment_row(true));
+        assert_eq!(transfer.transfer_type, 1074);
+        assert!(transfer.is_debit, "a debit correction must stay a debit");
+    }
+
+    /// POLY-9102: every transfer code the contract added keeps its number on
+    /// a decoded row.
+    #[test]
+    fn poly_9102_added_transfer_codes_keep_their_numbers() {
+        use crate::proto::ledger::v1::TransferCode;
+        use buffa::Enumeration;
+
+        for (code, number) in [
+            (TransferCode::TRADING_WITHDRAW_FEE_LEG, 1066),
+            (TransferCode::QUICKSWAP_POLYESTER_FEE, 1067),
+            (TransferCode::QUICKSWAP_BROKER_FEE, 1068),
+            (TransferCode::QUICKSWAP_AFFILIATE_FEE, 1069),
+            (TransferCode::FEE_SWEEP, 1072),
+            (TransferCode::FEE_REFILL, 1073),
+            (TransferCode::SYSTEM_ADJUSTMENT, 1074),
+        ] {
+            let mut row = system_adjustment_row(true);
+            row.transfer_code = code.into();
+            let transfer_type = transfer_row_from_proto(&row).transfer_type;
+            assert_eq!(transfer_type, number, "{code:?}");
+            assert_eq!(TransferCode::from_i32(transfer_type), Some(code));
+        }
+    }
 }

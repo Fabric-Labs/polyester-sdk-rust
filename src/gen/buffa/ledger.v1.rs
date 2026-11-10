@@ -178,6 +178,21 @@ pub enum TransferCode {
     FUNDING_USER_TRANSFER = 1063i32,
     /// Non-refundable on-chain request fee retained when a submitted trading withdrawal fails.
     TRADING_WITHDRAW_REQUEST_FEE = 1065i32,
+    /// Fee paid to a fee recipient when a trading withdrawal completes.
+    TRADING_WITHDRAW_FEE_LEG = 1066i32,
+    /// QuickSwap fee paid to Polyester in the received asset.
+    QUICKSWAP_POLYESTER_FEE = 1067i32,
+    /// QuickSwap fee paid to a broker in the received asset.
+    QUICKSWAP_BROKER_FEE = 1068i32,
+    /// QuickSwap fee paid to an affiliate in the received asset.
+    QUICKSWAP_AFFILIATE_FEE = 1069i32,
+    /// Collected fees transferred to the fee treasury's trading account.
+    FEE_SWEEP = 1072i32,
+    /// Funds transferred from the fee treasury's trading account to replenish fee funds.
+    FEE_REFILL = 1073i32,
+    /// Balance adjustment with a system account, including account seeding credits or corrections.
+    /// May credit or debit the user's account; the transfer direction identifies which.
+    SYSTEM_ADJUSTMENT = 1074i32,
 }
 impl TransferCode {
     ///Idiomatic alias for [`Self::TRANSFER_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -222,6 +237,27 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::TRADING_WITHDRAW_REQUEST_FEE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TradingWithdrawRequestFee: Self = Self::TRADING_WITHDRAW_REQUEST_FEE;
+    ///Idiomatic alias for [`Self::TRADING_WITHDRAW_FEE_LEG`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradingWithdrawFeeLeg: Self = Self::TRADING_WITHDRAW_FEE_LEG;
+    ///Idiomatic alias for [`Self::QUICKSWAP_POLYESTER_FEE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapPolyesterFee: Self = Self::QUICKSWAP_POLYESTER_FEE;
+    ///Idiomatic alias for [`Self::QUICKSWAP_BROKER_FEE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapBrokerFee: Self = Self::QUICKSWAP_BROKER_FEE;
+    ///Idiomatic alias for [`Self::QUICKSWAP_AFFILIATE_FEE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const QuickswapAffiliateFee: Self = Self::QUICKSWAP_AFFILIATE_FEE;
+    ///Idiomatic alias for [`Self::FEE_SWEEP`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeSweep: Self = Self::FEE_SWEEP;
+    ///Idiomatic alias for [`Self::FEE_REFILL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FeeRefill: Self = Self::FEE_REFILL;
+    ///Idiomatic alias for [`Self::SYSTEM_ADJUSTMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SystemAdjustment: Self = Self::SYSTEM_ADJUSTMENT;
 }
 impl ::core::default::Default for TransferCode {
     fn default() -> Self {
@@ -331,6 +367,13 @@ impl ::buffa::Enumeration for TransferCode {
             1062i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_RESERVE),
             1063i32 => ::core::option::Option::Some(Self::FUNDING_USER_TRANSFER),
             1065i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE),
+            1066i32 => ::core::option::Option::Some(Self::TRADING_WITHDRAW_FEE_LEG),
+            1067i32 => ::core::option::Option::Some(Self::QUICKSWAP_POLYESTER_FEE),
+            1068i32 => ::core::option::Option::Some(Self::QUICKSWAP_BROKER_FEE),
+            1069i32 => ::core::option::Option::Some(Self::QUICKSWAP_AFFILIATE_FEE),
+            1072i32 => ::core::option::Option::Some(Self::FEE_SWEEP),
+            1073i32 => ::core::option::Option::Some(Self::FEE_REFILL),
+            1074i32 => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             _ => ::core::option::Option::None,
         }
     }
@@ -353,6 +396,13 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_WITHDRAW_RESERVE => "TRADING_WITHDRAW_RESERVE",
             Self::FUNDING_USER_TRANSFER => "FUNDING_USER_TRANSFER",
             Self::TRADING_WITHDRAW_REQUEST_FEE => "TRADING_WITHDRAW_REQUEST_FEE",
+            Self::TRADING_WITHDRAW_FEE_LEG => "TRADING_WITHDRAW_FEE_LEG",
+            Self::QUICKSWAP_POLYESTER_FEE => "QUICKSWAP_POLYESTER_FEE",
+            Self::QUICKSWAP_BROKER_FEE => "QUICKSWAP_BROKER_FEE",
+            Self::QUICKSWAP_AFFILIATE_FEE => "QUICKSWAP_AFFILIATE_FEE",
+            Self::FEE_SWEEP => "FEE_SWEEP",
+            Self::FEE_REFILL => "FEE_REFILL",
+            Self::SYSTEM_ADJUSTMENT => "SYSTEM_ADJUSTMENT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -383,6 +433,21 @@ impl ::buffa::Enumeration for TransferCode {
             "TRADING_WITHDRAW_REQUEST_FEE" => {
                 ::core::option::Option::Some(Self::TRADING_WITHDRAW_REQUEST_FEE)
             }
+            "TRADING_WITHDRAW_FEE_LEG" => {
+                ::core::option::Option::Some(Self::TRADING_WITHDRAW_FEE_LEG)
+            }
+            "QUICKSWAP_POLYESTER_FEE" => {
+                ::core::option::Option::Some(Self::QUICKSWAP_POLYESTER_FEE)
+            }
+            "QUICKSWAP_BROKER_FEE" => {
+                ::core::option::Option::Some(Self::QUICKSWAP_BROKER_FEE)
+            }
+            "QUICKSWAP_AFFILIATE_FEE" => {
+                ::core::option::Option::Some(Self::QUICKSWAP_AFFILIATE_FEE)
+            }
+            "FEE_SWEEP" => ::core::option::Option::Some(Self::FEE_SWEEP),
+            "FEE_REFILL" => ::core::option::Option::Some(Self::FEE_REFILL),
+            "SYSTEM_ADJUSTMENT" => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             _ => ::core::option::Option::None,
         }
     }
@@ -402,6 +467,13 @@ impl ::buffa::Enumeration for TransferCode {
             Self::TRADING_WITHDRAW_RESERVE,
             Self::FUNDING_USER_TRANSFER,
             Self::TRADING_WITHDRAW_REQUEST_FEE,
+            Self::TRADING_WITHDRAW_FEE_LEG,
+            Self::QUICKSWAP_POLYESTER_FEE,
+            Self::QUICKSWAP_BROKER_FEE,
+            Self::QUICKSWAP_AFFILIATE_FEE,
+            Self::FEE_SWEEP,
+            Self::FEE_REFILL,
+            Self::SYSTEM_ADJUSTMENT,
         ]
     }
 }

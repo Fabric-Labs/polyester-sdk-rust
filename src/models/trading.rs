@@ -1248,6 +1248,10 @@ pub struct InternalTransferResult {
     /// a status this SDK version does not know. `"accepted"` means the
     /// transfer has a durable transfer ID, not that it has settled.
     pub status: String,
+    /// Lifecycle flow ID of the transfer, for
+    /// `LifecycleService::get_flow`; its ledger settlement step names
+    /// `transfer_id`. Empty when the server sent none.
+    pub flow_id: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

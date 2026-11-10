@@ -8,9 +8,22 @@ use crate::models::{
     ZipperTokenConfig,
 };
 use crate::proto::chain::zipper::v1::{
-    GetDepositWithdrawConfigResponse, ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch,
+    GetDepositWithdrawConfigResponse, MemoRequirement,
+    ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch,
     ZippedAssetSupplyUpdate as ProtoZippedAssetSupplyUpdate,
 };
+
+/// Memo rule label: `required`, `optional` or `not_supported`, empty when
+/// unspecified, and `UNKNOWN(n)` for a rule newer than this SDK.
+fn memo_requirement_label(requirement: &buffa::EnumValue<MemoRequirement>) -> String {
+    match requirement.as_known() {
+        Some(MemoRequirement::REQUIRED) => "required".to_owned(),
+        Some(MemoRequirement::OPTIONAL) => "optional".to_owned(),
+        Some(MemoRequirement::NOT_SUPPORTED) => "not_supported".to_owned(),
+        Some(MemoRequirement::MEMO_UNSPECIFIED) => String::new(),
+        None => format!("UNKNOWN({})", requirement.to_i32()),
+    }
+}
 
 pub fn deposit_withdraw_config_from_proto(
     msg: &GetDepositWithdrawConfigResponse,
@@ -33,6 +46,9 @@ pub fn deposit_withdraw_config_from_proto(
                 is_case_sensitive: c.is_case_sensitive,
                 min_address_length: c.min_address_length,
                 max_address_length: c.max_address_length,
+                memo_requirement: memo_requirement_label(&c.memo_requirement),
+                memo_label: c.memo_label.clone(),
+                memo_format_hint: c.memo_format_hint.clone(),
             })
             .collect(),
         assets: msg
@@ -165,5 +181,59 @@ mod tests {
         };
         let err = zipped_asset_supply_update_from_proto(&msg, |_| None).unwrap_err();
         assert!(err.to_string().contains("zipped_asset_id 99"));
+    }
+
+    /// POLY-9102: a network's memo rule, label and format hint reach the
+    /// chain config as sent. An unspecified rule reads as empty, not as
+    /// "no memo needed", and a rule newer than this SDK keeps its number.
+    #[test]
+    fn poly_9102_chain_config_keeps_memo_rule_label_and_hint() {
+        use crate::proto::chain::zipper::v1::MemoRequirement;
+
+        let chain = |requirement: buffa::EnumValue<MemoRequirement>| {
+            let msg = GetDepositWithdrawConfigResponse {
+                chains: vec![ChainConfig {
+                    chain_id: 9,
+                    code: "xrp".into(),
+                    memo_requirement: requirement,
+                    memo_label: "Destination tag".into(),
+                    memo_format_hint: "Up to 10 digits, e.g. 12345 (no leading zeros)".into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            deposit_withdraw_config_from_proto(&msg).chains.remove(0)
+        };
+        let xrp = chain(MemoRequirement::OPTIONAL.into());
+        assert_eq!(xrp.memo_requirement, "optional");
+        assert_eq!(xrp.memo_label, "Destination tag");
+        assert_eq!(
+            xrp.memo_format_hint,
+            "Up to 10 digits, e.g. 12345 (no leading zeros)"
+        );
+        assert_eq!(
+            chain(MemoRequirement::REQUIRED.into()).memo_requirement,
+            "required"
+        );
+        assert_eq!(
+            chain(MemoRequirement::NOT_SUPPORTED.into()).memo_requirement,
+            "not_supported"
+        );
+        assert_eq!(
+            chain(MemoRequirement::MEMO_UNSPECIFIED.into()).memo_requirement,
+            ""
+        );
+        assert_eq!(
+            chain(buffa::EnumValue::Unknown(9)).memo_requirement,
+            "UNKNOWN(9)"
+        );
+
+        let bare = deposit_withdraw_config_from_proto(&GetDepositWithdrawConfigResponse {
+            chains: vec![ChainConfig::default()],
+            ..Default::default()
+        });
+        assert_eq!(bare.chains[0].memo_requirement, "");
+        assert_eq!(bare.chains[0].memo_label, "");
+        assert_eq!(bare.chains[0].memo_format_hint, "");
     }
 }

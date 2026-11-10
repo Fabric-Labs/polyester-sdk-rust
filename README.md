@@ -71,8 +71,17 @@ preserved and `new_tags` are appended. `AddressBookViewInvalidation` includes
 including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
-still applies. In particular, social-verification routes may require a JWT
-session or may not be mounted.
+still applies. Each account read an API key makes needs its own permission on
+the key's API-key policy: `READ_API_KEYS` for `api_keys.list` and
+`api_keys.get`, `READ_VIP_STATUS` for `vip.get_vip_status`,
+`READ_SOCIAL_VERIFICATION` for `social_verification.get` (link status only),
+and `READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`. VIP status
+and social verification need a key scoped to the main account. A key without
+the permission is refused with `permission_denied` and
+`AUTH_API_KEY_ACCESS_DENIED` (the withdraw service answers
+`ERROR_CODE_PERMISSION_DENIED`), and the message names the missing
+permission. Starting a social verification stays session-only, and its routes
+may not be mounted.
 Private streams require an Account ID and the corresponding API-key permission.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The connection and subscription tokens are renewed on the
@@ -672,7 +681,8 @@ fee model and exact integer budgeting guidance.
 ## VIP, spot fees, and trading rate limits
 
 Public catalog reads need no credentials. Authenticated VIP status, effective spot fees, and
-account trading limits require an API key. `get_vip_status` has no subaccount selector: JWT
+account trading limits require an API key. `get_vip_status` needs `READ_VIP_STATUS` on the
+key's policy and a key scoped to the main account. It has no subaccount selector: session
 and API-key callers receive the owning root group only. USD amounts and fee percents are
 decimal strings. Optional qualification metrics, timestamps, and next-tier thresholds stay
 omitted when unset. `settled_volume_quality` and `average_aop_quality` say how complete each
@@ -936,8 +946,13 @@ SDK notes:
 - **Trading → external destination check:**
   `client.withdraw.validate_destination(chain_id, address).await?` returns
   user-safe `valid` / `code` / `message` / `canonical_destination_address`
-  without creating a withdraw (create RPCs remain authoritative).
+  without creating a withdraw (create RPCs remain authoritative). An API key
+  needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
+  opens it.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
+  The result's `flow_id` names the transfer's lifecycle flow
+  (`client.lifecycle.get_flow`). Looking a transfer up by its request or
+  transfer ID is session-only and not wrapped.
 
 ```rust,no_run
 use alloy_primitives::U256;
@@ -1132,7 +1147,7 @@ match client.orders.list_open(None).await {
 ```
 
 Session-only methods (a wallet trading withdraw, the auto-withdraw rule writes,
-the portfolio equity reads, VIP status, ...) refuse an account API key with
+the portfolio equity reads, ...) refuse an account API key with
 `AUTH_SESSION_KIND_NOT_ALLOWED`, HTTP 403. It maps to one error,
 `Error::SessionRequired`, on ConnectRPC and REST alike
 (`Error::is_session_required()`); call the method with a session token. An API
@@ -1450,7 +1465,8 @@ while let Some(event) = orders.recv_result().await? {
 
 let mut api_policies = client.policies.subscribe_api_policies(None).await?;
 if let Some(policy) = api_policies.recv_result().await? {
-    println!("{} {}", policy.policy_id, policy.revision);
+    // `actions` are `auth.v1.PolicyAction` names, such as "READ_SPOT" or "READ_API_KEYS".
+    println!("{} {} {:?}", policy.policy_id, policy.revision, policy.actions);
 }
 
 

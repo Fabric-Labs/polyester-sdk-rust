@@ -1468,6 +1468,9 @@ pub const __HEATMAP_DELTA_LEVELS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
     is_wkt: false,
 };
 /// HeatmapKeyframe is a full-book snapshot anchor.
+/// Best bid, best ask and mid preserve the raw prices where available. For older
+/// historical buckets without recorded raw prices, they use the reconstructed
+/// price bins instead.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10718,6 +10721,9 @@ pub mod __buffa {
             }
         }
         /// HeatmapKeyframe is a full-book snapshot anchor.
+        /// Best bid, best ask and mid preserve the raw prices where available. For older
+        /// historical buckets without recorded raw prices, they use the reconstructed
+        /// price bins instead.
         #[derive(Clone, Debug, Default)]
         pub struct HeatmapKeyframeView<'a> {
             /// Snapshot timestamp (seconds since epoch, UTC).

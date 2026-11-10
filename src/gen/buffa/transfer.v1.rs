@@ -1547,6 +1547,17 @@ pub struct CreateInternalTransferResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub status: ::buffa::EnumValue<InternalTransferStatus>,
+    /// Authoritative lifecycle flow identifier. Use GetFlowById to read the flow;
+    /// its ledger settlement step links back through milestone_tx_ref.
+    ///
+    /// Field 10: `flow_id`
+    #[serde(
+        rename = "flowId",
+        alias = "flow_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub flow_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1563,6 +1574,7 @@ impl ::core::fmt::Debug for CreateInternalTransferResponse {
             .field("amount_e18", &self.amount_e18)
             .field("destination", &self.destination)
             .field("status", &self.status)
+            .field("flow_id", &self.flow_id)
             .finish()
     }
 }
@@ -1633,6 +1645,9 @@ impl ::buffa::Message for CreateInternalTransferResponse {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.flow_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1674,6 +1689,9 @@ impl ::buffa::Message for CreateInternalTransferResponse {
             if val != 0 {
                 ::buffa::types::put_int32_field(9u32, val, buf);
             }
+        }
+        if !self.flow_id.is_empty() {
+            ::buffa::types::put_string_field(10u32, &self.flow_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1761,6 +1779,13 @@ impl ::buffa::Message for CreateInternalTransferResponse {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.flow_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1778,6 +1803,7 @@ impl ::buffa::Message for CreateInternalTransferResponse {
         self.amount_e18 = ::buffa::MessageField::none();
         self.destination = ::buffa::MessageField::none();
         self.status = ::buffa::EnumValue::from(0);
+        self.flow_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1808,6 +1834,509 @@ pub const __CREATE_INTERNAL_TRANSFER_RESPONSE_JSON_ANY: ::buffa::type_registry::
     type_url: "type.googleapis.com/transfer.v1.CreateInternalTransferResponse",
     to_json: ::buffa::type_registry::any_to_json::<CreateInternalTransferResponse>,
     from_json: ::buffa::type_registry::any_from_json::<CreateInternalTransferResponse>,
+    is_wkt: false,
+};
+/// GetInternalTransferRequest selects an accepted transfer from the source account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct GetInternalTransferRequest {
+    /// Optional source public subaccount ID. Omitted means the authenticated root
+    /// account. The caller must have access to the selected subaccount.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    #[serde(flatten)]
+    pub identifier: ::core::option::Option<
+        __buffa::oneof::get_internal_transfer_request::Identifier,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetInternalTransferRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetInternalTransferRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("identifier", &self.identifier)
+            .finish()
+    }
+}
+impl GetInternalTransferRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferRequest";
+}
+::buffa::impl_default_instance!(GetInternalTransferRequest);
+impl ::buffa::MessageName for GetInternalTransferRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "GetInternalTransferRequest";
+    const FULL_NAME: &'static str = "transfer.v1.GetInternalTransferRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferRequest";
+}
+impl ::buffa::Message for GetInternalTransferRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.identifier {
+            match v {
+                __buffa::oneof::get_internal_transfer_request::Identifier::RequestId(
+                    x,
+                ) => {
+                    size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                }
+                __buffa::oneof::get_internal_transfer_request::Identifier::TransferId(
+                    x,
+                ) => {
+                    size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                }
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.identifier {
+            match v {
+                __buffa::oneof::get_internal_transfer_request::Identifier::RequestId(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(2u32, x, buf);
+                }
+                __buffa::oneof::get_internal_transfer_request::Identifier::TransferId(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(3u32, x, buf);
+                }
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.identifier = ::core::option::Option::Some(
+                    __buffa::oneof::get_internal_transfer_request::Identifier::RequestId(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.identifier = ::core::option::Option::Some(
+                    __buffa::oneof::get_internal_transfer_request::Identifier::TransferId(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.identifier = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetInternalTransferRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.GetInternalTransferRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for GetInternalTransferRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = GetInternalTransferRequest;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct GetInternalTransferRequest")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<GetInternalTransferRequest, A::Error> {
+                let mut __f_subaccount_id: ::core::option::Option<u64> = None;
+                let mut __oneof_identifier: ::core::option::Option<
+                    __buffa::oneof::get_internal_transfer_request::Identifier,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "subaccountId" | "subaccount_id" => {
+                            __f_subaccount_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "requestId" | "request_id" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_identifier.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'identifier'",
+                                        ),
+                                    );
+                                }
+                                __oneof_identifier = Some(
+                                    __buffa::oneof::get_internal_transfer_request::Identifier::RequestId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "transferId" | "transfer_id" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_identifier.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'identifier'",
+                                        ),
+                                    );
+                                }
+                                __oneof_identifier = Some(
+                                    __buffa::oneof::get_internal_transfer_request::Identifier::TransferId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <GetInternalTransferRequest as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_subaccount_id {
+                    __r.subaccount_id = v;
+                }
+                __r.identifier = __oneof_identifier;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetInternalTransferRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_INTERNAL_TRANSFER_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.GetInternalTransferRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetInternalTransferRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetInternalTransferRequest>,
+    is_wkt: false,
+};
+pub mod get_internal_transfer_request {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::get_internal_transfer_request::Identifier;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::get_internal_transfer_request::Identifier as IdentifierView;
+}
+/// GetInternalTransferResponse links an accepted transfer to its lifecycle flow.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetInternalTransferResponse {
+    /// Stable server-owned intake request identifier.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Stable transfer identifier shared by its debit and credit ledger entries.
+    ///
+    /// Field 2: `transfer_id`
+    #[serde(
+        rename = "transferId",
+        alias = "transfer_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transfer_id: ::buffa::alloc::string::String,
+    /// Authoritative lifecycle identifier for GetFlowById. The flow's ledger
+    /// settlement step links back through milestone_tx_ref.
+    ///
+    /// Field 3: `flow_id`
+    #[serde(
+        rename = "flowId",
+        alias = "flow_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub flow_id: ::buffa::alloc::string::String,
+    /// Acceptance timestamp in nanoseconds since epoch (UTC).
+    ///
+    /// Field 4: `accepted_at_ts_ns`
+    #[serde(
+        rename = "acceptedAtTsNs",
+        alias = "accepted_at_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub accepted_at_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetInternalTransferResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetInternalTransferResponse")
+            .field("request_id", &self.request_id)
+            .field("transfer_id", &self.transfer_id)
+            .field("flow_id", &self.flow_id)
+            .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
+            .finish()
+    }
+}
+impl GetInternalTransferResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferResponse";
+}
+::buffa::impl_default_instance!(GetInternalTransferResponse);
+impl ::buffa::MessageName for GetInternalTransferResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "GetInternalTransferResponse";
+    const FULL_NAME: &'static str = "transfer.v1.GetInternalTransferResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferResponse";
+}
+impl ::buffa::Message for GetInternalTransferResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        if !self.transfer_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.transfer_id) as u32;
+        }
+        if !self.flow_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        if !self.transfer_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.transfer_id, buf);
+        }
+        if !self.flow_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.flow_id, buf);
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transfer_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.flow_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.transfer_id.clear();
+        self.flow_id.clear();
+        self.accepted_at_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetInternalTransferResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.GetInternalTransferResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetInternalTransferResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_INTERNAL_TRANSFER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.GetInternalTransferResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetInternalTransferResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetInternalTransferResponse>,
     is_wkt: false,
 };
 #[allow(
@@ -3088,6 +3617,11 @@ pub mod __buffa {
             ///
             /// Field 9: `status`
             pub status: ::buffa::EnumValue<super::super::InternalTransferStatus>,
+            /// Authoritative lifecycle flow identifier. Use GetFlowById to read the flow;
+            /// its ledger settlement step links back through milestone_tx_ref.
+            ///
+            /// Field 10: `flow_id`
+            pub flow_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateInternalTransferResponseView<'a> {
@@ -3224,6 +3758,13 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.flow_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -3276,6 +3817,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     status: self.status,
+                    flow_id: self.flow_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3347,6 +3889,11 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.flow_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3397,6 +3944,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(9u32, val, buf);
                     }
+                }
+                if !self.flow_id.is_empty() {
+                    ::buffa::types::put_string_field(10u32, &self.flow_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3465,6 +4015,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
                     __map.serialize_entry("status", &self.status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.flow_id) {
+                    __map.serialize_entry("flowId", self.flow_id)?;
                 }
                 __map.end()
             }
@@ -3641,6 +4194,14 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::InternalTransferStatus> {
                 self.0.reborrow().status
             }
+            /// Authoritative lifecycle flow identifier. Use GetFlowById to read the flow;
+            /// its ledger settlement step links back through milestone_tx_ref.
+            ///
+            /// Field 10: `flow_id`
+            #[must_use]
+            pub fn flow_id(&self) -> &'_ str {
+                self.0.reborrow().flow_id
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<CreateInternalTransferResponseView<'static>>,
@@ -3678,6 +4239,768 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetInternalTransferRequest selects an accepted transfer from the source account.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetInternalTransferRequestView<'a> {
+            /// Optional source public subaccount ID. Omitted means the authenticated root
+            /// account. The caller must have access to the selected subaccount.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            pub identifier: ::core::option::Option<
+                super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetInternalTransferRequestView<'a> {
+            type Owned = super::super::GetInternalTransferRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.identifier = Some(
+                            super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::RequestId(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.identifier = Some(
+                            super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::TransferId(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetInternalTransferRequest {
+                    subaccount_id: self.subaccount_id,
+                    identifier: self
+                        .identifier
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::RequestId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_internal_transfer_request::Identifier::RequestId(
+                                    v.to_string(),
+                                )
+                            }
+                            super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::TransferId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::get_internal_transfer_request::Identifier::TransferId(
+                                    v.to_string(),
+                                )
+                            }
+                        }),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetInternalTransferRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.identifier {
+                    match v {
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::RequestId(
+                            x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                        }
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::TransferId(
+                            x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                        }
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.identifier {
+                    match v {
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::RequestId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(2u32, x, buf);
+                        }
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::TransferId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(3u32, x, buf);
+                        }
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetInternalTransferRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.identifier {
+                    match __ov {
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::RequestId(
+                            v,
+                        ) => {
+                            __map.serialize_entry("requestId", v)?;
+                        }
+                        super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier::TransferId(
+                            v,
+                        ) => {
+                            __map.serialize_entry("transferId", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetInternalTransferRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "GetInternalTransferRequest";
+            const FULL_NAME: &'static str = "transfer.v1.GetInternalTransferRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetInternalTransferRequestView);
+        ::buffa::impl_view_reborrow!(GetInternalTransferRequestView);
+        /** Self-contained, `'static` owned view of a `GetInternalTransferRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetInternalTransferRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetInternalTransferRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetInternalTransferRequestOwnedView(
+            ::buffa::OwnedView<GetInternalTransferRequestView<'static>>,
+        );
+        impl GetInternalTransferRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetInternalTransferRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetInternalTransferRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetInternalTransferRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional source public subaccount ID. Omitted means the authenticated root
+            /// account. The caller must have access to the selected subaccount.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Oneof `identifier`.
+            #[must_use]
+            pub fn identifier(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::get_internal_transfer_request::Identifier<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().identifier.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetInternalTransferRequestView<'static>>,
+        > for GetInternalTransferRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetInternalTransferRequestView<'static>>,
+            ) -> Self {
+                GetInternalTransferRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetInternalTransferRequestOwnedView>
+        for ::buffa::OwnedView<GetInternalTransferRequestView<'static>> {
+            fn from(wrapper: GetInternalTransferRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetInternalTransferRequestView<'static>>,
+        > for GetInternalTransferRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetInternalTransferRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetInternalTransferRequest {
+            type View<'a> = GetInternalTransferRequestView<'a>;
+            type ViewHandle = GetInternalTransferRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetInternalTransferRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetInternalTransferResponse links an accepted transfer to its lifecycle flow.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetInternalTransferResponseView<'a> {
+            /// Stable server-owned intake request identifier.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            /// Stable transfer identifier shared by its debit and credit ledger entries.
+            ///
+            /// Field 2: `transfer_id`
+            pub transfer_id: &'a str,
+            /// Authoritative lifecycle identifier for GetFlowById. The flow's ledger
+            /// settlement step links back through milestone_tx_ref.
+            ///
+            /// Field 3: `flow_id`
+            pub flow_id: &'a str,
+            /// Acceptance timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `accepted_at_ts_ns`
+            pub accepted_at_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetInternalTransferResponseView<'a> {
+            type Owned = super::super::GetInternalTransferResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transfer_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.flow_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_at_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetInternalTransferResponse {
+                    request_id: self.request_id.to_string(),
+                    transfer_id: self.transfer_id.to_string(),
+                    flow_id: self.flow_id.to_string(),
+                    accepted_at_ts_ns: self.accepted_at_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetInternalTransferResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                if !self.transfer_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.transfer_id)
+                                as u32;
+                }
+                if !self.flow_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                if !self.transfer_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.transfer_id, buf);
+                }
+                if !self.flow_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.flow_id, buf);
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.accepted_at_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetInternalTransferResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transfer_id) {
+                    __map.serialize_entry("transferId", self.transfer_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.flow_id) {
+                    __map.serialize_entry("flowId", self.flow_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.accepted_at_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "acceptedAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetInternalTransferResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "GetInternalTransferResponse";
+            const FULL_NAME: &'static str = "transfer.v1.GetInternalTransferResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetInternalTransferResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetInternalTransferResponseView);
+        ::buffa::impl_view_reborrow!(GetInternalTransferResponseView);
+        /** Self-contained, `'static` owned view of a `GetInternalTransferResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetInternalTransferResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetInternalTransferResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetInternalTransferResponseOwnedView(
+            ::buffa::OwnedView<GetInternalTransferResponseView<'static>>,
+        );
+        impl GetInternalTransferResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetInternalTransferResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetInternalTransferResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetInternalTransferResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetInternalTransferResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetInternalTransferResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable server-owned intake request identifier.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Stable transfer identifier shared by its debit and credit ledger entries.
+            ///
+            /// Field 2: `transfer_id`
+            #[must_use]
+            pub fn transfer_id(&self) -> &'_ str {
+                self.0.reborrow().transfer_id
+            }
+            /// Authoritative lifecycle identifier for GetFlowById. The flow's ledger
+            /// settlement step links back through milestone_tx_ref.
+            ///
+            /// Field 3: `flow_id`
+            #[must_use]
+            pub fn flow_id(&self) -> &'_ str {
+                self.0.reborrow().flow_id
+            }
+            /// Acceptance timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `accepted_at_ts_ns`
+            #[must_use]
+            pub fn accepted_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_at_ts_ns
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetInternalTransferResponseView<'static>>,
+        > for GetInternalTransferResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetInternalTransferResponseView<'static>>,
+            ) -> Self {
+                GetInternalTransferResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetInternalTransferResponseOwnedView>
+        for ::buffa::OwnedView<GetInternalTransferResponseView<'static>> {
+            fn from(wrapper: GetInternalTransferResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetInternalTransferResponseView<'static>>,
+        > for GetInternalTransferResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetInternalTransferResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetInternalTransferResponse {
+            type View<'a> = GetInternalTransferResponseView<'a>;
+            type ViewHandle = GetInternalTransferResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetInternalTransferResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -3689,6 +5012,15 @@ pub mod __buffa {
                     DestinationAccountId(u64),
                     DestinationSubaccountId(u64),
                     DestinationSmartAccountAddress(&'a str),
+                }
+            }
+            pub mod get_internal_transfer_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Identifier<'a> {
+                    RequestId(&'a str),
+                    TransferId(&'a str),
                 }
             }
         }
@@ -3734,6 +5066,34 @@ pub mod __buffa {
                 }
             }
         }
+        pub mod get_internal_transfer_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Identifier {
+                RequestId(::buffa::alloc::string::String),
+                TransferId(::buffa::alloc::string::String),
+            }
+            impl ::buffa::Oneof for Identifier {}
+            impl serde::Serialize for Identifier {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::RequestId(v) => {
+                            map.serialize_entry("requestId", v)?;
+                        }
+                        Self::TransferId(v) => {
+                            map.serialize_entry("transferId", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -3741,6 +5101,8 @@ pub mod __buffa {
         reg.register_json_any(super::__RESOLVED_DESTINATION_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__CREATE_INTERNAL_TRANSFER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_INTERNAL_TRANSFER_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_INTERNAL_TRANSFER_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -3759,5 +5121,13 @@ pub use self::__buffa::view::ErrorDetailOwnedView;
 pub use self::__buffa::view::CreateInternalTransferResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateInternalTransferResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetInternalTransferRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetInternalTransferRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetInternalTransferResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetInternalTransferResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

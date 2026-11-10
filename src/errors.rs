@@ -2557,4 +2557,40 @@ mod tests {
             .is_mfa_enrollment_required()
         );
     }
+
+    /// POLY-9102: a path and body ID mismatch keeps its specific code on
+    /// either service and is no retryable or credential refusal.
+    #[test]
+    fn poly_9102_path_body_id_mismatch_codes_stay_specific() {
+        let order = map_order(
+            OrderErrorCode::ERROR_CODE_PATH_BODY_ID_MISMATCH,
+            ErrorCode::InvalidArgument,
+        );
+        match &order {
+            Error::Api { code, .. } => assert_eq!(code, "ERROR_CODE_PATH_BODY_ID_MISMATCH"),
+            other => panic!("unexpected error: {other:?}"),
+        }
+        assert_eq!(order.auth_code(), None);
+        assert!(!order.is_retryable() && !order.mutation_outcome_unknown());
+
+        let auth = map_auth_with(
+            ErrorCode::InvalidArgument,
+            AuthErrorCode::AUTH_PATH_BODY_ID_MISMATCH,
+            "Path and Body ID Mismatch",
+        );
+        assert_eq!(
+            auth.auth_code(),
+            Some(AuthErrorCode::AUTH_PATH_BODY_ID_MISMATCH)
+        );
+        assert_eq!(auth.auth_error_code(), Some("AUTH_PATH_BODY_ID_MISMATCH"));
+        assert!(!auth.is_retryable() && !auth.is_session_required());
+
+        assert_eq!(
+            auth_codes::from_rest_code("AUTH_PATH_BODY_ID_MISMATCH"),
+            Some(AuthErrorCode::AUTH_PATH_BODY_ID_MISMATCH)
+        );
+        assert!(is_recognised_rest_code("PATH_BODY_ID_MISMATCH"));
+        assert!(is_recognised_rest_code("AUTH_PATH_BODY_ID_MISMATCH"));
+        assert!(!is_credential_refusal_code("AUTH_PATH_BODY_ID_MISMATCH"));
+    }
 }

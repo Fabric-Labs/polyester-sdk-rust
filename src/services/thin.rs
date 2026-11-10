@@ -1348,6 +1348,11 @@ impl SocialVerificationService {
         Ok(api_data_from_proto(&resp))
     }
 
+    /// Read the account's social verification for `provider`. An API key
+    /// needs `READ_SOCIAL_VERIFICATION` on its policy and a main-account
+    /// scope, and receives the link status only (`provider`, `method`,
+    /// `handle`, `status`, `verified_at`). Starting a verification stays
+    /// session-only.
     pub async fn get(&self, provider: &str) -> crate::errors::Result<crate::models::ApiData> {
         use crate::codecs::decode::api_data_from_proto;
         use crate::proto::auth::v1::GetSocialVerificationRequest;
@@ -1419,6 +1424,10 @@ impl VipService {
         Ok(vip_tiers_list_from_proto(&resp))
     }
 
+    /// Read the owning root group's VIP status. An API key needs
+    /// `READ_VIP_STATUS` on its policy and a main-account scope; without it
+    /// the call is refused with `permission_denied`
+    /// (`AUTH_API_KEY_ACCESS_DENIED`).
     pub async fn get_vip_status(&self) -> crate::errors::Result<crate::models::VIPStatus> {
         use super::unary;
         use crate::codecs::decode::vip_status_from_proto;

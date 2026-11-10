@@ -960,6 +960,160 @@ pub const __ZIPPER_REASON_DETAILS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<ZipperReasonDetails>,
     is_wkt: false,
 };
+/// MemoRequirement describes the memo or destination tag needed for a payout target.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum MemoRequirement {
+    /// Requirement is unknown. Do not assume that a memo can be omitted.
+    MEMO_UNSPECIFIED = 0i32,
+    /// A memo or destination tag must be supplied.
+    REQUIRED = 1i32,
+    /// A memo or destination tag may be supplied.
+    OPTIONAL = 2i32,
+    /// A memo or destination tag must be empty.
+    NOT_SUPPORTED = 3i32,
+}
+impl MemoRequirement {
+    ///Idiomatic alias for [`Self::MEMO_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MemoUnspecified: Self = Self::MEMO_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::REQUIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Required: Self = Self::REQUIRED;
+    ///Idiomatic alias for [`Self::OPTIONAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Optional: Self = Self::OPTIONAL;
+    ///Idiomatic alias for [`Self::NOT_SUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NotSupported: Self = Self::NOT_SUPPORTED;
+}
+impl ::core::default::Default for MemoRequirement {
+    fn default() -> Self {
+        Self::MEMO_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for MemoRequirement {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for MemoRequirement {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = MemoRequirement;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(MemoRequirement)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<MemoRequirement, E> {
+                <MemoRequirement as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<MemoRequirement, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemoRequirement as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<MemoRequirement, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <MemoRequirement as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<MemoRequirement, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MemoRequirement {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for MemoRequirement {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::MEMO_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::REQUIRED),
+            2i32 => ::core::option::Option::Some(Self::OPTIONAL),
+            3i32 => ::core::option::Option::Some(Self::NOT_SUPPORTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::MEMO_UNSPECIFIED => "MEMO_UNSPECIFIED",
+            Self::REQUIRED => "REQUIRED",
+            Self::OPTIONAL => "OPTIONAL",
+            Self::NOT_SUPPORTED => "NOT_SUPPORTED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "MEMO_UNSPECIFIED" => ::core::option::Option::Some(Self::MEMO_UNSPECIFIED),
+            "REQUIRED" => ::core::option::Option::Some(Self::REQUIRED),
+            "OPTIONAL" => ::core::option::Option::Some(Self::OPTIONAL),
+            "NOT_SUPPORTED" => ::core::option::Option::Some(Self::NOT_SUPPORTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::MEMO_UNSPECIFIED, Self::REQUIRED, Self::OPTIONAL, Self::NOT_SUPPORTED]
+    }
+}
 /// ChainConfig describes one supported external chain for deposit and withdraw.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -1084,6 +1238,37 @@ pub struct ChainConfig {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_address_length: u32,
+    /// Memo rule for withdrawal destinations and QuickSwap destination, return,
+    /// and refund targets on this network. Does not describe deposit instructions.
+    ///
+    /// Field 13: `memo_requirement`
+    #[serde(
+        rename = "memoRequirement",
+        alias = "memo_requirement",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub memo_requirement: ::buffa::EnumValue<MemoRequirement>,
+    /// Display label, such as "Destination tag" or "Memo". Empty when not supported.
+    ///
+    /// Field 14: `memo_label`
+    #[serde(
+        rename = "memoLabel",
+        alias = "memo_label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub memo_label: ::buffa::alloc::string::String,
+    /// Human-readable format guidance. Empty when no additional guidance applies.
+    ///
+    /// Field 15: `memo_format_hint`
+    #[serde(
+        rename = "memoFormatHint",
+        alias = "memo_format_hint",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub memo_format_hint: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1103,6 +1288,9 @@ impl ::core::fmt::Debug for ChainConfig {
             .field("is_case_sensitive", &self.is_case_sensitive)
             .field("min_address_length", &self.min_address_length)
             .field("max_address_length", &self.max_address_length)
+            .field("memo_requirement", &self.memo_requirement)
+            .field("memo_label", &self.memo_label)
+            .field("memo_format_hint", &self.memo_format_hint)
             .finish()
     }
 }
@@ -1182,6 +1370,20 @@ impl ::buffa::Message for ChainConfig {
                 += 1u32
                     + ::buffa::types::uint32_encoded_len(self.max_address_length) as u32;
         }
+        {
+            let val = self.memo_requirement.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.memo_label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.memo_label) as u32;
+        }
+        if !self.memo_format_hint.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.memo_format_hint) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1227,6 +1429,18 @@ impl ::buffa::Message for ChainConfig {
         }
         if self.max_address_length != 0u32 {
             ::buffa::types::put_uint32_field(12u32, self.max_address_length, buf);
+        }
+        {
+            let val = self.memo_requirement.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
+        if !self.memo_label.is_empty() {
+            ::buffa::types::put_string_field(14u32, &self.memo_label, buf);
+        }
+        if !self.memo_format_hint.is_empty() {
+            ::buffa::types::put_string_field(15u32, &self.memo_format_hint, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1325,6 +1539,29 @@ impl ::buffa::Message for ChainConfig {
                 )?;
                 self.max_address_length = ::buffa::types::decode_uint32(buf)?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.memo_requirement = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.memo_label, buf)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.memo_format_hint, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1345,6 +1582,9 @@ impl ::buffa::Message for ChainConfig {
         self.is_case_sensitive = false;
         self.min_address_length = 0u32;
         self.max_address_length = 0u32;
+        self.memo_requirement = ::buffa::EnumValue::from(0);
+        self.memo_label.clear();
+        self.memo_format_hint.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3333,6 +3573,19 @@ pub mod __buffa {
             ///
             /// Field 12: `max_address_length`
             pub max_address_length: u32,
+            /// Memo rule for withdrawal destinations and QuickSwap destination, return,
+            /// and refund targets on this network. Does not describe deposit instructions.
+            ///
+            /// Field 13: `memo_requirement`
+            pub memo_requirement: ::buffa::EnumValue<super::super::MemoRequirement>,
+            /// Display label, such as "Destination tag" or "Memo". Empty when not supported.
+            ///
+            /// Field 14: `memo_label`
+            pub memo_label: &'a str,
+            /// Human-readable format guidance. Empty when no additional guidance applies.
+            ///
+            /// Field 15: `memo_format_hint`
+            pub memo_format_hint: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ChainConfigView<'a> {
@@ -3460,6 +3713,29 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.memo_requirement = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.memo_label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.memo_format_hint = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -3501,6 +3777,9 @@ pub mod __buffa {
                     is_case_sensitive: self.is_case_sensitive,
                     min_address_length: self.min_address_length,
                     max_address_length: self.max_address_length,
+                    memo_requirement: self.memo_requirement,
+                    memo_label: self.memo_label.to_string(),
+                    memo_format_hint: self.memo_format_hint.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3577,6 +3856,24 @@ pub mod __buffa {
                             + ::buffa::types::uint32_encoded_len(self.max_address_length)
                                 as u32;
                 }
+                {
+                    let val = self.memo_requirement.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.memo_label.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.memo_label)
+                                as u32;
+                }
+                if !self.memo_format_hint.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.memo_format_hint)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -3643,6 +3940,18 @@ pub mod __buffa {
                         self.max_address_length,
                         buf,
                     );
+                }
+                {
+                    let val = self.memo_requirement.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(13u32, val, buf);
+                    }
+                }
+                if !self.memo_label.is_empty() {
+                    ::buffa::types::put_string_field(14u32, &self.memo_label, buf);
+                }
+                if !self.memo_format_hint.is_empty() {
+                    ::buffa::types::put_string_field(15u32, &self.memo_format_hint, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3738,6 +4047,17 @@ pub mod __buffa {
                             "maxAddressLength",
                             &::buffa::json_helpers::ProtoJson(&self.max_address_length),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.memo_requirement,
+                ) {
+                    __map.serialize_entry("memoRequirement", &self.memo_requirement)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.memo_label) {
+                    __map.serialize_entry("memoLabel", self.memo_label)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.memo_format_hint) {
+                    __map.serialize_entry("memoFormatHint", self.memo_format_hint)?;
                 }
                 __map.end()
             }
@@ -3918,6 +4238,30 @@ pub mod __buffa {
             #[must_use]
             pub fn max_address_length(&self) -> u32 {
                 self.0.reborrow().max_address_length
+            }
+            /// Memo rule for withdrawal destinations and QuickSwap destination, return,
+            /// and refund targets on this network. Does not describe deposit instructions.
+            ///
+            /// Field 13: `memo_requirement`
+            #[must_use]
+            pub fn memo_requirement(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::MemoRequirement> {
+                self.0.reborrow().memo_requirement
+            }
+            /// Display label, such as "Destination tag" or "Memo". Empty when not supported.
+            ///
+            /// Field 14: `memo_label`
+            #[must_use]
+            pub fn memo_label(&self) -> &'_ str {
+                self.0.reborrow().memo_label
+            }
+            /// Human-readable format guidance. Empty when no additional guidance applies.
+            ///
+            /// Field 15: `memo_format_hint`
+            #[must_use]
+            pub fn memo_format_hint(&self) -> &'_ str {
+                self.0.reborrow().memo_format_hint
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChainConfigView<'static>>>

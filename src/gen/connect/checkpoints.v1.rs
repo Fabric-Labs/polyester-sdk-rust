@@ -91,7 +91,8 @@ pub const CHECKPOINT_SERVICE_LIST_MY_CHECKPOINTS_SPEC: ::connectrpc::Spec = ::co
 #[allow(clippy::type_complexity)]
 pub trait CheckpointService: Send + Sync + 'static {
     /// List every checkpoint of the authenticated caller's root account, newest
-    /// first. Checkpoints are private to the account owner.
+    /// first. Checkpoints are private to the account owner. An API key needs
+    /// READ_CHECKPOINTS and must be scoped to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

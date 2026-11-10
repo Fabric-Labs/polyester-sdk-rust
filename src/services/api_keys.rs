@@ -27,6 +27,10 @@ impl ApiKeysService {
         )
     }
 
+    /// List API keys. An API key needs `READ_API_KEYS` on its policy: a key
+    /// scoped to the main account reads the main account's keys and those of
+    /// its sub-accounts, a key scoped to a sub-account only that
+    /// sub-account's keys.
     pub async fn list(&self, subaccount_id: Option<u64>) -> Result<ApiKeysList> {
         let req = ListApiKeysRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
@@ -44,6 +48,8 @@ impl ApiKeysService {
         Ok(api_keys_list_from_proto(&resp))
     }
 
+    /// Read one API key. An API key needs `READ_API_KEYS` on its policy; a
+    /// key outside its scope answers `not_found`.
     pub async fn get(&self, key_id: &str) -> Result<Option<ApiKeySummary>> {
         let client = self.connect_client();
         let resp = unary::await_auth(

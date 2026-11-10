@@ -1049,11 +1049,17 @@ pub enum ErrorCode {
     /// The venue-wide admission rate that the account shares with other accounts is
     /// exhausted. The account's own limit was not reached; retry shortly.
     ERROR_CODE_SYSTEM_RATE_LIMITED = 225i32,
-    /// An earlier amend or replace of the order has not completed yet. Retry once it
-    /// completes.
+    /// An earlier amend or replace of the order has not completed yet. A batch
+    /// replace answer means its items were admitted, not completed, so the next
+    /// refresh of the same order can get this code. Retry after a short backoff.
+    /// For a batch item, resend only that item in a new batch under a fresh request
+    /// ID, because the rejected batch's request ID returns this rejection again.
     ERROR_CODE_ORDER_MODIFY_IN_PROGRESS = 226i32,
-    /// The order, or the replace that created it, has not been placed on the book
-    /// yet, so it cannot be modified. Retry shortly.
+    /// The placement of the order, or of the replacement an earlier replace
+    /// created, has not been confirmed yet, so it cannot be modified. It may already
+    /// rest on the book. A refresh that names the replacement order ID from a batch
+    /// whose replace has not been confirmed yet gets this code. Retry after a short
+    /// backoff, as for ORDER_MODIFY_IN_PROGRESS.
     ERROR_CODE_ORDER_PLACEMENT_PENDING = 227i32,
     /// The modify behavior is not a known behavior.
     ERROR_CODE_INVALID_MODIFY_BEHAVIOR = 228i32,
@@ -1316,6 +1322,9 @@ pub enum ErrorCode {
     /// The trigger's child order did not match the order the trigger requested,
     /// so the trigger failed and the child order was canceled.
     ERROR_CODE_CHILD_ORDER_INCONSISTENT = 94i32,
+    /// A non-empty resource ID in the REST request body differs from the path ID.
+    /// Nothing changed. Use the same ID in both places, or omit the body ID.
+    ERROR_CODE_PATH_BODY_ID_MISMATCH = 95i32,
     /// The request's receive window ended before it was sent on for admission:
     /// the request was not processed and changed nothing. The window is the
     /// request's timestamp plus its receive window: the X-API-RECV-WINDOW header
@@ -1912,6 +1921,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ChildOrderInconsistent: Self = Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PATH_BODY_ID_MISMATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PathBodyIdMismatch: Self = Self::ERROR_CODE_PATH_BODY_ID_MISMATCH;
     ///Idiomatic alias for [`Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RequestDeadlineExceeded: Self = Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED;
@@ -2538,6 +2550,7 @@ impl ::buffa::Enumeration for ErrorCode {
             94i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
             }
+            95i32 => ::core::option::Option::Some(Self::ERROR_CODE_PATH_BODY_ID_MISMATCH),
             308i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
             }
@@ -2959,6 +2972,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT => {
                 "ERROR_CODE_CHILD_ORDER_INCONSISTENT"
             }
+            Self::ERROR_CODE_PATH_BODY_ID_MISMATCH => "ERROR_CODE_PATH_BODY_ID_MISMATCH",
             Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED => {
                 "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED"
             }
@@ -3654,6 +3668,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CHILD_ORDER_INCONSISTENT" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT)
             }
+            "ERROR_CODE_PATH_BODY_ID_MISMATCH" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PATH_BODY_ID_MISMATCH)
+            }
             "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
             }
@@ -3858,6 +3875,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CONDITION_PARAMETER_SET,
             Self::ERROR_CODE_TWAP_CAPACITY_REACHED,
             Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT,
+            Self::ERROR_CODE_PATH_BODY_ID_MISMATCH,
             Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED,
         ]
     }
@@ -15810,6 +15828,14 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
 /// a different payload under the same key conflicts. Use a fresh key for a new batch.
 /// Read the batch's status with GetBatchReplaceStatus within the same window;
 /// after it, reconcile the individual orders and never resubmit an accepted batch.
+/// The response answers admission, before an admitted item's change completes.
+/// Until it completes, a later change of that order, an item of the next batch
+/// included, is rejected with a retryable code: ORDER_MODIFY_IN_PROGRESS when it
+/// names the order by client order ID, and ORDER_PLACEMENT_PENDING (or
+/// ORDER_MODIFY_IN_PROGRESS) when it names the replacement_order_id returned
+/// here. Resend only the rejected items, in a new batch under a fresh key, after
+/// a short backoff: the rejected batch's key keeps replaying its rejection, and
+/// admitted items must not be sent again.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -42303,6 +42329,14 @@ pub mod __buffa {
         /// a different payload under the same key conflicts. Use a fresh key for a new batch.
         /// Read the batch's status with GetBatchReplaceStatus within the same window;
         /// after it, reconcile the individual orders and never resubmit an accepted batch.
+        /// The response answers admission, before an admitted item's change completes.
+        /// Until it completes, a later change of that order, an item of the next batch
+        /// included, is rejected with a retryable code: ORDER_MODIFY_IN_PROGRESS when it
+        /// names the order by client order ID, and ORDER_PLACEMENT_PENDING (or
+        /// ORDER_MODIFY_IN_PROGRESS) when it names the replacement_order_id returned
+        /// here. Resend only the rejected items, in a new batch under a fresh key, after
+        /// a short backoff: the rejected batch's key keeps replaying its rejection, and
+        /// admitted items must not be sent again.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys

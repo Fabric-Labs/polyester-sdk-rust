@@ -94,6 +94,9 @@ pub trait HeatmapService: Send + Sync + 'static {
     /// - All intervals (1s/1m/5m/1h) return snapshot + sparse delta chain.
     /// - Response may also include the latest live bucket state when available.
     /// Response always includes realtime stitching anchors.
+    /// Replayable history starts at the oldest available snapshot. Earlier update
+    /// buckets are omitted, and pagination ends with an empty next_page_token.
+    /// A window entirely before replayable history returns an empty chain.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

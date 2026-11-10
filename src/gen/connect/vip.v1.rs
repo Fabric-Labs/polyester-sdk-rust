@@ -154,6 +154,7 @@ pub trait VipService: Send + Sync + 'static {
         >,
     > + Send;
     /// Get VIP qualification status for the authenticated caller's root account.
+    /// An API key needs READ_VIP_STATUS and must be scoped to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

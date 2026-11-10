@@ -337,7 +337,10 @@ impl WithdrawService {
     /// Check one external-chain destination without creating a withdraw.
     ///
     /// Use for form feedback before Trading → external submission; create RPCs
-    /// remain authoritative.
+    /// remain authoritative. It moves no value: an API key needs
+    /// `READ_WITHDRAW_VALIDATION` on its policy (`EXTERNAL_WITHDRAW` alone no
+    /// longer opens it), and is refused with `permission_denied` and the
+    /// withdraw code `ERROR_CODE_PERMISSION_DENIED` without it.
     pub async fn validate_destination(
         &self,
         destination_chain_id: u64,

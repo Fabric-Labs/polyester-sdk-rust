@@ -7,8 +7,8 @@ use crate::models::{
 use crate::proto::auth::v1::{
     ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse, GetApiPolicyResponse,
     GetSubaccountPolicyResponse, ListApiPoliciesResponse, ListSubaccountPoliciesResponse,
-    SpotMarketRule as ProtoSpotMarketRule, SubaccountPolicyView, UpdateApiPolicyResponse,
-    UpdateSubaccountPolicyResponse, market_scope,
+    PolicyAction, SpotMarketRule as ProtoSpotMarketRule, SubaccountPolicyView,
+    UpdateApiPolicyResponse, UpdateSubaccountPolicyResponse, market_scope,
 };
 
 /// Contract label for a market scope: `"ALL"` or `"ALLOWLIST"`, empty when
@@ -20,6 +20,16 @@ fn market_scope_label(scope: &buffa::EnumValue<market_scope::Value>) -> String {
         Some(market_scope::Value::UNSPECIFIED) => String::new(),
         None => format!("UNKNOWN({})", scope.to_i32()),
     }
+}
+
+/// Granted policy actions by proto name, skipping unset entries;
+/// `UNKNOWN(n)` for an action newer than this SDK.
+fn policy_actions(actions: &[buffa::EnumValue<PolicyAction>]) -> Vec<String> {
+    actions
+        .iter()
+        .filter(|action| action.to_i32() != 0)
+        .map(crate::codecs::decode::enum_proto_name)
+        .collect()
 }
 
 fn spot_market_rule_from_proto(msg: &ProtoSpotMarketRule) -> SpotMarketRule {
@@ -44,6 +54,7 @@ pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPol
         max_open_orders: msg.max_open_orders,
         trading_halted: msg.trading_halted,
         revision: msg.revision,
+        actions: policy_actions(&msg.actions),
     }
 }
 
@@ -89,6 +100,7 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
             .collect(),
         spot_market_scope: market_scope_label(&msg.spot_market_scope),
         revision: msg.revision,
+        actions: policy_actions(&msg.actions),
     }
 }
 
@@ -156,5 +168,64 @@ mod tests {
         assert_eq!(result.policies[0].spot_markets.len(), 1);
         assert_eq!(result.policies[0].spot_markets[0].symbol_id, 3);
         assert_eq!(result.policies[0].spot_markets[0].symbol, "");
+    }
+
+    /// Every `PolicyAction`, the POLY-9102 account permissions included,
+    /// reads as its proto name and parses back to the same value. Unset
+    /// entries are skipped and a value newer than this SDK keeps its number.
+    #[test]
+    fn poly_9102_policy_actions_round_trip_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let known: Vec<PolicyAction> = PolicyAction::values()
+            .iter()
+            .copied()
+            .filter(|action| *action != PolicyAction::UNSPECIFIED)
+            .collect();
+        for added in [
+            PolicyAction::READ_API_KEYS,
+            PolicyAction::READ_API_POLICIES,
+            PolicyAction::READ_SUBACCOUNT_POLICIES,
+            PolicyAction::READ_SUBACCOUNT_PERMISSIONS,
+            PolicyAction::READ_VIP_STATUS,
+            PolicyAction::READ_SOCIAL_VERIFICATION,
+            PolicyAction::READ_PROFILE,
+            PolicyAction::READ_ACCOUNT_DIRECTORY,
+            PolicyAction::READ_WITHDRAW_VALIDATION,
+            PolicyAction::READ_DAILY_CLAIMS,
+            PolicyAction::CLAIM_DAILY_REWARD,
+            PolicyAction::READ_CHECKPOINTS,
+            PolicyAction::READ_REWARDS,
+        ] {
+            assert!(known.contains(&added), "{added:?}");
+        }
+        let mut actions: Vec<buffa::EnumValue<PolicyAction>> =
+            known.iter().map(|action| (*action).into()).collect();
+        actions.push(PolicyAction::UNSPECIFIED.into());
+        actions.push(buffa::EnumValue::Unknown(99));
+
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: actions.clone(),
+            ..Default::default()
+        });
+        let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
+            actions,
+            ..Default::default()
+        });
+        for decoded in [&api.actions, &sub.actions] {
+            assert_eq!(decoded.len(), known.len() + 1, "{decoded:?}");
+            for (name, action) in decoded.iter().zip(&known) {
+                assert_eq!(name, action.proto_name());
+                assert_eq!(PolicyAction::from_proto_name(name), Some(*action));
+            }
+            assert_eq!(decoded.last().map(String::as_str), Some("UNKNOWN(99)"));
+        }
+        assert!(
+            api.actions
+                .iter()
+                .any(|name| name == "READ_WITHDRAW_VALIDATION")
+        );
+        assert!(api.actions.iter().any(|name| name == "CLAIM_DAILY_REWARD"));
     }
 }
