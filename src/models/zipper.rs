@@ -14,6 +14,10 @@ pub struct ZipperAssetChainVariant {
     pub network_fee: String,
     pub deposit_min_amount: String,
     pub withdraw_min_amount: String,
+    /// Latest zToken supply of this variant: `supply_q` at the asset's
+    /// `quantity_scale`, such as `97.08173223`, and `0` for none. Empty when
+    /// the asset's scale is not one a quantity can be formatted at.
+    pub supply: String,
     pub source_token: ZipperTokenConfig,
     pub z_token: ZipperTokenConfig,
 }

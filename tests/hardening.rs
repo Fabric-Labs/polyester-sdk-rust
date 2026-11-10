@@ -37,6 +37,8 @@ mod request_size_rate_limit;
 mod signed_redirects;
 #[path = "url_userinfo/mod.rs"]
 mod url_userinfo;
+#[path = "zipper_supply/mod.rs"]
+mod zipper_supply;
 
 use buffa::Message;
 use futures_util::future::FutureExt;
