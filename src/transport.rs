@@ -113,6 +113,22 @@ pub(crate) fn url_without_userinfo(raw: &str) -> String {
     }
 }
 
+/// `raw` as an error may name it: scheme, host, port and path, without its
+/// userinfo, query or fragment, any of which can carry a credential. A URL
+/// that does not parse becomes `[REDACTED INVALID URL]`.
+pub(crate) fn url_for_error(raw: &str) -> String {
+    match url::Url::parse(raw) {
+        Ok(mut parsed) => {
+            let _ = parsed.set_username("");
+            let _ = parsed.set_password(None);
+            parsed.set_query(None);
+            parsed.set_fragment(None);
+            parsed.to_string()
+        }
+        Err(_) => "[REDACTED INVALID URL]".to_owned(),
+    }
+}
+
 fn redact_url_for_log(url: &url::Url) -> String {
     let mut redacted = url.clone();
     let _ = redacted.set_username("");
@@ -1021,6 +1037,26 @@ mod tests {
 #[cfg(test)]
 mod url_userinfo_tests {
     use super::url_without_userinfo;
+
+    #[test]
+    fn url_for_error_keeps_only_scheme_host_port_and_path() {
+        for (raw, want) in [
+            (
+                "https://api.example.test/v1/rt/token",
+                "https://api.example.test/v1/rt/token",
+            ),
+            (
+                "https://fake-user:fake-password@api.example.test:8443/v1?token=fake-token#fake-fragment",
+                "https://api.example.test:8443/v1",
+            ),
+            (
+                "http://fake-user:fake-password@127.0.0.1:notaport/v1?token=fake-token",
+                "[REDACTED INVALID URL]",
+            ),
+        ] {
+            assert_eq!(super::url_for_error(raw), want, "{raw}");
+        }
+    }
 
     #[test]
     fn url_without_userinfo_drops_only_userinfo() {

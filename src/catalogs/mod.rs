@@ -1,9 +1,9 @@
 //! Spot / zipper catalog cache for scale lookups.
 //!
-//! Zipper live supply is read through [`Manager::supply_for_zipped_asset_id`]
-//! (keyed by `zipped_asset_id`). Full enriched zipper config rows are not
-//! mutated; use [`Manager::patch_zipper_supply`] from
-//! `subscribe_zipped_asset_supply(true)`.
+//! Zipper supply is read through [`Manager::supply_for_zipped_asset_id`]
+//! (keyed by `zipped_asset_id`), seeded from the hydrated zipper config. Full
+//! enriched zipper config rows are not mutated; use
+//! [`Manager::patch_zipper_supply`] from `subscribe_zipped_asset_supply(true)`.
 
 use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
@@ -160,6 +160,8 @@ struct ZipperSnapshot {
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
+    /// Each variant's supply as the config reports it.
+    zipped_id_to_supply: HashMap<u32, String>,
     zipper_config: Value,
 }
 
@@ -385,6 +387,14 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
                     )));
                 }
                 zipped_id_to_asset.insert(zipped_id, sym.to_owned());
+                if let Some(supply) = variant
+                    .get("supply")
+                    .and_then(Value::as_str)
+                    .filter(|supply| !supply.is_empty())
+                {
+                    snap.zipped_id_to_supply
+                        .insert(zipped_id, supply.to_owned());
+                }
             }
         }
     }
@@ -794,7 +804,8 @@ impl Manager {
             .copied()
     }
 
-    /// Latest supply string for a zipped asset id, if patched from realtime updates.
+    /// Latest supply string for a zipped asset id: from the hydrated zipper
+    /// config, or from a later realtime update.
     pub fn supply_for_zipped_asset_id(&self, id: u32) -> Option<String> {
         read_unpoisoned(&self.inner)
             .zipped_id_to_supply
@@ -806,7 +817,8 @@ impl Manager {
     ///
     /// Returns `true` when at least one entry changed. Unlike Go/Python, Rust
     /// catalogs do not store full enriched zipper chain rows with a `supply`
-    /// field; this map is the live-supply source of truth.
+    /// field; this map, seeded from the hydrated config, is the live-supply
+    /// source of truth.
     pub fn patch_zipper_supply(&self, updates: &[ZippedAssetSupplyUpdate]) -> bool {
         if updates.is_empty() {
             return false;
@@ -860,7 +872,9 @@ fn apply_zipper(inner: &mut Inner, snap: ZipperSnapshot) {
     inner.asset_to_qty_scale = snap.asset_to_qty_scale;
     inner.zipped_id_to_scale = snap.zipped_id_to_scale;
     inner.zipper_config = Some(snap.zipper_config);
-    // Preserve live supply patches across zipper catalog replacement.
+    // The config's supplies replace those of the variants it names; live
+    // supply patches of other variants are kept across replacement.
+    inner.zipped_id_to_supply.extend(snap.zipped_id_to_supply);
 }
 
 #[cfg(test)]
@@ -1287,6 +1301,49 @@ mod tests {
         }))
         .expect("hydrate");
         assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), Some(6));
+    }
+
+    /// The hydrated config seeds each variant's supply; a later config
+    /// replaces the supplies of the variants it names and keeps live patches
+    /// of the others.
+    #[test]
+    fn zipper_config_seeds_variant_supply() {
+        let mgr = Manager::new();
+        mgr.hydrate_zipper_config_json(json!({
+            "assets": [{
+                "asset": "BTC",
+                "ledger_id": 1,
+                "quantity_scale": 8,
+                "variants": [
+                    {"zipped_asset_id": 7, "supply": "97.08173223"},
+                    {"zipped_asset_id": 8, "supply": "0"},
+                    {"zipped_asset_id": 9}
+                ]
+            }]
+        }))
+        .expect("hydrate");
+        assert_eq!(
+            mgr.supply_for_zipped_asset_id(7).as_deref(),
+            Some("97.08173223")
+        );
+        assert_eq!(mgr.supply_for_zipped_asset_id(8).as_deref(), Some("0"));
+        assert_eq!(mgr.supply_for_zipped_asset_id(9), None);
+
+        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
+            zipped_asset_id: 9,
+            supply: "1.5".to_owned(),
+        }]));
+        mgr.hydrate_zipper_config_json(json!({
+            "assets": [{
+                "asset": "BTC",
+                "ledger_id": 1,
+                "quantity_scale": 8,
+                "variants": [{"zipped_asset_id": 7, "supply": "98"}]
+            }]
+        }))
+        .expect("replace");
+        assert_eq!(mgr.supply_for_zipped_asset_id(7).as_deref(), Some("98"));
+        assert_eq!(mgr.supply_for_zipped_asset_id(9).as_deref(), Some("1.5"));
     }
 
     #[test]

@@ -37,6 +37,8 @@ mod request_size_rate_limit;
 mod signed_redirects;
 #[path = "url_userinfo/mod.rs"]
 mod url_userinfo;
+#[path = "zipper_supply/mod.rs"]
+mod zipper_supply;
 
 use buffa::Message;
 use futures_util::future::FutureExt;
@@ -1407,7 +1409,8 @@ async fn l2_token_http_403_maps_to_structured_permission_denied() {
             assert_eq!(status, 403);
             assert_eq!(code, "permission_denied");
             assert!(context.contains("private:auth:transfers:acct:proto"));
-            assert!(endpoint.contains("/v1/rt/subscribe?channel="));
+            // The endpoint keeps no query; the context names the channel.
+            assert!(endpoint.ends_with("/v1/rt/subscribe"), "{endpoint}");
         }
         other => panic!("expected structured permission error, got {other:?}"),
     }
