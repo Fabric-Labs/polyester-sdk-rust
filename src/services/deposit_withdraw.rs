@@ -544,6 +544,8 @@ impl ZipperService {
         &self,
         patch_catalog: bool,
     ) -> Result<crate::realtime::TypedSubscription<ZippedAssetSupplyBatch>> {
+        // Each update is decoded with its asset's catalog quantity scale.
+        self.ctx.wait_for_catalogs().await?;
         let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
