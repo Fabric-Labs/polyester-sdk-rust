@@ -66,10 +66,25 @@ pub struct ServiceContext {
 }
 
 impl ServiceContext {
-    /// Wait for construction-time catalog hydration when enabled.
+    /// Wait for construction-time catalog hydration when enabled, before a
+    /// call resolves a display symbol or reads a pair's scales.
     ///
-    /// Propagates hydration failure so order paths do not proceed with empty catalogs.
+    /// A failed hydration is returned as [`Error::CatalogHydration`], so a
+    /// call names why the catalogs are missing instead of refusing the symbol.
     pub async fn wait_for_catalogs(&self) -> Result<()> {
+        self.hydration_outcome()
+            .await
+            .map_err(Error::catalog_hydration)
+    }
+
+    /// Wait for construction-time catalog hydration, whatever its outcome, for
+    /// a call that only labels or scales its results from the catalogs and
+    /// works without them.
+    pub(crate) async fn settle_catalogs(&self) {
+        let _ = self.hydration_outcome().await;
+    }
+
+    async fn hydration_outcome(&self) -> Result<()> {
         if !self.hydrate_catalogs_enabled {
             return Ok(());
         }

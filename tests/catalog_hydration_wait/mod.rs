@@ -74,6 +74,9 @@ fn zipper_config() -> GetDepositWithdrawConfigResponse {
     }
 }
 
+/// Requests other than the catalogs: each path and the symbol IDs it carries.
+type SentLog = Arc<Mutex<Vec<(String, Vec<u32>)>>>;
+
 /// A Connect API whose `GetSpotConfig` answers once released: `Some(false)`
 /// with the catalog, `Some(true)` with a server error.
 struct Stub {
@@ -81,7 +84,7 @@ struct Stub {
     release: watch::Sender<Option<bool>>,
     spot_requested: watch::Receiver<bool>,
     /// Every other request: its path and the symbol IDs it carries.
-    sent: Arc<Mutex<Vec<(String, Vec<u32>)>>>,
+    sent: SentLog,
     _refused_ws: RefusedPort,
     ws_url: String,
 }
@@ -153,7 +156,7 @@ async fn serve(
     mut stream: TcpStream,
     mut released: watch::Receiver<Option<bool>>,
     requested: Arc<watch::Sender<bool>>,
-    sent: Arc<Mutex<Vec<(String, Vec<u32>)>>>,
+    sent: SentLog,
 ) {
     let Some((path, body)) = read_request(&mut stream).await else {
         return;
@@ -425,12 +428,12 @@ fn is_symbol_refusal(err: &Error) -> bool {
 }
 
 /// Runs `check` for every probe and fails with every probe that failed it.
-async fn for_each_probe<F>(check: F)
+async fn for_each_probe<F>(probes: Vec<(&'static str, bool, Probe)>, check: F)
 where
     F: AsyncFn(&'static str, bool, Probe) -> Result<(), String>,
 {
     let mut failures = Vec::new();
-    for (name, stream, probe) in probes() {
+    for (name, stream, probe) in probes {
         if let Err(failure) = check(name, stream, probe).await {
             failures.push(format!("{name}: {failure}"));
         }
@@ -445,7 +448,7 @@ where
 
 #[tokio::test]
 async fn symbol_calls_wait_for_in_flight_catalog_hydration() {
-    for_each_probe(async |name, stream, probe| {
+    for_each_probe(probes(), async |name, stream, probe| {
         let stub = Stub::spawn().await;
         let client = stub.client(true);
         let handle = start_held(&stub, &client, probe, SYMBOL).await;
@@ -473,7 +476,7 @@ async fn symbol_calls_wait_for_in_flight_catalog_hydration() {
 
 #[tokio::test]
 async fn symbol_calls_report_failed_hydration_as_catalog_hydration_error() {
-    for_each_probe(async |name, _, probe| {
+    for_each_probe(probes(), async |name, _, probe| {
         let stub = Stub::spawn().await;
         let client = stub.client(true);
         let handle = start_held(&stub, &client, probe, SYMBOL).await;
@@ -504,7 +507,7 @@ async fn symbol_calls_report_failed_hydration_as_catalog_hydration_error() {
 
 #[tokio::test]
 async fn unknown_symbol_after_hydration_is_refused_as_unknown() {
-    for_each_probe(async |name, _, probe| {
+    for_each_probe(probes(), async |name, _, probe| {
         let stub = Stub::spawn().await;
         let client = stub.client(true);
         stub.release(false);
@@ -523,6 +526,86 @@ async fn unknown_symbol_after_hydration_is_refused_as_unknown() {
         Ok(())
     })
     .await;
+}
+
+/// Reads that only label or scale their results from the catalogs: they wait
+/// for hydration, and a failed one costs the labels, not the read.
+fn labelled_reads() -> Vec<(&'static str, bool, Probe)> {
+    vec![
+        ("market_overview.get_spot_volume_history", false, |c, _| {
+            Box::pin(async move {
+                c.market_overview
+                    .get_spot_volume_history(None, Some(&[SYMBOL_ID]))
+                    .await
+                    .map(drop)
+            })
+        }),
+        ("market_overview.subscribe", true, |c, _| {
+            Box::pin(async move { c.market_overview.subscribe().await.map(drop) })
+        }),
+        ("fees.get_spot_fee_rates", false, |c, _| {
+            Box::pin(async move { c.fees.get_spot_fee_rates(None, Vec::new()).await.map(drop) })
+        }),
+        ("triggers.list", false, |c, _| {
+            Box::pin(async move {
+                c.triggers
+                    .list(polyester::proto::triggers::v1::ListTriggersRequest::default())
+                    .await
+                    .map(drop)
+            })
+        }),
+        ("triggers.get_by_id", false, |c, _| {
+            Box::pin(async move { c.triggers.get_by_id("1", None).await.map(drop) })
+        }),
+    ]
+}
+
+#[tokio::test]
+async fn labelled_reads_wait_for_hydration_but_tolerate_failure() {
+    for fail in [false, true] {
+        for_each_probe(labelled_reads(), async |name, _, probe| {
+            let stub = Stub::spawn().await;
+            let client = stub.client(true);
+            let handle = start_held(&stub, &client, probe, SYMBOL).await;
+            if handle.is_finished() || !stub.sent().is_empty() {
+                return Err(format!("read before the catalogs loaded (failed={fail})"));
+            }
+            stub.release(fail);
+            let Err(err) = outcome(name, handle).await else {
+                return Err("the stub and the stream refuse every call, yet it succeeded".into());
+            };
+            if is_symbol_refusal(&err) {
+                return Err(format!("failed={fail}: refused for the catalogs: {err}"));
+            }
+            Ok(())
+        })
+        .await;
+    }
+}
+
+#[tokio::test]
+async fn zipped_asset_supply_waits_for_the_scales_it_decodes_with() {
+    for fail in [false, true] {
+        let stub = Stub::spawn().await;
+        let client = stub.client(true);
+        let probe: Probe = |c, _| {
+            Box::pin(async move { c.zipper.subscribe_zipped_asset_supply(true).await.map(drop) })
+        };
+        let handle = start_held(&stub, &client, probe, SYMBOL).await;
+        assert!(
+            !handle.is_finished(),
+            "the supply stream started before the catalogs loaded"
+        );
+        stub.release(fail);
+        let err = outcome("zipper.subscribe_zipped_asset_supply", handle)
+            .await
+            .expect_err("the stream is refused");
+        assert_eq!(
+            matches!(err, Error::CatalogHydration(_)),
+            fail,
+            "failed={fail}: {err:?}"
+        );
+    }
 }
 
 #[tokio::test]

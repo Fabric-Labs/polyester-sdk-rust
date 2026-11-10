@@ -130,6 +130,8 @@ impl MarketDataService {
     }
 
     pub async fn get_trades_with(&self, opts: GetTradesOpts) -> Result<MarketTradesResult> {
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
         let symbol_id =
             self.resolve_symbol_id(opts.symbol.as_deref(), opts.symbol_id, "get_trades")?;
         let quantity_scale = self.require_quantity_scale(symbol_id, "get_trades")?;
@@ -176,6 +178,8 @@ impl MarketDataService {
     }
 
     pub async fn get_candles_with(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
         let (req, volume_scale) = self.build_candles_request(&opts)?;
         let symbol_id = req.symbol_id;
         let resp = unary::await_public(self.client().get_candles(req))
@@ -210,6 +214,8 @@ impl MarketDataService {
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
         let (base, volume_scale) = self.build_candles_request(&opts)?;
         let req = GetCandlesColumnsRequest {
             symbol_id: base.symbol_id,
@@ -277,6 +283,8 @@ impl MarketDataService {
         &self,
         symbol: &str,
     ) -> Result<crate::realtime::TypedSubscription<MarketTrade>> {
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
             .catalogs
@@ -303,6 +311,8 @@ impl MarketDataService {
         symbol: &str,
         timeframe: &str,
     ) -> Result<crate::realtime::TypedSubscription<Candle>> {
+        // Decoded with the pair's catalog scales.
+        self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
             .catalogs
@@ -541,6 +551,8 @@ impl MarketOverviewService {
                 "market_overview.get_spot_volume_history accepts at most 2000 symbol_ids",
             ));
         }
+        // Pairs are labelled from the catalogs.
+        self.ctx.settle_catalogs().await;
         let req = GetSpotVolumeHistoryRequest {
             symbol_id: resolved,
             ..Default::default()
@@ -603,6 +615,8 @@ impl MarketOverviewService {
     pub async fn subscribe(
         &self,
     ) -> Result<crate::realtime::TypedSubscription<MarketOverviewList>> {
+        // Rows are labelled and scaled from the catalogs.
+        self.ctx.settle_catalogs().await;
         self.ctx
             .realtime
             .subscribe_proto("public:spot:market_overview:updates:proto", {
@@ -805,6 +819,8 @@ impl OrderbookService {
     /// requested. A depth above 1000 is a validation error before any request.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
         let depth = orderbook_snapshot_depth(depth.unwrap_or(0))?;
+        // Levels are decoded with the pair's catalog quantity scale.
+        self.ctx.wait_for_catalogs().await?;
         let req = GetOrderBookRequest {
             symbol_id: self.ctx.catalogs.require_symbol_id(symbol)?,
             depth: depth_enum_for_levels(depth).into(),
@@ -869,9 +885,16 @@ impl OrderbookService {
         let symbol = opts.symbol;
         let depth = opts.depth.unwrap_or(50);
         let stream_depth = orderbook_stream_tier(depth)?;
-        let resolved_symbol_id = opts
-            .symbol_id
-            .or_else(|| self.ctx.catalogs.symbol_id_for_symbol(&symbol));
+        let mut resolved_symbol_id = opts.symbol_id;
+        if self.ctx.hydrate_catalogs_enabled {
+            // Levels are decoded with the pair's catalog quantity scale.
+            self.ctx.wait_for_catalogs().await?;
+            if resolved_symbol_id.is_none() {
+                resolved_symbol_id = Some(self.ctx.catalogs.require_symbol_id(&symbol)?);
+            }
+        }
+        let resolved_symbol_id =
+            resolved_symbol_id.or_else(|| self.ctx.catalogs.symbol_id_for_symbol(&symbol));
         let Some(symbol_id) = resolved_symbol_id.filter(|id| *id != 0) else {
             return Err(Error::validation(format!(
                 "symbol_id is required for orderbook subscriptions ({symbol:?})"

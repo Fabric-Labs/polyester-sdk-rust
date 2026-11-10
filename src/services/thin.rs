@@ -146,6 +146,7 @@ impl HeatmapService {
         use buffa_types::google::protobuf::Timestamp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
+        self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
             .catalogs
@@ -209,6 +210,7 @@ impl HeatmapService {
     ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::ApiData>> {
         use crate::codecs::heatmap::heatmap_interval_channel_name;
         use crate::errors::Error;
+        self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
             .catalogs
@@ -1452,6 +1454,8 @@ impl FeeService {
             symbol_id,
             ..Default::default()
         };
+        // Rates are labelled with their symbol from the catalogs.
+        self.ctx.settle_catalogs().await;
         let client = self.connect_client();
         let resp = unary::await_auth(
             &self.ctx.factory,

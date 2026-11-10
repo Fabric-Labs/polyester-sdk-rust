@@ -618,6 +618,14 @@ impl Error {
         Self::Auth(msg.into())
     }
 
+    /// [`Error::CatalogHydration`] for a hydration failure, unless it is one.
+    pub(crate) fn catalog_hydration(failure: Error) -> Self {
+        match failure {
+            Self::CatalogHydration(_) => failure,
+            other => Self::CatalogHydration(Box::new(other)),
+        }
+    }
+
     pub fn validation(msg: impl Into<String>) -> Self {
         Self::Validation(msg.into())
     }
