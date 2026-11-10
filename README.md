@@ -1027,6 +1027,11 @@ for bal in view.balances.map(|list| list.balances).unwrap_or_default() {
 
 ## Errors, retries, and withdrawal identity
 
+The SDK never follows an HTTP redirect. ConnectRPC calls, realtime token requests and WebSocket
+handshakes go through hyper and tungstenite clients that follow none, so a signed request's API key
+ID, timestamp and signature never reach a redirect target. A redirect answer fails the call: a
+ConnectRPC call with an `Error::Server` naming the HTTP status. Set `api_url` to the API's own origin.
+
 Classify failures with `Error::is_retryable()` and respect `Error::retry_after()`. For mutations,
 `Error::mutation_outcome_unknown()` means the first request may have committed: reconcile state
 before retrying and reuse the same logical request identity.

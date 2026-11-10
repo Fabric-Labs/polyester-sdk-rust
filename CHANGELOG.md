@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Tests pin that a request signed with an API key is never forwarded to another origin by an HTTP redirect. The ConnectRPC transport (connectrpc's hyper client), the realtime token client (hyper-util's client) and the WebSocket handshake (tungstenite) follow no redirects, so a signed call answered with a 307 or 308 whose `Location` names another host or port fails with the redirect status and the destination receives nothing, in JSON and binary; the same holds for a realtime token request and every redirect status. No behaviour changes. Affected: none; the tests cover `auth.me` over ConnectRPC and the realtime connection token request.
+
 ## 0.18.0
 
 Package version: `0.18.0`. Git tag: `v0.18.0`. Released 2026-11-10. Built on public contract `a3e3784`.
