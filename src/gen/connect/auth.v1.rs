@@ -264,7 +264,9 @@ pub trait ApiKeyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List non-revoked API keys visible to the caller, newest first.
+    /// List non-revoked API keys visible to the caller, newest first. An API key
+    /// needs READ_API_KEYS; a key scoped to a sub-account sees only that
+    /// sub-account's keys.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -288,6 +290,8 @@ pub trait ApiKeyService: Send + Sync + 'static {
         >,
     > + Send;
     /// Get a single API key owned by the caller or scoped to a sub-account the caller administers.
+    /// An API key needs READ_API_KEYS; a key scoped to a sub-account reads only
+    /// that sub-account's keys.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1532,7 +1536,9 @@ pub const POLICY_SERVICE_SET_API_KEY_POLICY_SPEC: ::connectrpc::Spec = ::connect
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait PolicyService: Send + Sync + 'static {
-    /// List sub-account policy templates available to the caller.
+    /// List sub-account policy templates available to the caller. An API key
+    /// needs READ_SUBACCOUNT_POLICIES; a key scoped to a sub-account sees only the
+    /// policy attached to that sub-account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1555,7 +1561,9 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Get a sub-account policy template by id.
+    /// Get a sub-account policy template by id. An API key needs
+    /// READ_SUBACCOUNT_POLICIES; a key scoped to a sub-account reads only the
+    /// policy attached to that sub-account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1670,7 +1678,9 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List API key policy templates available to the caller.
+    /// List API key policy templates available to the caller. An API key needs
+    /// READ_API_POLICIES; a key scoped to a sub-account sees only the policies
+    /// attached to that sub-account's keys.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1693,7 +1703,9 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Get an API key policy template by id.
+    /// Get an API key policy template by id. An API key needs
+    /// READ_API_POLICIES; a key scoped to a sub-account reads only the policies
+    /// attached to that sub-account's keys.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -6008,6 +6020,8 @@ pub trait SubaccountRoleService: Send + Sync + 'static {
         >,
     > + Send;
     /// Return the authenticated caller's effective permissions for one sub-account.
+    /// An API key needs READ_SUBACCOUNT_PERMISSIONS and gets what the key itself
+    /// may do on a sub-account within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -12674,7 +12688,8 @@ pub const PROFILE_SERVICE_CLAIM_GENERATED_USERNAME_SPEC: ::connectrpc::Spec = ::
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait ProfileService: Send + Sync + 'static {
-    /// Get the caller's profile.
+    /// Get the caller's profile. An API key needs READ_PROFILE and must be scoped
+    /// to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -12722,7 +12737,8 @@ pub trait ProfileService: Send + Sync + 'static {
         >,
     > + Send;
     /// Get recent username history for the caller, newest first. Returns at most
-    /// 20 entries.
+    /// 20 entries. An API key needs READ_PROFILE and must be scoped to the main
+    /// account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -13572,6 +13588,7 @@ pub const RESOLVE_SERVICE_RESOLVE_ACCOUNT_SPEC: ::connectrpc::Spec = ::connectrp
 pub trait ResolveService: Send + Sync + 'static {
     /// Resolve an account by username, account ID, or smart-account address.
     /// Use this before sharing or transferring so the caller can confirm the target.
+    /// An API key needs READ_ACCOUNT_DIRECTORY.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -14113,6 +14130,9 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     > + Send;
     /// Get current verification status for the caller.
     /// A failed verification uses error_code for its machine-readable outcome.
+    /// An API key needs READ_SOCIAL_VERIFICATION and must be scoped to the main
+    /// account. It reads the status only: provider, method, handle, status, and
+    /// verification time, with every other field left empty.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

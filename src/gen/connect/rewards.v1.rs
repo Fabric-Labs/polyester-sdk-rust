@@ -8,6 +8,18 @@ pub type OwnedListMyRewardAwardsRequestView = ::buffa::view::OwnedView<
 pub type OwnedListMyRewardAwardsResponseView = ::buffa::view::OwnedView<
     crate::proto::rewards::v1::__buffa::view::ListMyRewardAwardsResponseView<'static>,
 >;
+///Shorthand for `OwnedView<AcknowledgeMyRewardAwardRequestView<'static>>`.
+pub type OwnedAcknowledgeMyRewardAwardRequestView = ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<AcknowledgeMyRewardAwardResponseView<'static>>`.
+pub type OwnedAcknowledgeMyRewardAwardResponseView = ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<SetMyRewardDestinationRequestView<'static>>`.
 pub type OwnedSetMyRewardDestinationRequestView = ::buffa::view::OwnedView<
     crate::proto::rewards::v1::__buffa::view::SetMyRewardDestinationRequestView<'static>,
@@ -28,6 +40,28 @@ for crate::proto::rewards::v1::__buffa::view::ListMyRewardAwardsResponseView<'_>
 impl ::connectrpc::Encodable<crate::proto::rewards::v1::ListMyRewardAwardsResponse>
 for ::buffa::view::OwnedView<
     crate::proto::rewards::v1::__buffa::view::ListMyRewardAwardsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::rewards::v1::AcknowledgeMyRewardAwardResponse>
+for crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::rewards::v1::AcknowledgeMyRewardAwardResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -64,6 +98,15 @@ pub const REWARD_CAMPAIGN_SERVICE_SERVICE_NAME: &str = "rewards.v1.RewardCampaig
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/rewards.v1.RewardCampaignService/ListMyRewardAwards",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `AcknowledgeMyRewardAward` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const REWARD_CAMPAIGN_SERVICE_ACKNOWLEDGE_MY_REWARD_AWARD_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/rewards.v1.RewardCampaignService/AcknowledgeMyRewardAward",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -128,6 +171,7 @@ pub const REWARD_CAMPAIGN_SERVICE_SET_MY_REWARD_DESTINATION_SPEC: ::connectrpc::
 #[allow(clippy::type_complexity)]
 pub trait RewardCampaignService: Send + Sync + 'static {
     /// List published awards for the authenticated root account, newest first.
+    /// An API key needs READ_REWARDS and must be scoped to the main account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -147,6 +191,29 @@ pub trait RewardCampaignService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::rewards::v1::ListMyRewardAwardsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Acknowledge revealing an award or seeing its delivery for the authenticated root account. At least one mark is required. Marks are independent, permanent and idempotent; timestamps are assigned at first acknowledgement. Awards owned by another account return not_found.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn acknowledge_my_reward_award<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::rewards::v1::AcknowledgeMyRewardAwardResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -234,6 +301,35 @@ impl<S: RewardCampaignService> RewardCampaignServiceExt for S {
                 },
             )
             .with_spec(REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC)
+            .route_view(
+                REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
+                "AcknowledgeMyRewardAward",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.acknowledge_my_reward_award(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::rewards::v1::AcknowledgeMyRewardAwardResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(REWARD_CAMPAIGN_SERVICE_ACKNOWLEDGE_MY_REWARD_AWARD_SPEC)
             .route_view(
                 REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
                 "SetMyRewardDestination",
@@ -326,6 +422,14 @@ for RewardCampaignServiceServer<T> {
                         .with_spec(REWARD_CAMPAIGN_SERVICE_LIST_MY_REWARD_AWARDS_SPEC),
                 )
             }
+            "AcknowledgeMyRewardAward" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            REWARD_CAMPAIGN_SERVICE_ACKNOWLEDGE_MY_REWARD_AWARD_SPEC,
+                        ),
+                )
+            }
             "SetMyRewardDestination" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -367,6 +471,27 @@ for RewardCampaignServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::rewards::v1::ListMyRewardAwardsResponse,
+                        >(format)
+                })
+            }
+            "AcknowledgeMyRewardAward" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+                    >::from_parts(&req, &body);
+                    svc.acknowledge_my_reward_award(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::rewards::v1::AcknowledgeMyRewardAwardResponse,
                         >(format)
                 })
             }
@@ -533,6 +658,51 @@ where
                 &self.config,
                 REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
                 "ListMyRewardAwards",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the AcknowledgeMyRewardAward RPC. Sends a request to /rewards.v1.RewardCampaignService/AcknowledgeMyRewardAward.
+    pub async fn acknowledge_my_reward_award(
+        &self,
+        request: crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.acknowledge_my_reward_award_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the AcknowledgeMyRewardAward RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn acknowledge_my_reward_award_with_options(
+        &self,
+        request: crate::proto::rewards::v1::AcknowledgeMyRewardAwardRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::rewards::v1::__buffa::view::AcknowledgeMyRewardAwardResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                REWARD_CAMPAIGN_SERVICE_SERVICE_NAME,
+                "AcknowledgeMyRewardAward",
                 request,
                 options,
             )

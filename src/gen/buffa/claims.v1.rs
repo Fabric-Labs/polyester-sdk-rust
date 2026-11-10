@@ -37,6 +37,10 @@ pub enum ErrorCode {
     ERROR_CODE_SUBACCOUNT_INACTIVE = 14i32,
     /// Reward payouts for this campaign are paused. Today's claim is kept and paid automatically once payouts resume.
     ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE = 15i32,
+    /// Today's claim is recorded and its reward payout was submitted, but its result could not be
+    /// confirmed. The claim is never paid twice: read the claim status, or retry the claim to get its
+    /// current state. The error detail names the claim.
+    ERROR_CODE_CLAIM_OUTCOME_UNKNOWN = 16i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -87,6 +91,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ClaimPayoutUnavailable: Self = Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaimOutcomeUnknown: Self = Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -208,6 +215,7 @@ impl ::buffa::Enumeration for ErrorCode {
             15i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE)
             }
+            16i32 => ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN),
             _ => ::core::option::Option::None,
         }
     }
@@ -238,6 +246,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE => {
                 "ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE"
             }
+            Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN => "ERROR_CODE_CLAIM_OUTCOME_UNKNOWN",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -294,6 +303,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE)
             }
+            "ERROR_CODE_CLAIM_OUTCOME_UNKNOWN" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -315,6 +327,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_SUBACCOUNT_NOT_FOUND,
             Self::ERROR_CODE_SUBACCOUNT_INACTIVE,
             Self::ERROR_CODE_CLAIM_PAYOUT_UNAVAILABLE,
+            Self::ERROR_CODE_CLAIM_OUTCOME_UNKNOWN,
         ]
     }
 }
@@ -654,13 +667,26 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
+    /// Identifier of the claim the error concerns. Set only with CLAIM_OUTCOME_UNKNOWN; empty otherwise.
+    ///
+    /// Field 2: `claim_id`
+    #[serde(
+        rename = "claimId",
+        alias = "claim_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub claim_id: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ErrorDetail {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ErrorDetail").field("code", &self.code).finish()
+        f.debug_struct("ErrorDetail")
+            .field("code", &self.code)
+            .field("claim_id", &self.claim_id)
+            .finish()
     }
 }
 impl ErrorDetail {
@@ -694,6 +720,9 @@ impl ::buffa::Message for ErrorDetail {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.claim_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.claim_id) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -709,6 +738,9 @@ impl ::buffa::Message for ErrorDetail {
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
+        }
+        if !self.claim_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.claim_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -730,6 +762,13 @@ impl ::buffa::Message for ErrorDetail {
                 )?;
                 self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.claim_id, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -739,6 +778,7 @@ impl ::buffa::Message for ErrorDetail {
     }
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
+        self.claim_id.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2252,6 +2292,10 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Identifier of the claim the error concerns. Set only with CLAIM_OUTCOME_UNKNOWN; empty otherwise.
+            ///
+            /// Field 2: `claim_id`
+            pub claim_id: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -2294,6 +2338,13 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.claim_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -2324,6 +2375,7 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ErrorDetail {
                     code: self.code,
+                    claim_id: self.claim_id.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -2344,6 +2396,11 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.claim_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.claim_id) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -2360,6 +2417,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
+                }
+                if !self.claim_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.claim_id, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -2384,6 +2444,9 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
                     __map.serialize_entry("code", &self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.claim_id) {
+                    __map.serialize_entry("claimId", self.claim_id)?;
                 }
                 __map.end()
             }
@@ -2485,6 +2548,13 @@ pub mod __buffa {
             #[must_use]
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
+            }
+            /// Identifier of the claim the error concerns. Set only with CLAIM_OUTCOME_UNKNOWN; empty otherwise.
+            ///
+            /// Field 2: `claim_id`
+            #[must_use]
+            pub fn claim_id(&self) -> &'_ str {
+                self.0.reborrow().claim_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>

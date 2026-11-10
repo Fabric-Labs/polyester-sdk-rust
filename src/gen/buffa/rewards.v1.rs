@@ -443,6 +443,26 @@ pub struct RewardAward {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub transaction_id: ::buffa::alloc::string::String,
+    /// Time the recipient first acknowledged revealing this award. Absent until explicitly acknowledged; shared across sessions and devices.
+    ///
+    /// Field 13: `revealed_at`
+    #[serde(
+        rename = "revealedAt",
+        alias = "revealed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub revealed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Time the recipient first acknowledged seeing delivery of this paid award. Absent until explicitly acknowledged; independent of revealed_at.
+    ///
+    /// Field 14: `delivery_seen_at`
+    #[serde(
+        rename = "deliverySeenAt",
+        alias = "delivery_seen_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub delivery_seen_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -462,6 +482,8 @@ impl ::core::fmt::Debug for RewardAward {
             .field("fulfillment_revision", &self.fulfillment_revision)
             .field("destination_address", &self.destination_address)
             .field("transaction_id", &self.transaction_id)
+            .field("revealed_at", &self.revealed_at)
+            .field("delivery_seen_at", &self.delivery_seen_at)
             .finish()
     }
 }
@@ -548,6 +570,22 @@ impl ::buffa::Message for RewardAward {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.transaction_id) as u32;
         }
+        if self.revealed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.revealed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.delivery_seen_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.delivery_seen_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -600,6 +638,14 @@ impl ::buffa::Message for RewardAward {
         }
         if !self.transaction_id.is_empty() {
             ::buffa::types::put_string_field(12u32, &self.transaction_id, buf);
+        }
+        if self.revealed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(13u32, __cache.consume_next(), buf);
+            self.revealed_at.write_to(__cache, buf);
+        }
+        if self.delivery_seen_at.is_set() {
+            ::buffa::types::put_len_delimited_header(14u32, __cache.consume_next(), buf);
+            self.delivery_seen_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -706,6 +752,28 @@ impl ::buffa::Message for RewardAward {
                 )?;
                 ::buffa::types::merge_string(&mut self.transaction_id, buf)?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.revealed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.delivery_seen_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -726,6 +794,8 @@ impl ::buffa::Message for RewardAward {
         self.fulfillment_revision = 0u64;
         self.destination_address.clear();
         self.transaction_id.clear();
+        self.revealed_at = ::buffa::MessageField::none();
+        self.delivery_seen_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1102,6 +1172,319 @@ pub const __SET_MY_REWARD_DESTINATION_RESPONSE_JSON_ANY: ::buffa::type_registry:
     from_json: ::buffa::type_registry::any_from_json::<SetMyRewardDestinationResponse>,
     is_wkt: false,
 };
+/// AcknowledgeMyRewardAwardRequest marks an owned award as seen without changing its delivery state.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcknowledgeMyRewardAwardRequest {
+    /// Award owned by the authenticated root account. Must be a UUID.
+    ///
+    /// Field 1: `award_id`
+    #[serde(
+        rename = "awardId",
+        alias = "award_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub award_id: ::buffa::alloc::string::String,
+    /// Record that the recipient revealed this award. False leaves the existing mark unchanged.
+    ///
+    /// Field 2: `revealed`
+    #[serde(
+        rename = "revealed",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub revealed: bool,
+    /// Record that the recipient saw this award's delivery. Requires a paid award; otherwise the entire request fails with failed_precondition. False leaves the existing mark unchanged.
+    ///
+    /// Field 3: `delivery_seen`
+    #[serde(
+        rename = "deliverySeen",
+        alias = "delivery_seen",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub delivery_seen: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcknowledgeMyRewardAwardRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcknowledgeMyRewardAwardRequest")
+            .field("award_id", &self.award_id)
+            .field("revealed", &self.revealed)
+            .field("delivery_seen", &self.delivery_seen)
+            .finish()
+    }
+}
+impl AcknowledgeMyRewardAwardRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardRequest";
+}
+::buffa::impl_default_instance!(AcknowledgeMyRewardAwardRequest);
+impl ::buffa::MessageName for AcknowledgeMyRewardAwardRequest {
+    const PACKAGE: &'static str = "rewards.v1";
+    const NAME: &'static str = "AcknowledgeMyRewardAwardRequest";
+    const FULL_NAME: &'static str = "rewards.v1.AcknowledgeMyRewardAwardRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardRequest";
+}
+impl ::buffa::Message for AcknowledgeMyRewardAwardRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.award_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.award_id) as u32;
+        }
+        if self.revealed {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.delivery_seen {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.award_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.award_id, buf);
+        }
+        if self.revealed {
+            ::buffa::types::put_bool_field(2u32, self.revealed, buf);
+        }
+        if self.delivery_seen {
+            ::buffa::types::put_bool_field(3u32, self.delivery_seen, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.award_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revealed = ::buffa::types::decode_bool(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.delivery_seen = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.award_id.clear();
+        self.revealed = false;
+        self.delivery_seen = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcknowledgeMyRewardAwardRequest {
+    const PROTO_FQN: &'static str = "rewards.v1.AcknowledgeMyRewardAwardRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcknowledgeMyRewardAwardRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACKNOWLEDGE_MY_REWARD_AWARD_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardRequest",
+    to_json: ::buffa::type_registry::any_to_json::<AcknowledgeMyRewardAwardRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<AcknowledgeMyRewardAwardRequest>,
+    is_wkt: false,
+};
+/// AcknowledgeMyRewardAwardResponse returns the award with its persisted seen state.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AcknowledgeMyRewardAwardResponse {
+    /// Current award. First acknowledgement timestamps are preserved on retries; fulfillment_revision is unchanged.
+    ///
+    /// Field 1: `award`
+    #[serde(
+        rename = "award",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub award: ::buffa::MessageField<RewardAward>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AcknowledgeMyRewardAwardResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AcknowledgeMyRewardAwardResponse")
+            .field("award", &self.award)
+            .finish()
+    }
+}
+impl AcknowledgeMyRewardAwardResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardResponse";
+}
+::buffa::impl_default_instance!(AcknowledgeMyRewardAwardResponse);
+impl ::buffa::MessageName for AcknowledgeMyRewardAwardResponse {
+    const PACKAGE: &'static str = "rewards.v1";
+    const NAME: &'static str = "AcknowledgeMyRewardAwardResponse";
+    const FULL_NAME: &'static str = "rewards.v1.AcknowledgeMyRewardAwardResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardResponse";
+}
+impl ::buffa::Message for AcknowledgeMyRewardAwardResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.award.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.award.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.award.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.award.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.award.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.award = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AcknowledgeMyRewardAwardResponse {
+    const PROTO_FQN: &'static str = "rewards.v1.AcknowledgeMyRewardAwardResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AcknowledgeMyRewardAwardResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ACKNOWLEDGE_MY_REWARD_AWARD_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardResponse",
+    to_json: ::buffa::type_registry::any_to_json::<AcknowledgeMyRewardAwardResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<AcknowledgeMyRewardAwardResponse>,
+    is_wkt: false,
+};
 /// ListMyRewardAwardsRequest requests a page of awards for the authenticated root account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -1278,7 +1661,7 @@ pub struct ListMyRewardAwardsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
-    /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+    /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or delivery changes until a new campaign is created; check again on the next page load or focus. Seen marks can still change when another session acknowledges an award.
     ///
     /// Field 3: `awards_may_change`
     #[serde(
@@ -1515,6 +1898,18 @@ pub mod __buffa {
             ///
             /// Field 12: `transaction_id`
             pub transaction_id: &'a str,
+            /// Time the recipient first acknowledged revealing this award. Absent until explicitly acknowledged; shared across sessions and devices.
+            ///
+            /// Field 13: `revealed_at`
+            pub revealed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Time the recipient first acknowledged seeing delivery of this paid award. Absent until explicitly acknowledged; independent of revealed_at.
+            ///
+            /// Field 14: `delivery_seen_at`
+            pub delivery_seen_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for RewardAwardView<'a> {
@@ -1656,6 +2051,56 @@ pub mod __buffa {
                         )?;
                         view.transaction_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.revealed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.revealed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.delivery_seen_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.delivery_seen_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -1704,6 +2149,22 @@ pub mod __buffa {
                     fulfillment_revision: self.fulfillment_revision,
                     destination_address: self.destination_address.to_string(),
                     transaction_id: self.transaction_id.to_string(),
+                    revealed_at: match self.revealed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    delivery_seen_at: match self.delivery_seen_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -1791,6 +2252,22 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.transaction_id)
                                 as u32;
                 }
+                if self.revealed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.revealed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.delivery_seen_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.delivery_seen_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -1856,6 +2333,22 @@ pub mod __buffa {
                 }
                 if !self.transaction_id.is_empty() {
                     ::buffa::types::put_string_field(12u32, &self.transaction_id, buf);
+                }
+                if self.revealed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.revealed_at.write_to(__cache, buf);
+                }
+                if self.delivery_seen_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.delivery_seen_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -1941,6 +2434,22 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.transaction_id) {
                     __map.serialize_entry("transactionId", self.transaction_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .revealed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("revealedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .delivery_seen_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("deliverySeenAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -2127,6 +2636,28 @@ pub mod __buffa {
             #[must_use]
             pub fn transaction_id(&self) -> &'_ str {
                 self.0.reborrow().transaction_id
+            }
+            /// Time the recipient first acknowledged revealing this award. Absent until explicitly acknowledged; shared across sessions and devices.
+            ///
+            /// Field 13: `revealed_at`
+            #[must_use]
+            pub fn revealed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().revealed_at
+            }
+            /// Time the recipient first acknowledged seeing delivery of this paid award. Absent until explicitly acknowledged; independent of revealed_at.
+            ///
+            /// Field 14: `delivery_seen_at`
+            #[must_use]
+            pub fn delivery_seen_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().delivery_seen_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<RewardAwardView<'static>>>
@@ -2868,6 +3399,659 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// AcknowledgeMyRewardAwardRequest marks an owned award as seen without changing its delivery state.
+        #[derive(Clone, Debug, Default)]
+        pub struct AcknowledgeMyRewardAwardRequestView<'a> {
+            /// Award owned by the authenticated root account. Must be a UUID.
+            ///
+            /// Field 1: `award_id`
+            pub award_id: &'a str,
+            /// Record that the recipient revealed this award. False leaves the existing mark unchanged.
+            ///
+            /// Field 2: `revealed`
+            pub revealed: bool,
+            /// Record that the recipient saw this award's delivery. Requires a paid award; otherwise the entire request fails with failed_precondition. False leaves the existing mark unchanged.
+            ///
+            /// Field 3: `delivery_seen`
+            pub delivery_seen: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AcknowledgeMyRewardAwardRequestView<'a> {
+            type Owned = super::super::AcknowledgeMyRewardAwardRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.award_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revealed = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.delivery_seen = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcknowledgeMyRewardAwardRequest {
+                    award_id: self.award_id.to_string(),
+                    revealed: self.revealed,
+                    delivery_seen: self.delivery_seen,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AcknowledgeMyRewardAwardRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.award_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.award_id) as u32;
+                }
+                if self.revealed {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.delivery_seen {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.award_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.award_id, buf);
+                }
+                if self.revealed {
+                    ::buffa::types::put_bool_field(2u32, self.revealed, buf);
+                }
+                if self.delivery_seen {
+                    ::buffa::types::put_bool_field(3u32, self.delivery_seen, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AcknowledgeMyRewardAwardRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.award_id) {
+                    __map.serialize_entry("awardId", self.award_id)?;
+                }
+                if self.revealed {
+                    __map.serialize_entry("revealed", &self.revealed)?;
+                }
+                if self.delivery_seen {
+                    __map.serialize_entry("deliverySeen", &self.delivery_seen)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcknowledgeMyRewardAwardRequestView<'a> {
+            const PACKAGE: &'static str = "rewards.v1";
+            const NAME: &'static str = "AcknowledgeMyRewardAwardRequest";
+            const FULL_NAME: &'static str = "rewards.v1.AcknowledgeMyRewardAwardRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardRequest";
+        }
+        ::buffa::impl_default_view_instance!(AcknowledgeMyRewardAwardRequestView);
+        ::buffa::impl_view_reborrow!(AcknowledgeMyRewardAwardRequestView);
+        /** Self-contained, `'static` owned view of a `AcknowledgeMyRewardAwardRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcknowledgeMyRewardAwardRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcknowledgeMyRewardAwardRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcknowledgeMyRewardAwardRequestOwnedView(
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>>,
+        );
+        impl AcknowledgeMyRewardAwardRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcknowledgeMyRewardAwardRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AcknowledgeMyRewardAwardRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcknowledgeMyRewardAwardRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Award owned by the authenticated root account. Must be a UUID.
+            ///
+            /// Field 1: `award_id`
+            #[must_use]
+            pub fn award_id(&self) -> &'_ str {
+                self.0.reborrow().award_id
+            }
+            /// Record that the recipient revealed this award. False leaves the existing mark unchanged.
+            ///
+            /// Field 2: `revealed`
+            #[must_use]
+            pub fn revealed(&self) -> bool {
+                self.0.reborrow().revealed
+            }
+            /// Record that the recipient saw this award's delivery. Requires a paid award; otherwise the entire request fails with failed_precondition. False leaves the existing mark unchanged.
+            ///
+            /// Field 3: `delivery_seen`
+            #[must_use]
+            pub fn delivery_seen(&self) -> bool {
+                self.0.reborrow().delivery_seen
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>>,
+        > for AcknowledgeMyRewardAwardRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>>,
+            ) -> Self {
+                AcknowledgeMyRewardAwardRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcknowledgeMyRewardAwardRequestOwnedView>
+        for ::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>> {
+            fn from(wrapper: AcknowledgeMyRewardAwardRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>>,
+        > for AcknowledgeMyRewardAwardRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AcknowledgeMyRewardAwardRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AcknowledgeMyRewardAwardRequest {
+            type View<'a> = AcknowledgeMyRewardAwardRequestView<'a>;
+            type ViewHandle = AcknowledgeMyRewardAwardRequestOwnedView;
+        }
+        impl ::serde::Serialize for AcknowledgeMyRewardAwardRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AcknowledgeMyRewardAwardResponse returns the award with its persisted seen state.
+        #[derive(Clone, Debug, Default)]
+        pub struct AcknowledgeMyRewardAwardResponseView<'a> {
+            /// Current award. First acknowledgement timestamps are preserved on retries; fulfillment_revision is unchanged.
+            ///
+            /// Field 1: `award`
+            pub award: ::buffa::MessageFieldView<
+                super::super::__buffa::view::RewardAwardView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AcknowledgeMyRewardAwardResponseView<'a> {
+            type Owned = super::super::AcknowledgeMyRewardAwardResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.award.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.award = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::RewardAwardView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AcknowledgeMyRewardAwardResponse {
+                    award: match self.award.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::RewardAward,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AcknowledgeMyRewardAwardResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.award.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.award.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.award.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.award.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AcknowledgeMyRewardAwardResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.award.as_option() {
+                        __map.serialize_entry("award", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AcknowledgeMyRewardAwardResponseView<'a> {
+            const PACKAGE: &'static str = "rewards.v1";
+            const NAME: &'static str = "AcknowledgeMyRewardAwardResponse";
+            const FULL_NAME: &'static str = "rewards.v1.AcknowledgeMyRewardAwardResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/rewards.v1.AcknowledgeMyRewardAwardResponse";
+        }
+        ::buffa::impl_default_view_instance!(AcknowledgeMyRewardAwardResponseView);
+        ::buffa::impl_view_reborrow!(AcknowledgeMyRewardAwardResponseView);
+        /** Self-contained, `'static` owned view of a `AcknowledgeMyRewardAwardResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AcknowledgeMyRewardAwardResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AcknowledgeMyRewardAwardResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AcknowledgeMyRewardAwardResponseOwnedView(
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>>,
+        );
+        impl AcknowledgeMyRewardAwardResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AcknowledgeMyRewardAwardResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AcknowledgeMyRewardAwardResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AcknowledgeMyRewardAwardResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AcknowledgeMyRewardAwardResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AcknowledgeMyRewardAwardResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Current award. First acknowledgement timestamps are preserved on retries; fulfillment_revision is unchanged.
+            ///
+            /// Field 1: `award`
+            #[must_use]
+            pub fn award(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::RewardAwardView<'_>,
+            > {
+                &self.0.reborrow().award
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>>,
+        > for AcknowledgeMyRewardAwardResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>>,
+            ) -> Self {
+                AcknowledgeMyRewardAwardResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AcknowledgeMyRewardAwardResponseOwnedView>
+        for ::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>> {
+            fn from(wrapper: AcknowledgeMyRewardAwardResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>>,
+        > for AcknowledgeMyRewardAwardResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AcknowledgeMyRewardAwardResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AcknowledgeMyRewardAwardResponse {
+            type View<'a> = AcknowledgeMyRewardAwardResponseView<'a>;
+            type ViewHandle = AcknowledgeMyRewardAwardResponseOwnedView;
+        }
+        impl ::serde::Serialize for AcknowledgeMyRewardAwardResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ListMyRewardAwardsRequest requests a page of awards for the authenticated root account.
         #[derive(Clone, Debug, Default)]
         pub struct ListMyRewardAwardsRequestView<'a> {
@@ -3193,7 +4377,7 @@ pub mod __buffa {
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
-            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or delivery changes until a new campaign is created; check again on the next page load or focus. Seen marks can still change when another session acknowledges an award.
             ///
             /// Field 3: `awards_may_change`
             pub awards_may_change: bool,
@@ -3500,7 +4684,7 @@ pub mod __buffa {
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
             }
-            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or award changes until a new campaign is created; check again on the next page load or focus.
+            /// True while a campaign can still publish new awards, or while one of this account's awards is awaiting a destination, ready for payout, or failed and may be retried. When false, repeated polling cannot return new awards or delivery changes until a new campaign is created; check again on the next page load or focus. Seen marks can still change when another session acknowledges an award.
             ///
             /// Field 3: `awards_may_change`
             #[must_use]
@@ -3550,6 +4734,8 @@ pub mod __buffa {
         reg.register_json_any(super::__REWARD_AWARD_JSON_ANY);
         reg.register_json_any(super::__SET_MY_REWARD_DESTINATION_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_MY_REWARD_DESTINATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ACKNOWLEDGE_MY_REWARD_AWARD_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__ACKNOWLEDGE_MY_REWARD_AWARD_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_MY_REWARD_AWARDS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MY_REWARD_AWARDS_RESPONSE_JSON_ANY);
     }
@@ -3566,6 +4752,14 @@ pub use self::__buffa::view::SetMyRewardDestinationRequestOwnedView;
 pub use self::__buffa::view::SetMyRewardDestinationResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetMyRewardDestinationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeMyRewardAwardRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeMyRewardAwardRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeMyRewardAwardResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::AcknowledgeMyRewardAwardResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMyRewardAwardsRequestView;
 #[doc(inline)]

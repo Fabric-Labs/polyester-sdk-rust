@@ -2502,8 +2502,14 @@ pub const __UPDATE_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     is_wkt: false,
 };
 /// PolicyAction is a high-level permission that can be granted by a policy.
-/// Write-style actions also grant the matching read visibility where needed by
-/// the product experience.
+/// The product actions TRADE_SPOT through SWAP apply to sub-account and API-key
+/// policies, and their write-style actions also grant the matching read
+/// visibility where needed by the product experience. The account permissions
+/// from READ_API_KEYS on apply to API-key policies only: a sub-account policy
+/// refuses them. Each grants exactly the calls it names and never implies
+/// another permission. A main-account permission is honored only for an API
+/// key scoped to the main account; a key scoped to a sub-account is refused
+/// even when its policy grants it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum PolicyAction {
@@ -2546,6 +2552,47 @@ pub enum PolicyAction {
     /// spot orders on the account's behalf, which also remain subject to the
     /// sub-account's spot trading policy.
     SWAP = 16i32,
+    /// Allow listing and reading API keys. A key scoped to the main account sees
+    /// the main account's keys and those of its sub-accounts; a key scoped to a
+    /// sub-account sees only that sub-account's keys.
+    READ_API_KEYS = 17i32,
+    /// Allow listing and reading API-key policies. A key scoped to the main
+    /// account sees every API-key policy of the main account; a key scoped to a
+    /// sub-account sees only the policies attached to that sub-account's keys.
+    READ_API_POLICIES = 18i32,
+    /// Allow listing and reading sub-account policies. A key scoped to the main
+    /// account sees every sub-account policy of the main account; a key scoped to
+    /// a sub-account sees only the policy attached to that sub-account.
+    READ_SUBACCOUNT_POLICIES = 19i32,
+    /// Allow reading what the key itself may do on a sub-account within its
+    /// scope.
+    READ_SUBACCOUNT_PERMISSIONS = 20i32,
+    /// Allow reading the main account's VIP status. Main-account permission.
+    READ_VIP_STATUS = 21i32,
+    /// Allow reading the main account's social verification status: provider,
+    /// handle, status, and verification time. Main-account permission.
+    READ_SOCIAL_VERIFICATION = 22i32,
+    /// Allow reading the main account's profile and username history.
+    /// Main-account permission.
+    READ_PROFILE = 23i32,
+    /// Allow resolving an account by username, account ID, or smart-account
+    /// address. Any key of the main account may use it, whatever its scope.
+    READ_ACCOUNT_DIRECTORY = 24i32,
+    /// Allow validating an external withdraw destination within the key's scope
+    /// without creating, signing, or reserving a withdraw. It does not allow
+    /// withdrawing.
+    READ_WITHDRAW_VALIDATION = 25i32,
+    /// Allow reading the main account's daily reward claim status.
+    /// Main-account permission.
+    READ_DAILY_CLAIMS = 26i32,
+    /// Allow claiming the main account's daily reward, paid to the main account
+    /// or a sub-account it owns. Main-account permission.
+    CLAIM_DAILY_REWARD = 27i32,
+    /// Allow reading the main account's checkpoints. Main-account permission.
+    READ_CHECKPOINTS = 28i32,
+    /// Allow reading the main account's published reward awards. Main-account
+    /// permission.
+    READ_REWARDS = 29i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2584,6 +2631,45 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::SWAP`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Swap: Self = Self::SWAP;
+    ///Idiomatic alias for [`Self::READ_API_KEYS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadApiKeys: Self = Self::READ_API_KEYS;
+    ///Idiomatic alias for [`Self::READ_API_POLICIES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadApiPolicies: Self = Self::READ_API_POLICIES;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNT_POLICIES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountPolicies: Self = Self::READ_SUBACCOUNT_POLICIES;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNT_PERMISSIONS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountPermissions: Self = Self::READ_SUBACCOUNT_PERMISSIONS;
+    ///Idiomatic alias for [`Self::READ_VIP_STATUS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadVipStatus: Self = Self::READ_VIP_STATUS;
+    ///Idiomatic alias for [`Self::READ_SOCIAL_VERIFICATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSocialVerification: Self = Self::READ_SOCIAL_VERIFICATION;
+    ///Idiomatic alias for [`Self::READ_PROFILE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadProfile: Self = Self::READ_PROFILE;
+    ///Idiomatic alias for [`Self::READ_ACCOUNT_DIRECTORY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadAccountDirectory: Self = Self::READ_ACCOUNT_DIRECTORY;
+    ///Idiomatic alias for [`Self::READ_WITHDRAW_VALIDATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadWithdrawValidation: Self = Self::READ_WITHDRAW_VALIDATION;
+    ///Idiomatic alias for [`Self::READ_DAILY_CLAIMS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadDailyClaims: Self = Self::READ_DAILY_CLAIMS;
+    ///Idiomatic alias for [`Self::CLAIM_DAILY_REWARD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClaimDailyReward: Self = Self::CLAIM_DAILY_REWARD;
+    ///Idiomatic alias for [`Self::READ_CHECKPOINTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadCheckpoints: Self = Self::READ_CHECKPOINTS;
+    ///Idiomatic alias for [`Self::READ_REWARDS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadRewards: Self = Self::READ_REWARDS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -2691,6 +2777,19 @@ impl ::buffa::Enumeration for PolicyAction {
             14i32 => ::core::option::Option::Some(Self::READ_AUTO_WITHDRAW),
             15i32 => ::core::option::Option::Some(Self::MANAGE_AUTO_WITHDRAW),
             16i32 => ::core::option::Option::Some(Self::SWAP),
+            17i32 => ::core::option::Option::Some(Self::READ_API_KEYS),
+            18i32 => ::core::option::Option::Some(Self::READ_API_POLICIES),
+            19i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_POLICIES),
+            20i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_PERMISSIONS),
+            21i32 => ::core::option::Option::Some(Self::READ_VIP_STATUS),
+            22i32 => ::core::option::Option::Some(Self::READ_SOCIAL_VERIFICATION),
+            23i32 => ::core::option::Option::Some(Self::READ_PROFILE),
+            24i32 => ::core::option::Option::Some(Self::READ_ACCOUNT_DIRECTORY),
+            25i32 => ::core::option::Option::Some(Self::READ_WITHDRAW_VALIDATION),
+            26i32 => ::core::option::Option::Some(Self::READ_DAILY_CLAIMS),
+            27i32 => ::core::option::Option::Some(Self::CLAIM_DAILY_REWARD),
+            28i32 => ::core::option::Option::Some(Self::READ_CHECKPOINTS),
+            29i32 => ::core::option::Option::Some(Self::READ_REWARDS),
             _ => ::core::option::Option::None,
         }
     }
@@ -2711,6 +2810,19 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_AUTO_WITHDRAW => "READ_AUTO_WITHDRAW",
             Self::MANAGE_AUTO_WITHDRAW => "MANAGE_AUTO_WITHDRAW",
             Self::SWAP => "SWAP",
+            Self::READ_API_KEYS => "READ_API_KEYS",
+            Self::READ_API_POLICIES => "READ_API_POLICIES",
+            Self::READ_SUBACCOUNT_POLICIES => "READ_SUBACCOUNT_POLICIES",
+            Self::READ_SUBACCOUNT_PERMISSIONS => "READ_SUBACCOUNT_PERMISSIONS",
+            Self::READ_VIP_STATUS => "READ_VIP_STATUS",
+            Self::READ_SOCIAL_VERIFICATION => "READ_SOCIAL_VERIFICATION",
+            Self::READ_PROFILE => "READ_PROFILE",
+            Self::READ_ACCOUNT_DIRECTORY => "READ_ACCOUNT_DIRECTORY",
+            Self::READ_WITHDRAW_VALIDATION => "READ_WITHDRAW_VALIDATION",
+            Self::READ_DAILY_CLAIMS => "READ_DAILY_CLAIMS",
+            Self::CLAIM_DAILY_REWARD => "CLAIM_DAILY_REWARD",
+            Self::READ_CHECKPOINTS => "READ_CHECKPOINTS",
+            Self::READ_REWARDS => "READ_REWARDS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -2735,6 +2847,31 @@ impl ::buffa::Enumeration for PolicyAction {
                 ::core::option::Option::Some(Self::MANAGE_AUTO_WITHDRAW)
             }
             "SWAP" => ::core::option::Option::Some(Self::SWAP),
+            "READ_API_KEYS" => ::core::option::Option::Some(Self::READ_API_KEYS),
+            "READ_API_POLICIES" => ::core::option::Option::Some(Self::READ_API_POLICIES),
+            "READ_SUBACCOUNT_POLICIES" => {
+                ::core::option::Option::Some(Self::READ_SUBACCOUNT_POLICIES)
+            }
+            "READ_SUBACCOUNT_PERMISSIONS" => {
+                ::core::option::Option::Some(Self::READ_SUBACCOUNT_PERMISSIONS)
+            }
+            "READ_VIP_STATUS" => ::core::option::Option::Some(Self::READ_VIP_STATUS),
+            "READ_SOCIAL_VERIFICATION" => {
+                ::core::option::Option::Some(Self::READ_SOCIAL_VERIFICATION)
+            }
+            "READ_PROFILE" => ::core::option::Option::Some(Self::READ_PROFILE),
+            "READ_ACCOUNT_DIRECTORY" => {
+                ::core::option::Option::Some(Self::READ_ACCOUNT_DIRECTORY)
+            }
+            "READ_WITHDRAW_VALIDATION" => {
+                ::core::option::Option::Some(Self::READ_WITHDRAW_VALIDATION)
+            }
+            "READ_DAILY_CLAIMS" => ::core::option::Option::Some(Self::READ_DAILY_CLAIMS),
+            "CLAIM_DAILY_REWARD" => {
+                ::core::option::Option::Some(Self::CLAIM_DAILY_REWARD)
+            }
+            "READ_CHECKPOINTS" => ::core::option::Option::Some(Self::READ_CHECKPOINTS),
+            "READ_REWARDS" => ::core::option::Option::Some(Self::READ_REWARDS),
             _ => ::core::option::Option::None,
         }
     }
@@ -2752,6 +2889,19 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_AUTO_WITHDRAW,
             Self::MANAGE_AUTO_WITHDRAW,
             Self::SWAP,
+            Self::READ_API_KEYS,
+            Self::READ_API_POLICIES,
+            Self::READ_SUBACCOUNT_POLICIES,
+            Self::READ_SUBACCOUNT_PERMISSIONS,
+            Self::READ_VIP_STATUS,
+            Self::READ_SOCIAL_VERIFICATION,
+            Self::READ_PROFILE,
+            Self::READ_ACCOUNT_DIRECTORY,
+            Self::READ_WITHDRAW_VALIDATION,
+            Self::READ_DAILY_CLAIMS,
+            Self::CLAIM_DAILY_REWARD,
+            Self::READ_CHECKPOINTS,
+            Self::READ_REWARDS,
         ]
     }
 }
@@ -4527,7 +4677,8 @@ pub struct SubaccountPolicySpec {
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
     /// High-level actions enabled for the sub-account policy. Mandatory read-only
     /// actions are included when omitted. Up to 64 unique explicit actions are
-    /// allowed.
+    /// allowed. Account permissions such as READ_API_KEYS apply to API-key
+    /// policies only and are refused here.
     ///
     /// Field 7: `actions`
     #[serde(
@@ -11659,7 +11810,8 @@ pub const __GET_EFFECTIVE_SUBACCOUNT_PERMISSIONS_REQUEST_JSON_ANY: ::buffa::type
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetEffectiveSubaccountPermissionsResponse {
-    /// Current role of the caller on the sub-account.
+    /// Current role of the caller on the sub-account. For an API key this is
+    /// OWNER: keys belong to the main account that owns the sub-account.
     ///
     /// Field 1: `role`
     #[serde(
@@ -11668,8 +11820,10 @@ pub struct GetEffectiveSubaccountPermissionsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub role: ::buffa::EnumValue<SubaccountRole>,
-    /// Permissions allowed by the role and current sub-account policy. Resource
-    /// state, MFA, limits, and other request context may still deny an operation.
+    /// Permissions allowed by the role and current sub-account policy. For an API
+    /// key, only those its API-key policy also grants and that API keys can use.
+    /// Resource state, MFA, limits, and other request context may still deny an
+    /// operation.
     ///
     /// Field 2: `permissions`
     #[serde(
@@ -36989,6 +37143,9 @@ pub enum AuthErrorCode {
     /// ConnectRPC answers resource_exhausted. The REST problem code is
     /// REPLAY_CAPACITY_EXHAUSTED, with HTTP 429.
     AUTH_REPLAY_CAPACITY_EXHAUSTED = 57i32,
+    /// A non-empty request body identifier differs from the REST path identifier.
+    /// The request is rejected with HTTP 400 before any action is performed.
+    AUTH_PATH_BODY_ID_MISMATCH = 58i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37162,6 +37319,9 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_REPLAY_CAPACITY_EXHAUSTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthReplayCapacityExhausted: Self = Self::AUTH_REPLAY_CAPACITY_EXHAUSTED;
+    ///Idiomatic alias for [`Self::AUTH_PATH_BODY_ID_MISMATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthPathBodyIdMismatch: Self = Self::AUTH_PATH_BODY_ID_MISMATCH;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37334,6 +37494,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             55i32 => ::core::option::Option::Some(Self::AUTH_WALLET_ALREADY_LINKED),
             56i32 => ::core::option::Option::Some(Self::AUTH_RECV_WINDOW_INVALID),
             57i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_CAPACITY_EXHAUSTED),
+            58i32 => ::core::option::Option::Some(Self::AUTH_PATH_BODY_ID_MISMATCH),
             _ => ::core::option::Option::None,
         }
     }
@@ -37415,6 +37576,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_WALLET_ALREADY_LINKED => "AUTH_WALLET_ALREADY_LINKED",
             Self::AUTH_RECV_WINDOW_INVALID => "AUTH_RECV_WINDOW_INVALID",
             Self::AUTH_REPLAY_CAPACITY_EXHAUSTED => "AUTH_REPLAY_CAPACITY_EXHAUSTED",
+            Self::AUTH_PATH_BODY_ID_MISMATCH => "AUTH_PATH_BODY_ID_MISMATCH",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37586,6 +37748,9 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_REPLAY_CAPACITY_EXHAUSTED" => {
                 ::core::option::Option::Some(Self::AUTH_REPLAY_CAPACITY_EXHAUSTED)
             }
+            "AUTH_PATH_BODY_ID_MISMATCH" => {
+                ::core::option::Option::Some(Self::AUTH_PATH_BODY_ID_MISMATCH)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37648,6 +37813,7 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_WALLET_ALREADY_LINKED,
             Self::AUTH_RECV_WINDOW_INVALID,
             Self::AUTH_REPLAY_CAPACITY_EXHAUSTED,
+            Self::AUTH_PATH_BODY_ID_MISMATCH,
         ]
     }
 }
@@ -52064,7 +52230,8 @@ pub mod __buffa {
             pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
             /// High-level actions enabled for the sub-account policy. Mandatory read-only
             /// actions are included when omitted. Up to 64 unique explicit actions are
-            /// allowed.
+            /// allowed. Account permissions such as READ_API_KEYS apply to API-key
+            /// policies only and are refused here.
             ///
             /// Field 7: `actions`
             pub actions: ::buffa::RepeatedView<
@@ -52713,7 +52880,8 @@ pub mod __buffa {
             }
             /// High-level actions enabled for the sub-account policy. Mandatory read-only
             /// actions are included when omitted. Up to 64 unique explicit actions are
-            /// allowed.
+            /// allowed. Account permissions such as READ_API_KEYS apply to API-key
+            /// policies only and are refused here.
             ///
             /// Field 7: `actions`
             #[must_use]
@@ -62119,12 +62287,15 @@ pub mod __buffa {
         /// Effective role-granted permissions for the caller on one sub-account.
         #[derive(Clone, Debug, Default)]
         pub struct GetEffectiveSubaccountPermissionsResponseView<'a> {
-            /// Current role of the caller on the sub-account.
+            /// Current role of the caller on the sub-account. For an API key this is
+            /// OWNER: keys belong to the main account that owns the sub-account.
             ///
             /// Field 1: `role`
             pub role: ::buffa::EnumValue<super::super::SubaccountRole>,
-            /// Permissions allowed by the role and current sub-account policy. Resource
-            /// state, MFA, limits, and other request context may still deny an operation.
+            /// Permissions allowed by the role and current sub-account policy. For an API
+            /// key, only those its API-key policy also grants and that API keys can use.
+            /// Resource state, MFA, limits, and other request context may still deny an
+            /// operation.
             ///
             /// Field 2: `permissions`
             pub permissions: ::buffa::RepeatedView<
@@ -62465,15 +62636,18 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Current role of the caller on the sub-account.
+            /// Current role of the caller on the sub-account. For an API key this is
+            /// OWNER: keys belong to the main account that owns the sub-account.
             ///
             /// Field 1: `role`
             #[must_use]
             pub fn role(&self) -> ::buffa::EnumValue<super::super::SubaccountRole> {
                 self.0.reborrow().role
             }
-            /// Permissions allowed by the role and current sub-account policy. Resource
-            /// state, MFA, limits, and other request context may still deny an operation.
+            /// Permissions allowed by the role and current sub-account policy. For an API
+            /// key, only those its API-key policy also grants and that API keys can use.
+            /// Resource state, MFA, limits, and other request context may still deny an
+            /// operation.
             ///
             /// Field 2: `permissions`
             #[must_use]

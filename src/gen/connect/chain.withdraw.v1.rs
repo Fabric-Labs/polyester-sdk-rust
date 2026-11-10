@@ -1180,7 +1180,8 @@ pub const WITHDRAW_SERVICE_CREATE_WALLET_TRADING_WITHDRAW_SPEC: ::connectrpc::Sp
 #[allow(clippy::type_complexity)]
 pub trait WithdrawService: Send + Sync + 'static {
     /// Validate an external-chain withdraw destination for an authenticated
-    /// caller without creating, signing, or reserving a withdraw.
+    /// caller without creating, signing, or reserving a withdraw. An API key
+    /// needs READ_WITHDRAW_VALIDATION within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
