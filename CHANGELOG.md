@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.17.0
+
+Package version: `0.17.0`. Git tag: `v0.17.0`. Released 2026-11-10. Built on public contract `c8d9827`.
 
 - **Breaking:** A managed order book adds one view when it applies a snapshot together with the deltas buffered behind it. It added one view per buffered delta and then the same book again, so a stale copy stayed queued: after `set_bucket`, the next view read could be the copy at the previous bucket (the intermittent `bid bucket price: actual 0, expected 71000000` of the hardening suite). Affected: `OrderbookService::create_subscription` and `orderbook::Subscription::updates`. Migration: read one view per snapshot, at the last buffered sequence; read `book_seq` instead of counting views.
 - Added `orderbook::Subscription::since_last_publication`, the time since the managed book's stream last delivered a publication, or since it started. The server republishes each book's whole view about every 30 s even when nothing changes, so an age far above that means the stream stalled while the socket stayed open, not that the market is quiet. The SDK sets no threshold; poll it and refresh or resubscribe on a stall.
