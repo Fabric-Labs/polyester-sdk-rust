@@ -736,6 +736,13 @@ impl Factory {
         self.connect_config.clone()
     }
 
+    /// A transport like [`Self::transport`] with a connection pool of its
+    /// own, so a read retried through it opens a new connection instead of
+    /// queueing behind one that dropped or stalled.
+    pub(crate) fn fresh_transport(&self) -> Result<SharedTransport> {
+        build_http_client(&self.config.api_url)
+    }
+
     pub fn require_credentials(&self) -> Result<&Credentials> {
         self.credentials
             .as_ref()

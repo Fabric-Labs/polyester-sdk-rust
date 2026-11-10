@@ -31,6 +31,103 @@ fn catalog_hydration_message(failure: &Error) -> String {
     }
 }
 
+/// Why a catalog the client loads when it is created could not be loaded;
+/// see [`Error::CatalogLoad`].
+#[derive(Debug, Clone)]
+pub struct CatalogLoadFailure {
+    /// `"spot"` or `"funding"`.
+    pub catalog: &'static str,
+    /// The Connect procedure, such as
+    /// `chain.zipper.v1.ZipperService/GetDepositWithdrawConfig`.
+    pub operation: &'static str,
+    /// `"timeout"`, `"connection_closed"`, `"connect_failed"`,
+    /// `"unavailable"`, `"invalid"` (the response did not validate) or
+    /// `"error"`.
+    pub failure: &'static str,
+    /// How many times the catalog was read.
+    pub attempts: u32,
+    /// How long the reads took.
+    pub elapsed: Duration,
+    /// The edge's reference of the last failed response (its `cf-ray`
+    /// header), when one arrived.
+    pub response_ref: Option<String>,
+    /// The last failure.
+    pub source: Error,
+}
+
+impl CatalogLoadFailure {
+    fn catalog_name(&self) -> &'static str {
+        if self.catalog == "spot" {
+            "spot config"
+        } else {
+            "funding config"
+        }
+    }
+}
+
+impl std::fmt::Display for CatalogLoadFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cause = redact_userinfo(&self.source.to_string());
+        if self.failure == "invalid" {
+            return write!(
+                f,
+                "catalog hydration failed: {} ({}) is invalid: {cause}",
+                self.catalog_name(),
+                self.operation
+            );
+        }
+        let words = match self.failure {
+            "timeout" => "timed out",
+            "connection_closed" => "connection closed",
+            "connect_failed" => "could not connect",
+            "unavailable" => "server unavailable",
+            _ => "request failed",
+        };
+        let noun = if self.attempts == 1 {
+            "attempt"
+        } else {
+            "attempts"
+        };
+        write!(
+            f,
+            "catalog hydration failed: {} ({}) {words} after {} {noun} in {:.1}s",
+            self.catalog_name(),
+            self.operation,
+            self.attempts,
+            self.elapsed.as_secs_f64()
+        )?;
+        if let Some(reference) = &self.response_ref {
+            write!(f, "; response ref {reference}")?;
+        }
+        write!(f, ": {cause}")
+    }
+}
+
+impl std::error::Error for CatalogLoadFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
+/// `text` without the user name and password of any URL in it.
+fn redact_userinfo(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(scheme_end) = rest.find("://") {
+        let (head, tail) = rest.split_at(scheme_end + 3);
+        out.push_str(head);
+        let authority_end = tail
+            .find(|c: char| c == '/' || c.is_whitespace() || c == '"' || c == ')')
+            .unwrap_or(tail.len());
+        match tail[..authority_end].rfind('@') {
+            Some(at) => rest = &tail[at + 1..],
+            None => rest = tail,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Root result alias for the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -65,6 +162,15 @@ pub enum Error {
     /// hydrates the catalogs again.
     #[error("{}", catalog_hydration_message(.0))]
     CatalogHydration(Box<Error>),
+    /// A catalog the client loads when it is created could not be loaded:
+    /// [`crate::Client::wait_for_catalogs`] returns it for the spot config,
+    /// [`crate::Client::wait_for_funding_catalog`] for the funding
+    /// (deposit/withdraw) config, and a call that needs that catalog returns
+    /// it inside [`Error::CatalogHydration`]. It names the catalog, the
+    /// operation, the kind of failure and the response reference, and keeps
+    /// the last failure as its [`std::error::Error::source`].
+    #[error(transparent)]
+    CatalogLoad(Box<CatalogLoadFailure>),
     #[error("{0}")]
     Transport(String),
     /// A successful RPC returned a payload that violates the documented
