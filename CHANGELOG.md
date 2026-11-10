@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.18.0
+
+Package version: `0.18.0`. Git tag: `v0.18.0`. Released 2026-11-10. Built on public contract `a3e3784`.
 
 - A method that names a market by symbol, or needs a pair's catalog scales, now waits for the catalog hydration the client starts in the background. It read the catalogs at once, so a call made right after `Client::new`, such as `orderbook.create_subscription` for `"DOGE-USDT"`, refused a valid symbol with `Error::Validation` (`unknown symbol ...` or `symbol_id is required for orderbook subscriptions`) while hydration was still running; only order and trigger paths and `market_overview.list` waited. A symbol the hydrated catalogs don't know returns the unknown-symbol `Error::Validation`. With `hydrate_catalogs: false` nothing waits and the refusals are unchanged. Affected: `market_data.get_trades`, `get_trades_with`, `get_candles`, `get_candles_with`, `get_current_candle`, `get_candles_columns`, `subscribe_trades` and `subscribe_candles`; `orderbook.get` and `orderbook.create_subscription`; `heatmap.get`, `heatmap.get_with_options` and `heatmap.subscribe_live`; and `zipper.subscribe_zipped_asset_supply`, whose updates are decoded with the catalog scales.
 - `market_overview.subscribe`, `market_overview.get_spot_volume_history` without symbols, `fees.get_spot_fee_rates`, and `triggers.list`, `triggers.list_with` without a symbol, `triggers.get` and `triggers.get_by_id` now wait for hydration in progress before they label and scale their results. Called right after the client was created, they returned an empty `symbol` and, for the overview, rows without the sizes and volumes the catalog scales decode. A failed hydration still leaves those fields empty and returns no error.
