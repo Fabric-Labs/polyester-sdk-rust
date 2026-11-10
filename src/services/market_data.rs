@@ -25,6 +25,7 @@ use crate::proto::marketoverview::v1::{
     GetSpotVolumeHistoryRequest, ListMarketOverviewRequest,
 };
 use crate::proto::orderbook::v1::GetOrderBookRequest;
+use crate::types::money::Quantity;
 use buffa_types::google::protobuf::Timestamp;
 
 #[derive(Clone)]
@@ -384,6 +385,25 @@ fn enrich_market_overview_rows(
     for market in rows {
         if market.symbol.is_empty() {
             market.symbol = catalogs.display_symbol(market.symbol_id);
+        }
+        // Book sizes are base quantities: give them the pair's scale and symbol.
+        if let Some(scale) = catalogs.base_quantity_scale_for_symbol_id(market.symbol_id) {
+            for qty in [&mut market.best_bid_qty, &mut market.best_ask_qty] {
+                if let Some(raw) = qty.as_ref() {
+                    *qty = Some(
+                        Quantity::from_scaled(
+                            raw.as_scaled(),
+                            Some(scale),
+                            raw.domain(),
+                            Some(market.symbol.clone()).filter(|symbol| !symbol.is_empty()),
+                            Some(market.symbol_id),
+                        )
+                        .map_err(|e| {
+                            Error::validation(format!("market overview book size invalid: {e}"))
+                        })?,
+                    );
+                }
+            }
         }
         if let (Some(raw), Some(scale)) = (
             market.volume_24h_base_scaled.as_deref(),
@@ -1193,6 +1213,44 @@ mod tests {
             assert!(matches!(err, Error::Validation(_)), "{err:?}");
             assert!(err.to_string().contains("after_trade_id"), "{err}");
         }
+    }
+
+    // POLY-9019: list and live rows carry the best bid and ask sizes at the
+    // pair's base quantity scale, with its symbol.
+    #[test]
+    fn overview_rows_size_the_top_of_book_from_the_catalogs() {
+        use buffa::Message as _;
+        let catalogs = crate::catalogs::Manager::new();
+        catalogs
+            .hydrate_spot_config_json(serde_json::json!({
+                "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let payload = crate::proto::marketoverview::v1::MarketOverviewBatch {
+            markets: vec![crate::proto::marketoverview::v1::MarketOverview {
+                symbol_id: 1,
+                best_bid_ticks: 74_883_900_000_000,
+                best_bid_qty_scaled: 6_166_686,
+                best_ask_ticks: 74_921_360_000_000,
+                best_ask_qty_scaled: 5_532_396,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let batch = enriched_market_overview_batch(&catalogs, &payload).unwrap();
+        let row = &batch.markets[0];
+        for (qty, scaled) in [
+            (&row.best_bid_qty, 6_166_686),
+            (&row.best_ask_qty, 5_532_396),
+        ] {
+            let qty = qty.as_ref().expect("size is set");
+            assert_eq!(qty.as_scaled(), scaled);
+            assert_eq!(qty.scale(), Some(8));
+            assert_eq!(qty.symbol(), Some("BTC-USDT"));
+            assert_eq!(qty.symbol_id(), Some(1));
+        }
+        assert_eq!(row.symbol, "BTC-USDT");
     }
 
     #[test]

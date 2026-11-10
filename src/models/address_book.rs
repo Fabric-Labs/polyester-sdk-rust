@@ -31,9 +31,21 @@ pub struct AddressBooksList {
     pub books: Vec<Value>,
 }
 
+/// An address book: the root account's own, or one of its sub-accounts'.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AccountScope {
+    /// `SCOPE_ROOT` or `SCOPE_SUBACCOUNT`.
+    pub scope_type: String,
+    /// The root account's public ID.
+    pub root_account_id: String,
+    /// The sub-account's public ID; empty for a root scope.
+    pub sub_account_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AddressBookViewInvalidation {
-    pub scope: String,
+    /// The address book that changed; `None` when the event names none.
+    pub scope: Option<AccountScope>,
     pub invalidated_at: String,
     /// Revision that `GetAddressBookView` must reach before this invalidation
     /// is considered satisfied.
