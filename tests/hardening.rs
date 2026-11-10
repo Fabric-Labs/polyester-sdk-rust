@@ -5,6 +5,8 @@
 
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
+#[path = "catalog_hydration_wait/mod.rs"]
+mod catalog_hydration_wait;
 #[allow(dead_code)]
 #[path = "hardening_support/centrifugo.rs"]
 mod centrifugo;
