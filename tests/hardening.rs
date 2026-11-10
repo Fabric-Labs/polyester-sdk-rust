@@ -13,10 +13,14 @@ mod changelog_revisions;
 mod hardening_support;
 #[path = "limit_market_ref_price/mod.rs"]
 mod limit_market_ref_price;
+#[path = "live_write_gates/mod.rs"]
+mod live_write_gates;
 #[path = "market_data/mod.rs"]
 mod market_data;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
+#[path = "order_by_symbol_id/mod.rs"]
+mod order_by_symbol_id;
 #[path = "orderbook_depths/mod.rs"]
 mod orderbook_depths;
 #[path = "orders_and_batches/mod.rs"]
@@ -8085,6 +8089,98 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
             "bid bucket price after the bucket change"
         );
         assert!(subscription.err().is_none());
+        subscription.close();
+    }
+}
+
+/// POLY-8563: a stalled publisher must be distinguishable from a quiet market.
+/// The server republishes every book about every 30 s, so the time since the
+/// stream's last publication tells them apart; the managed book reports it.
+#[tokio::test]
+async fn l2_orderbook_reports_time_since_last_publication() {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    let level = |price_ticks, qty_scaled| PriceLevel {
+        price_ticks,
+        qty_scaled,
+        ..Default::default()
+    };
+    for publishes in [false, true] {
+        let ws = if publishes {
+            let delta = OrderBookDelta {
+                symbol_id: 1,
+                book_seq_start: 2,
+                book_seq_end: 2,
+                bids: vec![level(71_600_000, 5)],
+                ..Default::default()
+            }
+            .encode_to_vec();
+            MockWsServer::spawn_centrifugo_publication_after_handshake(Arc::default(), delta).await
+        } else {
+            MockWsServer::spawn_centrifugo_public(Arc::default()).await
+        };
+        let http = MockHttpServer::spawn(move |_| {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 1,
+                available: true,
+                bids: vec![level(71_600_000, 3)],
+                asks: vec![level(71_700_000, 4)],
+                ..Default::default()
+            })
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            ws_url: ws.ws_url(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let created = Instant::now();
+        let mut subscription = client
+            .orderbook
+            .create_subscription(CreateSubscriptionOptions {
+                symbol: "DOGE-USDT".into(),
+                symbol_id: Some(1),
+                depth: Some(50),
+                bucket: None,
+            })
+            .await
+            .unwrap();
+        let want_seq = if publishes { "2" } else { "1" };
+        loop {
+            let view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                .await
+                .expect("a view")
+                .expect("stream must remain open");
+            if view.book_seq == want_seq {
+                break;
+            }
+        }
+        if publishes {
+            // The publication just arrived.
+            assert!(subscription.since_last_publication() < Duration::from_millis(200));
+        }
+
+        // Silence makes it grow; a bucket change is not a publication.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        subscription.set_bucket("0.1").unwrap();
+        tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+            .await
+            .expect("a view for the bucket change")
+            .expect("stream must remain open");
+        let age = subscription.since_last_publication();
+        assert!(age >= Duration::from_millis(300), "publishes={publishes}: age {age:?}");
+        // With no publication at all, the age runs from the subscription's start.
+        assert!(age <= created.elapsed(), "publishes={publishes}: age {age:?}");
         subscription.close();
     }
 }
