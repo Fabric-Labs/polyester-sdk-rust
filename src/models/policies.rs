@@ -25,6 +25,10 @@ pub struct SubaccountPolicy {
     pub trading_halted: bool,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
+    /// Granted `auth.v1.PolicyAction` names, such as `"TRADE_SPOT"` or
+    /// `"READ_BALANCES"`, in the order the server sent them; `"UNKNOWN(n)"`
+    /// for an action this SDK version does not know.
+    pub actions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +47,15 @@ pub struct ApiPolicy {
     pub spot_market_scope: String,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
+    /// Granted `auth.v1.PolicyAction` names, in the order the server sent
+    /// them; `"UNKNOWN(n)"` for an action this SDK version does not know.
+    /// Actions from `READ_API_KEYS` on (`READ_API_KEYS`, `READ_API_POLICIES`,
+    /// `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`,
+    /// `READ_VIP_STATUS`, `READ_SOCIAL_VERIFICATION`, `READ_PROFILE`,
+    /// `READ_ACCOUNT_DIRECTORY`, `READ_WITHDRAW_VALIDATION`,
+    /// `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`, `READ_CHECKPOINTS` and
+    /// `READ_REWARDS`) are account permissions, valid on API-key policies only.
+    pub actions: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

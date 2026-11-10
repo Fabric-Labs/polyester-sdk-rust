@@ -32,6 +32,19 @@ pub struct ZipperChainConfig {
     pub is_case_sensitive: bool,
     pub min_address_length: u32,
     pub max_address_length: u32,
+    /// Memo or destination-tag rule for withdrawal destinations on this
+    /// network: `"required"`, `"optional"` or `"not_supported"`. Empty when
+    /// the network names none, which does not mean a memo can be omitted;
+    /// `"UNKNOWN(n)"` for a rule this SDK version does not know. It does not
+    /// describe deposit instructions.
+    pub memo_requirement: String,
+    /// Display label for the memo, such as `"Destination tag"` or `"Memo"`.
+    /// Empty when memos are not supported.
+    pub memo_label: String,
+    /// Human-readable memo format guidance for display, exactly as sent.
+    /// Use `memo_requirement` as the rule; do not parse this text. Empty when
+    /// no guidance applies.
+    pub memo_format_hint: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

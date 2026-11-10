@@ -148,6 +148,7 @@ pub fn internal_transfer_from_proto(
         asset_code: msg.asset_code.clone(),
         quantity,
         status: internal_transfer_status_label(&msg.status),
+        flow_id: msg.flow_id.clone(),
     })
 }
 
@@ -332,5 +333,21 @@ mod tests {
                 .is_err()
         );
         assert!(internal_transfer_from_proto(&CreateInternalTransferResponse::default()).is_err());
+    }
+
+    /// POLY-9102: the receipt's lifecycle flow ID reaches the result, so the
+    /// transfer can be read back as a flow.
+    #[test]
+    fn poly_9102_internal_transfer_receipt_keeps_its_flow_id() {
+        let mut receipt = one_token_receipt(InternalTransferStatus::Accepted);
+        receipt.flow_id = "flow-7f3a".into();
+        let result = internal_transfer_from_proto(&receipt).unwrap();
+        assert_eq!(result.flow_id, "flow-7f3a");
+        assert_eq!(
+            internal_transfer_from_proto(&one_token_receipt(InternalTransferStatus::Accepted))
+                .unwrap()
+                .flow_id,
+            ""
+        );
     }
 }
