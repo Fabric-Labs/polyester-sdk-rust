@@ -330,6 +330,10 @@ let client = polyester::Client::from_env()?;
 client.wait_for_catalogs().await?;
 ```
 
+The hydrated zipper config also seeds each variant's supply, read with
+`catalogs.supply_for_zipped_asset_id`; `zipper.subscribe_zipped_asset_supply(true)`
+keeps it current.
+
 Catalogs supply scales and symbol IDs for encoding. Tick/step/minimum
 quantity and notional checks are venue-owned (preview/admission); the SDK does
 not preflight those pair constraints client-side.

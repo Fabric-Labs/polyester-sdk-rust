@@ -72,6 +72,8 @@ pub fn deposit_withdraw_config_from_proto(
                         network_fee: v.network_fee.clone(),
                         deposit_min_amount: v.deposit_min_amount.clone(),
                         withdraw_min_amount: v.withdraw_min_amount.clone(),
+                        // supply_q is scaled by the parent asset's quantity_scale.
+                        supply: format_ledger_u64(v.supply_q, a.quantity_scale).unwrap_or_default(),
                         source_token: ZipperTokenConfig {
                             address: v.source_address.clone(),
                             decimals: v.source_decimals,
