@@ -187,3 +187,59 @@ async fn signed_call_without_redirect_succeeds() {
         assert!(is_signed(&received[0]), "{wire_format:?}");
     }
 }
+
+/// Synthetic markers placed in a redirect Location; none is a real credential.
+const LOCATION_SECRETS: [&str; 4] = [
+    "synthetic-location-user",
+    "synthetic-location-password",
+    "synthetic-location-token",
+    "synthetic-location-fragment",
+];
+
+/// Redirect targets that do not parse, each with userinfo, a query token and a
+/// fragment: a non-numeric port and an unclosed IPv6 host.
+fn malformed_locations() -> [(&'static str, String); 2] {
+    let tail = "/v1/me?token=synthetic-location-token#synthetic-location-fragment";
+    let userinfo = "synthetic-location-user:synthetic-location-password";
+    [
+        (
+            "invalid-port",
+            format!("http://{userinfo}@127.0.0.1:notaport{tail}"),
+        ),
+        ("invalid-ipv6", format!("http://{userinfo}@[::1{tail}")),
+    ]
+}
+
+/// A signed call answered with 301, 307 or 308 whose Location does not parse
+/// fails without following it, and its error, displayed or debug-formatted,
+/// never repeats the Location's userinfo, query or fragment.
+#[tokio::test]
+async fn malformed_redirect_error_carries_no_location_secrets() {
+    for status in [301u16, 307, 308] {
+        for (kind, location) in malformed_locations() {
+            for wire_format in [WireFormat::Json, WireFormat::Binary] {
+                let label = format!("{status} {kind} {wire_format:?}");
+                let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+                let api_url = format!("http://{}", listener.local_addr().unwrap());
+                let answer = location.clone();
+                let received = serve(listener, move |_| redirect_answer(status, &answer));
+
+                let err = client(api_url, wire_format)
+                    .auth
+                    .me()
+                    .await
+                    .expect_err(&label);
+
+                assert_eq!(received.lock().unwrap().len(), 1, "{label}");
+                for rendered in [err.to_string(), format!("{err:?}"), format!("{err:#?}")] {
+                    for secret in LOCATION_SECRETS.iter().copied().chain([location.as_str()]) {
+                        assert!(
+                            !rendered.contains(secret),
+                            "{label}: error exposes {secret:?}: {rendered}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}

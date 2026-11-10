@@ -190,7 +190,7 @@ pub(super) async fn signed_get(
         }
         return Err(map_permission_denied(
             label,
-            &crate::transport::url_without_userinfo(url),
+            &crate::transport::url_for_error(url),
             status_code,
             &body,
         ));
@@ -435,7 +435,7 @@ mod userinfo_tests {
 
     /// Both token paths refuse with 401 and 403. Neither the error text nor a
     /// structured endpoint may carry the password from the API URL's userinfo,
-    /// and the endpoint keeps the URL without it.
+    /// and the endpoint keeps the URL without it, its query or its fragment.
     #[tokio::test]
     async fn token_errors_redact_url_userinfo() {
         for status in [401u16, 403] {
@@ -449,10 +449,8 @@ mod userinfo_tests {
                 let creds = credentials();
                 for (path, endpoint) in [
                     ("connection", format!("http://{host}/v1/rt/token")),
-                    (
-                        "subscription",
-                        format!("http://{host}/v1/rt/subscribe?channel=orders%3A1"),
-                    ),
+                    // The endpoint keeps no query: the context names the channel.
+                    ("subscription", format!("http://{host}/v1/rt/subscribe")),
                 ] {
                     let timeout = Duration::from_secs(5);
                     let err = if path == "connection" {
@@ -557,6 +555,54 @@ mod redirect_tests {
             assert!(result.is_err(), "{status}: {result:?}");
             assert_eq!(signed.load(Ordering::SeqCst), 0, "{status}");
             assert_eq!(requests.load(Ordering::SeqCst), 0, "{status}");
+        }
+    }
+
+    /// A token GET answered with a redirect whose Location does not parse
+    /// fails, and its error never repeats the Location's userinfo, query or
+    /// fragment.
+    #[tokio::test]
+    async fn malformed_redirect_token_error_carries_no_location_secrets() {
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        let creds = Credentials::new("ak_redirect_test", &secret_hex).unwrap();
+        let secrets = [
+            "synthetic-rt-user",
+            "synthetic-rt-password",
+            "synthetic-rt-token",
+            "synthetic-rt-fragment",
+        ];
+        let tail = "/v1/rt/token?token=synthetic-rt-token#synthetic-rt-fragment";
+        let userinfo = "synthetic-rt-user:synthetic-rt-password";
+        for location in [
+            format!("http://{userinfo}@127.0.0.1:notaport{tail}"),
+            format!("http://{userinfo}@[::1{tail}"),
+        ] {
+            for status in [301u16, 307, 308] {
+                let answer = location.clone();
+                let (origin, requests, _) = serve(move |_| {
+                    format!(
+                        "HTTP/1.1 {status} Redirect\r\nLocation: {answer}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    )
+                })
+                .await;
+                let err = fetch_connection_token(
+                    &creds,
+                    &format!("http://{origin}"),
+                    Duration::from_secs(5),
+                    false,
+                )
+                .await
+                .expect_err("malformed redirect");
+                assert_eq!(requests.load(Ordering::SeqCst), 1, "{status} {location}");
+                for rendered in [err.to_string(), format!("{err:?}")] {
+                    for secret in secrets.iter().copied().chain([location.as_str()]) {
+                        assert!(
+                            !rendered.contains(secret),
+                            "{status}: error exposes {secret:?}: {rendered}"
+                        );
+                    }
+                }
+            }
         }
     }
 }
