@@ -13,8 +13,12 @@ mod changelog_revisions;
 mod hardening_support;
 #[path = "limit_market_ref_price/mod.rs"]
 mod limit_market_ref_price;
+#[path = "live_write_gates/mod.rs"]
+mod live_write_gates;
 #[path = "market_data/mod.rs"]
 mod market_data;
+#[path = "order_by_symbol_id/mod.rs"]
+mod order_by_symbol_id;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]
@@ -7979,6 +7983,223 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
             assert!(subscription.err().is_none());
             subscription.close();
         }
+    }
+}
+
+/// POLY-9098: a snapshot applied with a buffered delta is one book state, so it
+/// must yield one view. A second, identical view stayed queued, and the next
+/// bucket change read that stale view instead of its own.
+#[tokio::test]
+async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    let level = |price_ticks, qty_scaled| PriceLevel {
+        price_ticks,
+        qty_scaled,
+        ..Default::default()
+    };
+    for buffered in [1_u64, 3] {
+        // Deltas 2..=1+buffered, published right after the subscribe reply, reach the
+        // client while the snapshot read (sequence 1) is held back, so all are buffered.
+        let deltas: Vec<Vec<u8>> = (2..2 + buffered)
+            .map(|seq| {
+                OrderBookDelta {
+                    symbol_id: 1,
+                    book_seq_start: seq,
+                    book_seq_end: seq,
+                    bids: vec![level(71_600_000, seq as i64)],
+                    ..Default::default()
+                }
+                .encode_to_vec()
+            })
+            .collect();
+        let ws =
+            MockWsServer::spawn_centrifugo_publications_after_handshake(Arc::default(), deltas)
+                .await;
+        let http = MockHttpServer::spawn(move |request| {
+            assert_eq!(request.path, "/orderbook.v1.OrderbookService/GetOrderBook");
+            hardening_support::HttpScript::RawAfter {
+                delay: Duration::from_millis(300),
+                status: 200,
+                headers: vec![("Content-Type".into(), "application/proto".into())],
+                body: GetOrderBookResponse {
+                    symbol_id: 1,
+                    book_seq: 1,
+                    available: true,
+                    bids: vec![level(71_600_000, 1)],
+                    asks: vec![level(71_700_000, 4)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            ws_url: ws.ws_url(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let mut subscription = client
+            .orderbook
+            .create_subscription(CreateSubscriptionOptions {
+                symbol: "DOGE-USDT".into(),
+                symbol_id: Some(1),
+                depth: Some(50),
+                bucket: Some("0.1".into()),
+            })
+            .await
+            .unwrap();
+
+        let last_seq = (1 + buffered).to_string();
+        let first = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+            .await
+            .expect("the snapshot must emit a view")
+            .expect("stream must remain open");
+        assert_eq!(first.book_seq, last_seq, "buffered deltas {buffered}");
+        assert_eq!(
+            first.bids[0].qty.as_ref().unwrap().as_scaled(),
+            1 + buffered as i64
+        );
+        let extra = tokio::time::timeout(Duration::from_millis(300), subscription.updates().recv())
+            .await
+            .ok()
+            .flatten();
+        assert!(
+            extra.is_none(),
+            "{buffered} buffered deltas: one book state emitted a second view {extra:?}"
+        );
+
+        // The next bucket change reads its own view, not a stale one.
+        subscription.set_bucket("0.001").unwrap();
+        let fine = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+            .await
+            .expect("bucket must emit a view")
+            .expect("stream must remain open");
+        assert_eq!(
+            fine.bids[0].price.as_ref().unwrap().as_ticks(),
+            71_000_000,
+            "bid bucket price after the bucket change"
+        );
+        assert!(subscription.err().is_none());
+        subscription.close();
+    }
+}
+
+/// POLY-8563: a stalled publisher must be distinguishable from a quiet market.
+/// The server republishes every book about every 30 s, so the time since the
+/// stream's last publication tells them apart; the managed book reports it.
+#[tokio::test]
+async fn l2_orderbook_reports_time_since_last_publication() {
+    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta, PriceLevel};
+    use polyester::services::CreateSubscriptionOptions;
+
+    let level = |price_ticks, qty_scaled| PriceLevel {
+        price_ticks,
+        qty_scaled,
+        ..Default::default()
+    };
+    for publishes in [false, true] {
+        let ws = if publishes {
+            let delta = OrderBookDelta {
+                symbol_id: 1,
+                book_seq_start: 2,
+                book_seq_end: 2,
+                bids: vec![level(71_600_000, 5)],
+                ..Default::default()
+            }
+            .encode_to_vec();
+            // Well after the start, so the publication's age and the
+            // subscription's age differ.
+            MockWsServer::spawn_centrifugo_publications_after_delay(
+                Arc::default(),
+                vec![delta],
+                Duration::from_millis(400),
+            )
+            .await
+        } else {
+            MockWsServer::spawn_centrifugo_public(Arc::default()).await
+        };
+        let http = MockHttpServer::spawn(move |_| {
+            connect_proto_ok(&GetOrderBookResponse {
+                symbol_id: 1,
+                book_seq: 1,
+                available: true,
+                bids: vec![level(71_600_000, 3)],
+                asks: vec![level(71_700_000, 4)],
+                ..Default::default()
+            })
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            ws_url: ws.ws_url(),
+            hydrate_catalogs: false,
+            ..Default::default()
+        })
+        .unwrap();
+        client
+            .catalogs
+            .hydrate_spot_config_json(json!({
+                "pairs": [{"symbol": "DOGE-USDT", "symbol_id": 1, "base_quantity_scale": 8}]
+            }))
+            .unwrap();
+        let created = Instant::now();
+        let mut subscription = client
+            .orderbook
+            .create_subscription(CreateSubscriptionOptions {
+                symbol: "DOGE-USDT".into(),
+                symbol_id: Some(1),
+                depth: Some(50),
+                bucket: None,
+            })
+            .await
+            .unwrap();
+        let want_seq = if publishes { "2" } else { "1" };
+        loop {
+            let view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+                .await
+                .expect("a view")
+                .expect("stream must remain open");
+            if view.book_seq == want_seq {
+                break;
+            }
+        }
+        if publishes {
+            // The publication just arrived, 400 ms after the start.
+            let age = subscription.since_last_publication();
+            assert!(
+                age < Duration::from_millis(200),
+                "age just after a publication {age:?}"
+            );
+        }
+
+        // Silence makes it grow; a bucket change is not a publication.
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        subscription.set_bucket("0.1").unwrap();
+        tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
+            .await
+            .expect("a view for the bucket change")
+            .expect("stream must remain open");
+        let age = subscription.since_last_publication();
+        assert!(
+            age >= Duration::from_millis(300),
+            "publishes={publishes}: age {age:?}"
+        );
+        // With no publication at all, the age runs from the subscription's start.
+        assert!(
+            age <= created.elapsed(),
+            "publishes={publishes}: age {age:?}"
+        );
+        subscription.close();
     }
 }
 

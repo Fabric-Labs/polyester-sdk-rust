@@ -445,6 +445,23 @@ params.attached_risk = Some(AttachedRisk {
 let result = client.orders.create(params).await?;
 ```
 
+To name the market by its Connect ID instead, such as a `symbol_id` from a
+market-data stream, use `CreateOrderParams::for_symbol_id` (or
+`PreviewOrderParams::for_symbol_id`), or set `symbol_id` next to `symbol`; both
+must then name the same market. The ID must be in the hydrated catalog, which
+supplies the pair's scales, and an unknown ID, a zero ID or a contradicting
+symbol is refused before sending.
+
+```rust,no_run
+use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+use polyester::types::{Price, Quantity};
+
+let mut params = CreateOrderParams::for_symbol_id(1, CreateSide::Buy, CreateOrderType::Limit);
+params.quantity = Some(Quantity::from_decimal_str("0.01", 8, None, None)?);
+params.price = Some(Price::from_decimal_str("90000", None)?);
+let result = client.orders.create(params).await?;
+```
+
 The SDK checks the trailing stop's maximum before sending and refuses a
 mistake with the code, field path and rule ID the server answers, as an
 `Error::Api` with one entry in `Error::violations()`
@@ -776,6 +793,23 @@ to clear. A buy market child and a buy TWAP slice take up to 10000; a sell
 market child and a sell TWAP slice take up to 9999.
 Standalone and attached `trailing_distance_bps` require 1–10000. A buy
 trailing stop's `limit_price` must be at least its `activation_price`.
+
+`trailing_distance_ticks` and `TrailingDistance::Ticks` are a price delta in 1e-9
+quote-unit ticks, the same scale as every price tick, sent as given. They are not
+a count of the pair's tick size. On BTC-USDT, a distance of 50 USDT is
+`50 × 1_000_000_000 = 50_000_000_000` ticks and 0.5 USDT is `500_000_000`; a value
+of `1` trails by 0.000000001 USDT. Convert a decimal distance with `Price`:
+
+```rust,no_run
+use polyester::models::TrailingDistance;
+use polyester::types::Price;
+
+let ticks = Price::from_decimal_str("0.5", None)?.as_ticks(); // 500_000_000
+let distance = TrailingDistance::Ticks(ticks);
+```
+
+Trigger reads decode the distance back to quote units
+(`TriggerTrailingDetails::trailing_distance`, a `Price`).
 
 `triggers.modify` and `triggers.resume_with` / `resume_by_id` take an optional
 symbol: leave it out to target the trigger's own market. An API key limited to
@@ -1445,6 +1479,25 @@ subscribe there:
   for more than 500 levels, read a snapshot with `orderbook.get`.
 - `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
   only a published depth and returns `Error::Validation` for any other.
+
+A snapshot applied with the publications buffered behind it adds one view, at the
+last buffered sequence.
+
+A stream that stops and a market with nothing to report look alike, since no view
+arrives in either case. `since_last_publication()` on a managed order book tells them
+apart: the time since its stream last delivered a publication (or since the
+subscription started); views from a snapshot or a bucket change don't count. The
+server republishes each book's whole view about every 30 s even when nothing changed
+(seen on every market of devnet and testnet; the public contract does not promise a
+cadence), so a quiet market stays under that. The SDK sets no threshold and acts on
+none. Poll it, and treat an age far above 30 s, such as 90 s, as a stall: call
+`refresh_snapshot()`, or close and subscribe again.
+
+```rust,no_run
+if book.since_last_publication() > std::time::Duration::from_secs(90) {
+    book.refresh_snapshot().await?;
+}
+```
 
 Streamed orders carry scaled quantity integers but may not carry the
 base quantity scale, so `Quantity::scale()` can return `None`. A bot must

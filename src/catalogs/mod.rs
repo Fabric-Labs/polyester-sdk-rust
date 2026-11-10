@@ -506,6 +506,38 @@ impl Manager {
         })
     }
 
+    /// The market an order names by display symbol, by Connect ID, or by both.
+    ///
+    /// An empty `symbol` with a `symbol_id` names the market by ID; both set
+    /// must name the same market.
+    pub(crate) fn require_order_market(
+        &self,
+        symbol: &str,
+        symbol_id: Option<u32>,
+    ) -> Result<Market> {
+        let Some(symbol_id) = symbol_id else {
+            return self.require_market(symbol);
+        };
+        if symbol_id == 0 {
+            return Err(Error::validation(
+                "symbol_id must be non-zero when supplied",
+            ));
+        }
+        let Some(canonical) = self.symbol_for_symbol_id(symbol_id) else {
+            return Err(Error::validation(format!(
+                "unknown symbol_id {symbol_id}; call hydrate_catalogs / get_spot_config first"
+            )));
+        };
+        if let Some(named) = Self::normalize_raw_symbol_filter(Some(symbol))
+            && named != canonical
+        {
+            return Err(Error::validation(format!(
+                "symbol {named:?} does not match symbol_id {symbol_id} ({canonical})"
+            )));
+        }
+        self.require_market(&canonical)
+    }
+
     /// Optional Connect symbol filter. Empty/omitted stays `0` (all symbols).
     /// A supplied display symbol is resolved and fails closed.
     pub fn optional_symbol_id(&self, symbol: Option<&str>, symbol_id: Option<u32>) -> Result<u32> {

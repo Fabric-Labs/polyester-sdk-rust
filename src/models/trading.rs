@@ -525,7 +525,12 @@ pub struct RiskLeg {
 /// Trailing-stop distance (exactly one of ticks or bps).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrailingDistance {
+    /// A price delta in 1e-9 quote-unit ticks, the scale of every price tick,
+    /// sent as given. It is not a count of the pair's tick size: on BTC-USDT,
+    /// 50 USDT is `50_000_000_000` and 0.5 USDT is `500_000_000`
+    /// (`Price::from_decimal_str("0.5", None)?.as_ticks()`).
     Ticks(i64),
+    /// Basis points of the price (1 bp = 0.01%), from 1 to 10000.
     Bps(i32),
 }
 
@@ -1000,7 +1005,13 @@ pub struct StopAllTradingResult {
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct CreateOrderParams {
+    /// Display symbol, such as `BTC-USDT`. Leave it empty and set
+    /// [`symbol_id`](Self::symbol_id) to name the market by its ID instead.
     pub symbol: String,
+    /// Connect market ID, such as a `symbol_id` from a market-data stream.
+    /// With an empty `symbol` it names the market; with both set they must
+    /// name the same market. The ID must be in the hydrated catalog.
+    pub symbol_id: Option<u32>,
     pub side: CreateSide,
     pub order_type: CreateOrderType,
     /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
@@ -1042,6 +1053,7 @@ impl CreateOrderParams {
     pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
         Self {
             symbol: symbol.into(),
+            symbol_id: None,
             side,
             order_type,
             quantity: None,
@@ -1058,6 +1070,14 @@ impl CreateOrderParams {
             attached_risk: None,
             expire_at: None,
         }
+    }
+
+    /// [`Self::new`] for the market with Connect ID `symbol_id`, the symbol
+    /// left empty.
+    pub fn for_symbol_id(symbol_id: u32, side: CreateSide, order_type: CreateOrderType) -> Self {
+        let mut params = Self::new(String::new(), side, order_type);
+        params.symbol_id = Some(symbol_id);
+        params
     }
 }
 
@@ -1085,7 +1105,13 @@ pub type OrderFeeSource = FeeAsset;
 #[non_exhaustive]
 #[derive(Debug, Clone)]
 pub struct PreviewOrderParams {
+    /// Display symbol, such as `BTC-USDT`. Leave it empty and set
+    /// [`symbol_id`](Self::symbol_id) to name the market by its ID instead.
     pub symbol: String,
+    /// Connect market ID, such as a `symbol_id` from a market-data stream.
+    /// With an empty `symbol` it names the market; with both set they must
+    /// name the same market. The ID must be in the hydrated catalog.
+    pub symbol_id: Option<u32>,
     pub side: CreateSide,
     pub order_type: CreateOrderType,
     /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
@@ -1120,6 +1146,7 @@ impl PreviewOrderParams {
     pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
         Self {
             symbol: symbol.into(),
+            symbol_id: None,
             side,
             order_type,
             quantity: None,
@@ -1136,6 +1163,14 @@ impl PreviewOrderParams {
             attached_risk: None,
             expire_at: None,
         }
+    }
+
+    /// [`Self::new`] for the market with Connect ID `symbol_id`, the symbol
+    /// left empty.
+    pub fn for_symbol_id(symbol_id: u32, side: CreateSide, order_type: CreateOrderType) -> Self {
+        let mut params = Self::new(String::new(), side, order_type);
+        params.symbol_id = Some(symbol_id);
+        params
     }
 }
 

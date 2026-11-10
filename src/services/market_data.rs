@@ -984,9 +984,10 @@ impl OrderbookService {
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
-        let handle_delta = {
+        // Applies one delta to the book without emitting a view; on a sequence
+        // gap it requests a refresh and returns false.
+        let apply_one = {
             let state = state.clone();
-            let emit = emit.clone();
             let stream_slot = stream_slot.clone();
             Arc::new(move |delta: OrderBookDeltaUpdate| {
                 let needs_refresh = {
@@ -1007,8 +1008,19 @@ impl OrderbookService {
                     }
                     return false;
                 }
-                emit();
                 true
+            }) as Arc<dyn Fn(OrderBookDeltaUpdate) -> bool + Send + Sync>
+        };
+        // A live delta is one book state: one view.
+        let handle_delta = {
+            let apply_one = apply_one.clone();
+            let emit = emit.clone();
+            Arc::new(move |delta: OrderBookDeltaUpdate| {
+                let applied = apply_one(delta);
+                if applied {
+                    emit();
+                }
+                applied
             }) as Arc<dyn Fn(OrderBookDeltaUpdate) -> bool + Send + Sync>
         };
 
@@ -1052,6 +1064,7 @@ impl OrderbookService {
             }) as Arc<dyn Fn(bool) + Send + Sync>
         };
 
+        let publications = crate::orderbook::PublicationClock::new();
         let svc = self.clone();
         let fetch_symbol = symbol.clone();
         let stream = SnapshotThenStream::new(SnapshotThenStreamConfig {
@@ -1065,10 +1078,16 @@ impl OrderbookService {
                 // view, and a level promoted into a trimmed view must already be known.
                 Box::pin(async move { svc.get(&symbol, Some(stream_depth)).await })
             }),
-            read_publication: Arc::new(|delta: OrderBookDeltaUpdate| vec![delta]),
+            read_publication: {
+                let publications = publications.clone();
+                Arc::new(move |delta: OrderBookDeltaUpdate| {
+                    publications.note();
+                    vec![delta]
+                })
+            },
             apply_snapshot: {
                 let state = state.clone();
-                let handle_delta = handle_delta.clone();
+                let apply_one = apply_one.clone();
                 let emit = emit.clone();
                 let stream_slot = stream_slot.clone();
                 let last_error = last_error.clone();
@@ -1100,9 +1119,12 @@ impl OrderbookService {
                             s.available = snapshot.available;
                             !snapshot.available && s.last_view_unavailable && buffered.is_empty()
                         };
+                        // The snapshot and the deltas buffered behind it are one
+                        // book state, so they yield one view: a view per delta
+                        // would queue stale copies of it.
                         let mut applied_all = true;
                         for delta in buffered {
-                            if !handle_delta(delta) {
+                            if !apply_one(delta) {
                                 applied_all = false;
                                 break;
                             }
@@ -1139,7 +1161,8 @@ impl OrderbookService {
             emit,
             last_error,
             tx_slot,
-        );
+        )
+        .with_publication_clock(publications);
         if let Err(err) = stream.start().await {
             subscription.close();
             return Err(err);

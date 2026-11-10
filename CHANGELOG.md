@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A managed order book adds one view when it applies a snapshot together with the deltas buffered behind it. It added one view per buffered delta and then the same book again, so a stale copy stayed queued: after `set_bucket`, the next view read could be the copy at the previous bucket (the intermittent `bid bucket price: actual 0, expected 71000000` of the hardening suite). Affected: `OrderbookService::create_subscription` and `orderbook::Subscription::updates`. Migration: read one view per snapshot, at the last buffered sequence; read `book_seq` instead of counting views.
+- Added `orderbook::Subscription::since_last_publication`, the time since the managed book's stream last delivered a publication, or since it started. The server republishes each book's whole view about every 30 s even when nothing changes, so an age far above that means the stream stalled while the socket stayed open, not that the market is quiet. The SDK sets no threshold; poll it and refresh or resubscribe on a stall.
+- **Breaking:** `CreateOrderParams` and `PreviewOrderParams` gain `symbol_id` and a `for_symbol_id` constructor, so `OrdersService::create`, `OrdersService::preview` and `OrdersService::batch_create` accept an order that names its market by Connect ID, as the Go and Python SDKs do. With an empty `symbol` the ID names the market; with both set they must name the same market. The ID must be in the hydrated catalog, and an unknown or zero ID or a contradicting symbol is `Error::Validation` before sending. An order with an empty `symbol` was refused ("symbol must be non-empty"); it is now accepted when `symbol_id` is set. Both structs are `#[non_exhaustive]`, so code outside the crate keeps compiling. Migration: none needed for orders that name a symbol, since `symbol_id` defaults to `None`; to order by market ID, use `CreateOrderParams::for_symbol_id` or set `symbol_id`.
+- The trailing distance in ticks is documented as what it is: a price delta in 1e-9 quote-unit ticks, the scale of every price tick, sent as given. On BTC-USDT, 50 USDT is `50_000_000_000` ticks and 0.5 USDT is `500_000_000` (`Price::from_decimal_str("0.5", None)?.as_ticks()`). It is not a count of the pair's tick size. Affected docs: `TrailingDistance::Ticks`, `CreateTriggerParams::trailing_distance_ticks`, `ModifyTriggerParams::trailing_distance_ticks`, `TriggerTrailingDetails::trailing_distance` and the README's trigger section.
+- The live social-verification start test runs only with `POLYESTER_TEST_MUTATION=1`, and a hardening test keeps every live test that writes behind a write gate.
+
 ## 0.16.0
 
 Package version: `0.16.0`. Git tag: `v0.16.0`. Released 2026-11-10. Built on public contract `c8d9827`.
