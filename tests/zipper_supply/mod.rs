@@ -16,7 +16,6 @@ use tokio::net::{TcpListener, TcpStream};
 
 const SPOT_CONFIG: &str = "/marketdata.v1.MarketDataService/GetSpotConfig";
 const ZIPPER_CONFIG: &str = "/chain.zipper.v1.ZipperService/GetDepositWithdrawConfig";
-const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
 /// zipped_asset_id, supply_q and the decimal supply the SDK must report.
 const SCALE_0: [(u32, u64, &str); 2] = [(11, 3_582_802, "3582802"), (12, 0, "0")];
@@ -152,7 +151,8 @@ async fn deposit_withdraw_config_keeps_variant_supply() {
             api_url,
             ws_url: format!("ws://{}/connection/websocket", refused.addr()),
             api_key_id: Some("ak_test".into()),
-            api_private_key: Some(TEST_KEY.into()),
+            // A disposable key generated for this test.
+            api_private_key: Some(polyester::auth::generate_ed25519_keypair().0),
             wire_format,
             timeout: Duration::from_secs(5),
             hydrate_catalogs: true,
