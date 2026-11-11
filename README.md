@@ -591,7 +591,12 @@ Stop-loss and take-profit triggers with a market child accept a slippage cap,
 fewer than 10000 bps). Without one, the pair's default market slippage
 applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
 reads expose the cap as `Trigger.max_slippage`. A TWAP market child takes the
-same cap; `max_slippage_ticks` is positive wherever a create sends it. No
+same cap, applied to each slice; `max_slippage_ticks` is positive wherever a
+create sends it. `Trigger.max_slippage` reports the cap of a stop-loss or
+take-profit market child, of a trailing stop and of a market TWAP's slices in
+the variant it was set in (`MaxSlippage::Ticks` or `MaxSlippage::Bps`), and
+`None` when none is set: the pair's default then applies. A trailing stop's
+cap also stays in its `TriggerDetails::Trailing` details. No
 trigger child has a GTD execution, so `CreateTimeInForce::Gtd` fails locally
 with `Error::Validation` for every trigger type. A market child (stop-loss,
 take-profit or TWAP) and a trailing stop always execute IOC: leave
@@ -929,7 +934,11 @@ first `-`) rather than parsing it.
 ## Triggers
 
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
-status. Valid values:
+status. `trigger_type: Some(CreateTriggerType::Ladder)` lists only one trigger
+type, and `parent_order_id: Some(order_id)` only the triggers attached to that
+order (base58 or decimal, as order reads spell it; an ID that does not parse
+or names order 0 fails locally with `Error::Validation`). Leave the other
+fields with `..Default::default()`. Valid status values:
 
 `created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
@@ -970,9 +979,17 @@ price is fixed at create: cancel the trigger and create a new one to change
 it. Send an explicit zero
 (`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
 or maximum-slippage cap. A trailing stop's `max_slippage_bps` (standalone or
-attached, buy or sell) and a modify's take 1–9999; modify still accepts `0`
-to clear. A buy market child and a buy TWAP slice take up to 10000; a sell
-market child and a sell TWAP slice take up to 9999.
+attached, buy or sell) takes 1–9999 at create. A buy market child and a buy
+TWAP slice take up to 10000; a sell market child and a sell TWAP slice take up
+to 9999. A modify takes `max_slippage_bps` from 0 (clear) to 10000, as the
+API does: a buy stop-loss or take-profit market child can be changed to 10000,
+and the server refuses 10000 for a sell one or a trailing stop
+(`ERROR_CODE_MAX_SLIPPAGE_INVALID`). Above 10000 fails locally.
+
+A ladder places limit GTC orders only: create it with
+`CreateOrderType::Limit`. `CreateOrderType::Market` on a ladder fails locally
+with `Error::Validation` before anything is sent, instead of placing resting
+limit orders.
 Standalone and attached `trailing_distance_bps` require 1–10000. A buy
 trailing stop's `limit_price` must be at least its `activation_price`.
 
@@ -1197,6 +1214,14 @@ for bal in view.balances.map(|list| list.balances).unwrap_or_default() {
     println!("{} available={}", bal.asset_id, bal.available);
 }
 ```
+
+Each `sub_accounts.subscribe` update carries the caller's `role` on the
+sub-account (`Some("VIEWER")`, `Some("TRADER")`, ..., as member roles read)
+and `removed`. `removed: true` means the caller lost access, for example after
+the owner removed it as a member: drop the sub-account from your list. A
+removal carries no role, so `role` is `None`; no role is assumed. A role or
+access change keeps `revision` and `updated_at`, so apply each update in the
+order it arrives rather than by revision.
 
 ## Errors, retries, and withdrawal identity
 

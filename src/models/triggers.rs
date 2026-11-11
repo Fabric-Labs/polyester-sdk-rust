@@ -130,8 +130,11 @@ pub struct ModifyTriggerParams {
     pub trailing_distance_ticks: Option<i64>,
     pub trailing_distance_bps: Option<i32>,
     /// Slippage cap of a trailing stop, or of a stop-loss or take-profit with
-    /// a market child, at most 9999 bps. Zero clears the cap; a cleared cap
-    /// on a market child falls back to the pair's default market slippage.
+    /// a market child. `max_slippage_bps` is 1 to 10000 here: a buy
+    /// stop-loss or take-profit market child takes up to 10000, as at
+    /// creation, and the server refuses 10000 for a trailing stop and a sell
+    /// one (`MAX_SLIPPAGE_INVALID`). Zero clears the cap; a cleared cap on a
+    /// market child falls back to the pair's default market slippage.
     pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
 }
@@ -172,6 +175,15 @@ pub struct ListTriggersOpts {
     pub limit: Option<u32>,
     pub page_token: Option<String>,
     pub subaccount_id: Option<u64>,
+    /// Only triggers of this type (the contract's `trigger_type` filter).
+    /// `None` lists every type.
+    pub trigger_type: Option<CreateTriggerType>,
+    /// Only the triggers attached to this order (the contract's
+    /// `parent_order_id` filter), as order reads and
+    /// [`Trigger::parent_order_id`] spell it, in base58 or decimal. An ID
+    /// that does not parse, or names order 0, is refused before sending.
+    /// `None` lists standalone and attached triggers alike.
+    pub parent_order_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -248,9 +260,10 @@ pub struct Trigger {
     pub post_only: bool,
     /// Convenience: stop-trigger price when details are `Stop`.
     pub trigger_price: Option<Price>,
-    /// Slippage cap configured on a stop-loss or take-profit market child or
-    /// on a trailing stop; `None` when none is set (a market child then uses
-    /// the pair's default market slippage).
+    /// Slippage cap configured on a stop-loss or take-profit market child,
+    /// on a trailing stop, or on each slice of a market TWAP, in the variant
+    /// it was set in (ticks or bps); `None` when none is set (a market child
+    /// or TWAP slice then uses the pair's default market slippage).
     pub max_slippage: Option<super::MaxSlippage>,
     pub client_trigger_id: String,
     pub created_at: Option<Timestamp>,
