@@ -973,9 +973,19 @@ impl TriggersService {
     ) -> Result<crate::realtime::TypedSubscription<Trigger>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:spot:triggers:{account}:proto");
+        // Each trigger takes its pair's base quantity scale from the catalogs
+        // loaded when it arrives, as `get` and `list` do.
+        let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::trigger_from_bytes)
+            .subscribe_proto(&channel, move |bytes: &[u8]| {
+                let mut trigger = crate::codecs::decode::trigger_from_bytes(bytes)?;
+                attach_trigger_scale(
+                    &mut trigger,
+                    catalogs.base_quantity_scale_for_symbol_id(trigger.symbol_id),
+                );
+                Ok(trigger)
+            })
             .await
     }
 

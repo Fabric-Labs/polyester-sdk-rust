@@ -3,7 +3,8 @@
 //! format without the caller passing the scale. Without catalogs a read
 //! decodes as before: quantities without a scale.
 
-use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
+use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer, connect_proto_ok};
+use buffa::Message as _;
 use polyester::models::{ListTriggersOpts, Order, OrderKey, TriggerDetails, UserTrade};
 use polyester::proto::orders::v1::{
     GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse,
@@ -262,4 +263,122 @@ async fn reads_without_catalogs_still_decode_without_a_scale() {
         scaled.is_empty(),
         "scale invented without catalogs: {scaled:#?}"
     );
+}
+
+/// Catalogs listing BTC-USDT (scale 5) and a pair whose base quantity scale
+/// is zero; symbol 99 is listed by neither.
+fn hydrate_stream_catalogs(client: &Client) {
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [
+                {"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 5, "quote_quantity_scale": 6},
+                {"symbol": "ZERO-USDT", "symbol_id": 2, "base_quantity_scale": 0, "quote_quantity_scale": 0}
+            ]
+        }))
+        .expect("catalog");
+}
+
+async fn stream_client(
+    publications: Vec<Vec<u8>>,
+    catalogs: bool,
+) -> (
+    Client,
+    MockHttpServer,
+    MockWsServer,
+) {
+    let ws = MockWsServer::spawn_centrifugo_publications_after_handshake(
+        std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        publications,
+    )
+    .await;
+    let (client, http) = super::streaming_client(&ws).await;
+    if catalogs {
+        hydrate_stream_catalogs(&client);
+    }
+    (client, http, ws)
+}
+
+/// `trades.subscribe` gives each fill its pair's base quantity scale from the
+/// loaded catalogs, as `trades.list` does: a zero scale is kept and a pair
+/// the catalogs don't list stays unscaled. Without catalogs nothing is scaled.
+#[tokio::test]
+async fn trade_stream_carries_the_catalog_base_scale() {
+    use polyester::proto::orders::v1::UserTradeBatch;
+    let batch = UserTradeBatch {
+        events: [(1, 10), (2, 11), (99, 12)]
+            .into_iter()
+            .map(|(symbol_id, match_id)| ProtoUserTrade {
+                symbol_id,
+                match_id,
+                qty_scaled: 5_000,
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    };
+    for (catalogs, want) in [
+        (true, [Some(5), Some(0), None]),
+        (false, [None, None, None]),
+    ] {
+        let (client, _http, _ws) = stream_client(vec![batch.encode_to_vec()], catalogs).await;
+        let mut sub = client.trades.subscribe(Some("acct")).await.expect("subscribe");
+        let got: Vec<_> = super::recv_n(&mut sub, 3)
+            .await
+            .into_iter()
+            .map(|t| (t.match_id, t.qty.as_ref().and_then(Quantity::scale)))
+            .collect();
+        let expected: Vec<_> = ["10", "11", "12"]
+            .into_iter()
+            .map(str::to_owned)
+            .zip(want)
+            .collect();
+        assert_eq!(got, expected, "catalogs loaded: {catalogs}");
+        sub.close();
+    }
+}
+
+/// `triggers.subscribe` gives a trigger's `qty` and its TWAP or ladder
+/// `executed_qty` the pair's base quantity scale, as `triggers.get` does.
+#[tokio::test]
+async fn trigger_stream_carries_the_catalog_base_scale() {
+    let mut zero = ladder();
+    zero.symbol_id = 2;
+    let mut unknown = twap();
+    unknown.symbol_id = 99;
+    let publications = vec![
+        twap().encode_to_vec(),
+        zero.encode_to_vec(),
+        unknown.encode_to_vec(),
+    ];
+    for (catalogs, want) in [
+        (true, [Some(5), Some(0), None]),
+        (false, [None, None, None]),
+    ] {
+        let (client, _http, _ws) = stream_client(publications.clone(), catalogs).await;
+        let mut sub = client.triggers.subscribe(Some("acct")).await.expect("subscribe");
+        let got: Vec<_> = super::recv_n(&mut sub, 3)
+            .await
+            .into_iter()
+            .map(|trigger| {
+                let executed = match trigger.details.as_ref() {
+                    Some(TriggerDetails::Twap(twap)) => twap.executed_qty.as_ref(),
+                    Some(TriggerDetails::Ladder(ladder)) => ladder.executed_qty.as_ref(),
+                    other => panic!("unexpected details {other:?}"),
+                };
+                (
+                    trigger.symbol_id,
+                    trigger.qty.as_ref().and_then(Quantity::scale),
+                    executed.and_then(Quantity::scale),
+                )
+            })
+            .collect();
+        let expected: Vec<_> = [1, 2, 99]
+            .into_iter()
+            .zip(want)
+            .map(|(symbol_id, scale)| (symbol_id, scale, scale))
+            .collect();
+        assert_eq!(got, expected, "catalogs loaded: {catalogs}");
+        sub.close();
+    }
 }

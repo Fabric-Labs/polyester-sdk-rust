@@ -1791,9 +1791,19 @@ impl TradesService {
     ) -> Result<crate::realtime::TypedSubscription<UserTrade>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:spot:trades:{account}:proto");
+        // Each fill takes its pair's base quantity scale from the catalogs
+        // loaded when it arrives, as `list` does; a member that failed to
+        // decode stays an error in its slot.
+        let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
-            .subscribe_proto_batch(&channel, crate::codecs::decode::user_trade_batch_from_bytes)
+            .subscribe_proto_batch(&channel, move |bytes: &[u8]| {
+                let mut trades = crate::codecs::decode::user_trade_batch_from_bytes(bytes)?;
+                for trade in trades.iter_mut().flatten() {
+                    scale_trade(&catalogs, trade);
+                }
+                Ok(trades)
+            })
             .await
     }
 }
