@@ -980,10 +980,8 @@ impl TriggersService {
             .realtime
             .subscribe_proto(&channel, move |bytes: &[u8]| {
                 let mut trigger = crate::codecs::decode::trigger_from_bytes(bytes)?;
-                attach_trigger_scale(
-                    &mut trigger,
-                    catalogs.base_quantity_scale_for_symbol_id(trigger.symbol_id),
-                );
+                let scale = catalogs.base_quantity_scale_for_symbol_id(trigger.symbol_id);
+                attach_trigger_scale(&mut trigger, scale);
                 Ok(trigger)
             })
             .await

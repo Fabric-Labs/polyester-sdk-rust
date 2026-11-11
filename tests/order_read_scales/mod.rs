@@ -282,11 +282,7 @@ fn hydrate_stream_catalogs(client: &Client) {
 async fn stream_client(
     publications: Vec<Vec<u8>>,
     catalogs: bool,
-) -> (
-    Client,
-    MockHttpServer,
-    MockWsServer,
-) {
+) -> (Client, MockHttpServer, MockWsServer) {
     let ws = MockWsServer::spawn_centrifugo_publications_after_handshake(
         std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         publications,
@@ -322,7 +318,11 @@ async fn trade_stream_carries_the_catalog_base_scale() {
         (false, [None, None, None]),
     ] {
         let (client, _http, _ws) = stream_client(vec![batch.encode_to_vec()], catalogs).await;
-        let mut sub = client.trades.subscribe(Some("acct")).await.expect("subscribe");
+        let mut sub = client
+            .trades
+            .subscribe(Some("acct"))
+            .await
+            .expect("subscribe");
         let got: Vec<_> = super::recv_n(&mut sub, 3)
             .await
             .into_iter()
@@ -356,7 +356,11 @@ async fn trigger_stream_carries_the_catalog_base_scale() {
         (false, [None, None, None]),
     ] {
         let (client, _http, _ws) = stream_client(publications.clone(), catalogs).await;
-        let mut sub = client.triggers.subscribe(Some("acct")).await.expect("subscribe");
+        let mut sub = client
+            .triggers
+            .subscribe(Some("acct"))
+            .await
+            .expect("subscribe");
         let got: Vec<_> = super::recv_n(&mut sub, 3)
             .await
             .into_iter()
@@ -380,5 +384,100 @@ async fn trigger_stream_carries_the_catalog_base_scale() {
             .collect();
         assert_eq!(got, expected, "catalogs loaded: {catalogs}");
         sub.close();
+    }
+}
+
+/// Order, trade and trigger reads take their scale from the spot config
+/// alone: they are scaled while the funding (deposit/withdraw) config is
+/// still loading or after it failed, and never wait for it.
+#[tokio::test]
+async fn reads_scale_from_the_spot_config_without_the_funding_config() {
+    use polyester::proto::marketdata::v1::{GetSpotConfigResponse, PairConfig};
+    for pending in [true, false] {
+        let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
+            "/marketdata.v1.MarketDataService/GetSpotConfig" => {
+                connect_proto_ok(&GetSpotConfigResponse {
+                    pairs: vec![PairConfig {
+                        symbol_id: 1,
+                        symbol: "BTC-USDT".into(),
+                        base_asset: "BTC".into(),
+                        quote_asset: "USDT".into(),
+                        base_quantity_scale: 5,
+                        quote_quantity_scale: 6,
+                        reference_price_scale: 9,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                })
+            }
+            "/chain.zipper.v1.ZipperService/GetDepositWithdrawConfig" if pending => {
+                HttpScript::NeverRespond {
+                    stall: std::time::Duration::from_secs(60),
+                }
+            }
+            "/chain.zipper.v1.ZipperService/GetDepositWithdrawConfig" => HttpScript::Json {
+                status: 500,
+                body: br#"{"code":"internal","message":"funding down"}"#.to_vec(),
+            },
+            "/orders.v1.OrdersReadService/GetOrder" => connect_proto_ok(&GetOrderResponse {
+                order: proto_order().into(),
+                trades: vec![proto_trade()],
+                ..Default::default()
+            }),
+            "/orders.v1.OrdersReadService/GetOpenOrders" => {
+                connect_proto_ok(&GetOpenOrdersResponse {
+                    orders: vec![proto_order()],
+                    ..Default::default()
+                })
+            }
+            "/orders.v1.OrdersReadService/GetOrderHistory" => {
+                connect_proto_ok(&GetOrderHistoryResponse {
+                    orders: vec![proto_order()],
+                    ..Default::default()
+                })
+            }
+            "/orders.v1.OrdersReadService/GetUserTrades" => {
+                connect_proto_ok(&GetUserTradesResponse {
+                    trades: vec![proto_trade()],
+                    ..Default::default()
+                })
+            }
+            "/triggers.v1.TriggersService/GetTrigger" => connect_proto_ok(&GetTriggerResponse {
+                trigger: twap().into(),
+                ..Default::default()
+            }),
+            "/triggers.v1.TriggersService/ListTriggers" => {
+                connect_proto_ok(&ListTriggersResponse {
+                    triggers: vec![twap(), ladder()],
+                    ..Default::default()
+                })
+            }
+            _ => HttpScript::NotFound,
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            api_key_id: Some("ak_test".into()),
+            api_private_key: Some(TEST_KEY.into()),
+            hydrate_catalogs: true,
+            catalog_timeout: Some(std::time::Duration::from_secs(if pending { 60 } else { 5 })),
+            ..Default::default()
+        })
+        .expect("client");
+        if !pending {
+            client
+                .wait_for_funding_catalog()
+                .await
+                .expect_err("the funding config fails");
+        }
+        // Started right after the client: each read settles the spot config only.
+        let seen = tokio::time::timeout(std::time::Duration::from_secs(10), read_all(&client))
+            .await
+            .unwrap_or_else(|_| panic!("reads waited for the funding config (pending: {pending})"));
+        let unscaled: Vec<_> = seen.iter().filter(|(_, scale)| *scale != Some(5)).collect();
+        assert!(
+            unscaled.is_empty(),
+            "funding pending: {pending}; read without the spot scale: {unscaled:#?}"
+        );
     }
 }

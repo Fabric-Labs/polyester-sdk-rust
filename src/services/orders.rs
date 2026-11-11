@@ -188,7 +188,11 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(scale_orders(&self.ctx, orders_list_from_open(&resp)?))
+        let list = orders_list_from_open(&resp)?;
+        // Scaled from the spot config: a load in progress is awaited, and a
+        // failed one leaves the quantities unscaled.
+        self.ctx.settle_catalogs().await;
+        Ok(scale_orders(&self.ctx, list))
     }
 
     pub async fn list_history(
@@ -265,7 +269,9 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        Ok(scale_orders(&self.ctx, orders_list_from_history(&resp)?))
+        let list = orders_list_from_history(&resp)?;
+        self.ctx.settle_catalogs().await;
+        Ok(scale_orders(&self.ctx, list))
     }
 
     pub async fn get(&self, key: OrderKey, subaccount_id: Option<u64>) -> Result<GetOrderResult> {
@@ -314,6 +320,7 @@ impl OrdersService {
         .await?
         .into_owned();
         let mut result = get_order_from_proto(&resp)?;
+        self.ctx.settle_catalogs().await;
         if let Some(order) = result.order.as_mut() {
             scale_order(&self.ctx.catalogs, order);
         }
@@ -1774,6 +1781,7 @@ impl TradesService {
         .await?
         .into_owned();
         let mut list = user_trades_list_from_proto(&resp)?;
+        self.ctx.settle_catalogs().await;
         for trade in &mut list.trades {
             scale_trade(&self.ctx.catalogs, trade);
         }
