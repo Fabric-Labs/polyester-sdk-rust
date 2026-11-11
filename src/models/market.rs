@@ -52,6 +52,31 @@ pub struct SpotConfig {
     /// all pairs; 0 when unpublished. An account may have a lower limit of
     /// its own.
     pub max_open_orders_total: u32,
+    /// Every asset of the spot config, in catalog order.
+    pub assets: Vec<SpotAsset>,
+}
+
+/// One asset of the spot config.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SpotAsset {
+    /// Asset code, such as `"BTC"`.
+    pub asset: String,
+    /// Numeric asset ID used by balance and order APIs.
+    pub ledger_id: u32,
+    /// Display name, such as `"Bitcoin"`.
+    pub name: String,
+    /// Suggested decimal places for showing amounts of the asset.
+    pub quantity_display_decimals: u32,
+    /// Scale of the asset's order quantities.
+    pub quantity_scale: u32,
+    /// Scale of public candle and market-overview base volume.
+    pub market_data_volume_scale: u32,
+    /// Whether the asset counts in the account's total equity. `None` means
+    /// unknown (a server that predates the field), never `false`: value only
+    /// assets where it is `Some(true)`, list `Some(false)` assets by amount
+    /// without a value, and show no value for an unknown one. An asset outside
+    /// equity can still have a market and an index price.
+    pub included_in_equity: Option<bool>,
 }
 
 /// Per-order and open-order limits of one spot pair.

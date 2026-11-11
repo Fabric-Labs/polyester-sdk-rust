@@ -137,6 +137,8 @@ impl DepositService {
         Self { ctx }
     }
 
+    /// List the account's deposit addresses. An API key needs
+    /// `READ_DEPOSIT_ADDRESSES` on its API-key policy.
     pub async fn list_addresses(&self) -> Result<DepositAddressesList> {
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),
@@ -155,7 +157,8 @@ impl DepositService {
     }
 
     /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// The configured default subaccount is not applied. An API key needs
+    /// `CREATE_DEPOSIT_ADDRESS` on its API-key policy.
     pub async fn create_address(&self, req: CreateDepositAddressRequest) -> Result<DepositAddress> {
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),

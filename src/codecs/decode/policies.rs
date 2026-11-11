@@ -170,6 +170,65 @@ mod tests {
         assert_eq!(result.policies[0].spot_markets[0].symbol, "");
     }
 
+    /// The account permissions that open deposit-address, sub-account and
+    /// Guard Signer calls to API keys read by name and keep their numbers;
+    /// `CREATE_DEPOSIT_ADDRESS` sits among the product actions' numbers, so
+    /// account permissions are told apart by name, not by number range.
+    #[test]
+    fn account_permissions_for_deposit_subaccount_and_guard_signer_reads() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let added = [
+            (
+                PolicyAction::CREATE_DEPOSIT_ADDRESS,
+                "CREATE_DEPOSIT_ADDRESS",
+                10,
+            ),
+            (
+                PolicyAction::READ_DEPOSIT_ADDRESSES,
+                "READ_DEPOSIT_ADDRESSES",
+                0,
+            ),
+            (PolicyAction::READ_SUBACCOUNTS, "READ_SUBACCOUNTS", 0),
+            (
+                PolicyAction::READ_SUBACCOUNT_ACTIVITY,
+                "READ_SUBACCOUNT_ACTIVITY",
+                0,
+            ),
+            (
+                PolicyAction::READ_SUBACCOUNT_MEMBERS,
+                "READ_SUBACCOUNT_MEMBERS",
+                0,
+            ),
+            (
+                PolicyAction::READ_SUBACCOUNT_INVITES,
+                "READ_SUBACCOUNT_INVITES",
+                0,
+            ),
+            (
+                PolicyAction::READ_GUARD_SIGNER_STATUS,
+                "READ_GUARD_SIGNER_STATUS",
+                0,
+            ),
+        ];
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: added
+                .iter()
+                .map(|(action, _, _)| (*action).into())
+                .collect(),
+            ..Default::default()
+        });
+        let names: Vec<&str> = added.iter().map(|(_, name, _)| *name).collect();
+        assert_eq!(api.actions, names);
+        for (action, name, number) in added {
+            assert_eq!(PolicyAction::from_proto_name(name), Some(action));
+            if number != 0 {
+                assert_eq!(action.to_i32(), number, "{name}");
+            }
+        }
+    }
+
     /// Every `PolicyAction`, the POLY-9102 account permissions included,
     /// reads as its proto name and parses back to the same value. Unset
     /// entries are skipped and a value newer than this SDK keeps its number.

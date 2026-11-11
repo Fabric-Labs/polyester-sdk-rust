@@ -7,7 +7,7 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, SpotConfig,
+    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, SpotAsset, SpotConfig,
     TradeEpochEnd,
 };
 use crate::proto::marketdata::v1::{
@@ -61,10 +61,24 @@ pub fn spot_config_from_proto(msg: &GetSpotConfigResponse) -> Result<SpotConfig>
         .iter()
         .map(pair_order_limits_from_proto)
         .collect::<Result<Vec<_>>>()?;
+    let assets = msg
+        .assets
+        .iter()
+        .map(|asset| SpotAsset {
+            asset: asset.asset.clone(),
+            ledger_id: asset.ledger_id,
+            name: asset.name.clone(),
+            quantity_display_decimals: asset.quantity_display_decimals,
+            quantity_scale: asset.quantity_scale,
+            market_data_volume_scale: asset.market_data_volume_scale,
+            included_in_equity: asset.included_in_equity,
+        })
+        .collect();
     Ok(SpotConfig {
         raw,
         pair_order_limits,
         max_open_orders_total: msg.max_open_orders_total,
+        assets,
     })
 }
 
@@ -436,6 +450,68 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// Each asset says whether it counts in total equity, keeping presence:
+    /// an absent value is unknown, never false. `false` reads back as false,
+    /// also in the raw JSON.
+    #[test]
+    fn spot_config_assets_keep_included_in_equity_presence() {
+        use crate::models::SpotAsset;
+        use crate::proto::marketdata::v1::AssetConfig;
+        let asset = |code: &str, ledger_id: u32, included: Option<bool>| AssetConfig {
+            asset: code.into(),
+            ledger_id,
+            name: format!("{code} name"),
+            quantity_display_decimals: 4,
+            quantity_scale: 8,
+            market_data_volume_scale: 0,
+            included_in_equity: included,
+            ..Default::default()
+        };
+        let msg = GetSpotConfigResponse {
+            assets: vec![
+                asset("BTC", 3, Some(true)),
+                asset("PTS", 9, Some(false)),
+                asset("OLD", 11, None),
+            ],
+            ..Default::default()
+        };
+        let spot = spot_config_from_proto(&msg).expect("decode");
+        assert_eq!(
+            spot.assets,
+            vec![
+                SpotAsset {
+                    asset: "BTC".into(),
+                    ledger_id: 3,
+                    name: "BTC name".into(),
+                    quantity_display_decimals: 4,
+                    quantity_scale: 8,
+                    market_data_volume_scale: 0,
+                    included_in_equity: Some(true),
+                },
+                SpotAsset {
+                    asset: "PTS".into(),
+                    ledger_id: 9,
+                    name: "PTS name".into(),
+                    quantity_display_decimals: 4,
+                    quantity_scale: 8,
+                    market_data_volume_scale: 0,
+                    included_in_equity: Some(false),
+                },
+                SpotAsset {
+                    asset: "OLD".into(),
+                    ledger_id: 11,
+                    name: "OLD name".into(),
+                    quantity_display_decimals: 4,
+                    quantity_scale: 8,
+                    market_data_volume_scale: 0,
+                    included_in_equity: None,
+                },
+            ]
+        );
+        assert_eq!(spot.raw["assets"][1]["includedInEquity"], false);
+        assert!(spot.raw["assets"][2].get("includedInEquity").is_none());
     }
 
     #[test]

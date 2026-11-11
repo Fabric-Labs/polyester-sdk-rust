@@ -36,3 +36,25 @@ pub fn prefer_rate_limit_retry_after(
         .and_then(RateLimitDetail::retry_after_seconds)
         .or(fallback)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proto::polyester::ratelimit::v1::PolicyClass;
+
+    /// The assistant's rate-limit classes read by their contract names.
+    #[test]
+    fn assistant_policy_classes_read_by_name() {
+        for (class, name) in [
+            (PolicyClass::ASSISTANT_CONTROL, "ASSISTANT_CONTROL"),
+            (PolicyClass::ASSISTANT_MESSAGE, "ASSISTANT_MESSAGE"),
+            (PolicyClass::ASSISTANT_READ, "ASSISTANT_READ"),
+        ] {
+            let detail = rate_limit_detail_from_proto(&ProtoRateLimitDetail {
+                policy_class: class.into(),
+                ..Default::default()
+            });
+            assert_eq!(detail.policy_class, name);
+        }
+    }
+}

@@ -76,13 +76,28 @@ still applies. Each account read an API key makes needs its own permission on
 the key's API-key policy: `READ_API_KEYS` for `api_keys.list` and
 `api_keys.get`, `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_SOCIAL_VERIFICATION` for `social_verification.get` (link status only),
-and `READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`. VIP status
-and social verification need a key scoped to the main account. A key without
-the permission is refused with `permission_denied` and
+`READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`,
+`READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
+for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
+`sub_accounts.get`, `READ_SUBACCOUNT_ACTIVITY` for
+`sub_accounts.list_activity`, `READ_SUBACCOUNT_MEMBERS` for
+`sub_accounts.list_members` (and the members of `sub_accounts.get`),
+`READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
+`sub_accounts.get`, which leaves out an expansion the key may not read rather
+than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
+`READ_BALANCES` for `withdraw.get_wallet_balances`. A key scoped to the main
+account also needs `READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) for the main
+account's address-book reads, as a sub-account's book already did. VIP status
+and social verification need a key scoped to the main account. A key scoped to
+a sub-account reaches only that sub-account, and `guard_signer.get_status`
+refuses a key for a sub-account another main account owns, even a shared one.
+A key without the permission is refused with `permission_denied` and
 `AUTH_API_KEY_ACCESS_DENIED` (the withdraw service answers
-`ERROR_CODE_PERMISSION_DENIED`), and the message names the missing
-permission. Starting a social verification stays session-only, and its routes
-may not be mounted.
+`ERROR_CODE_PERMISSION_DENIED`; the address book `AUTH_SUBACCOUNT_ACCESS_DENIED`),
+and the message names the missing permission. A client that rewrites a
+policy's whole action list must keep the permissions it read back. Starting,
+confirming and unlinking a social verification (Telegram included) stay
+session-only.
 Private streams require an Account ID and the corresponding API-key permission.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The connection and subscription tokens are renewed on the
@@ -964,7 +979,10 @@ malformed sub-account ID is refused with the ledger code
 
 To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
 and the dead-man switch cancel open orders, never triggers: an unfired stop
-stays armed, a TWAP keeps running. `stop_all_trading` pages through the live
+stays armed, a TWAP keeps running. An attached stop-loss, take-profit or
+trailing leg whose working exit order a cancel-all cancels ends, and with
+`oco` so do its siblings, so the position loses that protection.
+`stop_all_trading` pages through the live
 triggers (`created`, `armed`, `running`, `paused`), cancels each, then cancels
 all open orders, so an order a trigger places before its cancel is still
 canceled. Triggers it could not cancel are listed in `trigger_failures`.

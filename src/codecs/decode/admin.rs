@@ -19,6 +19,11 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
         last_used_at: msg.last_used_at.as_option().cloned(),
         updated_at: msg.updated_at.as_option().cloned(),
         revision: msg.revision,
+        purpose: if msg.purpose.to_i32() == 0 {
+            String::new()
+        } else {
+            enum_proto_name(&msg.purpose)
+        },
     }
 }
 
@@ -68,6 +73,26 @@ mod tests {
     use super::*;
     use crate::proto::auth::v1::ApiKeyStatus;
     use buffa_types::google::protobuf::Timestamp;
+
+    /// A key reads its purpose: `"STANDARD"` for the user's own keys and
+    /// `"ASSISTANT"` for the assistant's; empty when the server names none,
+    /// and `"UNKNOWN(n)"` for a purpose newer than this SDK.
+    #[test]
+    fn api_key_reads_its_purpose() {
+        use crate::proto::auth::v1::ApiKeyPurpose;
+        let purpose = |value: buffa::EnumValue<ApiKeyPurpose>| {
+            api_key_from_proto(&ProtoApiKey {
+                key_id: "key-1".into(),
+                purpose: value,
+                ..Default::default()
+            })
+            .purpose
+        };
+        assert_eq!(purpose(ApiKeyPurpose::STANDARD.into()), "STANDARD");
+        assert_eq!(purpose(ApiKeyPurpose::ASSISTANT.into()), "ASSISTANT");
+        assert_eq!(purpose(ApiKeyPurpose::PURPOSE_UNSPECIFIED.into()), "");
+        assert_eq!(purpose(buffa::EnumValue::from(9)), "UNKNOWN(9)");
+    }
 
     #[test]
     fn api_keys_list_maps_status() {
