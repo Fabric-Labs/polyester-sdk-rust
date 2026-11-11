@@ -595,8 +595,9 @@ With the catalogs loaded, order reads (`orders.get`, `list_open`,
 `list_history`, `trades.list`, and `orders.subscribe` orders and fills) and
 trigger reads (`qty`, a TWAP's or ladder's `executed_qty`) give each quantity
 the pair's base quantity scale, so `order.cum_qty.unwrap().format(None)` works
-without passing a scale. Reads do not wait for the catalogs: without them,
-quantities keep no scale and `format` needs one.
+without passing a scale. Reads wait for a spot config load in progress, never
+for the funding config; if that load failed, quantities keep no scale and
+`format` needs one.
 
 Orders carry exact execution totals. `Order::avg_price()` is the exact average
 execution price (from `avg_price_e18`, 18 decimals); `avg_px` stays the same
