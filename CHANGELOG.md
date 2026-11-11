@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.21.0
+
+Package version: `0.21.0`. Git tag: `v0.21.0`. Released 2026-11-12. Built on public contract `a3e3784`.
 
 - **Breaking:** Trigger reads report a market TWAP's per-slice slippage cap in `Trigger::max_slippage`, in the variant it was set in: `Some(MaxSlippage::Bps(50))` for `max_slippage_bps: 50`, `Some(MaxSlippage::Ticks(25_000_000_000))` for ticks, and `None` when no cap was set, in which case each slice uses the pair's default market slippage. The decoder dropped the TWAP's `market_ioc.max_slippage`, so every market TWAP read `None` and a saved cap could not be told from no cap. Stop-loss and take-profit market children and trailing stops read as before. Affected: `triggers.get`, `get_by_id`, `list`, `list_with` and `subscribe`, and `codecs::decode::trigger_from_proto`, `trigger_from_bytes`, `triggers_list_from_proto` and `get_trigger_from_proto`. Migration: code that took a `Some` `max_slippage` to mean a stop-loss, take-profit or trailing stop must check `trigger_type`.
 - A trailing stop's cap reads in `Trigger::max_slippage` from its configuration, as before, and now also from its runtime `TriggerDetails::Trailing` when a trigger carries no configuration; the details keep their own copy. Affected: the trigger reads and decoders named above.
