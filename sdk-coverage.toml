@@ -107,10 +107,6 @@ procedure = "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRule"
 reason = "Auto-withdraw rule changes require an interactive session with a fresh MFA step-up; API keys are not accepted."
 
 [[allowlist]]
-procedure = "/chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule"
-reason = "Auto-withdraw rule changes require an interactive session with a fresh MFA step-up; API keys are not accepted."
-
-[[allowlist]]
 procedure = "/chain.withdraw.v1.AutoWithdrawService/GetAutoWithdrawRule"
 reason = "Auto-withdraw rule reads are not wrapped in the API-key SDK."
 
@@ -129,3 +125,40 @@ reason = "ListMyCheckpoints accepts main-account API keys with READ_CHECKPOINTS 
 [[allowlist]]
 procedure = "/transfer.v1.InternalTransferService/GetInternalTransfer"
 reason = "Internal transfer lookup requires an interactive session; the contract does not accept API keys for it. CreateInternalTransfer returns the flow ID."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRuleEnabled"
+reason = "Pausing and resuming an auto-withdraw rule requires an interactive session (resuming also a fresh MFA step-up); API keys are not accepted."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.AutoWithdrawService/PreviewAutoWithdrawRun"
+reason = "The auto-withdraw run preview accepts API keys with READ_AUTO_WITHDRAW but is not wrapped in this SDK, like the other auto-withdraw reads."
+
+[[allowlist]]
+service = "ai.v1.AssistantService"
+reason = "The Polyester assistant accepts only interactive session tokens; API keys are not accepted. Devnet only."
+
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/SetAssistantKeys"
+reason = "Assistant key setup requires an interactive session with a fresh MFA step-up; API keys are not accepted. Devnet only."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/ListAssistantKeys"
+reason = "Assistant key listing requires an interactive session; API keys are not accepted. Devnet only."
+
+[[allowlist]]
+procedure = "/auth.v1.ApiKeyService/DeleteAssistantKeys"
+reason = "Assistant key revocation requires an interactive session; API keys are not accepted. Devnet only."
+
+[[allowlist]]
+procedure = "/auth.v1.SocialVerificationService/ConfirmSocialVerification"
+reason = "Confirming a Telegram link requires an interactive session with a fresh MFA step-up; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/auth.v1.SocialVerificationService/UnlinkSocialAccount"
+reason = "Unlinking a social account requires an interactive session; API keys are not accepted."
+
+[[allowlist]]
+service = "swap.quickswap.v1.QuickSwapReferralService"
+reason = "Quick Swap referrals authenticate with an interactive session; Quick Swap is outside the API-key SDK surface."

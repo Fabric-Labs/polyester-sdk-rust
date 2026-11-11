@@ -154,6 +154,157 @@ impl ::buffa::Enumeration for ApiKeyStatus {
         &[Self::API_KEY_STATUS_UNSPECIFIED, Self::ACTIVE, Self::REVOKED, Self::DISABLED]
     }
 }
+/// Purpose of an API key.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ApiKeyPurpose {
+    /// No purpose specified.
+    PURPOSE_UNSPECIFIED = 0i32,
+    /// A key the account holder created for their own programs.
+    STANDARD = 1i32,
+    /// A key the account holder created for the Polyester AI assistant through
+    /// SetAssistantKeys. Its policy can never allow actions that move value out
+    /// of the account or manage where it goes, such as external withdrawals or
+    /// internal transfers. Only its creator's assistant uses it, so a sub-account
+    /// assistant key is revoked when its creator loses the role that manages the
+    /// sub-account's API keys or leaves the sub-account.
+    ASSISTANT = 2i32,
+}
+impl ApiKeyPurpose {
+    ///Idiomatic alias for [`Self::PURPOSE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PurposeUnspecified: Self = Self::PURPOSE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::STANDARD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Standard: Self = Self::STANDARD;
+    ///Idiomatic alias for [`Self::ASSISTANT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Assistant: Self = Self::ASSISTANT;
+}
+impl ::core::default::Default for ApiKeyPurpose {
+    fn default() -> Self {
+        Self::PURPOSE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ApiKeyPurpose {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ApiKeyPurpose {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ApiKeyPurpose;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(ApiKeyPurpose)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ApiKeyPurpose, E> {
+                <ApiKeyPurpose as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ApiKeyPurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ApiKeyPurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ApiKeyPurpose, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ApiKeyPurpose as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ApiKeyPurpose, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ApiKeyPurpose {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ApiKeyPurpose {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PURPOSE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::STANDARD),
+            2i32 => ::core::option::Option::Some(Self::ASSISTANT),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PURPOSE_UNSPECIFIED => "PURPOSE_UNSPECIFIED",
+            Self::STANDARD => "STANDARD",
+            Self::ASSISTANT => "ASSISTANT",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PURPOSE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PURPOSE_UNSPECIFIED)
+            }
+            "STANDARD" => ::core::option::Option::Some(Self::STANDARD),
+            "ASSISTANT" => ::core::option::Option::Some(Self::ASSISTANT),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::PURPOSE_UNSPECIFIED, Self::STANDARD, Self::ASSISTANT]
+    }
+}
 /// ApiKey is public API key metadata. It never includes the private key or seed.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -311,6 +462,16 @@ pub struct ApiKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub revision: u64,
+    /// What the key is for. ASSISTANT keys are managed with SetAssistantKeys and
+    /// are otherwise listed, updated and revoked like any key.
+    ///
+    /// Field 27: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<ApiKeyPurpose>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -333,6 +494,7 @@ impl ::core::fmt::Debug for ApiKey {
             .field("created_by_actor", &self.created_by_actor)
             .field("updated_at", &self.updated_at)
             .field("revision", &self.revision)
+            .field("purpose", &self.purpose)
             .finish()
     }
 }
@@ -449,6 +611,12 @@ impl ::buffa::Message for ApiKey {
         if self.revision != 0u64 {
             size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
         }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -510,6 +678,12 @@ impl ::buffa::Message for ApiKey {
         }
         if self.revision != 0u64 {
             ::buffa::types::put_uint64_field(26u32, self.revision, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(27u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -651,6 +825,15 @@ impl ::buffa::Message for ApiKey {
                 )?;
                 self.revision = ::buffa::types::decode_uint64(buf)?;
             }
+            27u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -674,6 +857,7 @@ impl ::buffa::Message for ApiKey {
         self.created_by_actor.clear();
         self.updated_at = ::buffa::MessageField::none();
         self.revision = 0u64;
+        self.purpose = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2501,15 +2685,1020 @@ pub const __UPDATE_API_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<UpdateApiKeyResponse>,
     is_wkt: false,
 };
+/// AssistantKeySpec is one account's key in the caller's assistant key set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AssistantKeySpec {
+    /// Sub-account the key acts for (opaque ID). Unset means the caller's main
+    /// account. A key acts for exactly one account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Ed25519 public key bytes the Polyester AI assistant signs with. Must be
+    /// exactly 32 bytes, and distinct within the set.
+    ///
+    /// Field 2: `public_key_ed25519`
+    #[serde(
+        rename = "publicKeyEd25519",
+        alias = "public_key_ed25519",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub public_key_ed25519: ::buffa::alloc::vec::Vec<u8>,
+    /// API policy that bounds the key (opaque ID). It must belong to the same
+    /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+    /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+    ///
+    /// Field 3: `policy_id`
+    #[serde(
+        rename = "policyId",
+        alias = "policy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub policy_id: u64,
+    /// Time until which the key may be registered, as the Polyester AI assistant
+    /// issued it with the key (PrepareAssistantKeys), in whole milliseconds.
+    /// Required for a new key: it must still be ahead, and at most 15 minutes
+    /// ahead. Not needed when the account's current assistant key already has
+    /// this public key.
+    ///
+    /// Field 4: `registration_deadline`
+    #[serde(
+        rename = "registrationDeadline",
+        alias = "registration_deadline",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub registration_deadline: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
+    /// The key's own Ed25519 signature over the caller's account, the key's
+    /// account, its public key and registration_deadline, as the assistant
+    /// issued it with the key (64 bytes). Required for a new key; not needed
+    /// when the account's current assistant key already has this public key.
+    ///
+    /// Field 5: `registration_proof`
+    #[serde(
+        rename = "registrationProof",
+        alias = "registration_proof",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub registration_proof: ::buffa::alloc::vec::Vec<u8>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AssistantKeySpec {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AssistantKeySpec")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("public_key_ed25519", &self.public_key_ed25519)
+            .field("policy_id", &self.policy_id)
+            .field("registration_deadline", &self.registration_deadline)
+            .field("registration_proof", &self.registration_proof)
+            .finish()
+    }
+}
+impl AssistantKeySpec {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AssistantKeySpec";
+}
+impl AssistantKeySpec {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(AssistantKeySpec);
+impl ::buffa::MessageName for AssistantKeySpec {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "AssistantKeySpec";
+    const FULL_NAME: &'static str = "auth.v1.AssistantKeySpec";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AssistantKeySpec";
+}
+impl ::buffa::Message for AssistantKeySpec {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.public_key_ed25519.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::bytes_encoded_len(&self.public_key_ed25519) as u32;
+        }
+        if self.policy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.registration_deadline.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.registration_deadline.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.registration_proof.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::bytes_encoded_len(&self.registration_proof) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if !self.public_key_ed25519.is_empty() {
+            ::buffa::types::put_bytes_field(2u32, &self.public_key_ed25519, buf);
+        }
+        if self.policy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.policy_id, buf);
+        }
+        if self.registration_deadline.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.registration_deadline.write_to(__cache, buf);
+        }
+        if !self.registration_proof.is_empty() {
+            ::buffa::types::put_bytes_field(5u32, &self.registration_proof, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.public_key_ed25519, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.policy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.registration_deadline.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.registration_proof, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.public_key_ed25519.clear();
+        self.policy_id = 0u64;
+        self.registration_deadline = ::buffa::MessageField::none();
+        self.registration_proof.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AssistantKeySpec {
+    const PROTO_FQN: &'static str = "auth.v1.AssistantKeySpec";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AssistantKeySpec {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ASSISTANT_KEY_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.AssistantKeySpec",
+    to_json: ::buffa::type_registry::any_to_json::<AssistantKeySpec>,
+    from_json: ::buffa::type_registry::any_from_json::<AssistantKeySpec>,
+    is_wkt: false,
+};
+/// SetAssistantKeysRequest replaces the caller's assistant key set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetAssistantKeysRequest {
+    /// The complete set, at most one key per account and at most 64 keys. An
+    /// account left out loses its assistant key.
+    ///
+    /// Field 1: `keys`
+    #[serde(
+        rename = "keys",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub keys: ::buffa::alloc::vec::Vec<AssistantKeySpec>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetAssistantKeysRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetAssistantKeysRequest").field("keys", &self.keys).finish()
+    }
+}
+impl SetAssistantKeysRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysRequest";
+}
+::buffa::impl_default_instance!(SetAssistantKeysRequest);
+impl ::buffa::MessageName for SetAssistantKeysRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SetAssistantKeysRequest";
+    const FULL_NAME: &'static str = "auth.v1.SetAssistantKeysRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysRequest";
+}
+impl ::buffa::Message for SetAssistantKeysRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.keys {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.keys {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.keys.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.keys.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetAssistantKeysRequest {
+    const PROTO_FQN: &'static str = "auth.v1.SetAssistantKeysRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetAssistantKeysRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_ASSISTANT_KEYS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SetAssistantKeysRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetAssistantKeysRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetAssistantKeysRequest>,
+    is_wkt: false,
+};
+/// SetAssistantKeysResponse returns the caller's assistant key set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetAssistantKeysResponse {
+    /// The assistant keys now in the set, in request order.
+    ///
+    /// Field 1: `api_keys`
+    #[serde(
+        rename = "apiKeys",
+        alias = "api_keys",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub api_keys: ::buffa::alloc::vec::Vec<ApiKey>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetAssistantKeysResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetAssistantKeysResponse")
+            .field("api_keys", &self.api_keys)
+            .finish()
+    }
+}
+impl SetAssistantKeysResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysResponse";
+}
+::buffa::impl_default_instance!(SetAssistantKeysResponse);
+impl ::buffa::MessageName for SetAssistantKeysResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "SetAssistantKeysResponse";
+    const FULL_NAME: &'static str = "auth.v1.SetAssistantKeysResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysResponse";
+}
+impl ::buffa::Message for SetAssistantKeysResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.api_keys {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.api_keys {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.api_keys.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.api_keys.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetAssistantKeysResponse {
+    const PROTO_FQN: &'static str = "auth.v1.SetAssistantKeysResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetAssistantKeysResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.SetAssistantKeysResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetAssistantKeysResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetAssistantKeysResponse>,
+    is_wkt: false,
+};
+/// ListAssistantKeysRequest lists the caller's assistant key set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAssistantKeysRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAssistantKeysRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAssistantKeysRequest").finish()
+    }
+}
+impl ListAssistantKeysRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysRequest";
+}
+::buffa::impl_default_instance!(ListAssistantKeysRequest);
+impl ::buffa::MessageName for ListAssistantKeysRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListAssistantKeysRequest";
+    const FULL_NAME: &'static str = "auth.v1.ListAssistantKeysRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysRequest";
+}
+impl ::buffa::Message for ListAssistantKeysRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAssistantKeysRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ListAssistantKeysRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAssistantKeysRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ASSISTANT_KEYS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListAssistantKeysRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListAssistantKeysRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAssistantKeysRequest>,
+    is_wkt: false,
+};
+/// ListAssistantKeysResponse contains the caller's assistant keys.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAssistantKeysResponse {
+    /// Non-revoked assistant keys the caller set up, newest first.
+    ///
+    /// Field 1: `api_keys`
+    #[serde(
+        rename = "apiKeys",
+        alias = "api_keys",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub api_keys: ::buffa::alloc::vec::Vec<ApiKey>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAssistantKeysResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAssistantKeysResponse")
+            .field("api_keys", &self.api_keys)
+            .finish()
+    }
+}
+impl ListAssistantKeysResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysResponse";
+}
+::buffa::impl_default_instance!(ListAssistantKeysResponse);
+impl ::buffa::MessageName for ListAssistantKeysResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListAssistantKeysResponse";
+    const FULL_NAME: &'static str = "auth.v1.ListAssistantKeysResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysResponse";
+}
+impl ::buffa::Message for ListAssistantKeysResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.api_keys {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.api_keys {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.api_keys.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.api_keys.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAssistantKeysResponse {
+    const PROTO_FQN: &'static str = "auth.v1.ListAssistantKeysResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAssistantKeysResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListAssistantKeysResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListAssistantKeysResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAssistantKeysResponse>,
+    is_wkt: false,
+};
+/// DeleteAssistantKeysRequest revokes the caller's whole assistant key set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteAssistantKeysRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteAssistantKeysRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteAssistantKeysRequest").finish()
+    }
+}
+impl DeleteAssistantKeysRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysRequest";
+}
+::buffa::impl_default_instance!(DeleteAssistantKeysRequest);
+impl ::buffa::MessageName for DeleteAssistantKeysRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "DeleteAssistantKeysRequest";
+    const FULL_NAME: &'static str = "auth.v1.DeleteAssistantKeysRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysRequest";
+}
+impl ::buffa::Message for DeleteAssistantKeysRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteAssistantKeysRequest {
+    const PROTO_FQN: &'static str = "auth.v1.DeleteAssistantKeysRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteAssistantKeysRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_ASSISTANT_KEYS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.DeleteAssistantKeysRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteAssistantKeysRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteAssistantKeysRequest>,
+    is_wkt: false,
+};
+/// DeleteAssistantKeysResponse lists the keys that were revoked.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteAssistantKeysResponse {
+    /// Opaque identifiers of the keys revoked by this request. Empty when the set
+    /// was already empty.
+    ///
+    /// Field 1: `revoked_key_ids`
+    #[serde(
+        rename = "revokedKeyIds",
+        alias = "revoked_key_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub revoked_key_ids: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteAssistantKeysResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteAssistantKeysResponse")
+            .field("revoked_key_ids", &self.revoked_key_ids)
+            .finish()
+    }
+}
+impl DeleteAssistantKeysResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysResponse";
+}
+::buffa::impl_default_instance!(DeleteAssistantKeysResponse);
+impl ::buffa::MessageName for DeleteAssistantKeysResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "DeleteAssistantKeysResponse";
+    const FULL_NAME: &'static str = "auth.v1.DeleteAssistantKeysResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysResponse";
+}
+impl ::buffa::Message for DeleteAssistantKeysResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.revoked_key_ids {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.revoked_key_ids {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.revoked_key_ids.push(::buffa::types::decode_string(buf)?);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.revoked_key_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteAssistantKeysResponse {
+    const PROTO_FQN: &'static str = "auth.v1.DeleteAssistantKeysResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteAssistantKeysResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.DeleteAssistantKeysResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteAssistantKeysResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteAssistantKeysResponse>,
+    is_wkt: false,
+};
 /// PolicyAction is a high-level permission that can be granted by a policy.
-/// The product actions TRADE_SPOT through SWAP apply to sub-account and API-key
-/// policies, and their write-style actions also grant the matching read
-/// visibility where needed by the product experience. The account permissions
-/// from READ_API_KEYS on apply to API-key policies only: a sub-account policy
-/// refuses them. Each grants exactly the calls it names and never implies
-/// another permission. A main-account permission is honored only for an API
-/// key scoped to the main account; a key scoped to a sub-account is refused
-/// even when its policy grants it.
+/// Product actions apply to sub-account and API-key policies, and their
+/// write-style actions also grant the matching read visibility where needed by
+/// the product experience. Account permissions, each documented below as an
+/// account permission or a main-account permission, apply to API-key policies
+/// only: a sub-account policy refuses them. Each account permission grants
+/// exactly the calls it names and never implies another permission. A
+/// main-account permission is honored only for an API key scoped to the main
+/// account; a key scoped to a sub-account is refused even when its policy
+/// grants it. An API key without a policy has no permission at all.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum PolicyAction {
@@ -2523,10 +3712,12 @@ pub enum PolicyAction {
     /// this does not grant mutation access to a read-only API key.
     TRADE_SPOT = 1i32,
     /// Allow internal transfers between sub-accounts or linked Polyester accounts,
-    /// including reading internal transfer history.
+    /// including reading internal transfer history. Moves value out of the
+    /// account, so an assistant API key can never be allowed it.
     INTERNAL_TRANSFER = 3i32,
     /// Allow value to leave Trading through external withdrawals. Destination
-    /// authorization is enforced separately from this policy.
+    /// authorization is enforced separately from this policy. Moves value out of
+    /// the account, so an assistant API key can never be allowed it.
     EXTERNAL_WITHDRAW = 4i32,
     /// Allow reading balances and equity for a sub-account or API key.
     READ_BALANCES = 5i32,
@@ -2540,12 +3731,15 @@ pub enum PolicyAction {
     /// Allow creating, updating, deleting, and copying saved destination entries,
     /// including reading the address book. Address-book writes accept only a
     /// session token, so on an API-key policy this grants address-book reads only.
+    /// It manages where value can leave the account, so an assistant API key can
+    /// never be allowed it.
     MANAGE_ADDRESS_BOOK = 12i32,
     /// Allow reading the auto-withdraw rule and its runs.
     READ_AUTO_WITHDRAW = 14i32,
     /// Allow creating, changing, and disabling the auto-withdraw rule, including
     /// reading it. A rule pays value out, so changing one also requires
-    /// EXTERNAL_WITHDRAW, and API keys can never change one.
+    /// EXTERNAL_WITHDRAW, API keys can never change one, and an assistant API key
+    /// can never be allowed it.
     MANAGE_AUTO_WITHDRAW = 15i32,
     /// Allow quoting, creating, and reading Swaps: market conversions of the
     /// account's own Trading balance from one asset into another. Each Swap places
@@ -2554,18 +3748,20 @@ pub enum PolicyAction {
     SWAP = 16i32,
     /// Allow listing and reading API keys. A key scoped to the main account sees
     /// the main account's keys and those of its sub-accounts; a key scoped to a
-    /// sub-account sees only that sub-account's keys.
+    /// sub-account sees only that sub-account's keys. Account permission.
     READ_API_KEYS = 17i32,
     /// Allow listing and reading API-key policies. A key scoped to the main
     /// account sees every API-key policy of the main account; a key scoped to a
     /// sub-account sees only the policies attached to that sub-account's keys.
+    /// Account permission.
     READ_API_POLICIES = 18i32,
     /// Allow listing and reading sub-account policies. A key scoped to the main
     /// account sees every sub-account policy of the main account; a key scoped to
-    /// a sub-account sees only the policy attached to that sub-account.
+    /// a sub-account sees only the policy attached to that sub-account. Account
+    /// permission.
     READ_SUBACCOUNT_POLICIES = 19i32,
     /// Allow reading what the key itself may do on a sub-account within its
-    /// scope.
+    /// scope. Account permission.
     READ_SUBACCOUNT_PERMISSIONS = 20i32,
     /// Allow reading the main account's VIP status. Main-account permission.
     READ_VIP_STATUS = 21i32,
@@ -2577,10 +3773,11 @@ pub enum PolicyAction {
     READ_PROFILE = 23i32,
     /// Allow resolving an account by username, account ID, or smart-account
     /// address. Any key of the main account may use it, whatever its scope.
+    /// Account permission.
     READ_ACCOUNT_DIRECTORY = 24i32,
     /// Allow validating an external withdraw destination within the key's scope
     /// without creating, signing, or reserving a withdraw. It does not allow
-    /// withdrawing.
+    /// withdrawing. Account permission.
     READ_WITHDRAW_VALIDATION = 25i32,
     /// Allow reading the main account's daily reward claim status.
     /// Main-account permission.
@@ -2593,6 +3790,27 @@ pub enum PolicyAction {
     /// Allow reading the main account's published reward awards. Main-account
     /// permission.
     READ_REWARDS = 29i32,
+    /// Allow creating a deposit address within the key's scope. Account
+    /// permission.
+    CREATE_DEPOSIT_ADDRESS = 10i32,
+    /// Allow listing the deposit addresses within the key's scope. Account
+    /// permission.
+    READ_DEPOSIT_ADDRESSES = 30i32,
+    /// Allow listing and reading the subaccounts within the key's scope. Account
+    /// permission.
+    READ_SUBACCOUNTS = 31i32,
+    /// Allow reading the activity of the subaccounts within the key's scope.
+    /// Account permission.
+    READ_SUBACCOUNT_ACTIVITY = 32i32,
+    /// Allow listing the members of the subaccounts within the key's scope.
+    /// Account permission.
+    READ_SUBACCOUNT_MEMBERS = 33i32,
+    /// Allow listing the outgoing invites of the subaccounts within the key's
+    /// scope. Account permission.
+    READ_SUBACCOUNT_INVITES = 34i32,
+    /// Allow reading the Guard Signer status within the key's scope; a key never
+    /// reads another main account's Guard Signer. Account permission.
+    READ_GUARD_SIGNER_STATUS = 35i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2670,6 +3888,27 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::READ_REWARDS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadRewards: Self = Self::READ_REWARDS;
+    ///Idiomatic alias for [`Self::CREATE_DEPOSIT_ADDRESS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CreateDepositAddress: Self = Self::CREATE_DEPOSIT_ADDRESS;
+    ///Idiomatic alias for [`Self::READ_DEPOSIT_ADDRESSES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadDepositAddresses: Self = Self::READ_DEPOSIT_ADDRESSES;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccounts: Self = Self::READ_SUBACCOUNTS;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNT_ACTIVITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountActivity: Self = Self::READ_SUBACCOUNT_ACTIVITY;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNT_MEMBERS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountMembers: Self = Self::READ_SUBACCOUNT_MEMBERS;
+    ///Idiomatic alias for [`Self::READ_SUBACCOUNT_INVITES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadSubaccountInvites: Self = Self::READ_SUBACCOUNT_INVITES;
+    ///Idiomatic alias for [`Self::READ_GUARD_SIGNER_STATUS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadGuardSignerStatus: Self = Self::READ_GUARD_SIGNER_STATUS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -2790,6 +4029,13 @@ impl ::buffa::Enumeration for PolicyAction {
             27i32 => ::core::option::Option::Some(Self::CLAIM_DAILY_REWARD),
             28i32 => ::core::option::Option::Some(Self::READ_CHECKPOINTS),
             29i32 => ::core::option::Option::Some(Self::READ_REWARDS),
+            10i32 => ::core::option::Option::Some(Self::CREATE_DEPOSIT_ADDRESS),
+            30i32 => ::core::option::Option::Some(Self::READ_DEPOSIT_ADDRESSES),
+            31i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNTS),
+            32i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_ACTIVITY),
+            33i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_MEMBERS),
+            34i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_INVITES),
+            35i32 => ::core::option::Option::Some(Self::READ_GUARD_SIGNER_STATUS),
             _ => ::core::option::Option::None,
         }
     }
@@ -2823,6 +4069,13 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::CLAIM_DAILY_REWARD => "CLAIM_DAILY_REWARD",
             Self::READ_CHECKPOINTS => "READ_CHECKPOINTS",
             Self::READ_REWARDS => "READ_REWARDS",
+            Self::CREATE_DEPOSIT_ADDRESS => "CREATE_DEPOSIT_ADDRESS",
+            Self::READ_DEPOSIT_ADDRESSES => "READ_DEPOSIT_ADDRESSES",
+            Self::READ_SUBACCOUNTS => "READ_SUBACCOUNTS",
+            Self::READ_SUBACCOUNT_ACTIVITY => "READ_SUBACCOUNT_ACTIVITY",
+            Self::READ_SUBACCOUNT_MEMBERS => "READ_SUBACCOUNT_MEMBERS",
+            Self::READ_SUBACCOUNT_INVITES => "READ_SUBACCOUNT_INVITES",
+            Self::READ_GUARD_SIGNER_STATUS => "READ_GUARD_SIGNER_STATUS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -2872,6 +4125,25 @@ impl ::buffa::Enumeration for PolicyAction {
             }
             "READ_CHECKPOINTS" => ::core::option::Option::Some(Self::READ_CHECKPOINTS),
             "READ_REWARDS" => ::core::option::Option::Some(Self::READ_REWARDS),
+            "CREATE_DEPOSIT_ADDRESS" => {
+                ::core::option::Option::Some(Self::CREATE_DEPOSIT_ADDRESS)
+            }
+            "READ_DEPOSIT_ADDRESSES" => {
+                ::core::option::Option::Some(Self::READ_DEPOSIT_ADDRESSES)
+            }
+            "READ_SUBACCOUNTS" => ::core::option::Option::Some(Self::READ_SUBACCOUNTS),
+            "READ_SUBACCOUNT_ACTIVITY" => {
+                ::core::option::Option::Some(Self::READ_SUBACCOUNT_ACTIVITY)
+            }
+            "READ_SUBACCOUNT_MEMBERS" => {
+                ::core::option::Option::Some(Self::READ_SUBACCOUNT_MEMBERS)
+            }
+            "READ_SUBACCOUNT_INVITES" => {
+                ::core::option::Option::Some(Self::READ_SUBACCOUNT_INVITES)
+            }
+            "READ_GUARD_SIGNER_STATUS" => {
+                ::core::option::Option::Some(Self::READ_GUARD_SIGNER_STATUS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -2902,6 +4174,13 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::CLAIM_DAILY_REWARD,
             Self::READ_CHECKPOINTS,
             Self::READ_REWARDS,
+            Self::CREATE_DEPOSIT_ADDRESS,
+            Self::READ_DEPOSIT_ADDRESSES,
+            Self::READ_SUBACCOUNTS,
+            Self::READ_SUBACCOUNT_ACTIVITY,
+            Self::READ_SUBACCOUNT_MEMBERS,
+            Self::READ_SUBACCOUNT_INVITES,
+            Self::READ_GUARD_SIGNER_STATUS,
         ]
     }
 }
@@ -7623,7 +8902,9 @@ pub struct CreateApiPolicyRequest {
     pub policy: ::buffa::MessageField<ApiPolicySpec>,
     /// Optional API key identifier to bind this newly-created policy to
     /// atomically. When set, the caller must be allowed to manage the key and the
-    /// create+assign operation consumes a single fresh step-up proof.
+    /// create+assign operation consumes a single fresh step-up proof. An
+    /// assistant API key cannot be assigned a policy that allows a money-out
+    /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
     ///
     /// Field 2: `assign_to_key_id`
     #[serde(
@@ -37036,7 +38317,10 @@ pub enum AuthErrorCode {
     AUTH_RESOURCE_NOT_FOUND = 10i32,
     /// Caller does not have access to the requested sub-account.
     AUTH_SUBACCOUNT_ACCESS_DENIED = 11i32,
-    /// Caller does not have access to the requested API key.
+    /// Caller does not have access to the requested API key, or the calling API
+    /// key's policy lacks the account permission the call needs, or the call needs
+    /// a key scoped to the main account. Those two permission refusals name the
+    /// permission in the message; an ownership refusal names none.
     AUTH_API_KEY_ACCESS_DENIED = 12i32,
     /// Requested API key status transition is not allowed.
     AUTH_API_KEY_INVALID_STATUS_TRANSITION = 14i32,
@@ -37096,7 +38380,7 @@ pub enum AuthErrorCode {
     AUTH_TERMS_NOT_ACCEPTED = 41i32,
     /// Social verification challenge expired. Start a new verification, then mark it ready again.
     AUTH_SOCIAL_VERIFICATION_EXPIRED = 42i32,
-    /// Social verification cannot accept a ready mark in its current state.
+    /// Social verification cannot accept this request in its current state.
     AUTH_SOCIAL_VERIFICATION_INVALID_STATE = 43i32,
     /// Sub-account authorization is expired, replaced, consumed, or has an invalid signature.
     /// Temporary verification failures return Unavailable; retry the same signed challenge.
@@ -37104,6 +38388,7 @@ pub enum AuthErrorCode {
     /// Social account is already linked to another Polyester account.
     AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED = 45i32,
     /// The request could not be completed right now and changed nothing. Retry the same request.
+    /// A refused WebSocket login needs a new signed login with a fresh nonce.
     AUTH_TEMPORARILY_UNAVAILABLE = 46i32,
     /// The account owns this sub-account. An owner cannot be invited to it, and member role
     /// changes and member removal do not apply to the owner.
@@ -37111,12 +38396,13 @@ pub enum AuthErrorCode {
     /// The API key request signature does not verify against the request, or the key is unknown.
     /// The REST problem code is SIGNATURE_INVALID.
     AUTH_SIGNATURE_INVALID = 48i32,
-    /// The API key request timestamp is malformed, more than 10 seconds ahead of the server
-    /// clock, or older than the request's receive window (X-API-RECV-WINDOW, 10 seconds when
+    /// The API key request timestamp is malformed, more than 1 second ahead of the server
+    /// clock, or older than the request's receive window (X-API-RECV-WINDOW, 5 seconds when
     /// omitted) when the request arrived. The request was not processed. Sync the clock, then
     /// sign the request again with a fresh timestamp. The REST problem code is TIMESTAMP_SKEW.
     AUTH_TIMESTAMP_SKEW = 49i32,
-    /// The API key request lacks its timestamp or signature header. The REST problem code is
+    /// The API key request lacks its timestamp or signature header, or a signed
+    /// WebSocket login lacks a valid X-API-NONCE. The REST problem code is
     /// MISSING_HEADERS.
     AUTH_MISSING_HEADERS = 50i32,
     /// The API key has expired. The REST problem code is KEY_EXPIRED.
@@ -37146,6 +38432,23 @@ pub enum AuthErrorCode {
     /// A non-empty request body identifier differs from the REST path identifier.
     /// The request is rejected with HTTP 400 before any action is performed.
     AUTH_PATH_BODY_ID_MISMATCH = 58i32,
+    /// An assistant API key can never be allowed an action that moves value out of the
+    /// account or manages where it goes: EXTERNAL_WITHDRAW, INTERNAL_TRANSFER,
+    /// MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+    AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED = 59i32,
+    /// A new assistant key's registration proof is missing or does not verify
+    /// for its account, public key and registration deadline. The REST problem
+    /// code is ASSISTANT_KEY_PROOF_INVALID.
+    AUTH_ASSISTANT_KEY_PROOF_INVALID = 60i32,
+    /// A new assistant key's registration deadline has passed; prepare the key
+    /// again. The REST problem code is ASSISTANT_KEY_REGISTRATION_EXPIRED.
+    AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED = 61i32,
+    /// A new assistant key's registration deadline is more than 15 minutes
+    /// ahead. The REST problem code is ASSISTANT_KEY_DEADLINE_TOO_FAR.
+    AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR = 62i32,
+    /// The signed WebSocket login nonce has already been used. Create a new login
+    /// with a fresh random nonce and signature. HTTP 401, REPLAY_DETECTED.
+    AUTH_REPLAY_DETECTED = 63i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -37322,6 +38625,21 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_PATH_BODY_ID_MISMATCH`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthPathBodyIdMismatch: Self = Self::AUTH_PATH_BODY_ID_MISMATCH;
+    ///Idiomatic alias for [`Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAssistantKeyActionNotAllowed: Self = Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::AUTH_ASSISTANT_KEY_PROOF_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAssistantKeyProofInvalid: Self = Self::AUTH_ASSISTANT_KEY_PROOF_INVALID;
+    ///Idiomatic alias for [`Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAssistantKeyRegistrationExpired: Self = Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED;
+    ///Idiomatic alias for [`Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAssistantKeyDeadlineTooFar: Self = Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR;
+    ///Idiomatic alias for [`Self::AUTH_REPLAY_DETECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthReplayDetected: Self = Self::AUTH_REPLAY_DETECTED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -37495,6 +38813,19 @@ impl ::buffa::Enumeration for AuthErrorCode {
             56i32 => ::core::option::Option::Some(Self::AUTH_RECV_WINDOW_INVALID),
             57i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_CAPACITY_EXHAUSTED),
             58i32 => ::core::option::Option::Some(Self::AUTH_PATH_BODY_ID_MISMATCH),
+            59i32 => {
+                ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED)
+            }
+            60i32 => ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_PROOF_INVALID),
+            61i32 => {
+                ::core::option::Option::Some(
+                    Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED,
+                )
+            }
+            62i32 => {
+                ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR)
+            }
+            63i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_DETECTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -37577,6 +38908,17 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_RECV_WINDOW_INVALID => "AUTH_RECV_WINDOW_INVALID",
             Self::AUTH_REPLAY_CAPACITY_EXHAUSTED => "AUTH_REPLAY_CAPACITY_EXHAUSTED",
             Self::AUTH_PATH_BODY_ID_MISMATCH => "AUTH_PATH_BODY_ID_MISMATCH",
+            Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED => {
+                "AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED"
+            }
+            Self::AUTH_ASSISTANT_KEY_PROOF_INVALID => "AUTH_ASSISTANT_KEY_PROOF_INVALID",
+            Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED => {
+                "AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED"
+            }
+            Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR => {
+                "AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR"
+            }
+            Self::AUTH_REPLAY_DETECTED => "AUTH_REPLAY_DETECTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -37751,6 +39093,23 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_PATH_BODY_ID_MISMATCH" => {
                 ::core::option::Option::Some(Self::AUTH_PATH_BODY_ID_MISMATCH)
             }
+            "AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED)
+            }
+            "AUTH_ASSISTANT_KEY_PROOF_INVALID" => {
+                ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_PROOF_INVALID)
+            }
+            "AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED" => {
+                ::core::option::Option::Some(
+                    Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED,
+                )
+            }
+            "AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR" => {
+                ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR)
+            }
+            "AUTH_REPLAY_DETECTED" => {
+                ::core::option::Option::Some(Self::AUTH_REPLAY_DETECTED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -37814,6 +39173,11 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_RECV_WINDOW_INVALID,
             Self::AUTH_REPLAY_CAPACITY_EXHAUSTED,
             Self::AUTH_PATH_BODY_ID_MISMATCH,
+            Self::AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED,
+            Self::AUTH_ASSISTANT_KEY_PROOF_INVALID,
+            Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED,
+            Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR,
+            Self::AUTH_REPLAY_DETECTED,
         ]
     }
 }
@@ -42572,6 +43936,9 @@ pub enum SocialProvider {
     TWITTER = 1i32,
     /// Discord account verification.
     DISCORD = 2i32,
+    /// Telegram account linking. The user sends the challenge code to the Polyester
+    /// Telegram bot, then confirms the Telegram account that sent it.
+    TELEGRAM = 3i32,
 }
 impl SocialProvider {
     ///Idiomatic alias for [`Self::PROVIDER_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -42583,6 +43950,9 @@ impl SocialProvider {
     ///Idiomatic alias for [`Self::DISCORD`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Discord: Self = Self::DISCORD;
+    ///Idiomatic alias for [`Self::TELEGRAM`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Telegram: Self = Self::TELEGRAM;
 }
 impl ::core::default::Default for SocialProvider {
     fn default() -> Self {
@@ -42683,6 +44053,7 @@ impl ::buffa::Enumeration for SocialProvider {
             0i32 => ::core::option::Option::Some(Self::PROVIDER_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::TWITTER),
             2i32 => ::core::option::Option::Some(Self::DISCORD),
+            3i32 => ::core::option::Option::Some(Self::TELEGRAM),
             _ => ::core::option::Option::None,
         }
     }
@@ -42694,6 +44065,7 @@ impl ::buffa::Enumeration for SocialProvider {
             Self::PROVIDER_UNSPECIFIED => "PROVIDER_UNSPECIFIED",
             Self::TWITTER => "TWITTER",
             Self::DISCORD => "DISCORD",
+            Self::TELEGRAM => "TELEGRAM",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -42703,11 +44075,12 @@ impl ::buffa::Enumeration for SocialProvider {
             }
             "TWITTER" => ::core::option::Option::Some(Self::TWITTER),
             "DISCORD" => ::core::option::Option::Some(Self::DISCORD),
+            "TELEGRAM" => ::core::option::Option::Some(Self::TELEGRAM),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::PROVIDER_UNSPECIFIED, Self::TWITTER, Self::DISCORD]
+        &[Self::PROVIDER_UNSPECIFIED, Self::TWITTER, Self::DISCORD, Self::TELEGRAM]
     }
 }
 /// Current state of a social account verification attempt.
@@ -42728,8 +44101,11 @@ pub enum SocialVerificationStatus {
     STATUS_FAILED = 5i32,
     /// Challenge code expired before verification completed.
     STATUS_EXPIRED = 6i32,
-    /// Verification was cancelled.
+    /// Verification was cancelled, or the linked account was unlinked.
     STATUS_CANCELLED = 7i32,
+    /// A provider account submitted the challenge code. The user must confirm that
+    /// account with ConfirmSocialVerification before it is linked. Telegram only.
+    STATUS_AWAITING_CONFIRMATION = 8i32,
 }
 impl SocialVerificationStatus {
     ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -42756,6 +44132,9 @@ impl SocialVerificationStatus {
     ///Idiomatic alias for [`Self::STATUS_CANCELLED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StatusCancelled: Self = Self::STATUS_CANCELLED;
+    ///Idiomatic alias for [`Self::STATUS_AWAITING_CONFIRMATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatusAwaitingConfirmation: Self = Self::STATUS_AWAITING_CONFIRMATION;
 }
 impl ::core::default::Default for SocialVerificationStatus {
     fn default() -> Self {
@@ -42862,6 +44241,7 @@ impl ::buffa::Enumeration for SocialVerificationStatus {
             5i32 => ::core::option::Option::Some(Self::STATUS_FAILED),
             6i32 => ::core::option::Option::Some(Self::STATUS_EXPIRED),
             7i32 => ::core::option::Option::Some(Self::STATUS_CANCELLED),
+            8i32 => ::core::option::Option::Some(Self::STATUS_AWAITING_CONFIRMATION),
             _ => ::core::option::Option::None,
         }
     }
@@ -42878,6 +44258,7 @@ impl ::buffa::Enumeration for SocialVerificationStatus {
             Self::STATUS_FAILED => "STATUS_FAILED",
             Self::STATUS_EXPIRED => "STATUS_EXPIRED",
             Self::STATUS_CANCELLED => "STATUS_CANCELLED",
+            Self::STATUS_AWAITING_CONFIRMATION => "STATUS_AWAITING_CONFIRMATION",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -42896,6 +44277,9 @@ impl ::buffa::Enumeration for SocialVerificationStatus {
             "STATUS_FAILED" => ::core::option::Option::Some(Self::STATUS_FAILED),
             "STATUS_EXPIRED" => ::core::option::Option::Some(Self::STATUS_EXPIRED),
             "STATUS_CANCELLED" => ::core::option::Option::Some(Self::STATUS_CANCELLED),
+            "STATUS_AWAITING_CONFIRMATION" => {
+                ::core::option::Option::Some(Self::STATUS_AWAITING_CONFIRMATION)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -42909,6 +44293,7 @@ impl ::buffa::Enumeration for SocialVerificationStatus {
             Self::STATUS_FAILED,
             Self::STATUS_EXPIRED,
             Self::STATUS_CANCELLED,
+            Self::STATUS_AWAITING_CONFIRMATION,
         ]
     }
 }
@@ -43109,7 +44494,8 @@ pub struct SocialVerification {
     )]
     pub method: ::buffa::EnumValue<SocialVerificationMethod>,
     /// Provider handle being verified. Handles are returned lowercase and without
-    /// a leading "@".
+    /// a leading "@". For Telegram, the username of the account that submitted the
+    /// code; empty when that account has no username.
     ///
     /// Field 2: `handle`
     #[serde(
@@ -43118,7 +44504,10 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub handle: ::buffa::alloc::string::String,
-    /// Stable provider-side user identifier. Empty until verification succeeds.
+    /// Stable provider-side user identifier. Empty until verification succeeds,
+    /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
+    /// the numeric user ID of the Telegram account that submitted the code, the
+    /// value ConfirmSocialVerification takes.
     ///
     /// Field 3: `provider_user_id`
     #[serde(
@@ -43128,9 +44517,21 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub provider_user_id: ::buffa::alloc::string::String,
+    /// Provider display name of the account being verified, for showing it to the
+    /// user. Telegram only: the account's name, set once the code is submitted.
+    /// Empty for other providers.
+    ///
+    /// Field 17: `display_name`
+    #[serde(
+        rename = "displayName",
+        alias = "display_name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub display_name: ::buffa::alloc::string::String,
     /// Challenge code the user must submit according to the verification method.
-    /// Discord codes are returned only when a challenge is issued. Codes expire
-    /// after 15 minutes.
+    /// Discord and Telegram codes are returned only when a challenge is issued.
+    /// Codes expire after 15 minutes.
     ///
     /// Field 13: `challenge_code`
     #[serde(
@@ -43228,6 +44629,7 @@ impl ::core::fmt::Debug for SocialVerification {
             .field("method", &self.method)
             .field("handle", &self.handle)
             .field("provider_user_id", &self.provider_user_id)
+            .field("display_name", &self.display_name)
             .field("challenge_code", &self.challenge_code)
             .field("status", &self.status)
             .field("requested_at", &self.requested_at)
@@ -43343,6 +44745,9 @@ impl ::buffa::Message for SocialVerification {
                 size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.display_name.is_empty() {
+            size += 2u32 + ::buffa::types::string_encoded_len(&self.display_name) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -43410,6 +44815,9 @@ impl ::buffa::Message for SocialVerification {
             if val != 0 {
                 ::buffa::types::put_int32_field(16u32, val, buf);
             }
+        }
+        if !self.display_name.is_empty() {
+            ::buffa::types::put_string_field(17u32, &self.display_name, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -43546,6 +44954,13 @@ impl ::buffa::Message for SocialVerification {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.display_name, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -43568,6 +44983,7 @@ impl ::buffa::Message for SocialVerification {
         self.challenge_code.clear();
         self.updated_at = ::buffa::MessageField::none();
         self.error_code = ::buffa::EnumValue::from(0);
+        self.display_name.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -43616,7 +45032,8 @@ pub struct StartSocialVerificationRequest {
     )]
     pub provider: ::buffa::EnumValue<SocialProvider>,
     /// Verification method. If unspecified, profile verification is used for
-    /// X/Twitter and channel verification is used for Discord.
+    /// X/Twitter, channel verification for Discord and direct message
+    /// verification for Telegram.
     ///
     /// Field 3: `method`
     #[serde(
@@ -43626,7 +45043,7 @@ pub struct StartSocialVerificationRequest {
     )]
     pub method: ::buffa::EnumValue<SocialVerificationMethod>,
     /// Provider handle the user claims. Required for X/Twitter and omitted for
-    /// Discord, where the authenticated bot supplies the provider identity.
+    /// Discord and Telegram, where the provider bot supplies the provider identity.
     /// A leading "@" is accepted and removed from X/Twitter handles.
     ///
     /// Field 2: `handle`
@@ -43829,6 +45246,18 @@ pub struct StartSocialVerificationResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub verification: ::buffa::MessageField<SocialVerification>,
+    /// Link that completes the user action, when the provider has one. Telegram:
+    /// opening it starts a chat with the Polyester bot that submits the code.
+    /// Empty for other providers.
+    ///
+    /// Field 4: `action_url`
+    #[serde(
+        rename = "actionUrl",
+        alias = "action_url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub action_url: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -43839,6 +45268,7 @@ impl ::core::fmt::Debug for StartSocialVerificationResponse {
             .field("challenge_code", &self.challenge_code)
             .field("expires_at", &self.expires_at)
             .field("verification", &self.verification)
+            .field("action_url", &self.action_url)
             .finish()
     }
 }
@@ -43888,6 +45318,9 @@ impl ::buffa::Message for StartSocialVerificationResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if !self.action_url.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.action_url) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -43908,6 +45341,9 @@ impl ::buffa::Message for StartSocialVerificationResponse {
         if self.verification.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.verification.write_to(__cache, buf);
+        }
+        if !self.action_url.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.action_url, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -43951,6 +45387,13 @@ impl ::buffa::Message for StartSocialVerificationResponse {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.action_url, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -43962,6 +45405,7 @@ impl ::buffa::Message for StartSocialVerificationResponse {
         self.challenge_code.clear();
         self.expires_at = ::buffa::MessageField::none();
         self.verification = ::buffa::MessageField::none();
+        self.action_url.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -44542,6 +45986,584 @@ pub const __GET_SOCIAL_VERIFICATION_RESPONSE_JSON_ANY: ::buffa::type_registry::J
     from_json: ::buffa::type_registry::any_from_json::<GetSocialVerificationResponse>,
     is_wkt: false,
 };
+/// ConfirmSocialVerificationRequest links the provider account that submitted
+/// the caller's challenge code.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ConfirmSocialVerificationRequest {
+    /// Provider account to confirm. Only TELEGRAM is accepted.
+    ///
+    /// Field 1: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub provider: ::buffa::EnumValue<SocialProvider>,
+    /// Provider user ID the user confirms, as provider_user_id of the verification
+    /// in STATUS_AWAITING_CONFIRMATION. The request fails when it is not the
+    /// account that submitted the code, so the user links exactly the account
+    /// they were shown.
+    ///
+    /// Field 2: `provider_user_id`
+    #[serde(
+        rename = "providerUserId",
+        alias = "provider_user_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub provider_user_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConfirmSocialVerificationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConfirmSocialVerificationRequest")
+            .field("provider", &self.provider)
+            .field("provider_user_id", &self.provider_user_id)
+            .finish()
+    }
+}
+impl ConfirmSocialVerificationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationRequest";
+}
+::buffa::impl_default_instance!(ConfirmSocialVerificationRequest);
+impl ::buffa::MessageName for ConfirmSocialVerificationRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ConfirmSocialVerificationRequest";
+    const FULL_NAME: &'static str = "auth.v1.ConfirmSocialVerificationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationRequest";
+}
+impl ::buffa::Message for ConfirmSocialVerificationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.provider_user_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.provider_user_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.provider_user_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.provider_user_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.provider_user_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.provider = ::buffa::EnumValue::from(0);
+        self.provider_user_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConfirmSocialVerificationRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ConfirmSocialVerificationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConfirmSocialVerificationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONFIRM_SOCIAL_VERIFICATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ConfirmSocialVerificationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ConfirmSocialVerificationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ConfirmSocialVerificationRequest>,
+    is_wkt: false,
+};
+/// ConfirmSocialVerificationResponse returns the verification after the
+/// provider account was linked.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ConfirmSocialVerificationResponse {
+    /// Current verification state, STATUS_VERIFIED.
+    ///
+    /// Field 1: `verification`
+    #[serde(
+        rename = "verification",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub verification: ::buffa::MessageField<SocialVerification>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConfirmSocialVerificationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConfirmSocialVerificationResponse")
+            .field("verification", &self.verification)
+            .finish()
+    }
+}
+impl ConfirmSocialVerificationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationResponse";
+}
+::buffa::impl_default_instance!(ConfirmSocialVerificationResponse);
+impl ::buffa::MessageName for ConfirmSocialVerificationResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ConfirmSocialVerificationResponse";
+    const FULL_NAME: &'static str = "auth.v1.ConfirmSocialVerificationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationResponse";
+}
+impl ::buffa::Message for ConfirmSocialVerificationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.verification.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.verification.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.verification.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.verification.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.verification.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.verification = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConfirmSocialVerificationResponse {
+    const PROTO_FQN: &'static str = "auth.v1.ConfirmSocialVerificationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConfirmSocialVerificationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONFIRM_SOCIAL_VERIFICATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ConfirmSocialVerificationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ConfirmSocialVerificationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        ConfirmSocialVerificationResponse,
+    >,
+    is_wkt: false,
+};
+/// UnlinkSocialAccountRequest removes the caller's linked provider account, or
+/// cancels a link in progress.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UnlinkSocialAccountRequest {
+    /// Provider account to unlink. Only TELEGRAM is accepted.
+    ///
+    /// Field 1: `provider`
+    #[serde(
+        rename = "provider",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub provider: ::buffa::EnumValue<SocialProvider>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UnlinkSocialAccountRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UnlinkSocialAccountRequest")
+            .field("provider", &self.provider)
+            .finish()
+    }
+}
+impl UnlinkSocialAccountRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountRequest";
+}
+::buffa::impl_default_instance!(UnlinkSocialAccountRequest);
+impl ::buffa::MessageName for UnlinkSocialAccountRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "UnlinkSocialAccountRequest";
+    const FULL_NAME: &'static str = "auth.v1.UnlinkSocialAccountRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountRequest";
+}
+impl ::buffa::Message for UnlinkSocialAccountRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.provider.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.provider = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.provider = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UnlinkSocialAccountRequest {
+    const PROTO_FQN: &'static str = "auth.v1.UnlinkSocialAccountRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UnlinkSocialAccountRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UNLINK_SOCIAL_ACCOUNT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.UnlinkSocialAccountRequest",
+    to_json: ::buffa::type_registry::any_to_json::<UnlinkSocialAccountRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<UnlinkSocialAccountRequest>,
+    is_wkt: false,
+};
+/// UnlinkSocialAccountResponse returns the verification after unlinking.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UnlinkSocialAccountResponse {
+    /// Current verification state, STATUS_CANCELLED. Absent when no verification
+    /// was ever started for the provider.
+    ///
+    /// Field 1: `verification`
+    #[serde(
+        rename = "verification",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub verification: ::buffa::MessageField<SocialVerification>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UnlinkSocialAccountResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UnlinkSocialAccountResponse")
+            .field("verification", &self.verification)
+            .finish()
+    }
+}
+impl UnlinkSocialAccountResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountResponse";
+}
+::buffa::impl_default_instance!(UnlinkSocialAccountResponse);
+impl ::buffa::MessageName for UnlinkSocialAccountResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "UnlinkSocialAccountResponse";
+    const FULL_NAME: &'static str = "auth.v1.UnlinkSocialAccountResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountResponse";
+}
+impl ::buffa::Message for UnlinkSocialAccountResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.verification.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.verification.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.verification.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.verification.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.verification.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.verification = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UnlinkSocialAccountResponse {
+    const PROTO_FQN: &'static str = "auth.v1.UnlinkSocialAccountResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UnlinkSocialAccountResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UNLINK_SOCIAL_ACCOUNT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.UnlinkSocialAccountResponse",
+    to_json: ::buffa::type_registry::any_to_json::<UnlinkSocialAccountResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<UnlinkSocialAccountResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -44641,6 +46663,11 @@ pub mod __buffa {
             ///
             /// Field 26: `revision`
             pub revision: u64,
+            /// What the key is for. ASSISTANT keys are managed with SetAssistantKeys and
+            /// are otherwise listed, updated and revoked like any key.
+            ///
+            /// Field 27: `purpose`
+            pub purpose: ::buffa::EnumValue<super::super::ApiKeyPurpose>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ApiKeyView<'a> {
@@ -44850,6 +46877,15 @@ pub mod __buffa {
                         )?;
                         view.revision = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    27u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -44927,6 +46963,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     revision: self.revision,
+                    purpose: self.purpose,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -45021,6 +47058,12 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::uint64_encoded_len(self.revision) as u32;
                 }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -45103,6 +47146,12 @@ pub mod __buffa {
                 }
                 if self.revision != 0u64 {
                     ::buffa::types::put_uint64_field(26u32, self.revision, buf);
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(27u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45207,6 +47256,11 @@ pub mod __buffa {
                             "revision",
                             &::buffa::json_helpers::ProtoJson(&self.revision),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
                 }
                 __map.end()
             }
@@ -45430,6 +47484,14 @@ pub mod __buffa {
             #[must_use]
             pub fn revision(&self) -> u64 {
                 self.0.reborrow().revision
+            }
+            /// What the key is for. ASSISTANT keys are managed with SetAssistantKeys and
+            /// are otherwise listed, updated and revoked like any key.
+            ///
+            /// Field 27: `purpose`
+            #[must_use]
+            pub fn purpose(&self) -> ::buffa::EnumValue<super::super::ApiKeyPurpose> {
+                self.0.reborrow().purpose
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ApiKeyView<'static>>>
@@ -49109,6 +51171,2176 @@ pub mod __buffa {
             type ViewHandle = UpdateApiKeyResponseOwnedView;
         }
         impl ::serde::Serialize for UpdateApiKeyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AssistantKeySpec is one account's key in the caller's assistant key set.
+        #[derive(Clone, Debug, Default)]
+        pub struct AssistantKeySpecView<'a> {
+            /// Sub-account the key acts for (opaque ID). Unset means the caller's main
+            /// account. A key acts for exactly one account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Ed25519 public key bytes the Polyester AI assistant signs with. Must be
+            /// exactly 32 bytes, and distinct within the set.
+            ///
+            /// Field 2: `public_key_ed25519`
+            pub public_key_ed25519: &'a [u8],
+            /// API policy that bounds the key (opaque ID). It must belong to the same
+            /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+            ///
+            /// Field 3: `policy_id`
+            pub policy_id: u64,
+            /// Time until which the key may be registered, as the Polyester AI assistant
+            /// issued it with the key (PrepareAssistantKeys), in whole milliseconds.
+            /// Required for a new key: it must still be ahead, and at most 15 minutes
+            /// ahead. Not needed when the account's current assistant key already has
+            /// this public key.
+            ///
+            /// Field 4: `registration_deadline`
+            pub registration_deadline: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The key's own Ed25519 signature over the caller's account, the key's
+            /// account, its public key and registration_deadline, as the assistant
+            /// issued it with the key (64 bytes). Required for a new key; not needed
+            /// when the account's current assistant key already has this public key.
+            ///
+            /// Field 5: `registration_proof`
+            pub registration_proof: &'a [u8],
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AssistantKeySpecView<'a> {
+            type Owned = super::super::AssistantKeySpec;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.public_key_ed25519 = ::buffa::types::borrow_bytes(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.registration_deadline.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.registration_deadline = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.registration_proof = ::buffa::types::borrow_bytes(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AssistantKeySpec,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AssistantKeySpec,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AssistantKeySpec {
+                    subaccount_id: self.subaccount_id,
+                    public_key_ed25519: (self.public_key_ed25519).to_vec(),
+                    policy_id: self.policy_id,
+                    registration_deadline: match self.registration_deadline.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    registration_proof: (self.registration_proof).to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AssistantKeySpecView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.public_key_ed25519.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::bytes_encoded_len(&self.public_key_ed25519)
+                                as u32;
+                }
+                if self.policy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.registration_deadline.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.registration_deadline.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.registration_proof.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::bytes_encoded_len(&self.registration_proof)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if !self.public_key_ed25519.is_empty() {
+                    ::buffa::types::put_bytes_field(2u32, &self.public_key_ed25519, buf);
+                }
+                if self.policy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(3u32, self.policy_id, buf);
+                }
+                if self.registration_deadline.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.registration_deadline.write_to(__cache, buf);
+                }
+                if !self.registration_proof.is_empty() {
+                    ::buffa::types::put_bytes_field(5u32, &self.registration_proof, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AssistantKeySpecView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(
+                    self.public_key_ed25519,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "publicKeyEd25519",
+                            &::buffa::json_helpers::BytesJson(self.public_key_ed25519),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.policy_id) {
+                    __map
+                        .serialize_entry(
+                            "policyId",
+                            &::buffa::json_helpers::ProtoJson(&self.policy_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .registration_deadline
+                        .as_option()
+                    {
+                        __map.serialize_entry("registrationDeadline", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(
+                    self.registration_proof,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "registrationProof",
+                            &::buffa::json_helpers::BytesJson(self.registration_proof),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AssistantKeySpecView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "AssistantKeySpec";
+            const FULL_NAME: &'static str = "auth.v1.AssistantKeySpec";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AssistantKeySpec";
+        }
+        ::buffa::impl_default_view_instance!(AssistantKeySpecView);
+        ::buffa::impl_view_reborrow!(AssistantKeySpecView);
+        /** Self-contained, `'static` owned view of a `AssistantKeySpec` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AssistantKeySpecView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AssistantKeySpecView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AssistantKeySpecOwnedView(
+            ::buffa::OwnedView<AssistantKeySpecView<'static>>,
+        );
+        impl AssistantKeySpecOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AssistantKeySpecOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AssistantKeySpecOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AssistantKeySpec,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AssistantKeySpecOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AssistantKeySpecView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AssistantKeySpecView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AssistantKeySpec,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Sub-account the key acts for (opaque ID). Unset means the caller's main
+            /// account. A key acts for exactly one account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Ed25519 public key bytes the Polyester AI assistant signs with. Must be
+            /// exactly 32 bytes, and distinct within the set.
+            ///
+            /// Field 2: `public_key_ed25519`
+            #[must_use]
+            pub fn public_key_ed25519(&self) -> &'_ [u8] {
+                self.0.reborrow().public_key_ed25519
+            }
+            /// API policy that bounds the key (opaque ID). It must belong to the same
+            /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+            ///
+            /// Field 3: `policy_id`
+            #[must_use]
+            pub fn policy_id(&self) -> u64 {
+                self.0.reborrow().policy_id
+            }
+            /// Time until which the key may be registered, as the Polyester AI assistant
+            /// issued it with the key (PrepareAssistantKeys), in whole milliseconds.
+            /// Required for a new key: it must still be ahead, and at most 15 minutes
+            /// ahead. Not needed when the account's current assistant key already has
+            /// this public key.
+            ///
+            /// Field 4: `registration_deadline`
+            #[must_use]
+            pub fn registration_deadline(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().registration_deadline
+            }
+            /// The key's own Ed25519 signature over the caller's account, the key's
+            /// account, its public key and registration_deadline, as the assistant
+            /// issued it with the key (64 bytes). Required for a new key; not needed
+            /// when the account's current assistant key already has this public key.
+            ///
+            /// Field 5: `registration_proof`
+            #[must_use]
+            pub fn registration_proof(&self) -> &'_ [u8] {
+                self.0.reborrow().registration_proof
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AssistantKeySpecView<'static>>>
+        for AssistantKeySpecOwnedView {
+            fn from(inner: ::buffa::OwnedView<AssistantKeySpecView<'static>>) -> Self {
+                AssistantKeySpecOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AssistantKeySpecOwnedView>
+        for ::buffa::OwnedView<AssistantKeySpecView<'static>> {
+            fn from(wrapper: AssistantKeySpecOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<AssistantKeySpecView<'static>>>
+        for AssistantKeySpecOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AssistantKeySpecView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AssistantKeySpec {
+            type View<'a> = AssistantKeySpecView<'a>;
+            type ViewHandle = AssistantKeySpecOwnedView;
+        }
+        impl ::serde::Serialize for AssistantKeySpecOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetAssistantKeysRequest replaces the caller's assistant key set.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetAssistantKeysRequestView<'a> {
+            /// The complete set, at most one key per account and at most 64 keys. An
+            /// account left out loses its assistant key.
+            ///
+            /// Field 1: `keys`
+            pub keys: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AssistantKeySpecView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetAssistantKeysRequestView<'a> {
+            type Owned = super::super::SetAssistantKeysRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.keys
+                            .push(
+                                <super::super::__buffa::view::AssistantKeySpecView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetAssistantKeysRequest {
+                    keys: self
+                        .keys
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetAssistantKeysRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.keys {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.keys {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetAssistantKeysRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.keys.is_empty() {
+                    __map.serialize_entry("keys", &*self.keys)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetAssistantKeysRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SetAssistantKeysRequest";
+            const FULL_NAME: &'static str = "auth.v1.SetAssistantKeysRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysRequest";
+        }
+        ::buffa::impl_default_view_instance!(SetAssistantKeysRequestView);
+        ::buffa::impl_view_reborrow!(SetAssistantKeysRequestView);
+        /** Self-contained, `'static` owned view of a `SetAssistantKeysRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetAssistantKeysRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetAssistantKeysRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetAssistantKeysRequestOwnedView(
+            ::buffa::OwnedView<SetAssistantKeysRequestView<'static>>,
+        );
+        impl SetAssistantKeysRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetAssistantKeysRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetAssistantKeysRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetAssistantKeysRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The complete set, at most one key per account and at most 64 keys. An
+            /// account left out loses its assistant key.
+            ///
+            /// Field 1: `keys`
+            #[must_use]
+            pub fn keys(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AssistantKeySpecView<'_>,
+            > {
+                &self.0.reborrow().keys
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetAssistantKeysRequestView<'static>>,
+        > for SetAssistantKeysRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetAssistantKeysRequestView<'static>>,
+            ) -> Self {
+                SetAssistantKeysRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetAssistantKeysRequestOwnedView>
+        for ::buffa::OwnedView<SetAssistantKeysRequestView<'static>> {
+            fn from(wrapper: SetAssistantKeysRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetAssistantKeysRequestView<'static>>,
+        > for SetAssistantKeysRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetAssistantKeysRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetAssistantKeysRequest {
+            type View<'a> = SetAssistantKeysRequestView<'a>;
+            type ViewHandle = SetAssistantKeysRequestOwnedView;
+        }
+        impl ::serde::Serialize for SetAssistantKeysRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetAssistantKeysResponse returns the caller's assistant key set.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetAssistantKeysResponseView<'a> {
+            /// The assistant keys now in the set, in request order.
+            ///
+            /// Field 1: `api_keys`
+            pub api_keys: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ApiKeyView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetAssistantKeysResponseView<'a> {
+            type Owned = super::super::SetAssistantKeysResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.api_keys
+                            .push(
+                                <super::super::__buffa::view::ApiKeyView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetAssistantKeysResponse {
+                    api_keys: self
+                        .api_keys
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetAssistantKeysResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.api_keys {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.api_keys {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetAssistantKeysResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.api_keys.is_empty() {
+                    __map.serialize_entry("apiKeys", &*self.api_keys)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetAssistantKeysResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "SetAssistantKeysResponse";
+            const FULL_NAME: &'static str = "auth.v1.SetAssistantKeysResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.SetAssistantKeysResponse";
+        }
+        ::buffa::impl_default_view_instance!(SetAssistantKeysResponseView);
+        ::buffa::impl_view_reborrow!(SetAssistantKeysResponseView);
+        /** Self-contained, `'static` owned view of a `SetAssistantKeysResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetAssistantKeysResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetAssistantKeysResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetAssistantKeysResponseOwnedView(
+            ::buffa::OwnedView<SetAssistantKeysResponseView<'static>>,
+        );
+        impl SetAssistantKeysResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetAssistantKeysResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetAssistantKeysResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetAssistantKeysResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The assistant keys now in the set, in request order.
+            ///
+            /// Field 1: `api_keys`
+            #[must_use]
+            pub fn api_keys(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ApiKeyView<'_>,
+            > {
+                &self.0.reborrow().api_keys
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetAssistantKeysResponseView<'static>>,
+        > for SetAssistantKeysResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetAssistantKeysResponseView<'static>>,
+            ) -> Self {
+                SetAssistantKeysResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetAssistantKeysResponseOwnedView>
+        for ::buffa::OwnedView<SetAssistantKeysResponseView<'static>> {
+            fn from(wrapper: SetAssistantKeysResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetAssistantKeysResponseView<'static>>,
+        > for SetAssistantKeysResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetAssistantKeysResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetAssistantKeysResponse {
+            type View<'a> = SetAssistantKeysResponseView<'a>;
+            type ViewHandle = SetAssistantKeysResponseOwnedView;
+        }
+        impl ::serde::Serialize for SetAssistantKeysResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListAssistantKeysRequest lists the caller's assistant key set.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAssistantKeysRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAssistantKeysRequestView<'a> {
+            type Owned = super::super::ListAssistantKeysRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAssistantKeysRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAssistantKeysRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAssistantKeysRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAssistantKeysRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListAssistantKeysRequest";
+            const FULL_NAME: &'static str = "auth.v1.ListAssistantKeysRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListAssistantKeysRequestView);
+        ::buffa::impl_view_reborrow!(ListAssistantKeysRequestView);
+        /** Self-contained, `'static` owned view of a `ListAssistantKeysRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAssistantKeysRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAssistantKeysRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAssistantKeysRequestOwnedView(
+            ::buffa::OwnedView<ListAssistantKeysRequestView<'static>>,
+        );
+        impl ListAssistantKeysRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAssistantKeysRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAssistantKeysRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAssistantKeysRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAssistantKeysRequestView<'static>>,
+        > for ListAssistantKeysRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAssistantKeysRequestView<'static>>,
+            ) -> Self {
+                ListAssistantKeysRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAssistantKeysRequestOwnedView>
+        for ::buffa::OwnedView<ListAssistantKeysRequestView<'static>> {
+            fn from(wrapper: ListAssistantKeysRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAssistantKeysRequestView<'static>>,
+        > for ListAssistantKeysRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAssistantKeysRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAssistantKeysRequest {
+            type View<'a> = ListAssistantKeysRequestView<'a>;
+            type ViewHandle = ListAssistantKeysRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListAssistantKeysRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListAssistantKeysResponse contains the caller's assistant keys.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAssistantKeysResponseView<'a> {
+            /// Non-revoked assistant keys the caller set up, newest first.
+            ///
+            /// Field 1: `api_keys`
+            pub api_keys: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ApiKeyView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAssistantKeysResponseView<'a> {
+            type Owned = super::super::ListAssistantKeysResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.api_keys
+                            .push(
+                                <super::super::__buffa::view::ApiKeyView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAssistantKeysResponse {
+                    api_keys: self
+                        .api_keys
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAssistantKeysResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.api_keys {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.api_keys {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAssistantKeysResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.api_keys.is_empty() {
+                    __map.serialize_entry("apiKeys", &*self.api_keys)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAssistantKeysResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListAssistantKeysResponse";
+            const FULL_NAME: &'static str = "auth.v1.ListAssistantKeysResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListAssistantKeysResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListAssistantKeysResponseView);
+        ::buffa::impl_view_reborrow!(ListAssistantKeysResponseView);
+        /** Self-contained, `'static` owned view of a `ListAssistantKeysResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAssistantKeysResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAssistantKeysResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAssistantKeysResponseOwnedView(
+            ::buffa::OwnedView<ListAssistantKeysResponseView<'static>>,
+        );
+        impl ListAssistantKeysResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAssistantKeysResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAssistantKeysResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAssistantKeysResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Non-revoked assistant keys the caller set up, newest first.
+            ///
+            /// Field 1: `api_keys`
+            #[must_use]
+            pub fn api_keys(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ApiKeyView<'_>,
+            > {
+                &self.0.reborrow().api_keys
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAssistantKeysResponseView<'static>>,
+        > for ListAssistantKeysResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAssistantKeysResponseView<'static>>,
+            ) -> Self {
+                ListAssistantKeysResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAssistantKeysResponseOwnedView>
+        for ::buffa::OwnedView<ListAssistantKeysResponseView<'static>> {
+            fn from(wrapper: ListAssistantKeysResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAssistantKeysResponseView<'static>>,
+        > for ListAssistantKeysResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAssistantKeysResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAssistantKeysResponse {
+            type View<'a> = ListAssistantKeysResponseView<'a>;
+            type ViewHandle = ListAssistantKeysResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListAssistantKeysResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeleteAssistantKeysRequest revokes the caller's whole assistant key set.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteAssistantKeysRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeleteAssistantKeysRequestView<'a> {
+            type Owned = super::super::DeleteAssistantKeysRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteAssistantKeysRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteAssistantKeysRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteAssistantKeysRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteAssistantKeysRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "DeleteAssistantKeysRequest";
+            const FULL_NAME: &'static str = "auth.v1.DeleteAssistantKeysRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysRequest";
+        }
+        ::buffa::impl_default_view_instance!(DeleteAssistantKeysRequestView);
+        ::buffa::impl_view_reborrow!(DeleteAssistantKeysRequestView);
+        /** Self-contained, `'static` owned view of a `DeleteAssistantKeysRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteAssistantKeysRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteAssistantKeysRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteAssistantKeysRequestOwnedView(
+            ::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>>,
+        );
+        impl DeleteAssistantKeysRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteAssistantKeysRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeleteAssistantKeysRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteAssistantKeysRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>>,
+        > for DeleteAssistantKeysRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>>,
+            ) -> Self {
+                DeleteAssistantKeysRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteAssistantKeysRequestOwnedView>
+        for ::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>> {
+            fn from(wrapper: DeleteAssistantKeysRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>>,
+        > for DeleteAssistantKeysRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeleteAssistantKeysRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeleteAssistantKeysRequest {
+            type View<'a> = DeleteAssistantKeysRequestView<'a>;
+            type ViewHandle = DeleteAssistantKeysRequestOwnedView;
+        }
+        impl ::serde::Serialize for DeleteAssistantKeysRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeleteAssistantKeysResponse lists the keys that were revoked.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteAssistantKeysResponseView<'a> {
+            /// Opaque identifiers of the keys revoked by this request. Empty when the set
+            /// was already empty.
+            ///
+            /// Field 1: `revoked_key_ids`
+            pub revoked_key_ids: ::buffa::RepeatedView<'a, &'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeleteAssistantKeysResponseView<'a> {
+            type Owned = super::super::DeleteAssistantKeysResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.revoked_key_ids.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteAssistantKeysResponse {
+                    revoked_key_ids: self
+                        .revoked_key_ids
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteAssistantKeysResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.revoked_key_ids {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.revoked_key_ids {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteAssistantKeysResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.revoked_key_ids.is_empty() {
+                    __map.serialize_entry("revokedKeyIds", &*self.revoked_key_ids)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteAssistantKeysResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "DeleteAssistantKeysResponse";
+            const FULL_NAME: &'static str = "auth.v1.DeleteAssistantKeysResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DeleteAssistantKeysResponse";
+        }
+        ::buffa::impl_default_view_instance!(DeleteAssistantKeysResponseView);
+        ::buffa::impl_view_reborrow!(DeleteAssistantKeysResponseView);
+        /** Self-contained, `'static` owned view of a `DeleteAssistantKeysResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteAssistantKeysResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteAssistantKeysResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteAssistantKeysResponseOwnedView(
+            ::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>>,
+        );
+        impl DeleteAssistantKeysResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteAssistantKeysResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteAssistantKeysResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeleteAssistantKeysResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteAssistantKeysResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteAssistantKeysResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Opaque identifiers of the keys revoked by this request. Empty when the set
+            /// was already empty.
+            ///
+            /// Field 1: `revoked_key_ids`
+            #[must_use]
+            pub fn revoked_key_ids(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().revoked_key_ids
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>>,
+        > for DeleteAssistantKeysResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>>,
+            ) -> Self {
+                DeleteAssistantKeysResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteAssistantKeysResponseOwnedView>
+        for ::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>> {
+            fn from(wrapper: DeleteAssistantKeysResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>>,
+        > for DeleteAssistantKeysResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeleteAssistantKeysResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeleteAssistantKeysResponse {
+            type View<'a> = DeleteAssistantKeysResponseView<'a>;
+            type ViewHandle = DeleteAssistantKeysResponseOwnedView;
+        }
+        impl ::serde::Serialize for DeleteAssistantKeysResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -58020,7 +62252,9 @@ pub mod __buffa {
             >,
             /// Optional API key identifier to bind this newly-created policy to
             /// atomically. When set, the caller must be allowed to manage the key and the
-            /// create+assign operation consumes a single fresh step-up proof.
+            /// create+assign operation consumes a single fresh step-up proof. An
+            /// assistant API key cannot be assigned a policy that allows a money-out
+            /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
             ///
             /// Field 2: `assign_to_key_id`
             pub assign_to_key_id: &'a str,
@@ -58315,7 +62549,9 @@ pub mod __buffa {
             }
             /// Optional API key identifier to bind this newly-created policy to
             /// atomically. When set, the caller must be allowed to manage the key and the
-            /// create+assign operation consumes a single fresh step-up proof.
+            /// create+assign operation consumes a single fresh step-up proof. An
+            /// assistant API key cannot be assigned a policy that allows a money-out
+            /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
             ///
             /// Field 2: `assign_to_key_id`
             #[must_use]
@@ -115370,17 +119606,27 @@ pub mod __buffa {
             /// Field 11: `method`
             pub method: ::buffa::EnumValue<super::super::SocialVerificationMethod>,
             /// Provider handle being verified. Handles are returned lowercase and without
-            /// a leading "@".
+            /// a leading "@". For Telegram, the username of the account that submitted the
+            /// code; empty when that account has no username.
             ///
             /// Field 2: `handle`
             pub handle: &'a str,
-            /// Stable provider-side user identifier. Empty until verification succeeds.
+            /// Stable provider-side user identifier. Empty until verification succeeds,
+            /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
+            /// the numeric user ID of the Telegram account that submitted the code, the
+            /// value ConfirmSocialVerification takes.
             ///
             /// Field 3: `provider_user_id`
             pub provider_user_id: &'a str,
+            /// Provider display name of the account being verified, for showing it to the
+            /// user. Telegram only: the account's name, set once the code is submitted.
+            /// Empty for other providers.
+            ///
+            /// Field 17: `display_name`
+            pub display_name: &'a str,
             /// Challenge code the user must submit according to the verification method.
-            /// Discord codes are returned only when a challenge is issued. Codes expire
-            /// after 15 minutes.
+            /// Discord and Telegram codes are returned only when a challenge is issued.
+            /// Codes expire after 15 minutes.
             ///
             /// Field 13: `challenge_code`
             pub challenge_code: &'a str,
@@ -115497,6 +119743,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.provider_user_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.display_name = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     13u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -115671,6 +119924,7 @@ pub mod __buffa {
                     method: self.method,
                     handle: self.handle.to_string(),
                     provider_user_id: self.provider_user_id.to_string(),
+                    display_name: self.display_name.to_string(),
                     challenge_code: self.challenge_code.to_string(),
                     status: self.status,
                     requested_at: match self.requested_at.as_option() {
@@ -115809,6 +120063,12 @@ pub mod __buffa {
                         size += 2u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.display_name.is_empty() {
+                    size
+                        += 2u32
+                            + ::buffa::types::string_encoded_len(&self.display_name)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -115894,6 +120154,9 @@ pub mod __buffa {
                         ::buffa::types::put_int32_field(16u32, val, buf);
                     }
                 }
+                if !self.display_name.is_empty() {
+                    ::buffa::types::put_string_field(17u32, &self.display_name, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -115935,6 +120198,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.provider_user_id) {
                     __map.serialize_entry("providerUserId", self.provider_user_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.display_name) {
+                    __map.serialize_entry("displayName", self.display_name)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.challenge_code) {
                     __map.serialize_entry("challengeCode", self.challenge_code)?;
@@ -116110,23 +120376,36 @@ pub mod __buffa {
                 self.0.reborrow().method
             }
             /// Provider handle being verified. Handles are returned lowercase and without
-            /// a leading "@".
+            /// a leading "@". For Telegram, the username of the account that submitted the
+            /// code; empty when that account has no username.
             ///
             /// Field 2: `handle`
             #[must_use]
             pub fn handle(&self) -> &'_ str {
                 self.0.reborrow().handle
             }
-            /// Stable provider-side user identifier. Empty until verification succeeds.
+            /// Stable provider-side user identifier. Empty until verification succeeds,
+            /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
+            /// the numeric user ID of the Telegram account that submitted the code, the
+            /// value ConfirmSocialVerification takes.
             ///
             /// Field 3: `provider_user_id`
             #[must_use]
             pub fn provider_user_id(&self) -> &'_ str {
                 self.0.reborrow().provider_user_id
             }
+            /// Provider display name of the account being verified, for showing it to the
+            /// user. Telegram only: the account's name, set once the code is submitted.
+            /// Empty for other providers.
+            ///
+            /// Field 17: `display_name`
+            #[must_use]
+            pub fn display_name(&self) -> &'_ str {
+                self.0.reborrow().display_name
+            }
             /// Challenge code the user must submit according to the verification method.
-            /// Discord codes are returned only when a challenge is issued. Codes expire
-            /// after 15 minutes.
+            /// Discord and Telegram codes are returned only when a challenge is issued.
+            /// Codes expire after 15 minutes.
             ///
             /// Field 13: `challenge_code`
             #[must_use]
@@ -116249,12 +120528,13 @@ pub mod __buffa {
             /// Field 1: `provider`
             pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
             /// Verification method. If unspecified, profile verification is used for
-            /// X/Twitter and channel verification is used for Discord.
+            /// X/Twitter, channel verification for Discord and direct message
+            /// verification for Telegram.
             ///
             /// Field 3: `method`
             pub method: ::buffa::EnumValue<super::super::SocialVerificationMethod>,
             /// Provider handle the user claims. Required for X/Twitter and omitted for
-            /// Discord, where the authenticated bot supplies the provider identity.
+            /// Discord and Telegram, where the provider bot supplies the provider identity.
             /// A leading "@" is accepted and removed from X/Twitter handles.
             ///
             /// Field 2: `handle`
@@ -116546,7 +120826,8 @@ pub mod __buffa {
                 self.0.reborrow().provider
             }
             /// Verification method. If unspecified, profile verification is used for
-            /// X/Twitter and channel verification is used for Discord.
+            /// X/Twitter, channel verification for Discord and direct message
+            /// verification for Telegram.
             ///
             /// Field 3: `method`
             #[must_use]
@@ -116556,7 +120837,7 @@ pub mod __buffa {
                 self.0.reborrow().method
             }
             /// Provider handle the user claims. Required for X/Twitter and omitted for
-            /// Discord, where the authenticated bot supplies the provider identity.
+            /// Discord and Telegram, where the provider bot supplies the provider identity.
             /// A leading "@" is accepted and removed from X/Twitter handles.
             ///
             /// Field 2: `handle`
@@ -116622,6 +120903,12 @@ pub mod __buffa {
             pub verification: ::buffa::MessageFieldView<
                 super::super::__buffa::view::SocialVerificationView<'a>,
             >,
+            /// Link that completes the user action, when the provider has one. Telegram:
+            /// opening it starts a chat with the Polyester bot that submits the code.
+            /// Empty for other providers.
+            ///
+            /// Field 4: `action_url`
+            pub action_url: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for StartSocialVerificationResponseView<'a> {
@@ -116712,6 +120999,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.action_url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -116758,6 +121052,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    action_url: self.action_url.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -116794,6 +121089,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if !self.action_url.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.action_url)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -116823,6 +121124,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.verification.write_to(__cache, buf);
+                }
+                if !self.action_url.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.action_url, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -116863,6 +121167,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("verification", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.action_url) {
+                    __map.serialize_entry("actionUrl", self.action_url)?;
                 }
                 __map.end()
             }
@@ -116994,6 +121301,15 @@ pub mod __buffa {
                 super::super::__buffa::view::SocialVerificationView<'_>,
             > {
                 &self.0.reborrow().verification
+            }
+            /// Link that completes the user action, when the provider has one. Telegram:
+            /// opening it starts a chat with the Polyester bot that submits the code.
+            /// Empty for other providers.
+            ///
+            /// Field 4: `action_url`
+            #[must_use]
+            pub fn action_url(&self) -> &'_ str {
+                self.0.reborrow().action_url
             }
         }
         impl ::core::convert::From<
@@ -118255,6 +122571,1265 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ConfirmSocialVerificationRequest links the provider account that submitted
+        /// the caller's challenge code.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConfirmSocialVerificationRequestView<'a> {
+            /// Provider account to confirm. Only TELEGRAM is accepted.
+            ///
+            /// Field 1: `provider`
+            pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
+            /// Provider user ID the user confirms, as provider_user_id of the verification
+            /// in STATUS_AWAITING_CONFIRMATION. The request fails when it is not the
+            /// account that submitted the code, so the user links exactly the account
+            /// they were shown.
+            ///
+            /// Field 2: `provider_user_id`
+            pub provider_user_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConfirmSocialVerificationRequestView<'a> {
+            type Owned = super::super::ConfirmSocialVerificationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.provider_user_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConfirmSocialVerificationRequest {
+                    provider: self.provider,
+                    provider_user_id: self.provider_user_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConfirmSocialVerificationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.provider_user_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.provider_user_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.provider_user_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.provider_user_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConfirmSocialVerificationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.provider,
+                ) {
+                    __map.serialize_entry("provider", &self.provider)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.provider_user_id) {
+                    __map.serialize_entry("providerUserId", self.provider_user_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConfirmSocialVerificationRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ConfirmSocialVerificationRequest";
+            const FULL_NAME: &'static str = "auth.v1.ConfirmSocialVerificationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationRequest";
+        }
+        ::buffa::impl_default_view_instance!(ConfirmSocialVerificationRequestView);
+        ::buffa::impl_view_reborrow!(ConfirmSocialVerificationRequestView);
+        /** Self-contained, `'static` owned view of a `ConfirmSocialVerificationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConfirmSocialVerificationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConfirmSocialVerificationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConfirmSocialVerificationRequestOwnedView(
+            ::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>>,
+        );
+        impl ConfirmSocialVerificationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConfirmSocialVerificationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ConfirmSocialVerificationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConfirmSocialVerificationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Provider account to confirm. Only TELEGRAM is accepted.
+            ///
+            /// Field 1: `provider`
+            #[must_use]
+            pub fn provider(&self) -> ::buffa::EnumValue<super::super::SocialProvider> {
+                self.0.reborrow().provider
+            }
+            /// Provider user ID the user confirms, as provider_user_id of the verification
+            /// in STATUS_AWAITING_CONFIRMATION. The request fails when it is not the
+            /// account that submitted the code, so the user links exactly the account
+            /// they were shown.
+            ///
+            /// Field 2: `provider_user_id`
+            #[must_use]
+            pub fn provider_user_id(&self) -> &'_ str {
+                self.0.reborrow().provider_user_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>>,
+        > for ConfirmSocialVerificationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>>,
+            ) -> Self {
+                ConfirmSocialVerificationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConfirmSocialVerificationRequestOwnedView>
+        for ::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>> {
+            fn from(wrapper: ConfirmSocialVerificationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>>,
+        > for ConfirmSocialVerificationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ConfirmSocialVerificationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ConfirmSocialVerificationRequest {
+            type View<'a> = ConfirmSocialVerificationRequestView<'a>;
+            type ViewHandle = ConfirmSocialVerificationRequestOwnedView;
+        }
+        impl ::serde::Serialize for ConfirmSocialVerificationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ConfirmSocialVerificationResponse returns the verification after the
+        /// provider account was linked.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConfirmSocialVerificationResponseView<'a> {
+            /// Current verification state, STATUS_VERIFIED.
+            ///
+            /// Field 1: `verification`
+            pub verification: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SocialVerificationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConfirmSocialVerificationResponseView<'a> {
+            type Owned = super::super::ConfirmSocialVerificationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.verification.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.verification = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SocialVerificationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConfirmSocialVerificationResponse {
+                    verification: match self.verification.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::SocialVerification,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConfirmSocialVerificationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.verification.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.verification.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.verification.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.verification.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConfirmSocialVerificationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .verification
+                        .as_option()
+                    {
+                        __map.serialize_entry("verification", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConfirmSocialVerificationResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ConfirmSocialVerificationResponse";
+            const FULL_NAME: &'static str = "auth.v1.ConfirmSocialVerificationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConfirmSocialVerificationResponse";
+        }
+        ::buffa::impl_default_view_instance!(ConfirmSocialVerificationResponseView);
+        ::buffa::impl_view_reborrow!(ConfirmSocialVerificationResponseView);
+        /** Self-contained, `'static` owned view of a `ConfirmSocialVerificationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConfirmSocialVerificationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConfirmSocialVerificationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConfirmSocialVerificationResponseOwnedView(
+            ::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>>,
+        );
+        impl ConfirmSocialVerificationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConfirmSocialVerificationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConfirmSocialVerificationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ConfirmSocialVerificationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConfirmSocialVerificationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConfirmSocialVerificationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Current verification state, STATUS_VERIFIED.
+            ///
+            /// Field 1: `verification`
+            #[must_use]
+            pub fn verification(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SocialVerificationView<'_>,
+            > {
+                &self.0.reborrow().verification
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>>,
+        > for ConfirmSocialVerificationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>>,
+            ) -> Self {
+                ConfirmSocialVerificationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConfirmSocialVerificationResponseOwnedView>
+        for ::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>> {
+            fn from(wrapper: ConfirmSocialVerificationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>>,
+        > for ConfirmSocialVerificationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ConfirmSocialVerificationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::ConfirmSocialVerificationResponse {
+            type View<'a> = ConfirmSocialVerificationResponseView<'a>;
+            type ViewHandle = ConfirmSocialVerificationResponseOwnedView;
+        }
+        impl ::serde::Serialize for ConfirmSocialVerificationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// UnlinkSocialAccountRequest removes the caller's linked provider account, or
+        /// cancels a link in progress.
+        #[derive(Clone, Debug, Default)]
+        pub struct UnlinkSocialAccountRequestView<'a> {
+            /// Provider account to unlink. Only TELEGRAM is accepted.
+            ///
+            /// Field 1: `provider`
+            pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UnlinkSocialAccountRequestView<'a> {
+            type Owned = super::super::UnlinkSocialAccountRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.provider = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UnlinkSocialAccountRequest {
+                    provider: self.provider,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UnlinkSocialAccountRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.provider.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UnlinkSocialAccountRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.provider,
+                ) {
+                    __map.serialize_entry("provider", &self.provider)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UnlinkSocialAccountRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "UnlinkSocialAccountRequest";
+            const FULL_NAME: &'static str = "auth.v1.UnlinkSocialAccountRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountRequest";
+        }
+        ::buffa::impl_default_view_instance!(UnlinkSocialAccountRequestView);
+        ::buffa::impl_view_reborrow!(UnlinkSocialAccountRequestView);
+        /** Self-contained, `'static` owned view of a `UnlinkSocialAccountRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UnlinkSocialAccountRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UnlinkSocialAccountRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UnlinkSocialAccountRequestOwnedView(
+            ::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>>,
+        );
+        impl UnlinkSocialAccountRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UnlinkSocialAccountRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UnlinkSocialAccountRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UnlinkSocialAccountRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Provider account to unlink. Only TELEGRAM is accepted.
+            ///
+            /// Field 1: `provider`
+            #[must_use]
+            pub fn provider(&self) -> ::buffa::EnumValue<super::super::SocialProvider> {
+                self.0.reborrow().provider
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>>,
+        > for UnlinkSocialAccountRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>>,
+            ) -> Self {
+                UnlinkSocialAccountRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UnlinkSocialAccountRequestOwnedView>
+        for ::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>> {
+            fn from(wrapper: UnlinkSocialAccountRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>>,
+        > for UnlinkSocialAccountRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UnlinkSocialAccountRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UnlinkSocialAccountRequest {
+            type View<'a> = UnlinkSocialAccountRequestView<'a>;
+            type ViewHandle = UnlinkSocialAccountRequestOwnedView;
+        }
+        impl ::serde::Serialize for UnlinkSocialAccountRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// UnlinkSocialAccountResponse returns the verification after unlinking.
+        #[derive(Clone, Debug, Default)]
+        pub struct UnlinkSocialAccountResponseView<'a> {
+            /// Current verification state, STATUS_CANCELLED. Absent when no verification
+            /// was ever started for the provider.
+            ///
+            /// Field 1: `verification`
+            pub verification: ::buffa::MessageFieldView<
+                super::super::__buffa::view::SocialVerificationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UnlinkSocialAccountResponseView<'a> {
+            type Owned = super::super::UnlinkSocialAccountResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.verification.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.verification = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::SocialVerificationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UnlinkSocialAccountResponse {
+                    verification: match self.verification.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::SocialVerification,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UnlinkSocialAccountResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.verification.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.verification.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.verification.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.verification.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UnlinkSocialAccountResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .verification
+                        .as_option()
+                    {
+                        __map.serialize_entry("verification", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UnlinkSocialAccountResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "UnlinkSocialAccountResponse";
+            const FULL_NAME: &'static str = "auth.v1.UnlinkSocialAccountResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.UnlinkSocialAccountResponse";
+        }
+        ::buffa::impl_default_view_instance!(UnlinkSocialAccountResponseView);
+        ::buffa::impl_view_reborrow!(UnlinkSocialAccountResponseView);
+        /** Self-contained, `'static` owned view of a `UnlinkSocialAccountResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UnlinkSocialAccountResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UnlinkSocialAccountResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UnlinkSocialAccountResponseOwnedView(
+            ::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>>,
+        );
+        impl UnlinkSocialAccountResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UnlinkSocialAccountResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnlinkSocialAccountResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`UnlinkSocialAccountResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UnlinkSocialAccountResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnlinkSocialAccountResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Current verification state, STATUS_CANCELLED. Absent when no verification
+            /// was ever started for the provider.
+            ///
+            /// Field 1: `verification`
+            #[must_use]
+            pub fn verification(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::SocialVerificationView<'_>,
+            > {
+                &self.0.reborrow().verification
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>>,
+        > for UnlinkSocialAccountResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>>,
+            ) -> Self {
+                UnlinkSocialAccountResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UnlinkSocialAccountResponseOwnedView>
+        for ::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>> {
+            fn from(wrapper: UnlinkSocialAccountResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>>,
+        > for UnlinkSocialAccountResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UnlinkSocialAccountResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UnlinkSocialAccountResponse {
+            type View<'a> = UnlinkSocialAccountResponseView<'a>;
+            type ViewHandle = UnlinkSocialAccountResponseOwnedView;
+        }
+        impl ::serde::Serialize for UnlinkSocialAccountResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -118598,6 +124173,13 @@ pub mod __buffa {
         reg.register_json_any(super::__API_KEY_UPDATE_SPEC_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_KEY_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_API_KEY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__ASSISTANT_KEY_SPEC_JSON_ANY);
+        reg.register_json_any(super::__SET_ASSISTANT_KEYS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_ASSISTANT_KEYS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_ASSISTANT_KEYS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ASSISTANT_KEYS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_ASSISTANT_KEYS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARKET_SCOPE_JSON_ANY);
         reg.register_json_any(super::__SPOT_MARKET_SELECTOR_JSON_ANY);
         reg.register_json_any(super::__SPOT_MARKET_RULE_JSON_ANY);
@@ -118789,6 +124371,10 @@ pub mod __buffa {
         reg.register_json_any(super::__SOCIAL_VERIFICATION_READY_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_SOCIAL_VERIFICATION_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_SOCIAL_VERIFICATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CONFIRM_SOCIAL_VERIFICATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CONFIRM_SOCIAL_VERIFICATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNLINK_SOCIAL_ACCOUNT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__UNLINK_SOCIAL_ACCOUNT_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -118839,6 +124425,34 @@ pub use self::__buffa::view::UpdateApiKeyRequestOwnedView;
 pub use self::__buffa::view::UpdateApiKeyResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateApiKeyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AssistantKeySpecView;
+#[doc(inline)]
+pub use self::__buffa::view::AssistantKeySpecOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAssistantKeysRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAssistantKeysRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAssistantKeysResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetAssistantKeysResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAssistantKeysRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAssistantKeysRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAssistantKeysResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAssistantKeysResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteAssistantKeysRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteAssistantKeysRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteAssistantKeysResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteAssistantKeysResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::MarketScopeView;
 #[doc(inline)]
@@ -119555,5 +125169,21 @@ pub use self::__buffa::view::GetSocialVerificationRequestOwnedView;
 pub use self::__buffa::view::GetSocialVerificationResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSocialVerificationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConfirmSocialVerificationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ConfirmSocialVerificationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConfirmSocialVerificationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ConfirmSocialVerificationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkSocialAccountRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkSocialAccountRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkSocialAccountResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::UnlinkSocialAccountResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

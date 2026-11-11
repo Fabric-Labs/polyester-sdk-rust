@@ -193,6 +193,10 @@ pub enum TransferCode {
     /// Balance adjustment with a system account, including account seeding credits or corrections.
     /// May credit or debit the user's account; the transfer direction identifies which.
     SYSTEM_ADJUSTMENT = 1074i32,
+    /// Funds that left the account for a withdrawal that Zipper rejected or that failed to execute.
+    /// A rejected withdrawal refunds its net amount to the user's own wallet; the withdrawal fee is
+    /// not refunded.
+    WITHDRAW_FAILED = 1075i32,
 }
 impl TransferCode {
     ///Idiomatic alias for [`Self::TRANSFER_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -258,6 +262,9 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::SYSTEM_ADJUSTMENT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SystemAdjustment: Self = Self::SYSTEM_ADJUSTMENT;
+    ///Idiomatic alias for [`Self::WITHDRAW_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const WithdrawFailed: Self = Self::WITHDRAW_FAILED;
 }
 impl ::core::default::Default for TransferCode {
     fn default() -> Self {
@@ -374,6 +381,7 @@ impl ::buffa::Enumeration for TransferCode {
             1072i32 => ::core::option::Option::Some(Self::FEE_SWEEP),
             1073i32 => ::core::option::Option::Some(Self::FEE_REFILL),
             1074i32 => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
+            1075i32 => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
             _ => ::core::option::Option::None,
         }
     }
@@ -403,6 +411,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_SWEEP => "FEE_SWEEP",
             Self::FEE_REFILL => "FEE_REFILL",
             Self::SYSTEM_ADJUSTMENT => "SYSTEM_ADJUSTMENT",
+            Self::WITHDRAW_FAILED => "WITHDRAW_FAILED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -448,6 +457,7 @@ impl ::buffa::Enumeration for TransferCode {
             "FEE_SWEEP" => ::core::option::Option::Some(Self::FEE_SWEEP),
             "FEE_REFILL" => ::core::option::Option::Some(Self::FEE_REFILL),
             "SYSTEM_ADJUSTMENT" => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
+            "WITHDRAW_FAILED" => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
             _ => ::core::option::Option::None,
         }
     }
@@ -474,6 +484,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_SWEEP,
             Self::FEE_REFILL,
             Self::SYSTEM_ADJUSTMENT,
+            Self::WITHDRAW_FAILED,
         ]
     }
 }

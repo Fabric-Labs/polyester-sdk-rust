@@ -1434,7 +1434,12 @@ impl OrdersService {
     /// Schedules cancel-all-after for the account scope.
     ///
     /// When it fires, the dead-man switch cancels open orders, never
-    /// triggers: the client's triggers stay live. Cancel them with
+    /// triggers: standalone stop-loss, take-profit and trailing triggers and
+    /// TWAPs stay live and can place new orders; a ladder stops once its
+    /// levels are canceled. An attached stop-loss, take-profit or trailing leg
+    /// whose working exit order is canceled ends, and with `oco` so do the
+    /// parent's other legs, so the position loses that protection. Cancel
+    /// triggers first with
     /// [`crate::services::TriggersService::cancel`], or stop everything with
     /// [`crate::Client::stop_all_trading`].
     ///
@@ -1551,8 +1556,12 @@ impl OrdersService {
     /// Open orders only, never triggers: orders that triggers placed (a TWAP
     /// slice, ladder levels, a fired stop's order, an attached leg's working
     /// exit) are canceled like any other, but the triggers stay live and keep
-    /// their reserved funds. `matched_orders` counts orders, never triggers.
-    /// To stop all automated trading use [`crate::Client::stop_all_trading`].
+    /// their reserved funds. An attached stop-loss, take-profit or trailing
+    /// leg whose working exit order is canceled ends, with its OCO siblings,
+    /// so the position loses that protection; other attached legs keep
+    /// protecting the parent's filled quantity. `matched_orders` counts
+    /// orders, never triggers. To stop all automated trading use
+    /// [`crate::Client::stop_all_trading`], which cancels the triggers first.
     ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value via [`Self::cancel_all_with`] when retrying the same logical bulk cancellation.

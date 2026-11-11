@@ -40,6 +40,30 @@ pub type OwnedUpdateApiKeyRequestView = ::buffa::view::OwnedView<
 pub type OwnedUpdateApiKeyResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::UpdateApiKeyResponseView<'static>,
 >;
+///Shorthand for `OwnedView<SetAssistantKeysRequestView<'static>>`.
+pub type OwnedSetAssistantKeysRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::SetAssistantKeysRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetAssistantKeysResponseView<'static>>`.
+pub type OwnedSetAssistantKeysResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::SetAssistantKeysResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListAssistantKeysRequestView<'static>>`.
+pub type OwnedListAssistantKeysRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAssistantKeysRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListAssistantKeysResponseView<'static>>`.
+pub type OwnedListAssistantKeysResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAssistantKeysResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteAssistantKeysRequestView<'static>>`.
+pub type OwnedDeleteAssistantKeysRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteAssistantKeysResponseView<'static>>`.
+pub type OwnedDeleteAssistantKeysResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::auth::v1::CreateApiKeyResponse>
 for crate::proto::auth::v1::__buffa::view::CreateApiKeyResponseView<'_> {
     fn encode(
@@ -140,6 +164,66 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::auth::v1::SetAssistantKeysResponse>
+for crate::proto::auth::v1::__buffa::view::SetAssistantKeysResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::SetAssistantKeysResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::SetAssistantKeysResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListAssistantKeysResponse>
+for crate::proto::auth::v1::__buffa::view::ListAssistantKeysResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListAssistantKeysResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAssistantKeysResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteAssistantKeysResponse>
+for crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DeleteAssistantKeysResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const API_KEY_SERVICE_SERVICE_NAME: &str = "auth.v1.ApiKeyService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateApiKey` RPC.
@@ -184,6 +268,33 @@ pub const API_KEY_SERVICE_DELETE_API_KEY_SPEC: ::connectrpc::Spec = ::connectrpc
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const API_KEY_SERVICE_UPDATE_API_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/auth.v1.ApiKeyService/UpdateApiKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetAssistantKeys` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const API_KEY_SERVICE_SET_ASSISTANT_KEYS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ApiKeyService/SetAssistantKeys",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListAssistantKeys` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const API_KEY_SERVICE_LIST_ASSISTANT_KEYS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ApiKeyService/ListAssistantKeys",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DeleteAssistantKeys` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const API_KEY_SERVICE_DELETE_ASSISTANT_KEYS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ApiKeyService/DeleteAssistantKeys",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -358,6 +469,95 @@ pub trait ApiKeyService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::UpdateApiKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Create or replace the caller's Polyester AI assistant key set: one
+    /// ASSISTANT key per enabled account, each bounded by its API policy. One
+    /// fresh step-up proof covers the whole set, and the change is all or
+    /// nothing. An entry whose account already has an assistant key with the same
+    /// public key keeps that key, with its status, and takes the requested
+    /// policy; any other entry replaces the account's key. Accounts left out of
+    /// the set have their assistant key revoked. A sub-account entry needs the
+    /// same access as CreateApiKey: owner, or a role that manages its API keys.
+    /// The acting caller's root account must have accepted the current terms;
+    /// otherwise FailedPrecondition with AUTH_TERMS_NOT_ACCEPTED is returned. A
+    /// policy that allows a money-out action returns FailedPrecondition with
+    /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED. A new key is registered only with
+    /// the registration proof and deadline the assistant issued with it
+    /// (PrepareAssistantKeys), before that deadline: a missing or failing proof
+    /// returns InvalidArgument with AUTH_ASSISTANT_KEY_PROOF_INVALID, a passed
+    /// deadline FailedPrecondition with AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED,
+    /// and one more than 15 minutes ahead InvalidArgument with
+    /// AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_assistant_keys<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::SetAssistantKeysRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::SetAssistantKeysResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// List the caller's non-revoked Polyester AI assistant keys, newest first.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_assistant_keys<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ListAssistantKeysRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ListAssistantKeysResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Revoke the caller's whole Polyester AI assistant key set. Revocation only
+    /// removes access, so it needs no step-up proof. Revocation is permanent. As
+    /// for DeleteApiKey, key management sees it at once, and requests signed with
+    /// a revoked key are refused within a few seconds of the response.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_assistant_keys<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::DeleteAssistantKeysRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::DeleteAssistantKeysResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -536,6 +736,93 @@ impl<S: ApiKeyService> ApiKeyServiceExt for S {
                 },
             )
             .with_spec(API_KEY_SERVICE_UPDATE_API_KEY_SPEC)
+            .route_view(
+                API_KEY_SERVICE_SERVICE_NAME,
+                "SetAssistantKeys",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::SetAssistantKeysRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::SetAssistantKeysRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_assistant_keys(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::SetAssistantKeysResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(API_KEY_SERVICE_SET_ASSISTANT_KEYS_SPEC)
+            .route_view(
+                API_KEY_SERVICE_SERVICE_NAME,
+                "ListAssistantKeys",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ListAssistantKeysRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ListAssistantKeysRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_assistant_keys(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ListAssistantKeysResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(API_KEY_SERVICE_LIST_ASSISTANT_KEYS_SPEC)
+            .route_view(
+                API_KEY_SERVICE_SERVICE_NAME,
+                "DeleteAssistantKeys",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::DeleteAssistantKeysRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_assistant_keys(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::DeleteAssistantKeysResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(API_KEY_SERVICE_DELETE_ASSISTANT_KEYS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -618,6 +905,24 @@ impl<T: ApiKeyService> ::connectrpc::Dispatcher for ApiKeyServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(API_KEY_SERVICE_UPDATE_API_KEY_SPEC),
+                )
+            }
+            "SetAssistantKeys" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(API_KEY_SERVICE_SET_ASSISTANT_KEYS_SPEC),
+                )
+            }
+            "ListAssistantKeys" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(API_KEY_SERVICE_LIST_ASSISTANT_KEYS_SPEC),
+                )
+            }
+            "DeleteAssistantKeys" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(API_KEY_SERVICE_DELETE_ASSISTANT_KEYS_SPEC),
                 )
             }
             _ => None,
@@ -728,6 +1033,69 @@ impl<T: ApiKeyService> ::connectrpc::Dispatcher for ApiKeyServiceServer<T> {
                     svc.update_api_key(ctx, req)
                         .await?
                         .encode::<crate::proto::auth::v1::UpdateApiKeyResponse>(format)
+                })
+            }
+            "SetAssistantKeys" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::SetAssistantKeysRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::SetAssistantKeysRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::SetAssistantKeysRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_assistant_keys(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::SetAssistantKeysResponse,
+                        >(format)
+                })
+            }
+            "ListAssistantKeys" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ListAssistantKeysRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ListAssistantKeysRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ListAssistantKeysRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_assistant_keys(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ListAssistantKeysResponse,
+                        >(format)
+                })
+            }
+            "DeleteAssistantKeys" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::DeleteAssistantKeysRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::DeleteAssistantKeysRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_assistant_keys(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::DeleteAssistantKeysResponse,
+                        >(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -1032,6 +1400,141 @@ where
                 &self.config,
                 API_KEY_SERVICE_SERVICE_NAME,
                 "UpdateApiKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetAssistantKeys RPC. Sends a request to /auth.v1.ApiKeyService/SetAssistantKeys.
+    pub async fn set_assistant_keys(
+        &self,
+        request: crate::proto::auth::v1::SetAssistantKeysRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::SetAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_assistant_keys_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetAssistantKeys RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_assistant_keys_with_options(
+        &self,
+        request: crate::proto::auth::v1::SetAssistantKeysRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::SetAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                API_KEY_SERVICE_SERVICE_NAME,
+                "SetAssistantKeys",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListAssistantKeys RPC. Sends a request to /auth.v1.ApiKeyService/ListAssistantKeys.
+    pub async fn list_assistant_keys(
+        &self,
+        request: crate::proto::auth::v1::ListAssistantKeysRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_assistant_keys_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListAssistantKeys RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_assistant_keys_with_options(
+        &self,
+        request: crate::proto::auth::v1::ListAssistantKeysRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                API_KEY_SERVICE_SERVICE_NAME,
+                "ListAssistantKeys",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteAssistantKeys RPC. Sends a request to /auth.v1.ApiKeyService/DeleteAssistantKeys.
+    pub async fn delete_assistant_keys(
+        &self,
+        request: crate::proto::auth::v1::DeleteAssistantKeysRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_assistant_keys_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteAssistantKeys RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_assistant_keys_with_options(
+        &self,
+        request: crate::proto::auth::v1::DeleteAssistantKeysRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DeleteAssistantKeysResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                API_KEY_SERVICE_SERVICE_NAME,
+                "DeleteAssistantKeys",
                 request,
                 options,
             )
@@ -1751,7 +2254,9 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Change selected fields on an existing API key policy template.
+    /// Change selected fields on an existing API key policy template. Adding a
+    /// money-out action to a policy attached to an assistant API key returns
+    /// FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -1797,7 +2302,9 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Attach or clear an API key policy for a key.
+    /// Attach or clear an API key policy for a key. Attaching a policy that allows
+    /// a money-out action to an assistant API key returns FailedPrecondition with
+    /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -3750,7 +4257,10 @@ pub const SUBACCOUNT_VIEW_SERVICE_LIST_SUBACCOUNT_ACTIVITY_SPEC: ::connectrpc::S
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait SubaccountViewService: Send + Sync + 'static {
-    /// Aggregate commonly-needed read data for a sub-account dashboard page.
+    /// Aggregate commonly-needed read data for a sub-account dashboard page. An
+    /// API key needs READ_SUBACCOUNTS within its scope; it gets the members and
+    /// invites expansions only with READ_SUBACCOUNT_MEMBERS and
+    /// READ_SUBACCOUNT_INVITES, and never the API-key or policy expansions.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -3773,7 +4283,8 @@ pub trait SubaccountViewService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List audit and activity events for a sub-account.
+    /// List audit and activity events for a sub-account. An API key needs
+    /// READ_SUBACCOUNT_ACTIVITY within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4351,7 +4862,8 @@ pub const SUBACCOUNT_SERVICE_RESPOND_SUBACCOUNT_INVITE_SPEC: ::connectrpc::Spec 
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait SubaccountService: Send + Sync + 'static {
-    /// List sub-accounts owned by or shared with the caller.
+    /// List sub-accounts owned by or shared with the caller. An API key needs
+    /// READ_SUBACCOUNTS and lists only the sub-accounts within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4469,7 +4981,8 @@ pub trait SubaccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// List current members for a sub-account visible to any current member.
+    /// List current members for a sub-account visible to any current member. An
+    /// API key needs READ_SUBACCOUNT_MEMBERS within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4492,7 +5005,8 @@ pub trait SubaccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Remove a member from a sub-account (owner/admin only).
+    /// Remove a member from a sub-account (owner/admin only). The member's
+    /// assistant API keys on the sub-account are revoked with the removal.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4515,7 +5029,9 @@ pub trait SubaccountService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Update an existing sub-account member's role (owner/admin only).
+    /// Update an existing sub-account member's role (owner/admin only). A role
+    /// that cannot manage API keys revokes the member's assistant API keys on the
+    /// sub-account with the change.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -4562,6 +5078,8 @@ pub trait SubaccountService: Send + Sync + 'static {
         >,
     > + Send;
     /// List incoming invitations and invitations for administered sub-accounts.
+    /// An API key needs READ_SUBACCOUNT_INVITES and lists only the outgoing
+    /// invitations of the sub-accounts within its scope.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -6992,7 +7510,11 @@ pub const ADDRESS_BOOK_SERVICE_GET_ADDRESS_BOOK_VIEW_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Server trait for AddressBookService.
+/// AddressBookService serves saved destinations, transfer counterparties and
+/// whitelists. An API key reads them with READ_ADDRESS_BOOK or
+/// MANAGE_ADDRESS_BOOK on its policy, for the main account's book and for a
+/// sub-account's within its scope; address-book writes accept only a session
+/// token.
 ///
 /// # Implementing handlers
 ///
@@ -13931,6 +14453,22 @@ pub type OwnedSocialVerificationReadyRequestView = ::buffa::view::OwnedView<
 pub type OwnedSocialVerificationReadyResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::SocialVerificationReadyResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ConfirmSocialVerificationRequestView<'static>>`.
+pub type OwnedConfirmSocialVerificationRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ConfirmSocialVerificationResponseView<'static>>`.
+pub type OwnedConfirmSocialVerificationResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<UnlinkSocialAccountRequestView<'static>>`.
+pub type OwnedUnlinkSocialAccountRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountRequestView<'static>,
+>;
+///Shorthand for `OwnedView<UnlinkSocialAccountResponseView<'static>>`.
+pub type OwnedUnlinkSocialAccountResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<GetSocialVerificationRequestView<'static>>`.
 pub type OwnedGetSocialVerificationRequestView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::GetSocialVerificationRequestView<'static>,
@@ -13979,6 +14517,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ConfirmSocialVerificationResponse>
+for crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ConfirmSocialVerificationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::UnlinkSocialAccountResponse>
+for crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::UnlinkSocialAccountResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::auth::v1::GetSocialVerificationResponse>
 for crate::proto::auth::v1::__buffa::view::GetSocialVerificationResponseView<'_> {
     fn encode(
@@ -14016,6 +14594,24 @@ pub const SOCIAL_VERIFICATION_SERVICE_START_SOCIAL_VERIFICATION_SPEC: ::connectr
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const SOCIAL_VERIFICATION_SERVICE_SOCIAL_VERIFICATION_READY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/auth.v1.SocialVerificationService/SocialVerificationReady",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ConfirmSocialVerification` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SOCIAL_VERIFICATION_SERVICE_CONFIRM_SOCIAL_VERIFICATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.SocialVerificationService/ConfirmSocialVerification",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `UnlinkSocialAccount` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SOCIAL_VERIFICATION_SERVICE_UNLINK_SOCIAL_ACCOUNT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.SocialVerificationService/UnlinkSocialAccount",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -14080,6 +14676,9 @@ pub const SOCIAL_VERIFICATION_SERVICE_GET_SOCIAL_VERIFICATION_SPEC: ::connectrpc
 #[allow(clippy::type_complexity)]
 pub trait SocialVerificationService: Send + Sync + 'static {
     /// Start or restart social verification by issuing a new challenge code.
+    /// For Telegram, open action_url to send the code to the Polyester bot, then
+    /// confirm the account with ConfirmSocialVerification.
+    /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE for Telegram means a Telegram account is already linked; unlink it first.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -14106,6 +14705,7 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// AUTH_RESOURCE_NOT_FOUND means no verification exists; start one first.
     /// AUTH_SOCIAL_VERIFICATION_EXPIRED means the challenge window passed; start a new verification, then mark it ready again.
     /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE means Ready is not valid in the current state; call GetSocialVerification for the current status.
+    /// Telegram linking does not use Ready and always answers AUTH_SOCIAL_VERIFICATION_INVALID_STATE.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -14125,6 +14725,64 @@ pub trait SocialVerificationService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::SocialVerificationReadyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Link the Telegram account that submitted the caller's challenge code. A
+    /// linked Telegram account becomes a channel to the account, so the caller
+    /// needs enrolled MFA and a fresh, single-use step-up proof in the
+    /// X-Auth-Step-Up header, obtained by completing an MFA challenge for fresh
+    /// step-up. The link consumes the proof; a retried confirmation of an existing
+    /// link needs no new proof.
+    /// AUTH_RESOURCE_NOT_FOUND means no verification exists; start one first.
+    /// AUTH_SOCIAL_VERIFICATION_EXPIRED means the challenge window passed; start a new verification.
+    /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE means no submitted account awaits confirmation, or provider_user_id is not the account that submitted the code.
+    /// AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED means that Telegram account is linked to another Polyester account; the verification fails.
+    /// AUTH_MFA_NOT_ENROLLED means enroll MFA first; AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new fresh step-up and retry.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn confirm_social_verification<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ConfirmSocialVerificationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Unlink the caller's Telegram account, or cancel a Telegram link in progress.
+    /// Unlinking again succeeds and changes nothing. To link again, start a new
+    /// verification.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn unlink_social_account<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::UnlinkSocialAccountRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::UnlinkSocialAccountResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -14247,6 +14905,64 @@ impl<S: SocialVerificationService> SocialVerificationServiceExt for S {
             .with_spec(SOCIAL_VERIFICATION_SERVICE_SOCIAL_VERIFICATION_READY_SPEC)
             .route_view(
                 SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
+                "ConfirmSocialVerification",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.confirm_social_verification(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ConfirmSocialVerificationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SOCIAL_VERIFICATION_SERVICE_CONFIRM_SOCIAL_VERIFICATION_SPEC)
+            .route_view(
+                SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
+                "UnlinkSocialAccount",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::UnlinkSocialAccountRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.unlink_social_account(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::UnlinkSocialAccountResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SOCIAL_VERIFICATION_SERVICE_UNLINK_SOCIAL_ACCOUNT_SPEC)
+            .route_view(
+                SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
                 "GetSocialVerification",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -14347,6 +15063,22 @@ for SocialVerificationServiceServer<T> {
                         ),
                 )
             }
+            "ConfirmSocialVerification" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            SOCIAL_VERIFICATION_SERVICE_CONFIRM_SOCIAL_VERIFICATION_SPEC,
+                        ),
+                )
+            }
+            "UnlinkSocialAccount" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            SOCIAL_VERIFICATION_SERVICE_UNLINK_SOCIAL_ACCOUNT_SPEC,
+                        ),
+                )
+            }
             "GetSocialVerification" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -14409,6 +15141,48 @@ for SocialVerificationServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::auth::v1::SocialVerificationReadyResponse,
+                        >(format)
+                })
+            }
+            "ConfirmSocialVerification" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+                    >::from_parts(&req, &body);
+                    svc.confirm_social_verification(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ConfirmSocialVerificationResponse,
+                        >(format)
+                })
+            }
+            "UnlinkSocialAccount" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::UnlinkSocialAccountRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::UnlinkSocialAccountRequest,
+                    >::from_parts(&req, &body);
+                    svc.unlink_social_account(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::UnlinkSocialAccountResponse,
                         >(format)
                 })
             }
@@ -14620,6 +15394,96 @@ where
                 &self.config,
                 SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
                 "SocialVerificationReady",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ConfirmSocialVerification RPC. Sends a request to /auth.v1.SocialVerificationService/ConfirmSocialVerification.
+    pub async fn confirm_social_verification(
+        &self,
+        request: crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.confirm_social_verification_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ConfirmSocialVerification RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn confirm_social_verification_with_options(
+        &self,
+        request: crate::proto::auth::v1::ConfirmSocialVerificationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ConfirmSocialVerificationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
+                "ConfirmSocialVerification",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the UnlinkSocialAccount RPC. Sends a request to /auth.v1.SocialVerificationService/UnlinkSocialAccount.
+    pub async fn unlink_social_account(
+        &self,
+        request: crate::proto::auth::v1::UnlinkSocialAccountRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.unlink_social_account_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the UnlinkSocialAccount RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn unlink_social_account_with_options(
+        &self,
+        request: crate::proto::auth::v1::UnlinkSocialAccountRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::UnlinkSocialAccountResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SOCIAL_VERIFICATION_SERVICE_SERVICE_NAME,
+                "UnlinkSocialAccount",
                 request,
                 options,
             )

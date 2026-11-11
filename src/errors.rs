@@ -8,6 +8,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 use crate::models::{OrderFieldViolation, RateLimitDetail};
+use crate::proto::alerts::v1::{ErrorCode as AlertErrorCode, ErrorDetail as AlertErrorDetail};
 use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
@@ -374,6 +375,15 @@ pub mod auth_codes {
     /// sooner. See
     /// [`super::Error::is_replay_capacity_exhausted`].
     pub const REPLAY_CAPACITY_EXHAUSTED: &str = "AUTH_REPLAY_CAPACITY_EXHAUSTED";
+    /// The server already saw this exact signed login or request (REST
+    /// `REPLAY_DETECTED`, HTTP 401): a final [`super::Error::ApiKeyRejected`],
+    /// not retryable as is, since the first copy may have been applied. Each
+    /// request this SDK signs gets its own timestamp, so it means one signed
+    /// request was sent twice; read a mutation back before sending it again.
+    /// Signed trading and market-data WebSocket upgrades also carry a
+    /// single-use login nonce; this SDK's private streams authenticate with
+    /// realtime tokens over signed HTTP and send none.
+    pub const REPLAY_DETECTED: &str = "AUTH_REPLAY_DETECTED";
     /// A valid signed wallet login named an account address no account uses,
     /// and the signing wallet is already linked to another account
     /// (ConnectRPC `already_exists`, REST 409). Wallets are not moved between
@@ -400,6 +410,34 @@ pub mod auth_codes {
             .or_else(|| AuthErrorCode::from_proto_name(&format!("AUTH_{code}")))
             .filter(|value| value.to_i32() != 0)
     }
+}
+
+/// Stable `alerts.v1.ErrorDetail` codes of the price alert service, read from
+/// [`Error::Api`]'s `code`. `SUBACCOUNT_KEY_REFUSED` (an API key scoped to a
+/// sub-account; alerts belong to the root account) is an
+/// [`Error::PermissionDenied`] with that code instead.
+pub mod alert_codes {
+    /// The market's price could not be read; nothing changed. Retryable.
+    pub const PRICE_UNAVAILABLE: &str = "PRICE_UNAVAILABLE";
+    /// The alert service cannot answer now. As for other services, the
+    /// outcome of a create, update or cancel is unknown
+    /// ([`super::Error::mutation_outcome_unknown`]): send it again with the
+    /// same idempotency key (cancel is idempotent), or read the alerts back.
+    pub const SERVICE_UNAVAILABLE: &str = "SERVICE_UNAVAILABLE";
+    /// `expected_revision` is stale: read the alert again.
+    pub const REVISION_CONFLICT: &str = "REVISION_CONFLICT";
+    /// The idempotency key was used for another request.
+    pub const IDEMPOTENCY_CONFLICT: &str = "IDEMPOTENCY_CONFLICT";
+    /// The alert already holds 1000 update keys; updates without a key, and
+    /// repeats of stored keys, still work.
+    pub const ALERT_UPDATE_LIMIT_REACHED: &str = "ALERT_UPDATE_LIMIT_REACHED";
+    /// The account holds as many alerts as it may.
+    pub const ALERT_LIMIT_REACHED: &str = "ALERT_LIMIT_REACHED";
+    /// No such alert; another account's alert reads the same.
+    pub const ALERT_NOT_FOUND: &str = "ALERT_NOT_FOUND";
+    /// The root account's API key was refused because it is scoped to a
+    /// sub-account.
+    pub const SUBACCOUNT_KEY_REFUSED: &str = "SUBACCOUNT_KEY_REFUSED";
 }
 
 /// Stable REST problem codes that every service answers alike.
@@ -488,7 +526,7 @@ pub mod order_codes {
 /// API-key credential refusals a service answers with an
 /// `auth.v1.AuthErrorDetail`. They map to [`Error::ApiKeyRejected`], as the
 /// API gateway's answers for the same reasons do.
-const API_KEY_REJECTIONS: [AuthErrorCode; 7] = [
+const API_KEY_REJECTIONS: [AuthErrorCode; 8] = [
     AuthErrorCode::AUTH_SIGNATURE_INVALID,
     AuthErrorCode::AUTH_MISSING_HEADERS,
     AuthErrorCode::AUTH_KEY_EXPIRED,
@@ -496,6 +534,7 @@ const API_KEY_REJECTIONS: [AuthErrorCode; 7] = [
     AuthErrorCode::AUTH_IP_NOT_ALLOWED,
     AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
     AuthErrorCode::AUTH_RECV_WINDOW_INVALID,
+    AuthErrorCode::AUTH_REPLAY_DETECTED,
 ];
 
 /// Whether a REST or API-gateway `code` refuses the API key's credentials,
@@ -509,6 +548,41 @@ pub(crate) fn is_credential_refusal_code(code: &str) -> bool {
 
 /// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
 const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
+/// [`Error::Api`] metadata key holding [`Error::withdraw_field_path`].
+const WITHDRAW_FIELD_PATH_METADATA: &str = "withdraw_field_path";
+/// [`Error::Api`] metadata key holding [`Error::withdraw_min_floor_e18`].
+const WITHDRAW_MIN_FLOOR_METADATA: &str = "withdraw_min_floor_e18";
+/// [`Error::Api`] metadata key holding [`Error::withdraw_payable_from`], as
+/// `<unix seconds>.<nanoseconds>`.
+const WITHDRAW_PAYABLE_FROM_METADATA: &str = "withdraw_payable_from";
+
+/// The optional fields of a `chain.withdraw.v1.ErrorDetail`, as
+/// [`Error::Api`] metadata.
+fn withdraw_detail_metadata(detail: &WithdrawErrorDetail) -> Vec<(String, String)> {
+    let mut metadata = Vec::new();
+    if !detail.field_path.is_empty() {
+        metadata.push((
+            WITHDRAW_FIELD_PATH_METADATA.to_owned(),
+            detail.field_path.clone(),
+        ));
+    }
+    if let Some(floor) = detail.min_floor_e18.as_option() {
+        metadata.push((
+            WITHDRAW_MIN_FLOOR_METADATA.to_owned(),
+            crate::codecs::scalars::u128_to_str(floor.hi, floor.lo),
+        ));
+    }
+    if let Some(at) = detail.payable_from.as_option()
+        && at.seconds >= 0
+        && (0..1_000_000_000).contains(&at.nanos)
+    {
+        metadata.push((
+            WITHDRAW_PAYABLE_FROM_METADATA.to_owned(),
+            format!("{}.{:09}", at.seconds, at.nanos),
+        ));
+    }
+    metadata
+}
 
 /// Error for an API-gateway rejection of an API-key request: `code` comes
 /// from the gateway's `{"code": ...}` JSON body.
@@ -565,6 +639,9 @@ fn is_placeholder_detail(detail: &ErrorDetail) -> bool {
     if let Some(transfer) = decode_transfer_error_detail(detail) {
         return transfer.code.to_i32() == 0;
     }
+    if let Some(alert) = decode_alert_error_detail(detail) {
+        return alert.code.to_i32() == 0;
+    }
     false
 }
 
@@ -599,6 +676,8 @@ fn future_code_label(detail: &ErrorDetail) -> Option<String> {
             .as_known()
             .is_none()
             .then(|| transfer.code.to_i32())
+    } else if let Some(alert) = decode_alert_error_detail(detail) {
+        alert.code.as_known().is_none().then(|| alert.code.to_i32())
     } else {
         None
     };
@@ -613,7 +692,8 @@ pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
         || decode_order_error_detail(detail).is_some()
         || decode_withdraw_error_detail(detail).is_some()
         || decode_ledger_error_detail(detail).is_some()
-        || decode_transfer_error_detail(detail).is_some();
+        || decode_transfer_error_detail(detail).is_some()
+        || decode_alert_error_detail(detail).is_some();
     decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
 }
 
@@ -908,6 +988,7 @@ impl Error {
                 code == auth_codes::TEMPORARILY_UNAVAILABLE
                     || code == order_codes::ACCOUNT_REPAIRING
                     || code == order_codes::REQUEST_DEADLINE_EXCEEDED
+                    || code == alert_codes::PRICE_UNAVAILABLE
             }
             _ => false,
         }
@@ -931,7 +1012,9 @@ impl Error {
             | Self::Server(_)
             | Self::GatewayTimeout { .. }
             | Self::RouteNotFound { .. } => true,
-            Self::Api { code, .. } => is_outcome_unknown_code(code),
+            Self::Api { code, .. } => {
+                is_outcome_unknown_code(code) || code == alert_codes::SERVICE_UNAVAILABLE
+            }
             _ => false,
         }
     }
@@ -1069,6 +1152,50 @@ impl Error {
         }
     }
 
+    fn api_metadata(&self, key: &str) -> Option<&str> {
+        match self {
+            Self::Api { metadata, .. } => metadata
+                .iter()
+                .find(|(name, _)| name == key)
+                .map(|(_, value)| value.as_str()),
+            _ => None,
+        }
+    }
+
+    /// The request field a withdraw-service refusal is about, from
+    /// `chain.withdraw.v1.ErrorDetail.field_path`, such as
+    /// `destinations[0].min_amount_e18`; `None` when it names none.
+    pub fn withdraw_field_path(&self) -> Option<&str> {
+        self.api_metadata(WITHDRAW_FIELD_PATH_METADATA)
+    }
+
+    /// With `ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`: the least amount, an
+    /// unsigned integer in 18-decimal asset units as a decimal string, that a
+    /// destination's minimum may be.
+    pub fn withdraw_min_floor_e18(&self) -> Option<&str> {
+        self.api_metadata(WITHDRAW_MIN_FLOOR_METADATA)
+    }
+
+    /// True for `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`: a withdrawal
+    /// from a broker vault to an external destination added to its whitelist
+    /// less than 24 hours ago. The destination is listed, so this is not a
+    /// whitelist refusal; nothing was reserved, and the same withdrawal
+    /// succeeds from [`Self::withdraw_payable_from`] on. Not
+    /// [`Self::is_retryable`]: wait until then rather than retrying at once.
+    pub fn is_withdraw_destination_cooling_down(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN")
+    }
+
+    /// With `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`: when the
+    /// destination can be paid; `None` when the server does not know yet.
+    pub fn withdraw_payable_from(&self) -> Option<std::time::SystemTime> {
+        let (seconds, nanos) = self
+            .api_metadata(WITHDRAW_PAYABLE_FROM_METADATA)?
+            .split_once('.')?;
+        let duration = Duration::new(seconds.parse().ok()?, nanos.parse().ok()?);
+        std::time::UNIX_EPOCH.checked_add(duration)
+    }
+
     /// True when the caller must enroll an MFA factor before continuing.
     pub fn is_mfa_enrollment_required(&self) -> bool {
         self.auth_error_code() == Some(auth_codes::MFA_NOT_ENROLLED)
@@ -1130,6 +1257,13 @@ fn decode_withdraw_error_detail(detail: &ErrorDetail) -> Option<WithdrawErrorDet
         return None;
     }
     WithdrawErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
+    if !detail.type_url.ends_with("alerts.v1.ErrorDetail") {
+        return None;
+    }
+    AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
@@ -1639,6 +1773,28 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: withdraw_detail_metadata(&withdraw_detail),
+                violations: Vec::new(),
+            };
+        }
+        if let Some(alert_detail) = decode_alert_error_detail(detail) {
+            let code = known_or_unknown_code(
+                alert_detail.code.as_known().map(|c| c.proto_name()),
+                alert_detail.code.to_i32(),
+            );
+            if alert_detail.code.as_known() == Some(AlertErrorCode::SUBACCOUNT_KEY_REFUSED) {
+                return Error::PermissionDenied {
+                    message: raw_message.to_owned(),
+                    status,
+                    code,
+                    context: "alerts.v1.PriceAlertService".to_owned(),
+                    endpoint: String::new(),
+                    problem: None,
+                };
             }
             return Error::Api {
                 message: fallback_message.clone(),
@@ -2834,5 +2990,125 @@ mod tests {
         assert!(is_recognised_rest_code("PATH_BODY_ID_MISMATCH"));
         assert!(is_recognised_rest_code("AUTH_PATH_BODY_ID_MISMATCH"));
         assert!(!is_credential_refusal_code("AUTH_PATH_BODY_ID_MISMATCH"));
+    }
+
+    /// The e339360 auth codes read by their REST and contract names: a
+    /// replayed WebSocket login, and the refusals of assistant-key setup.
+    #[test]
+    fn e339360_auth_codes_are_recognised() {
+        assert_eq!(auth_codes::REPLAY_DETECTED, "AUTH_REPLAY_DETECTED");
+        assert_eq!(
+            auth_codes::from_rest_code("REPLAY_DETECTED"),
+            Some(AuthErrorCode::AUTH_REPLAY_DETECTED)
+        );
+        for name in [
+            "AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED",
+            "AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR",
+            "AUTH_ASSISTANT_KEY_PROOF_INVALID",
+            "AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED",
+        ] {
+            assert!(auth_codes::from_rest_code(name).is_some(), "{name}");
+            assert!(is_recognised_rest_code(name), "{name}");
+        }
+        // A replayed signed request is a final credential refusal: the server
+        // already saw that exact request, so the first may have applied.
+        assert!(is_credential_refusal_code("REPLAY_DETECTED"));
+        let replayed = map_connect_error(
+            ConnectError::new(ErrorCode::Unauthenticated, "request replay detected").with_detail(
+                ErrorDetail::from_message(
+                    "auth.v1.AuthErrorDetail",
+                    &AuthErrorDetail {
+                        code: EnumValue::Known(AuthErrorCode::AUTH_REPLAY_DETECTED),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert!(
+            matches!(&replayed, Error::ApiKeyRejected { code, .. } if code == "REPLAY_DETECTED"),
+            "{replayed:?}"
+        );
+        assert!(!replayed.is_retryable());
+    }
+
+    /// A withdrawal from a broker vault to a destination still in its 24-hour
+    /// whitelist cool-down names when the destination can be paid; it is not
+    /// a whitelist refusal and changed nothing. A refusal about one field
+    /// names it, and a minimum below the floor carries the floor.
+    #[test]
+    fn withdraw_error_detail_fields_reach_the_caller() {
+        use crate::proto::chain::withdraw::v1::ErrorDetail as WithdrawErrorDetail;
+        use crate::proto::polyester::r#type::v1::U128;
+        use buffa_types::google::protobuf::Timestamp;
+        use std::time::{Duration as StdDuration, UNIX_EPOCH};
+
+        let cooling = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "cooling down").with_detail(
+                ErrorDetail::from_message(
+                    "chain.withdraw.v1.ErrorDetail",
+                    &WithdrawErrorDetail {
+                        code: WithdrawErrorCode::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN
+                            .into(),
+                        payable_from: Timestamp {
+                            seconds: 1_794_405_600,
+                            nanos: 5,
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert!(
+            matches!(&cooling, Error::Api { code, .. } if code == "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN"),
+            "{cooling:?}"
+        );
+        assert!(cooling.is_withdraw_destination_cooling_down());
+        assert_eq!(
+            cooling.withdraw_payable_from(),
+            Some(UNIX_EPOCH + StdDuration::new(1_794_405_600, 5))
+        );
+        assert!(!cooling.is_retryable() && !cooling.mutation_outcome_unknown());
+
+        let floor = map_connect_error(
+            ConnectError::new(ErrorCode::InvalidArgument, "below floor").with_detail(
+                ErrorDetail::from_message(
+                    "chain.withdraw.v1.ErrorDetail",
+                    &WithdrawErrorDetail {
+                        code: WithdrawErrorCode::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR.into(),
+                        field_path: "destinations[0].min_amount_e18".into(),
+                        min_floor_e18: U128 {
+                            hi: 0,
+                            lo: 2_500_000_000_000_000_000,
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert_eq!(
+            floor.withdraw_field_path(),
+            Some("destinations[0].min_amount_e18")
+        );
+        assert_eq!(floor.withdraw_min_floor_e18(), Some("2500000000000000000"));
+        assert!(!floor.is_withdraw_destination_cooling_down());
+        assert_eq!(floor.withdraw_payable_from(), None);
+
+        let plain = map_connect_error(
+            ConnectError::new(ErrorCode::FailedPrecondition, "insufficient").with_detail(
+                ErrorDetail::from_message(
+                    "chain.withdraw.v1.ErrorDetail",
+                    &WithdrawErrorDetail {
+                        code: WithdrawErrorCode::ERROR_CODE_INSUFFICIENT_FUNDS.into(),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert_eq!(plain.withdraw_field_path(), None);
+        assert_eq!(plain.withdraw_min_floor_e18(), None);
     }
 }

@@ -10,6 +10,10 @@ pub enum RequestFeeStatus {
     REQUEST_FEE_STATUS_LOCKED = 1i32,
     /// The request completed far enough for the locked fee to settle.
     REQUEST_FEE_STATUS_SETTLED = 2i32,
+    /// The request did not complete, and the fee was charged anyway: Zipper
+    /// does not refund a withdrawal's fee when it rejects the withdrawal or its
+    /// execution fails.
+    REQUEST_FEE_STATUS_KEPT = 3i32,
 }
 impl RequestFeeStatus {
     ///Idiomatic alias for [`Self::REQUEST_FEE_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -21,6 +25,9 @@ impl RequestFeeStatus {
     ///Idiomatic alias for [`Self::REQUEST_FEE_STATUS_SETTLED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Settled: Self = Self::REQUEST_FEE_STATUS_SETTLED;
+    ///Idiomatic alias for [`Self::REQUEST_FEE_STATUS_KEPT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Kept: Self = Self::REQUEST_FEE_STATUS_KEPT;
 }
 impl ::core::default::Default for RequestFeeStatus {
     fn default() -> Self {
@@ -121,6 +128,7 @@ impl ::buffa::Enumeration for RequestFeeStatus {
             0i32 => ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_LOCKED),
             2i32 => ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_SETTLED),
+            3i32 => ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_KEPT),
             _ => ::core::option::Option::None,
         }
     }
@@ -132,6 +140,7 @@ impl ::buffa::Enumeration for RequestFeeStatus {
             Self::REQUEST_FEE_STATUS_UNSPECIFIED => "REQUEST_FEE_STATUS_UNSPECIFIED",
             Self::REQUEST_FEE_STATUS_LOCKED => "REQUEST_FEE_STATUS_LOCKED",
             Self::REQUEST_FEE_STATUS_SETTLED => "REQUEST_FEE_STATUS_SETTLED",
+            Self::REQUEST_FEE_STATUS_KEPT => "REQUEST_FEE_STATUS_KEPT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -145,6 +154,9 @@ impl ::buffa::Enumeration for RequestFeeStatus {
             "REQUEST_FEE_STATUS_SETTLED" => {
                 ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_SETTLED)
             }
+            "REQUEST_FEE_STATUS_KEPT" => {
+                ::core::option::Option::Some(Self::REQUEST_FEE_STATUS_KEPT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -153,6 +165,7 @@ impl ::buffa::Enumeration for RequestFeeStatus {
             Self::REQUEST_FEE_STATUS_UNSPECIFIED,
             Self::REQUEST_FEE_STATUS_LOCKED,
             Self::REQUEST_FEE_STATUS_SETTLED,
+            Self::REQUEST_FEE_STATUS_KEPT,
         ]
     }
 }
@@ -162,14 +175,30 @@ impl ::buffa::Enumeration for RequestFeeStatus {
 #[repr(i32)]
 pub enum LifecycleReason {
     REASON_UNSPECIFIED = 0i32,
-    /// Zipper validators reached the rejection quorum.
+    /// Zipper validators reached the rejection quorum. A rejected withdrawal
+    /// ends REFUNDED once Zipper refunds it: the amount net of its request fee
+    /// goes back, as zTokens, to the Polyester Chain smart account that sent
+    /// it, and the request fee is kept.
     ZIPPER_VALIDATION_REJECTED = 101i32,
-    /// Zipper execution rejected the request.
+    /// Zipper execution rejected the request. A withdrawal rejected at
+    /// execution ends REFUNDED like one rejected at validation.
     ZIPPER_EXECUTION_REJECTED = 102i32,
-    /// Zipper withdraw execution failed.
+    /// Zipper withdraw execution failed after the withdrawal's destination
+    /// transaction was committed, and Zipper reviews it manually: the user may
+    /// have received the funds on the destination chain. The flow ends FAILED,
+    /// and its FAILED step's transaction is that destination transaction.
+    /// Nothing is refunded to the account, and the request fee is kept; Zipper
+    /// settles the withdrawal with the user outside Polyester Chain.
     ZIPPER_WITHDRAW_EXECUTION_FAILED = 103i32,
     /// Zipper deposit refund failed.
     ZIPPER_DEPOSIT_REFUND_FAILED = 104i32,
+    /// Zipper's compliance screening blocked the deposit (zipper_reason_code
+    /// COMPLIANCE_ADDRESS_BLOCKED), and Zipper's compliance team then
+    /// transferred the funds out on the deposit's source chain to an address of
+    /// its choosing, not necessarily the depositor's. The flow ends FAILED, and
+    /// its FAILED step's transaction is that transfer. Polyester records
+    /// neither the recipient nor the amount. This is not a return or a refund.
+    ZIPPER_COMPLIANCE_TRANSFERRED = 105i32,
     /// Ledger mirror rejected a command before it could be durably applied.
     LEDGER_MIRROR_REJECTED = 200i32,
     /// Ledger settlement rejected the mirror command because the source account did
@@ -210,6 +239,9 @@ impl LifecycleReason {
     ///Idiomatic alias for [`Self::ZIPPER_DEPOSIT_REFUND_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ZipperDepositRefundFailed: Self = Self::ZIPPER_DEPOSIT_REFUND_FAILED;
+    ///Idiomatic alias for [`Self::ZIPPER_COMPLIANCE_TRANSFERRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ZipperComplianceTransferred: Self = Self::ZIPPER_COMPLIANCE_TRANSFERRED;
     ///Idiomatic alias for [`Self::LEDGER_MIRROR_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const LedgerMirrorRejected: Self = Self::LEDGER_MIRROR_REJECTED;
@@ -341,6 +373,7 @@ impl ::buffa::Enumeration for LifecycleReason {
                 ::core::option::Option::Some(Self::ZIPPER_WITHDRAW_EXECUTION_FAILED)
             }
             104i32 => ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_REFUND_FAILED),
+            105i32 => ::core::option::Option::Some(Self::ZIPPER_COMPLIANCE_TRANSFERRED),
             200i32 => ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED),
             201i32 => {
                 ::core::option::Option::Some(
@@ -379,6 +412,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::ZIPPER_EXECUTION_REJECTED => "ZIPPER_EXECUTION_REJECTED",
             Self::ZIPPER_WITHDRAW_EXECUTION_FAILED => "ZIPPER_WITHDRAW_EXECUTION_FAILED",
             Self::ZIPPER_DEPOSIT_REFUND_FAILED => "ZIPPER_DEPOSIT_REFUND_FAILED",
+            Self::ZIPPER_COMPLIANCE_TRANSFERRED => "ZIPPER_COMPLIANCE_TRANSFERRED",
             Self::LEDGER_MIRROR_REJECTED => "LEDGER_MIRROR_REJECTED",
             Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS => {
                 "LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS"
@@ -416,6 +450,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             }
             "ZIPPER_DEPOSIT_REFUND_FAILED" => {
                 ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_REFUND_FAILED)
+            }
+            "ZIPPER_COMPLIANCE_TRANSFERRED" => {
+                ::core::option::Option::Some(Self::ZIPPER_COMPLIANCE_TRANSFERRED)
             }
             "LEDGER_MIRROR_REJECTED" => {
                 ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED)
@@ -460,6 +497,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::ZIPPER_EXECUTION_REJECTED,
             Self::ZIPPER_WITHDRAW_EXECUTION_FAILED,
             Self::ZIPPER_DEPOSIT_REFUND_FAILED,
+            Self::ZIPPER_COMPLIANCE_TRANSFERRED,
             Self::LEDGER_MIRROR_REJECTED,
             Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
             Self::LEDGER_MIRROR_TRANSFER_EXISTS,
@@ -7096,6 +7134,20 @@ pub struct FlowStepView {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub activities: ::buffa::alloc::vec::Vec<FlowStepActivityView>,
+    /// Polyester Chain smart account the step refunded, set only on
+    /// `FLOW_STEP_REFUNDED` of a withdrawal: Zipper rejected the withdrawal and
+    /// returned `amount_e18`, the amount net of the request fee it kept, as
+    /// zTokens to the smart account that sent it. The zTokens stay in that
+    /// smart account; nothing moves them back to Funding or Trading.
+    ///
+    /// Field 27: `refund_address`
+    #[serde(
+        rename = "refundAddress",
+        alias = "refund_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub refund_address: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7124,6 +7176,7 @@ impl ::core::fmt::Debug for FlowStepView {
             .field("occurred_at_unix_ms", &self.occurred_at_unix_ms)
             .field("block_time_moving_average_ms", &self.block_time_moving_average_ms)
             .field("activities", &self.activities)
+            .field("refund_address", &self.refund_address)
             .finish()
     }
 }
@@ -7276,6 +7329,11 @@ impl ::buffa::Message for FlowStepView {
                     + ::buffa::types::uint32_encoded_len(self.milestone_tx_chain_id)
                         as u32;
         }
+        if !self.refund_address.is_empty() {
+            size
+                += 2u32
+                    + ::buffa::types::string_encoded_len(&self.refund_address) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7366,6 +7424,9 @@ impl ::buffa::Message for FlowStepView {
         }
         if self.milestone_tx_chain_id != 0u32 {
             ::buffa::types::put_uint32_field(26u32, self.milestone_tx_chain_id, buf);
+        }
+        if !self.refund_address.is_empty() {
+            ::buffa::types::put_string_field(27u32, &self.refund_address, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7549,6 +7610,13 @@ impl ::buffa::Message for FlowStepView {
                 )?;
                 self.milestone_tx_chain_id = ::buffa::types::decode_uint32(buf)?;
             }
+            27u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.refund_address, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7578,6 +7646,7 @@ impl ::buffa::Message for FlowStepView {
         self.request_fee = ::buffa::MessageField::none();
         self.zipper_reason = ::buffa::MessageField::none();
         self.milestone_tx_chain_id = 0u32;
+        self.refund_address.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -15443,6 +15512,14 @@ pub mod __buffa {
                 'a,
                 super::super::__buffa::view::FlowStepActivityViewView<'a>,
             >,
+            /// Polyester Chain smart account the step refunded, set only on
+            /// `FLOW_STEP_REFUNDED` of a withdrawal: Zipper rejected the withdrawal and
+            /// returned `amount_e18`, the amount net of the request fee it kept, as
+            /// zTokens to the smart account that sent it. The zTokens stay in that
+            /// smart account; nothing moves them back to Funding or Trading.
+            ///
+            /// Field 27: `refund_address`
+            pub refund_address: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for FlowStepViewView<'a> {
@@ -15710,6 +15787,13 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    27u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.refund_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     21u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -15807,6 +15891,7 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    refund_address: self.refund_address.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -15962,6 +16047,12 @@ pub mod __buffa {
                                 self.milestone_tx_chain_id,
                             ) as u32;
                 }
+                if !self.refund_address.is_empty() {
+                    size
+                        += 2u32
+                            + ::buffa::types::string_encoded_len(&self.refund_address)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -16097,6 +16188,9 @@ pub mod __buffa {
                         self.milestone_tx_chain_id,
                         buf,
                     );
+                }
+                if !self.refund_address.is_empty() {
+                    ::buffa::types::put_string_field(27u32, &self.refund_address, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -16275,6 +16369,9 @@ pub mod __buffa {
                 }
                 if !self.activities.is_empty() {
                     __map.serialize_entry("activities", &*self.activities)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.refund_address) {
+                    __map.serialize_entry("refundAddress", self.refund_address)?;
                 }
                 __map.end()
             }
@@ -16554,6 +16651,17 @@ pub mod __buffa {
                 super::super::__buffa::view::FlowStepActivityViewView<'_>,
             > {
                 &self.0.reborrow().activities
+            }
+            /// Polyester Chain smart account the step refunded, set only on
+            /// `FLOW_STEP_REFUNDED` of a withdrawal: Zipper rejected the withdrawal and
+            /// returned `amount_e18`, the amount net of the request fee it kept, as
+            /// zTokens to the smart account that sent it. The zTokens stay in that
+            /// smart account; nothing moves them back to Funding or Trading.
+            ///
+            /// Field 27: `refund_address`
+            #[must_use]
+            pub fn refund_address(&self) -> &'_ str {
+                self.0.reborrow().refund_address
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<FlowStepViewView<'static>>>

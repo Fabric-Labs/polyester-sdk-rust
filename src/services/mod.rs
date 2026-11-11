@@ -1,5 +1,6 @@
 //! Service wrappers over generated Connect clients.
 
+mod alerts;
 mod api_keys;
 mod auth;
 mod balances;
@@ -10,10 +11,12 @@ mod market_data;
 mod orders;
 mod profile;
 mod scope;
+pub(crate) mod system;
 mod thin;
 mod triggers;
 pub(crate) mod unary;
 
+pub use alerts::AlertsService;
 pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
 pub use balances::BalancesService;

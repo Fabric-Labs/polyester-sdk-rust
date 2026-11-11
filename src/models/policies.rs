@@ -49,12 +49,17 @@ pub struct ApiPolicy {
     pub revision: u64,
     /// Granted `auth.v1.PolicyAction` names, in the order the server sent
     /// them; `"UNKNOWN(n)"` for an action this SDK version does not know.
-    /// Actions from `READ_API_KEYS` on (`READ_API_KEYS`, `READ_API_POLICIES`,
+    /// Account permissions, valid on API-key policies only, open account
+    /// reads to API keys: `READ_API_KEYS`, `READ_API_POLICIES`,
     /// `READ_SUBACCOUNT_POLICIES`, `READ_SUBACCOUNT_PERMISSIONS`,
     /// `READ_VIP_STATUS`, `READ_SOCIAL_VERIFICATION`, `READ_PROFILE`,
     /// `READ_ACCOUNT_DIRECTORY`, `READ_WITHDRAW_VALIDATION`,
-    /// `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`, `READ_CHECKPOINTS` and
-    /// `READ_REWARDS`) are account permissions, valid on API-key policies only.
+    /// `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`, `READ_CHECKPOINTS`,
+    /// `READ_REWARDS`, `CREATE_DEPOSIT_ADDRESS`, `READ_DEPOSIT_ADDRESSES`,
+    /// `READ_SUBACCOUNTS`, `READ_SUBACCOUNT_ACTIVITY`,
+    /// `READ_SUBACCOUNT_MEMBERS`, `READ_SUBACCOUNT_INVITES` and
+    /// `READ_GUARD_SIGNER_STATUS`. Tell them apart by name, not by number:
+    /// `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
     pub actions: Vec<String>,
 }
 

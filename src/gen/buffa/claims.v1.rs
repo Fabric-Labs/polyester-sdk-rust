@@ -9,7 +9,7 @@ pub enum ErrorCode {
     ERROR_CODE_UNSPECIFIED = 0i32,
     /// The claim reward is temporarily unavailable. Please try again later.
     ERROR_CODE_CLAIM_TEMPORARILY_UNAVAILABLE = 1i32,
-    /// A valid session is required. API keys cannot access claims.
+    /// The request carries no valid session token or API-key signature.
     ERROR_CODE_UNAUTHENTICATED = 2i32,
     /// The applicable request rate limit was exceeded.
     ERROR_CODE_RATE_LIMIT_EXCEEDED = 3i32,

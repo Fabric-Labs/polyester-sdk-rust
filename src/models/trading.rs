@@ -1292,6 +1292,12 @@ pub struct ApiKeySummary {
     pub updated_at: Option<Timestamp>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
+    /// What the key is for: `"STANDARD"` for a key the user created and
+    /// `"ASSISTANT"` for a key the user set up for the Polyester assistant
+    /// (listed and revoked like any key); empty when the server names none,
+    /// and `"UNKNOWN(n)"` for a purpose this SDK version does not know.
+    /// Existing keys read `"STANDARD"`.
+    pub purpose: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]

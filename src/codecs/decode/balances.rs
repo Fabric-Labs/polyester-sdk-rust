@@ -557,6 +557,7 @@ mod tests {
             (TransferCode::FEE_SWEEP, 1072),
             (TransferCode::FEE_REFILL, 1073),
             (TransferCode::SYSTEM_ADJUSTMENT, 1074),
+            (TransferCode::WITHDRAW_FAILED, 1075),
         ] {
             let mut row = system_adjustment_row(true);
             row.transfer_code = code.into();

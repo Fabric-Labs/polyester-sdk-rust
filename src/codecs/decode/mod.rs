@@ -2,6 +2,7 @@
 
 mod address_book;
 mod admin;
+mod alerts;
 mod auth;
 mod balances;
 mod changelog;
@@ -20,6 +21,7 @@ mod policies;
 mod ratelimit;
 mod realtime;
 mod sub_accounts;
+mod system;
 mod trading_rate_limits;
 mod triggers;
 mod vip;
@@ -27,6 +29,7 @@ mod zipper;
 
 pub use address_book::*;
 pub use admin::*;
+pub use alerts::*;
 pub use auth::*;
 pub use balances::*;
 pub use changelog::*;
@@ -45,6 +48,7 @@ pub use policies::*;
 pub use ratelimit::*;
 pub use realtime::*;
 pub use sub_accounts::*;
+pub use system::*;
 pub use trading_rate_limits::*;
 pub use triggers::*;
 pub use vip::*;

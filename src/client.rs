@@ -12,11 +12,11 @@ use crate::models::{
     StopAllTradingScope,
 };
 use crate::services::{
-    AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
-    ChangelogService, DepositService, FeeService, GuardSignerService, HeatmapService,
-    InternalTransfersService, LifecycleService, MarketDataService, MarketOverviewService,
-    OrderbookService, OrdersService, PoliciesService, RateLimitService, ServiceContext,
-    SocialVerificationService, SubAccountsService, TradesService, TransfersService,
+    AddressBookService, AlertsService, ApiKeysService, AuthService, BalancesService,
+    ChainAnalyticsService, ChangelogService, DepositService, FeeService, GuardSignerService,
+    HeatmapService, InternalTransfersService, LifecycleService, MarketDataService,
+    MarketOverviewService, OrderbookService, OrdersService, PoliciesService, RateLimitService,
+    ServiceContext, SocialVerificationService, SubAccountsService, TradesService, TransfersService,
     TriggersService, VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
@@ -157,6 +157,9 @@ pub struct Client {
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
     pub withdraw: WithdrawService,
+    /// Price alerts of the root account. Available on devnet; not yet routed
+    /// on testnet.
+    pub alerts: AlertsService,
     /// Outcome of the spot config's load.
     catalog_ready: Arc<OnceCell<Result<()>>>,
     catalog_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
@@ -283,6 +286,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
@@ -395,6 +399,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
@@ -548,6 +553,16 @@ impl Client {
             })
             .await
             .clone()
+    }
+
+    /// The exact build the API host serves: its version, full source
+    /// revision and environment (`system.v1.SystemService/GetVersion`). Needs
+    /// no API key and counts against the public per-IP read budget; the
+    /// answer changes only when the environment deploys a new build. Compare
+    /// [`crate::models::ServerVersion::release`] to tell which release a
+    /// build follows.
+    pub async fn get_version(&self) -> Result<crate::models::ServerVersion> {
+        crate::services::system::get_version(&self.factory).await
     }
 
     /// Why the spot config failed to load, if it did: the

@@ -684,6 +684,16 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": ["changelog.v1.ChangelogService"],
     },
     {
+        "id": "server_version",
+        "label": "Server build version",
+        "any_services": ["system.v1.SystemService"],
+    },
+    {
+        "id": "price_alerts",
+        "label": "Price alerts (devnet)",
+        "any_services": ["alerts.v1.PriceAlertService"],
+    },
+    {
         "id": "balances",
         "label": "Balances and equity history",
         "any_services": ["ledger.read.v1.LedgerReadService"],

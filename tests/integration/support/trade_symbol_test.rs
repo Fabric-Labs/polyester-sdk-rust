@@ -14,6 +14,7 @@ fn spot_with_eth_first() -> SpotConfig {
         }),
         pair_order_limits: Vec::new(),
         max_open_orders_total: 0,
+        assets: Vec::new(),
     }
 }
 

@@ -415,6 +415,9 @@ impl SubAccountsService {
             .await
     }
 
+    /// List the sub-accounts the key or session reaches. An API key needs
+    /// `READ_SUBACCOUNTS` on its API-key policy; a key scoped to a
+    /// sub-account sees only that sub-account.
     pub async fn list(
         &self,
         req: crate::proto::auth::v1::ListSubaccountsRequest,
@@ -435,7 +438,11 @@ impl SubAccountsService {
         Ok(subaccounts_list_from_proto(&resp))
     }
 
-    /// Read a sub-account's aggregated view. With
+    /// Read a sub-account's aggregated view. An API key needs
+    /// `READ_SUBACCOUNTS`; the members and invites expansions are left out,
+    /// rather than failing the call, for a key without
+    /// `READ_SUBACCOUNT_MEMBERS` or `READ_SUBACCOUNT_INVITES`. A sub-account
+    /// outside the key's scope answers `not_found`. With
     /// [`GetSubaccountOpts::include_balances`] the result also carries the
     /// sub-account's balances (an empty list when it holds none); without it
     /// `balances` is `None`.
@@ -484,6 +491,8 @@ impl SubAccountsService {
         Ok(result)
     }
 
+    /// List a sub-account's members. API keys can call it with
+    /// `READ_SUBACCOUNT_MEMBERS` on their API-key policy.
     pub async fn list_members(
         &self,
         req: crate::proto::auth::v1::ListSubaccountMembersRequest,
@@ -504,6 +513,8 @@ impl SubAccountsService {
         Ok(subaccount_members_list_from_proto(&resp))
     }
 
+    /// List a sub-account's invites. An API key needs
+    /// `READ_SUBACCOUNT_INVITES`.
     pub async fn list_invites(
         &self,
         req: crate::proto::auth::v1::ListSubaccountInvitesRequest,
@@ -524,6 +535,8 @@ impl SubAccountsService {
         Ok(subaccount_invites_list_from_proto(&resp))
     }
 
+    /// List a sub-account's activity. An API key needs
+    /// `READ_SUBACCOUNT_ACTIVITY`.
     pub async fn list_activity(
         &self,
         req: crate::proto::auth::v1::ListSubaccountEventsRequest,
@@ -577,6 +590,12 @@ impl AddressBookService {
         self.subscribe(root_account_public_id).await
     }
 
+    /// List the address books. A key scoped to the main account needs
+    /// `READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) for the main account's
+    /// book, as a sub-account's book already needed; without it the read is
+    /// refused with `permission_denied` and `AUTH_SUBACCOUNT_ACCESS_DENIED`.
+    /// The other address-book reads (entries, transfer counterparties and
+    /// destinations, internal-transfer whitelist) follow the same rule.
     pub async fn list_books(
         &self,
         req: crate::proto::auth::v1::ListAddressBooksRequest,
@@ -1168,6 +1187,11 @@ impl LifecycleService {
 }
 
 impl GuardSignerService {
+    /// Read the Guard Signer status. An API key needs
+    /// `READ_GUARD_SIGNER_STATUS`, and is refused (`permission_denied`,
+    /// `AUTH_API_KEY_ACCESS_DENIED`) for a sub-account another main account
+    /// owns, even one shared with the key's main account: read that one with
+    /// a key of the owning main account.
     pub async fn get_status(
         &self,
         req: crate::proto::chain::guard::v1::GetGuardSignerStatusRequest,
@@ -1348,11 +1372,14 @@ impl SocialVerificationService {
         Ok(api_data_from_proto(&resp))
     }
 
-    /// Read the account's social verification for `provider`. An API key
-    /// needs `READ_SOCIAL_VERIFICATION` on its policy and a main-account
-    /// scope, and receives the link status only (`provider`, `method`,
-    /// `handle`, `status`, `verified_at`). Starting a verification stays
-    /// session-only.
+    /// Read the account's social verification for `provider` (`"twitter"`,
+    /// `"discord"` or `"telegram"`). An API key needs
+    /// `READ_SOCIAL_VERIFICATION` on its policy and a main-account scope, and
+    /// receives the link status only (`provider`, `method`, `handle`,
+    /// `status`, `verified_at`). A Telegram link waiting for the user to
+    /// confirm reads `STATUS_AWAITING_CONFIRMATION`. Starting, confirming and
+    /// unlinking a verification stay session-only; confirming a Telegram link
+    /// also needs a fresh MFA step-up.
     pub async fn get(&self, provider: &str) -> crate::errors::Result<crate::models::ApiData> {
         use crate::codecs::decode::api_data_from_proto;
         use crate::proto::auth::v1::GetSocialVerificationRequest;
@@ -1395,6 +1422,7 @@ fn social_provider_enum(v: &str) -> crate::proto::auth::v1::SocialProvider {
     match v.trim().to_ascii_lowercase().as_str() {
         "twitter" => SocialProvider::TWITTER,
         "discord" => SocialProvider::DISCORD,
+        "telegram" => SocialProvider::TELEGRAM,
         _ => SocialProvider::PROVIDER_UNSPECIFIED,
     }
 }
@@ -1619,6 +1647,55 @@ mod tests {
         assert_eq!(
             req.provider.as_known(),
             Some(crate::proto::auth::v1::SocialProvider::TWITTER)
+        );
+    }
+
+    /// Telegram linking reuses social verification: `"telegram"` names
+    /// `SocialProvider::TELEGRAM` on start, ready and get.
+    #[test]
+    fn social_provider_accepts_telegram() {
+        let req = super::start_social_request("Telegram", "", "");
+        assert_eq!(
+            req.provider.as_known(),
+            Some(crate::proto::auth::v1::SocialProvider::TELEGRAM)
+        );
+        assert!(req.handle.is_empty());
+    }
+
+    /// A Telegram verification awaiting confirmation reads back with its
+    /// status, the Telegram account's display name and numeric user ID, and
+    /// the start link, as the contract names them.
+    #[test]
+    fn telegram_verification_reads_back_its_new_fields() {
+        use crate::codecs::decode::api_data_from_proto;
+        use crate::proto::auth::v1::{
+            GetSocialVerificationResponse, SocialProvider, SocialVerification,
+            SocialVerificationStatus, StartSocialVerificationResponse,
+        };
+        let got = api_data_from_proto(&GetSocialVerificationResponse {
+            verification: SocialVerification {
+                provider: SocialProvider::TELEGRAM.into(),
+                status: SocialVerificationStatus::STATUS_AWAITING_CONFIRMATION.into(),
+                display_name: "Alice".into(),
+                provider_user_id: "7654321098".into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        });
+        let verification = &got.raw["verification"];
+        assert_eq!(verification["provider"], "TELEGRAM");
+        assert_eq!(verification["status"], "STATUS_AWAITING_CONFIRMATION");
+        assert_eq!(verification["displayName"], "Alice");
+        assert_eq!(verification["providerUserId"], "7654321098");
+
+        let started = api_data_from_proto(&StartSocialVerificationResponse {
+            action_url: "https://t.me/polyester_bot?start=abc".into(),
+            ..Default::default()
+        });
+        assert_eq!(
+            started.raw["actionUrl"],
+            "https://t.me/polyester_bot?start=abc"
         );
     }
 

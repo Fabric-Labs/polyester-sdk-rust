@@ -36,6 +36,8 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
+| Server build version | Yes |
+| Price alerts (devnet) | Yes |
 | Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -75,13 +77,28 @@ still applies. Each account read an API key makes needs its own permission on
 the key's API-key policy: `READ_API_KEYS` for `api_keys.list` and
 `api_keys.get`, `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_SOCIAL_VERIFICATION` for `social_verification.get` (link status only),
-and `READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`. VIP status
-and social verification need a key scoped to the main account. A key without
-the permission is refused with `permission_denied` and
+`READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`,
+`READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
+for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
+`sub_accounts.get`, `READ_SUBACCOUNT_ACTIVITY` for
+`sub_accounts.list_activity`, `READ_SUBACCOUNT_MEMBERS` for
+`sub_accounts.list_members` (and the members of `sub_accounts.get`),
+`READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
+`sub_accounts.get`, which leaves out an expansion the key may not read rather
+than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
+`READ_BALANCES` for `withdraw.get_wallet_balances`. A key scoped to the main
+account also needs `READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) for the main
+account's address-book reads, as a sub-account's book already did. VIP status
+and social verification need a key scoped to the main account. A key scoped to
+a sub-account reaches only that sub-account, and `guard_signer.get_status`
+refuses a key for a sub-account another main account owns, even a shared one.
+A key without the permission is refused with `permission_denied` and
 `AUTH_API_KEY_ACCESS_DENIED` (the withdraw service answers
-`ERROR_CODE_PERMISSION_DENIED`), and the message names the missing
-permission. Starting a social verification stays session-only, and its routes
-may not be mounted.
+`ERROR_CODE_PERMISSION_DENIED`; the address book `AUTH_SUBACCOUNT_ACCESS_DENIED`),
+and the message names the missing permission. A client that rewrites a
+policy's whole action list must keep the permissions it read back. Starting,
+confirming and unlinking a social verification (Telegram included) stay
+session-only.
 Private streams require an Account ID and the corresponding API-key permission.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The connection and subscription tokens are renewed on the
@@ -850,6 +867,70 @@ let api_changes = client
 
 `examples/changelog.rs` runs these calls against devnet.
 
+## Price alerts
+
+Price alerts are available on devnet; they are not yet routed on testnet,
+where these calls fail. `client.alerts` creates durable alerts ("tell me when
+BTC-USDT falls to 90,000") that the exchange evaluates and delivers in-app
+and/or to your linked Telegram account. Alerts belong to the main account:
+use an API key scoped to the main account. A key scoped to a sub-account is
+refused with `Error::PermissionDenied` and code `SUBACCOUNT_KEY_REFUSED`.
+
+```rust,ignore
+use polyester::models::{AlertChannel, AlertDirection, CreateAlertParams, ListAlertsOptions, UpdateAlertParams};
+use polyester::types::Price;
+
+let alert = client.alerts.create(
+    CreateAlertParams::new(
+        "BTC-USDT",
+        AlertDirection::Below, // inclusive: fires at a price <= the alert price
+        Price::from_decimal_str("90000", None)?,
+        vec![AlertChannel::InApp, AlertChannel::Telegram],
+    )
+    .with_idempotency_key("bot-7:alert-1"), // a retry returns the alert created first
+).await?;
+// Move the level, keyed so a retry applies at most once.
+let moved = client.alerts.update(
+    UpdateAlertParams::new(alert.alert_id.clone(), alert.revision)
+        .with_price(Price::from_decimal_str("91000", None)?)
+        .with_idempotency_key("bot-7:alert-1:move-1"),
+).await?;
+client.alerts.cancel(&alert.alert_id).await?;
+```
+
+An alert watches the market's last traded price or its index price
+(`AlertPriceSource`); without one it watches the index price where the market
+has one and the last price otherwise, and the returned alert states it. The
+market's price at creation is recorded as `reference_price`; an alert whose
+condition already holds then starts unarmed and fires only after the price
+moves to the other side and crosses back. It fires once: `status`
+`"triggered"`, with `triggered_at` and `triggered_price`. A late price or a
+stalled feed never fires it. Status values are `"active"`, `"triggered"` and
+`"cancelled"` (the contract's spelling).
+
+`update` sends only the fields set on `UpdateAlertParams` with the
+`expected_revision` you last read; a stale one is refused with code
+`REVISION_CONFLICT`, so read the alert again. An update that sets no field
+changes nothing on an active alert and sets a triggered one again as it is.
+`outcome` is `"applied"`, `"unchanged"` or `"replayed"` (the idempotency key
+was already used for this request; nothing was applied now): tell a retry
+from a fresh change by `outcome`, never by `revision`. `list` pages newest
+first, up to 200 per page; `all` streams every page. Refusals keep their
+contract codes (`polyester::errors::alert_codes`): `PRICE_UNAVAILABLE` changed
+nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
+cancel outcome unknown, so send it again with the same idempotency key
+(`cancel` is idempotent) or read the alerts back.
+
+## Server build version
+
+`client.get_version().await?` returns the exact build the API host serves
+(`system.v1.SystemService/GetVersion`): `version`, the full source revision
+`commit`, and the `environment` that answered (`"devnet"`, `"testnet"`,
+`"mainnet"` or `"local"`, kept as a string). It needs no API key. A release
+reads `"0.10.0"`; a build made after one reads `"0.10.0-12-g4e21a2f09670"`,
+which is not a semantic version, so compare `release()` (the part before the
+first `-`) rather than parsing it.
+
 ## Triggers
 
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
@@ -970,7 +1051,10 @@ malformed sub-account ID is refused with the ledger code
 
 To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
 and the dead-man switch cancel open orders, never triggers: an unfired stop
-stays armed, a TWAP keeps running. `stop_all_trading` pages through the live
+stays armed, a TWAP keeps running. An attached stop-loss, take-profit or
+trailing leg whose working exit order a cancel-all cancels ends, and with
+`oco` so do its siblings, so the position loses that protection.
+`stop_all_trading` pages through the live
 triggers (`created`, `armed`, `running`, `paused`), cancels each, then cancels
 all open orders, so an order a trigger places before its cancel is still
 canceled. Triggers it could not cancel are listed in `trigger_failures`.
@@ -1049,6 +1133,12 @@ SDK notes:
   without creating a withdraw (create RPCs remain authoritative). An API key
   needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
   opens it.
+- **Smart account wallet:** `client.withdraw.get_wallet_balances(None).await?`
+  lists the zTokens the account's smart account wallet holds on Polyester
+  Chain, such as the refund of a withdrawal Zipper rejected (the amount less
+  the fee Zipper kept), with each balance in 18-decimal units (`amount_e18`)
+  and whole units (`amount`). Pass a sub-account ID to read that sub-account's
+  wallet. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The result's `flow_id` names the transfer's lifecycle flow
   (`client.lifecycle.get_flow`). Looking a transfer up by its request or
