@@ -26,6 +26,7 @@ pub use market_data::{
     CreateSubscriptionOptions, ListMarketOverviewOptions, MarketDataService,
     MarketOverviewCreateSubscriptionOptions, MarketOverviewService, OrderbookService,
 };
+pub(crate) use orders::scale_order;
 pub use orders::{OrdersService, TradesService};
 pub use profile::ProfileService;
 pub use thin::*;

@@ -19,8 +19,12 @@ mod limit_market_ref_price;
 mod live_write_gates;
 #[path = "market_data/mod.rs"]
 mod market_data;
+#[path = "market_tif/mod.rs"]
+mod market_tif;
 #[path = "order_by_symbol_id/mod.rs"]
 mod order_by_symbol_id;
+#[path = "order_read_scales/mod.rs"]
+mod order_read_scales;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
 #[path = "orderbook_depths/mod.rs"]

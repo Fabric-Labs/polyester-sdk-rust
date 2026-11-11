@@ -1,7 +1,7 @@
 //! Trigger response decoders.
 
 use super::enums::{enum_value_self_trade_prevention_mode, enum_value_side};
-use super::money::{decode_price_ticks, decode_qty_scaled};
+use super::money::{attach_qty_scale, decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
@@ -457,6 +457,20 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         failure_reason,
         details,
         version: (msg.version != 0).then_some(msg.version),
+    }
+}
+
+/// Gives a read trigger's quantities (`qty` and a TWAP's or ladder's
+/// `executed_qty`) the pair's base quantity scale (`base_scale`, from the
+/// catalogs by `symbol_id`); the wire carries none.
+pub(crate) fn attach_trigger_scale(trigger: &mut Trigger, base_scale: Option<u32>) {
+    attach_qty_scale(&mut trigger.qty, base_scale);
+    match trigger.details.as_mut() {
+        Some(TriggerDetails::Twap(twap)) => attach_qty_scale(&mut twap.executed_qty, base_scale),
+        Some(TriggerDetails::Ladder(ladder)) => {
+            attach_qty_scale(&mut ladder.executed_qty, base_scale)
+        }
+        _ => {}
     }
 }
 

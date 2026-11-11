@@ -120,8 +120,9 @@ pub struct OrderFill {
     pub ordinal: u32,
     /// `maker`, `taker`, or `UNKNOWN(<number>)`.
     pub role: String,
-    /// Filled base quantity. The stream does not carry the scale; resolve it
-    /// from the catalog by the order's `symbol_id`.
+    /// Filled base quantity. The wire does not carry its scale: with the
+    /// catalogs loaded, `orders().subscribe` sets the pair's base quantity
+    /// scale from the changed order in the same unit.
     pub qty: Option<crate::types::Quantity>,
     pub price: Option<crate::types::Price>,
 }
