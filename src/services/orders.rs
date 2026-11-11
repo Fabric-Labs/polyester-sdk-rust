@@ -4,13 +4,14 @@ use super::correlation_id::{
 };
 use super::scope;
 use super::unary;
+use crate::catalogs::Manager as CatalogManager;
 use crate::catalogs::Market;
 use crate::codecs::decode::{
-    batch_cancel_from_proto, batch_create_from_proto, batch_replace_from_proto,
-    batch_replace_status_from_proto, cancel_all_after_from_proto, cancel_all_from_proto,
-    get_order_from_proto, modify_order_from_proto, order_mutation_from_cancel,
-    order_mutation_from_create, orders_list_from_history, orders_list_from_open,
-    preview_order_from_proto, user_trades_list_from_proto,
+    attach_order_scale, attach_trade_scale, batch_cancel_from_proto, batch_create_from_proto,
+    batch_replace_from_proto, batch_replace_status_from_proto, cancel_all_after_from_proto,
+    cancel_all_from_proto, get_order_from_proto, modify_order_from_proto,
+    order_mutation_from_cancel, order_mutation_from_create, orders_list_from_history,
+    orders_list_from_open, preview_order_from_proto, user_trades_list_from_proto,
 };
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::orders::v1::{OrdersReadServiceClient, OrdersServiceClient};
@@ -21,7 +22,7 @@ use crate::models::{
     CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
     CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
     ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
-    OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
+    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
     PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade,
     UserTradesList,
 };
@@ -187,7 +188,11 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        orders_list_from_open(&resp)
+        let list = orders_list_from_open(&resp)?;
+        // Scaled from the spot config: a load in progress is awaited, and a
+        // failed one leaves the quantities unscaled.
+        self.ctx.settle_catalogs().await;
+        Ok(scale_orders(&self.ctx, list))
     }
 
     pub async fn list_history(
@@ -264,7 +269,9 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        orders_list_from_history(&resp)
+        let list = orders_list_from_history(&resp)?;
+        self.ctx.settle_catalogs().await;
+        Ok(scale_orders(&self.ctx, list))
     }
 
     pub async fn get(&self, key: OrderKey, subaccount_id: Option<u64>) -> Result<GetOrderResult> {
@@ -312,7 +319,15 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        get_order_from_proto(&resp)
+        let mut result = get_order_from_proto(&resp)?;
+        self.ctx.settle_catalogs().await;
+        if let Some(order) = result.order.as_mut() {
+            scale_order(&self.ctx.catalogs, order);
+        }
+        for trade in &mut result.trades {
+            scale_trade(&self.ctx.catalogs, trade);
+        }
+        Ok(result)
     }
 
     /// Poll [`Self::get`] until the order is terminal (`status` `filled`,
@@ -544,6 +559,18 @@ impl OrdersService {
         let post_only = params.post_only.unwrap_or(false);
         intent.execution = Some(match params.order_type {
             CreateOrderType::Market => {
+                // The contract's only market execution is `market_ioc`: market
+                // orders always execute as immediate-or-cancel. Any other time
+                // in force is refused, never sent as IOC; gtd just below.
+                match params.time_in_force {
+                    None | Some(CreateTimeInForce::Ioc | CreateTimeInForce::Gtd) => {}
+                    Some(CreateTimeInForce::Gtc) => {
+                        return Err(Error::validation("tif=gtc is only valid for limit orders"));
+                    }
+                    Some(CreateTimeInForce::Fok) => {
+                        return Err(Error::validation("tif=fok is only valid for limit orders"));
+                    }
+                }
                 if matches!(params.time_in_force, Some(CreateTimeInForce::Gtd))
                     || params.expire_at.is_some()
                 {
@@ -1649,14 +1676,16 @@ impl OrdersService {
     /// [`crate::models::PrivateOrdersEvent`]: `Connected`, a `Snapshot` of
     /// the live view, then one `Unit` per change, with `Stale`,
     /// `Disconnected` and `Error` along the way. Orders use the same
-    /// [`crate::models::Order`] model as the order reads. The stream reconnects and resumes
+    /// [`crate::models::Order`] model as the order reads and, with the
+    /// catalogs loaded, the same base quantity scale. The stream reconnects and resumes
     /// by itself and ends only on a terminal error.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
     ) -> Result<crate::realtime::PrivateOrdersSubscription> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
-        self.ctx.realtime.subscribe_private_orders(&account).await
+        let subscription = self.ctx.realtime.subscribe_private_orders(&account).await?;
+        Ok(subscription.with_catalogs(self.ctx.catalogs.clone()))
     }
 }
 
@@ -1751,7 +1780,12 @@ impl TradesService {
         )
         .await?
         .into_owned();
-        user_trades_list_from_proto(&resp)
+        let mut list = user_trades_list_from_proto(&resp)?;
+        self.ctx.settle_catalogs().await;
+        for trade in &mut list.trades {
+            scale_trade(&self.ctx.catalogs, trade);
+        }
+        Ok(list)
     }
 
     /// Subscribe to private user trade updates (requires `realtime` feature).
@@ -1765,11 +1799,45 @@ impl TradesService {
     ) -> Result<crate::realtime::TypedSubscription<UserTrade>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:spot:trades:{account}:proto");
+        // Each fill takes its pair's base quantity scale from the catalogs
+        // loaded when it arrives, as `list` does; a member that failed to
+        // decode stays an error in its slot.
+        let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
-            .subscribe_proto_batch(&channel, crate::codecs::decode::user_trade_batch_from_bytes)
+            .subscribe_proto_batch(&channel, move |bytes: &[u8]| {
+                let mut trades = crate::codecs::decode::user_trade_batch_from_bytes(bytes)?;
+                for trade in trades.iter_mut().flatten() {
+                    scale_trade(&catalogs, trade);
+                }
+                Ok(trades)
+            })
             .await
     }
+}
+
+/// Gives a read order's quantities the pair's base quantity scale from the
+/// loaded catalogs, as the order book does. Reads never wait for the
+/// catalogs: without them, quantities keep no scale.
+pub(crate) fn scale_order(catalogs: &CatalogManager, order: &mut Order) {
+    attach_order_scale(
+        order,
+        catalogs.base_quantity_scale_for_symbol_id(order.symbol_id),
+    );
+}
+
+fn scale_trade(catalogs: &CatalogManager, trade: &mut UserTrade) {
+    attach_trade_scale(
+        trade,
+        catalogs.base_quantity_scale_for_symbol_id(trade.symbol_id),
+    );
+}
+
+fn scale_orders(ctx: &ServiceContext, mut list: OrdersList) -> OrdersList {
+    for order in &mut list.orders {
+        scale_order(&ctx.catalogs, order);
+    }
+    list
 }
 
 /// `None` sends nothing: the server then watches the last trade price.
@@ -1997,7 +2065,7 @@ mod tests {
             quantity: Some(quantity),
             max_quote_debit_scaled: None,
             price: Some(price),
-            time_in_force: Some(CreateTimeInForce::Gtc),
+            time_in_force: None,
             client_order_id: Some("order-equivalence".into()),
             subaccount_id: None,
             post_only: Some(true),

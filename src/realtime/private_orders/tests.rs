@@ -1559,3 +1559,95 @@ async fn late_joiner_schedule(seed: u64) {
         );
     }
 }
+
+/// POLY-9302: with the catalogs loaded, the stream's orders and fills carry
+/// the pair's base quantity scale, as the order reads do.
+#[tokio::test(start_paused = true)]
+async fn orders_and_fills_carry_the_catalog_base_scale() {
+    use crate::proto::privatews::v1::{Fill, OrderEvent};
+    use crate::types::Quantity;
+
+    let filled = |id: u64, version: u32| ProtoOrder {
+        orig_qty_scaled: 8_000,
+        cum_qty_scaled: 5_000,
+        leaves_qty_scaled: 3_000,
+        ..proto_order(id, version)
+    };
+    let catalogs = Arc::new(CatalogManager::default());
+    catalogs
+        .hydrate_spot_config_json(serde_json::json!({
+            "pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 5}]
+        }))
+        .unwrap();
+    let mut harness = Harness::new();
+    let mut consumer = harness.connect(ACCOUNT).with_catalogs(catalogs);
+    let (mut server, _) = harness.accept("s1").await;
+    expect_connected(&mut consumer).await;
+    server.send("s1", 1, SnapshotBegin::default()).await;
+    server
+        .send(
+            "s1",
+            2,
+            SnapshotPage {
+                orders: vec![filled(1, 1)],
+                ..Default::default()
+            },
+        )
+        .await;
+    server
+        .send(
+            "s1",
+            3,
+            SnapshotEnd {
+                cursor: "c1".into(),
+                count: 1,
+                ..Default::default()
+            },
+        )
+        .await;
+    let snapshot = expect_snapshot(&mut consumer).await;
+
+    let mut change = unit("c1", "c2", &[]);
+    change.orders = vec![filled(1, 2)];
+    change.events = vec![UnitEvent {
+        kind: Some(
+            OrderEvent {
+                order_id: 1,
+                version: 2,
+                kind: order_event::Kind::FILLED.into(),
+                fill: buffa::MessageField::some(Fill {
+                    match_id: 900,
+                    ordinal: 1,
+                    qty_scaled: 5_000,
+                    price_ticks: 2_420_000_000_000,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }
+            .into(),
+        ),
+        ..Default::default()
+    }];
+    server.send("s1", 4, change).await;
+    let delivered = expect_unit(&mut consumer).await;
+
+    let scale = |qty: &Option<Quantity>| qty.as_ref().and_then(Quantity::scale);
+    let mut seen = Vec::new();
+    for (from, order) in [("snapshot", &snapshot[0]), ("unit", &delivered.orders[0])] {
+        seen.push((format!("{from} orig_qty"), scale(&order.orig_qty)));
+        seen.push((format!("{from} cum_qty"), scale(&order.cum_qty)));
+        seen.push((format!("{from} leaves_qty"), scale(&order.leaves_qty)));
+    }
+    let Some(OrderUnitEvent::Order(OrderStreamEvent {
+        fill: Some(fill), ..
+    })) = delivered.events.first()
+    else {
+        panic!("expected a fill, got {:?}", delivered.events);
+    };
+    seen.push(("fill qty".into(), scale(&fill.qty)));
+    let unscaled: Vec<_> = seen.iter().filter(|(_, s)| *s != Some(5)).collect();
+    assert!(
+        unscaled.is_empty(),
+        "without the pair's scale: {unscaled:?}"
+    );
+}

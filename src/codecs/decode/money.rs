@@ -26,6 +26,27 @@ pub fn decode_qty_scaled(
     Quantity::from_scaled(scaled, scale, QuantityDomain::OrderBase, symbol, symbol_id).ok()
 }
 
+/// Gives a decoded quantity the pair's catalog base scale when the wire did
+/// not carry one. A quantity that already has a scale, or an unknown scale,
+/// leaves it as it is.
+pub(crate) fn attach_qty_scale(qty: &mut Option<Quantity>, scale: Option<u32>) {
+    let (Some(scale), Some(current)) = (scale, qty.as_ref()) else {
+        return;
+    };
+    if current.scale().is_some() {
+        return;
+    }
+    if let Ok(scaled) = Quantity::from_scaled(
+        current.as_scaled(),
+        Some(scale),
+        current.domain(),
+        current.symbol().map(str::to_owned),
+        current.symbol_id(),
+    ) {
+        *qty = Some(scaled);
+    }
+}
+
 /// Decode qty where zero is meaningful (e.g. fully filled `leaves_qty` / `cum_qty`).
 ///
 /// Negative wire values are invalid and map to [`None`] (corruption), distinct from

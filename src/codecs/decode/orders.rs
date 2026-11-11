@@ -6,7 +6,7 @@ use super::enums::{
     order_cancel_reason, order_reject_reason,
 };
 use super::money::{
-    decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
+    attach_qty_scale, decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
     decode_qty_scaled_allow_zero,
 };
 use crate::codecs::scalars::{TsNs, format_uint64_id, u128_to_str};
@@ -95,6 +95,23 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         reject_reason: order_reject_reason(msg.reject_reason),
         cancel_reason: order_cancel_reason(msg.cancel_reason),
     })
+}
+
+/// Gives a read order's quantities the pair's base quantity scale
+/// (`base_scale`, from the catalogs by `symbol_id`); the wire carries none.
+pub(crate) fn attach_order_scale(order: &mut Order, base_scale: Option<u32>) {
+    attach_qty_scale(&mut order.orig_qty, base_scale);
+    attach_qty_scale(&mut order.cum_qty, base_scale);
+    attach_qty_scale(&mut order.leaves_qty, base_scale);
+    attach_qty_scale(&mut order.inherited_cum_qty, base_scale);
+    if let Some(fee) = order.fee_total.as_mut() {
+        attach_qty_scale(&mut fee.qty, base_scale);
+    }
+}
+
+/// [`attach_order_scale`] for a user trade.
+pub(crate) fn attach_trade_scale(trade: &mut UserTrade, base_scale: Option<u32>) {
+    attach_qty_scale(&mut trade.qty, base_scale);
 }
 
 /// A price that zero (or less) leaves unset.

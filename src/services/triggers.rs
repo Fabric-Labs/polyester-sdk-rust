@@ -3,9 +3,9 @@ use super::correlation_id::require_client_style_id;
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
-    get_trigger_from_proto, trigger_events_list_from_proto, trigger_mutation_from_cancel,
-    trigger_mutation_from_create, trigger_mutation_from_modify, trigger_mutation_from_pause,
-    trigger_mutation_from_resume, triggers_list_from_proto,
+    attach_trigger_scale, get_trigger_from_proto, trigger_events_list_from_proto,
+    trigger_mutation_from_cancel, trigger_mutation_from_create, trigger_mutation_from_modify,
+    trigger_mutation_from_pause, trigger_mutation_from_resume, triggers_list_from_proto,
 };
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::triggers::v1::TriggersServiceClient;
@@ -144,8 +144,9 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
             "time_in_force=Gtd is not valid for trigger child orders",
         ));
     }
-    // None leaves execution unspecified. Retain explicit Gtc for compatibility;
-    // fixed IOC executions also accept Ioc.
+    // None leaves execution unspecified. Ladder and twap limit slices are GTC.
+    // A market child and a trailing stop always execute IOC, so they accept
+    // only None or Ioc: another time in force is refused, never sent as IOC.
     if p.trigger_type == Ladder
         || (p.trigger_type == Twap && p.order_type == CreateOrderType::Limit)
     {
@@ -157,12 +158,20 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
                 "time_in_force must be Gtc for ladder or twap limit slices",
             ));
         }
-    } else if (p.trigger_type == TrailingStop || p.order_type == CreateOrderType::Market)
-        && p.time_in_force == Some(CreateTimeInForce::Fok)
-    {
-        return Err(Error::validation(
-            "time_in_force=Fok applies only to stop_loss or take_profit limit children",
-        ));
+    } else if p.trigger_type == TrailingStop || p.order_type == CreateOrderType::Market {
+        match p.time_in_force {
+            Some(CreateTimeInForce::Fok) => {
+                return Err(Error::validation(
+                    "time_in_force=Fok applies only to stop_loss or take_profit limit children",
+                ));
+            }
+            Some(CreateTimeInForce::Gtc) => {
+                return Err(Error::validation(
+                    "time_in_force=Gtc applies only to limit children; a market or trailing_stop child executes IOC",
+                ));
+            }
+            _ => {}
+        }
     }
     if p.trigger_type == TrailingStop
         && p.side == CreateSide::Sell
@@ -215,9 +224,7 @@ impl TriggersService {
         .into_owned();
         let mut list = triggers_list_from_proto(&resp);
         for trigger in &mut list.triggers {
-            if trigger.symbol.is_empty() {
-                trigger.symbol = self.ctx.catalogs.display_symbol(trigger.symbol_id);
-            }
+            self.label_from_catalogs(trigger);
         }
         Ok(list)
     }
@@ -267,11 +274,24 @@ impl TriggersService {
         .await?
         .into_owned();
         Ok(get_trigger_from_proto(&resp).map(|mut trigger| {
-            if trigger.symbol.is_empty() {
-                trigger.symbol = self.ctx.catalogs.display_symbol(trigger.symbol_id);
-            }
+            self.label_from_catalogs(&mut trigger);
             trigger
         }))
+    }
+
+    /// Names a read trigger's symbol and gives its quantities the pair's base
+    /// quantity scale, both from the loaded catalogs. Without them the trigger
+    /// keeps an empty symbol and unscaled quantities.
+    fn label_from_catalogs(&self, trigger: &mut Trigger) {
+        if trigger.symbol.is_empty() {
+            trigger.symbol = self.ctx.catalogs.display_symbol(trigger.symbol_id);
+        }
+        attach_trigger_scale(
+            trigger,
+            self.ctx
+                .catalogs
+                .base_quantity_scale_for_symbol_id(trigger.symbol_id),
+        );
     }
 
     /// Retrieve a trigger using the public string ID returned by create and list calls.
@@ -953,9 +973,17 @@ impl TriggersService {
     ) -> Result<crate::realtime::TypedSubscription<Trigger>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:spot:triggers:{account}:proto");
+        // Each trigger takes its pair's base quantity scale from the catalogs
+        // loaded when it arrives, as `get` and `list` do.
+        let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::trigger_from_bytes)
+            .subscribe_proto(&channel, move |bytes: &[u8]| {
+                let mut trigger = crate::codecs::decode::trigger_from_bytes(bytes)?;
+                let scale = catalogs.base_quantity_scale_for_symbol_id(trigger.symbol_id);
+                attach_trigger_scale(&mut trigger, scale);
+                Ok(trigger)
+            })
             .await
     }
 
@@ -1020,7 +1048,7 @@ mod tests {
             trigger_price: Some(trigger_price),
             limit_price: Some(limit_price),
             trigger_price_source: None,
-            time_in_force: Some(CreateTimeInForce::Gtc),
+            time_in_force: None,
             subaccount_id: None,
             client_trigger_id: "trigger-equivalence".into(),
             post_only: false,

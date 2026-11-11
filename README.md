@@ -575,14 +575,28 @@ applies. A limit child takes no cap; its `limit_price` bounds it. Trigger
 reads expose the cap as `Trigger.max_slippage`. A TWAP market child takes the
 same cap; `max_slippage_ticks` is positive wherever a create sends it. No
 trigger child has a GTD execution, so `CreateTimeInForce::Gtd` fails locally
-with `Error::Validation` for every trigger type.
+with `Error::Validation` for every trigger type. A market child (stop-loss,
+take-profit or TWAP) and a trailing stop always execute IOC: leave
+`time_in_force` `None` or set `Ioc`; `Gtc` and `Fok` fail locally with
+`Error::Validation` instead of being sent as IOC.
 
-Market orders are IOC and enforce a slippage-derived execution boundary. See
+Market orders are IOC and enforce a slippage-derived execution boundary: the
+contract's only market execution is `market_ioc`. Leave a market order's
+`time_in_force` `None` or set `Ioc`; `Gtc`, `Fok` and `Gtd` fail locally with
+`Error::Validation` ("tif=fok is only valid for limit orders") before
+`create`, `preview` or `batch_create` sends anything. See
 [Market Order Price Protection](https://polyester.com/docs/developer-docs/shared-concepts/market-order-price-protection)
 before overriding `market_max_slippage`. `MaxSlippage::Bps` is 1–10000 for a
 buy and 1–9999 for a sell: a 100% cap would leave a sell no positive price.
 An attached trailing stop's `max_slippage` takes at most 9999 bps on either
 side.
+
+With the catalogs loaded, order reads (`orders.get`, `list_open`,
+`list_history`, `trades.list`, and `orders.subscribe` orders and fills) and
+trigger reads (`qty`, a TWAP's or ladder's `executed_qty`) give each quantity
+the pair's base quantity scale, so `order.cum_qty.unwrap().format(None)` works
+without passing a scale. Reads do not wait for the catalogs: without them,
+quantities keep no scale and `format` needs one.
 
 Orders carry exact execution totals. `Order::avg_price()` is the exact average
 execution price (from `avg_price_e18`, 18 decimals); `avg_px` stays the same
@@ -834,10 +848,11 @@ let api_changes = client
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
 status. Valid values:
 
-`created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+`created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
 Unknown values return a validation error (they do not silently return an empty
-list). Response `status` uses the same labels (British spelling `cancelled`).
+list). Response `status` uses the same labels, with `canceled` spelled as
+trigger events and order statuses spell it.
 
 `orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
@@ -917,14 +932,14 @@ order that was placed and expired (`CANCEL_REASON_STP_EXPIRE_TAKER` or
 `CANCEL_REASON_STP_EXPIRE_BOTH`); for every other reason `child_seq` is an
 attempt that placed no order and `child_order_id` is empty. A refusal
 that ends the trigger is still `failed` with `failure_reason`. A ladder whose
-levels were all canceled before any filled ends `cancelled` with
+levels were all canceled before any filled ends `canceled` with
 `user_request`.
 
 `TriggerEvent.event_type` is `fired`, `canceled`, `updated`, `failed`,
 `activated` (a trailing stop started tracking), `armed` (an attached
 take-profit, stop-loss or trailing stop started protecting its parent's filled
 quantity, once) or `fire_refused`. A ladder has no event types of its own: read
-its status, `completed`, `cancelled` or `failed`. A completed ladder may not
+its status, `completed`, `canceled` or `failed`. A completed ladder may not
 have filled: read its executed quantity and levels.
 
 A trigger change that names a listed pair other than the trigger's own is

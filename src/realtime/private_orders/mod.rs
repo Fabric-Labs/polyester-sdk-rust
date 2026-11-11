@@ -6,14 +6,18 @@
 //! token or a reconnect.
 
 use crate::auth::Credentials;
-use crate::codecs::decode::order_from_proto;
+use crate::catalogs::Manager as CatalogManager;
+use crate::codecs::decode::{attach_qty_scale, order_from_proto};
 use crate::codecs::decode::{orders_stale_from_proto, orders_unit_from_proto};
 use crate::errors::{Error, Result};
-use crate::models::{Order, OrdersStale, OrdersUnit, PrivateOrdersEvent};
+use crate::models::{
+    Order, OrderStreamEvent, OrderUnitEvent, OrdersStale, OrdersUnit, PrivateOrdersEvent,
+};
 use crate::proto::privatews::v1::{
     Auth, Channel, ClientMessage, ServerMessage, Subscribe, SubscribeRefresh, Unsubscribe,
     client_message, request_error, server_message,
 };
+use crate::services::scale_order;
 use buffa::{Enumeration, Message as _};
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use rand_core::{OsRng, RngCore};
@@ -198,6 +202,7 @@ impl PrivateOrderStreams {
                         id,
                         commands: commands.clone(),
                         ended,
+                        catalogs: None,
                     };
                 }
                 Err(mpsc::error::SendError(returned)) => command = returned,
@@ -214,6 +219,7 @@ impl PrivateOrderStreams {
             id,
             commands,
             ended,
+            catalogs: None,
         }
     }
 }
@@ -233,12 +239,62 @@ pub struct PrivateOrdersSubscription {
     id: u64,
     commands: mpsc::UnboundedSender<Command>,
     ended: Arc<Mutex<Option<Error>>>,
+    /// Scales each delivered order's quantities from these catalogs.
+    catalogs: Option<Arc<CatalogManager>>,
 }
 
 impl PrivateOrdersSubscription {
+    /// Gives every delivered order's quantities, and a fill's quantity, the
+    /// pair's base quantity scale from `catalogs` when it is loaded.
+    pub(crate) fn with_catalogs(mut self, catalogs: Arc<CatalogManager>) -> Self {
+        self.catalogs = Some(catalogs);
+        self
+    }
+
     /// The next event, or `None` once the stream ended.
     pub async fn recv(&mut self) -> Option<PrivateOrdersEvent> {
-        self.rx.recv().await
+        let event = self.rx.recv().await;
+        event.map(|event| self.scaled(event))
+    }
+
+    fn scaled(&self, mut event: PrivateOrdersEvent) -> PrivateOrdersEvent {
+        let Some(catalogs) = self.catalogs.as_deref() else {
+            return event;
+        };
+        match &mut event {
+            PrivateOrdersEvent::Snapshot(orders) => {
+                for order in orders {
+                    scale_order(catalogs, order);
+                }
+            }
+            PrivateOrdersEvent::Unit(unit) => {
+                for order in &mut unit.orders {
+                    scale_order(catalogs, order);
+                }
+                // A fill names its order, not its pair: the unit carries the
+                // changed order, and with it the pair.
+                for event in &mut unit.events {
+                    let OrderUnitEvent::Order(OrderStreamEvent {
+                        order_id,
+                        fill: Some(fill),
+                        ..
+                    }) = event
+                    else {
+                        continue;
+                    };
+                    let scale = unit
+                        .orders
+                        .iter()
+                        .find(|order| order.order_id == *order_id)
+                        .and_then(|order| {
+                            catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)
+                        });
+                    attach_qty_scale(&mut fill.qty, scale);
+                }
+            }
+            _ => {}
+        }
+        event
     }
 
     /// Like [`Self::recv`], but a stream that ended because of an error
@@ -246,7 +302,7 @@ impl PrivateOrdersSubscription {
     /// keep up) returns that error instead of `None`.
     pub async fn recv_result(&mut self) -> Result<Option<PrivateOrdersEvent>> {
         match self.rx.recv().await {
-            Some(event) => Ok(Some(event)),
+            Some(event) => Ok(Some(self.scaled(event))),
             None => match super::lock_unpoisoned(&self.ended).take() {
                 Some(err) => Err(err),
                 None => Ok(None),
