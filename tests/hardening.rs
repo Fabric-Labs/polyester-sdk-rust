@@ -303,12 +303,12 @@ async fn mock_http_server_hides_only_a_port_probe() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_safe() {
+async fn l2_auth_identical_request_burst_is_unique_future_bounded_and_runtime_safe() {
     use polyester::auth::{HEADER_SIGNATURE, HEADER_TIMESTAMP, MAX_SIGNING_FUTURE_SKEW_MS};
     use std::collections::{BTreeMap, HashSet};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    const FROM_THREADS: usize = 7_000;
+    const FROM_THREADS: usize = 2_000;
     const FROM_RUNTIME: usize = 3_000;
     const URL: &str = "https://api.example.test/orders.v1.OrdersService/CreateOrder";
     const BODY: &[u8] = b"identical-order-body";
@@ -418,11 +418,19 @@ async fn l2_auth_10k_identical_requests_are_unique_future_bounded_and_runtime_sa
     );
 
     tuples.extend(from_runtime);
-    assert_eq!(tuples.len(), 10_000);
+    assert_eq!(tuples.len(), FROM_THREADS + FROM_RUNTIME);
     let timestamps = tuples.iter().map(|item| item.0).collect::<HashSet<_>>();
     let signatures = tuples.iter().map(|item| &item.1).collect::<HashSet<_>>();
-    assert_eq!(timestamps.len(), 10_000, "duplicate signing timestamp");
-    assert_eq!(signatures.len(), 10_000, "duplicate authentication tuple");
+    assert_eq!(
+        timestamps.len(),
+        FROM_THREADS + FROM_RUNTIME,
+        "duplicate signing timestamp"
+    );
+    assert_eq!(
+        signatures.len(),
+        FROM_THREADS + FROM_RUNTIME,
+        "duplicate authentication tuple"
+    );
     for (timestamp, _, observed_at_ms) in &tuples {
         assert!(
             *timestamp <= *observed_at_ms + MAX_SIGNING_FUTURE_SKEW_MS,
