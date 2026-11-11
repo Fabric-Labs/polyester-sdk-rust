@@ -56,7 +56,7 @@ pub struct Config {
     pub allow_insecure_http: bool,
     /// Receive window of every signed request, in milliseconds (1 to 60000),
     /// sent as the signed `X-API-RECV-WINDOW` header. `None` sends none, and
-    /// the server applies 10000.
+    /// the server applies 5000.
     pub recv_window_ms: Option<u32>,
 }
 
