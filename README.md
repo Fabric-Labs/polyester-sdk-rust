@@ -327,7 +327,11 @@ proxy URL from the environment reads `[proxy]`, in `Display`, `Debug` and every
 `source()`, problem details and a rate limit's `detail` included. A URL that
 does not parse is dropped whole. The client's own secrets read `[REDACTED]`
 however an answer quotes them: the userinfo and password of its `api_url` and
-`ws_url` and of a proxy the environment sets, and its API private key. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
+`ws_url` and of a proxy the environment sets (raw and percent-decoded), and
+its API private key. Limitations: a password shorter than 4 characters is not
+replaced where it stands alone, since replacing so short a string would
+mangle ordinary text; and a request signature is not redacted when the server
+echoes it back, since it is single-use and expires with its receive window. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
 (chain.zipper.v1.ZipperService/GetDepositWithdrawConfig) connection closed
 after 3 attempts in 0.8s: ...`.
 

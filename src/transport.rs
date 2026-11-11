@@ -242,15 +242,24 @@ fn secrets_in_effect() -> Vec<String> {
     let mut secrets = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS).clone();
     for name in PROXY_ENV {
         if let Ok(proxy) = std::env::var(name) {
-            secrets.extend(
-                userinfo_parts(proxy.trim())
-                    .into_iter()
-                    .filter(|part| part.len() >= MIN_SECRET_LENGTH),
-            );
+            secrets.extend(proxy_secrets(proxy.trim()));
         }
     }
     secrets.sort_by_key(|secret| std::cmp::Reverse(secret.len()));
     secrets
+}
+
+/// The userinfo and password of a proxy URL from the environment, raw and
+/// decoded, as [`register_url_secrets`] keeps them.
+fn proxy_secrets(proxy: &str) -> Vec<String> {
+    userinfo_parts(proxy)
+        .into_iter()
+        .flat_map(|part| {
+            let decoded = urlencoding_decode(&part).ok();
+            std::iter::once(part).chain(decoded)
+        })
+        .filter(|part| part.len() >= MIN_SECRET_LENGTH)
+        .collect()
 }
 
 /// After each `://`, up to the next whitespace, drop everything up to the last
@@ -1209,7 +1218,7 @@ mod tests {
 
 #[cfg(test)]
 mod url_userinfo_tests {
-    use super::url_without_userinfo;
+    use super::{proxy_secrets, url_without_userinfo};
 
     #[test]
     fn url_for_error_keeps_only_scheme_host_port_and_path() {
@@ -1228,6 +1237,21 @@ mod url_userinfo_tests {
             ),
         ] {
             assert_eq!(super::url_for_error(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn environment_proxy_userinfo_is_redacted_decoded() {
+        let secrets =
+            proxy_secrets("http://decoded%2Denv%2Duser:decoded%2Denv%2Dsecret%2DA73x@127.0.0.1:9");
+        for secret in [
+            "decoded-env-user:decoded-env-secret-A73x",
+            "decoded-env-secret-A73x",
+        ] {
+            assert!(
+                secrets.iter().any(|item| item == secret),
+                "{secret} not in {secrets:?}"
+            );
         }
     }
 
