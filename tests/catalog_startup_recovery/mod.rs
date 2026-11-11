@@ -56,12 +56,26 @@ impl Api {
 
     /// `failure_headers` are sent with every answer that is not a catalog.
     pub(crate) async fn spawn_with(plan: Plan, failure_headers: Vec<(String, String)>) -> Self {
+        Self::spawn_full(plan, failure_headers, None).await
+    }
+
+    /// [`Action::Unavailable`] answers `status` with `body` instead.
+    pub(crate) async fn spawn_with_funding_answer(plan: Plan, status: u16, body: String) -> Self {
+        Self::spawn_full(plan, Vec::new(), Some((status, body))).await
+    }
+
+    async fn spawn_full(
+        plan: Plan,
+        failure_headers: Vec<(String, String)>,
+        unavailable_answer: Option<(u16, String)>,
+    ) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let base_url = format!("http://{}", listener.local_addr().expect("addr"));
         let connections = Arc::new(AtomicUsize::new(0));
         let calls = Arc::new(Mutex::new(HashMap::new()));
         let (accepted, seen) = (connections.clone(), calls.clone());
         let failure_headers = Arc::new(failure_headers);
+        let unavailable_answer = Arc::new(unavailable_answer);
         tokio::spawn(async move {
             while let Ok((stream, _)) = listener.accept().await {
                 accepted.fetch_add(1, Ordering::SeqCst);
@@ -70,6 +84,7 @@ impl Api {
                     plan.clone(),
                     seen.clone(),
                     failure_headers.clone(),
+                    unavailable_answer.clone(),
                 ));
             }
         });
@@ -108,6 +123,7 @@ async fn serve(
     plan: Plan,
     calls: Arc<Mutex<HashMap<String, usize>>>,
     failure_headers: Arc<Vec<(String, String)>>,
+    unavailable_answer: Arc<Option<(u16, String)>>,
 ) {
     let mut buf = Vec::new();
     loop {
@@ -134,11 +150,16 @@ async fn serve(
         }
         let unavailable = action == Action::Unavailable;
         let (status, headers, body) = match operation.as_str() {
-            _ if unavailable => (
-                503,
-                failure_headers.to_vec(),
-                br#"{"code":"unavailable","message":"edge unavailable"}"#.to_vec(),
-            ),
+            _ if unavailable => match unavailable_answer.as_ref() {
+                Some((status, body)) => {
+                    (*status, failure_headers.to_vec(), body.clone().into_bytes())
+                }
+                None => (
+                    503,
+                    failure_headers.to_vec(),
+                    br#"{"code":"unavailable","message":"edge unavailable"}"#.to_vec(),
+                ),
+            },
             SPOT => (200, Vec::new(), spot_config().encode_to_bytes().to_vec()),
             FUNDING => (200, Vec::new(), funding_config().encode_to_bytes().to_vec()),
             _ => (
@@ -511,4 +532,110 @@ fn catalog_timeout_must_be_positive() {
         matches!(&err, Error::Validation(msg) if msg.contains("catalog_timeout")),
         "{err}"
     );
+}
+
+/// A client whose funding config is still loading (`pending`) or failed.
+async fn funding_state_client(pending: bool) -> (Client, Api) {
+    let api = Api::spawn(plan(move |op, _| match op {
+        FUNDING if pending => Action::Stall,
+        FUNDING => Action::Unavailable,
+        _ => Action::Answer,
+    }))
+    .await;
+    let mut config = api.config(Duration::from_secs(30));
+    config.catalog_timeout = Some(Duration::from_secs(if pending { 60 } else { 2 }));
+    let client = Client::new(config).expect("client");
+    client.wait_for_catalogs().await.expect("spot catalogs");
+    if !pending {
+        client
+            .wait_for_funding_catalog()
+            .await
+            .expect_err("the funding config fails");
+    }
+    (client, api)
+}
+
+/// The supply stream decodes with the funding config: it sends nothing while
+/// the config is pending, and refuses without sending once it failed. The
+/// stream's port refuses connections, so a connect attempt would end the
+/// call at once with a realtime error.
+#[tokio::test]
+async fn the_supply_stream_sends_nothing_without_the_funding_config() {
+    for pending in [true, false] {
+        let (client, _api) = funding_state_client(pending).await;
+        let outcome = tokio::time::timeout(
+            Duration::from_millis(300),
+            client.zipper.subscribe_zipped_asset_supply(true),
+        )
+        .await;
+        match outcome {
+            Err(_) => assert!(pending, "the failed config made the stream wait"),
+            Ok(result) => {
+                assert!(!pending, "the stream went on while the config was pending");
+                let err = result.map(drop).expect_err("no funding config");
+                assert!(matches!(err, Error::CatalogHydration(_)), "{err:?}");
+                assert!(err.to_string().contains("funding config"), "{err}");
+            }
+        }
+        // A lookup that reads the funding config answers None, not a guess.
+        assert_eq!(client.catalogs.ledger_id_for_asset("USDT"), None);
+    }
+}
+
+/// Deposit addresses and withdrawals read nothing from the funding config.
+#[tokio::test]
+async fn deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_config() {
+    use polyester::models::CreateTradingWithdrawParams;
+    use polyester::proto::chain::deposit::v1::CreateDepositAddressRequest;
+    use polyester::{AssetAmount, QuantityDomain};
+
+    for pending in [true, false] {
+        let (client, api) = funding_state_client(pending).await;
+        let list = tokio::time::timeout(Duration::from_secs(5), client.deposit.list_addresses())
+            .await
+            .expect("list ended");
+        let create = tokio::time::timeout(
+            Duration::from_secs(5),
+            client
+                .deposit
+                .create_address(CreateDepositAddressRequest::default()),
+        )
+        .await
+        .expect("create ended");
+        let withdraw = tokio::time::timeout(
+            Duration::from_secs(5),
+            client
+                .withdraw
+                .create_to_funding(CreateTradingWithdrawParams {
+                    asset_id: 2,
+                    amount: AssetAmount::from_scaled(
+                        1,
+                        Some(18),
+                        QuantityDomain::LedgerE18,
+                        Some(2),
+                    )
+                    .unwrap(),
+                    payload_signature: vec![1; 65],
+                    destination_address: String::new(),
+                    idempotency_key: "poly-9228-control".into(),
+                    amount_scale: Some(18),
+                    deadline_ts_sec: Some(4_102_444_800),
+                    nonce: 1,
+                }),
+        )
+        .await
+        .expect("withdraw ended");
+        for (operation, result) in [
+            ("ListDepositAddresses", list.map(drop)),
+            ("CreateDepositAddress", create.map(drop)),
+            ("CreateTradingWithdraw", withdraw.map(drop)),
+        ] {
+            let err = result.expect_err("the stub refuses every call");
+            assert!(
+                !matches!(err, Error::CatalogHydration(_) | Error::CatalogLoad(_)),
+                "{operation} waited for the funding config: {err}"
+            );
+            assert_eq!(api.count(operation), 1, "{operation} was not sent: {err}");
+        }
+    }
 }

@@ -14,6 +14,8 @@ mod catalog_startup_recovery;
 mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
+#[path = "error_chain_redaction/mod.rs"]
+mod error_chain_redaction;
 mod hardening_support;
 #[path = "limit_market_ref_price/mod.rs"]
 mod limit_market_ref_price;

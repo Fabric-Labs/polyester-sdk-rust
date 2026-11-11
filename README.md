@@ -294,6 +294,17 @@ catalog and `catalogs.ledger_id_for_asset` after it returns `Ok`. Each returns
 `Error::CatalogLoad` when its catalog could not be loaded, and loads it again
 on the next call.
 
+Only what reads the funding config waits for it: the zipper supply stream,
+which decodes with its scales. A waiting call sends nothing until the config
+loads, and returns `Error::CatalogHydration` naming the funding config,
+without sending, when it failed. Deposit addresses and withdrawals
+(`deposit.list_addresses`, `deposit.create_address`, `withdraw.create_*`) and
+`zipper.get_deposit_withdraw_config` read nothing from it and work while it is
+loading or failed. `catalogs.ledger_id_for_asset` doesn't wait: `None` means
+either that the funding config has not loaded (yet, or its load failed) or
+that it does not know the asset, so await `wait_for_funding_catalog()` first.
+With `hydrate_catalogs: false` nothing loads and nothing waits, as before.
+
 These two reads change nothing, so a read that times out or loses its
 connection (`client error (SendRequest)`) is read again: at most 3 reads per
 catalog, 250ms and then 500ms apart, each retry on a connection pool of its
@@ -309,7 +320,11 @@ other call is retried this way, and mutations never are.
 `elapsed`, and the edge's reference of the last failed response
 (`response_ref`, the `cf-ray` header) when one arrived; `source` is the last
 failure, also returned by `std::error::Error::source`. Its message drops URL
-credentials, for example `catalog hydration failed: funding config
+credentials. No SDK error prints a credential anywhere in its chain: every
+error mapped from a Connect call is redacted where it is mapped, so each URL an
+answer or a transport quotes keeps only its scheme, host, port and path, and a
+proxy URL from the environment reads `[proxy]`, in `Display`, `Debug` and every
+`source()`. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
 (chain.zipper.v1.ZipperService/GetDepositWithdrawConfig) connection closed
 after 3 attempts in 0.8s: ...`.
 

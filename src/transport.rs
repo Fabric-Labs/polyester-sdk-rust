@@ -129,6 +129,63 @@ pub(crate) fn url_for_error(raw: &str) -> String {
     }
 }
 
+/// Proxy settings an HTTP client may read from the environment.
+const PROXY_ENV: [&str; 6] = [
+    "HTTPS_PROXY",
+    "https_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+    "ALL_PROXY",
+    "all_proxy",
+];
+
+/// `text` with every URL in it as [`url_for_error`] names it, and every proxy
+/// URL from the environment as `[proxy]`. For text that quotes an answer or a
+/// transport, such as an error message.
+pub(crate) fn redact_text(text: &str) -> String {
+    let mut text = text.to_owned();
+    for name in PROXY_ENV {
+        let Ok(proxy) = std::env::var(name) else {
+            continue;
+        };
+        let proxy = proxy.trim();
+        if proxy.is_empty() {
+            continue;
+        }
+        let mut forms = vec![proxy.to_owned(), proxy.trim_end_matches('/').to_owned()];
+        let stripped = url_without_userinfo(proxy);
+        if stripped != "[REDACTED INVALID URL]" {
+            forms.push(stripped.trim_end_matches('/').to_owned());
+            forms.push(stripped);
+        }
+        forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+        for form in forms.iter().filter(|form| !form.is_empty()) {
+            text = text.replace(form.as_str(), "[proxy]");
+        }
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text.as_str();
+    while let Some(separator) = rest.find("://") {
+        let scheme_start = rest[..separator]
+            .rfind(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
+            .map_or(0, |i| i + 1);
+        let end = rest[separator + 3..]
+            .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '(' | ')'))
+            .map_or(rest.len(), |i| separator + 3 + i);
+        if scheme_start == separator {
+            // No scheme before "://": not a URL.
+            out.push_str(&rest[..separator + 3]);
+            rest = &rest[separator + 3..];
+            continue;
+        }
+        out.push_str(&rest[..scheme_start]);
+        out.push_str(&url_for_error(&rest[scheme_start..end]));
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
 fn redact_url_for_log(url: &url::Url) -> String {
     let mut redacted = url.clone();
     let _ = redacted.set_username("");
