@@ -20,7 +20,7 @@ pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
 pub const HEADER_RECV_WINDOW: &str = "X-API-RECV-WINDOW";
 
 /// Bounds of an API-key request's receive window, in milliseconds. Without
-/// the header the server applies 10000.
+/// the header the server applies 5000.
 pub const MIN_RECV_WINDOW_MS: u32 = 1;
 pub const MAX_RECV_WINDOW_MS: u32 = 60_000;
 
@@ -38,9 +38,10 @@ pub fn validate_recv_window_ms(recv_window_ms: Option<u32>) -> Result<()> {
 }
 
 /// Maximum amount an automatically allocated signing timestamp may lead the
-/// local wall clock. The API accepts a 10-second freshness window; keeping the
-/// client ceiling at 5 seconds leaves room for clock and network skew.
-pub const MAX_SIGNING_FUTURE_SKEW_MS: u64 = 5_000;
+/// local wall clock. The API refuses a timestamp more than one second ahead of
+/// its own clock as `TIMESTAMP_SKEW`; half a second leaves the other half for
+/// clock skew.
+pub const MAX_SIGNING_FUTURE_SKEW_MS: u64 = 500;
 const MAX_SIGNING_BACKPRESSURE: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Default)]
@@ -633,9 +634,70 @@ mod tests {
         assert_eq!(headers.get(HEADER_SIGNATURE).unwrap().len(), 128);
     }
 
+    /// The API refuses an API-key timestamp more than one second ahead of its
+    /// clock as `TIMESTAMP_SKEW`.
+    const SERVER_FUTURE_ALLOWANCE_MS: u64 = 1_000;
+
+    #[test]
+    fn signing_ceiling_leaves_room_for_clock_skew_under_the_server_allowance() {
+        let ceiling = std::hint::black_box(MAX_SIGNING_FUTURE_SKEW_MS);
+        assert!(
+            ceiling > 0 && ceiling < SERVER_FUTURE_ALLOWANCE_MS,
+            "MAX_SIGNING_FUTURE_SKEW_MS = {ceiling}, want 1 to {}",
+            SERVER_FUTURE_ALLOWANCE_MS - 1
+        );
+    }
+
+    #[test]
+    fn sync_signing_burst_never_signs_beyond_the_server_allowance() {
+        let (seed, _) = generate_ed25519_keypair();
+        let creds = Credentials::new("key_future_allowance_sync", &seed).unwrap();
+        let mut signed = 0;
+        for _ in 0..2_000 {
+            let headers = match creds.sign_request(
+                "GET",
+                "https://api.example.test/v1/rt/token",
+                b"",
+                None,
+            ) {
+                Ok(headers) => headers,
+                // Capacity backpressure is the allowed outcome at the ceiling.
+                Err(Error::RateLimit { .. }) => continue,
+                Err(other) => panic!("{other:?}"),
+            };
+            let now = timestamp_ms_from(SystemTime::now()).unwrap();
+            let timestamp = headers[HEADER_TIMESTAMP].parse::<u64>().unwrap();
+            let ahead = timestamp.saturating_sub(now);
+            assert!(
+                ahead <= SERVER_FUTURE_ALLOWANCE_MS,
+                "signed {ahead} ms ahead; the server refuses more than {SERVER_FUTURE_ALLOWANCE_MS} ms"
+            );
+            signed += 1;
+        }
+        assert!(signed > 0);
+    }
+
+    #[tokio::test]
+    async fn async_signing_burst_never_signs_beyond_the_server_allowance() {
+        let (seed, _) = generate_ed25519_keypair();
+        let creds = Credentials::new("key_future_allowance_async", &seed).unwrap();
+        for _ in 0..2_000 {
+            let headers = creds
+                .sign_request_async("GET", "https://api.example.test/v1/rt/token", b"", None)
+                .await
+                .unwrap();
+            let now = timestamp_ms_from(SystemTime::now()).unwrap();
+            let timestamp = headers[HEADER_TIMESTAMP].parse::<u64>().unwrap();
+            let ahead = timestamp.saturating_sub(now);
+            assert!(
+                ahead <= SERVER_FUTURE_ALLOWANCE_MS,
+                "signed {ahead} ms ahead; the server refuses more than {SERVER_FUTURE_ALLOWANCE_MS} ms"
+            );
+        }
+    }
+
     #[tokio::test(flavor = "current_thread")]
-    async fn ten_thousand_identical_requests_get_unique_bounded_auth_tuples_without_blocking_runtime()
-     {
+    async fn identical_request_burst_gets_unique_bounded_auth_tuples_without_blocking_runtime() {
         use std::collections::HashSet;
 
         let (seed, _) = generate_ed25519_keypair();
@@ -653,11 +715,11 @@ mod tests {
             largest_gap
         });
         // Join in chunks so CPU-bound Ed25519 work cannot starve the ticker for
-        // the whole 10k burst on a current-thread runtime. The allocator itself
+        // the whole burst on a current-thread runtime. The allocator itself
         // must still yield under backpressure between chunks.
-        let mut headers = Vec::with_capacity(10_000);
-        for chunk_start in (0..10_000).step_by(250) {
-            let chunk_end = (chunk_start + 250).min(10_000);
+        let mut headers = Vec::with_capacity(3_000);
+        for chunk_start in (0..3_000).step_by(250) {
+            let chunk_end = (chunk_start + 250).min(3_000);
             let handles = (chunk_start..chunk_end)
                 .map(|_| {
                     let creds = creds.clone();
@@ -677,7 +739,7 @@ mod tests {
             tokio::task::yield_now().await;
         }
         let largest_timer_gap = ticker.await.unwrap();
-        assert_eq!(headers.len(), 10_000);
+        assert_eq!(headers.len(), 3_000);
         assert!(
             largest_timer_gap < Duration::from_secs(1),
             "signing backpressure stalled the current-thread runtime for {largest_timer_gap:?}"
@@ -697,8 +759,8 @@ mod tests {
                 "duplicate signature for timestamp {timestamp}"
             );
         }
-        assert_eq!(timestamps.len(), 10_000);
-        assert_eq!(signatures.len(), 10_000);
+        assert_eq!(timestamps.len(), 3_000);
+        assert_eq!(signatures.len(), 3_000);
     }
 
     #[tokio::test]
