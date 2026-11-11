@@ -48,6 +48,9 @@ fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
         Some(LifecycleReason::DEPOSIT_SOURCE_NOT_CONFIRMED) => {
             "deposit_source_not_confirmed".to_owned()
         }
+        Some(LifecycleReason::ZIPPER_COMPLIANCE_TRANSFERRED) => {
+            "zipper_compliance_transferred".to_owned()
+        }
         None => format!("unknown_reason_{}", value.to_i32()),
     }
 }
@@ -267,6 +270,17 @@ mod tests {
             let flow = flow_summary_message_from_proto(&msg);
             assert_eq!(flow.lifecycle_reason, expected);
         }
+    }
+
+    #[test]
+    fn zipper_compliance_transfer_reason_has_its_label() {
+        let msg = FlowSummaryView {
+            flow_id: "flow-compliance".into(),
+            lifecycle_reason: LifecycleReason::ZIPPER_COMPLIANCE_TRANSFERRED.into(),
+            ..Default::default()
+        };
+        let flow = flow_summary_message_from_proto(&msg);
+        assert_eq!(flow.lifecycle_reason, "zipper_compliance_transferred");
     }
 
     #[test]

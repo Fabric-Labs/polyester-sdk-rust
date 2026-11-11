@@ -7,6 +7,8 @@
     unused_qualifications
 )]
 
+pub mod ai;
+pub mod alerts;
 pub mod auth;
 pub mod chain;
 pub mod changelog;
@@ -23,6 +25,7 @@ pub mod privatews;
 pub mod ratelimit;
 pub mod rewards;
 pub mod swap;
+pub mod system;
 pub mod tradews;
 pub mod transfer;
 pub mod triggers;
