@@ -12,7 +12,7 @@ use crate::proto::auth::v1::{
     CreateSubaccountResponse, GetSubaccountResponse, InviteSubaccountMemberResponse,
     ListSubaccountEventsResponse, ListSubaccountInvitesResponse, ListSubaccountMembersResponse,
     ListSubaccountsResponse, RespondSubaccountInviteResponse, Subaccount, SubaccountInvite,
-    SubaccountInviteDirection, SubaccountMemberView, SubaccountStatus,
+    SubaccountInviteDirection, SubaccountMemberView, SubaccountRole, SubaccountStatus,
 };
 
 fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
@@ -50,6 +50,14 @@ fn activity_label<T: buffa::Enumeration>(value: &buffa::EnumValue<T>, prefix: &s
     }
 }
 
+/// The caller's role as its proto name (`"VIEWER"`, ...), as member and
+/// invite roles read. `None` when unspecified, as on a removal: no role is
+/// invented.
+fn subaccount_role(role: &buffa::EnumValue<SubaccountRole>) -> Option<String> {
+    (role.to_i32() != SubaccountRole::SUBACCOUNT_ROLE_UNSPECIFIED as i32)
+        .then(|| enum_proto_name(role))
+}
+
 pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
     SubAccount {
         subaccount_id: format_uint64_id(msg.id),
@@ -58,6 +66,8 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
         status: subaccount_status_name(&msg.status),
         updated_at: msg.updated_at.as_option().cloned(),
         revision: msg.revision,
+        role: subaccount_role(&msg.role),
+        removed: msg.removed,
     }
 }
 
@@ -150,9 +160,7 @@ pub fn subaccount_activity_list_from_proto(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proto::auth::v1::{
-        ActivityEntityKind, ActivityEvent, ActivityEventAction, SubaccountRole,
-    };
+    use crate::proto::auth::v1::{ActivityEntityKind, ActivityEvent, ActivityEventAction};
     use buffa_types::google::protobuf::Timestamp;
 
     #[test]
@@ -184,6 +192,71 @@ mod tests {
             123_456_000
         );
         assert_eq!(result.subaccounts[0].revision, 4);
+    }
+
+    /// POLY-9397: a sub-account update keeps `removed` and the caller's role.
+    /// A removal (`removed`, role unspecified) never reads as an active viewer,
+    /// even with the same revision and `updated_at`, through the stream
+    /// decoder and in proto JSON.
+    #[test]
+    fn poly_9397_subaccount_update_keeps_removed_and_role() {
+        let update = |removed: bool, role: SubaccountRole, revision: u64| Subaccount {
+            id: 42,
+            role: role.into(),
+            status: SubaccountStatus::Active.into(),
+            revision,
+            removed,
+            updated_at: Timestamp {
+                seconds: 1_700_000_000,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let mut failures = Vec::new();
+        for revision in [0, 3, 9_007_199_254_740_993] {
+            let removal = update(true, SubaccountRole::SUBACCOUNT_ROLE_UNSPECIFIED, revision);
+            let viewer = update(false, SubaccountRole::VIEWER, revision);
+            for (label, msg, want_removed, want_role) in [
+                ("removal", &removal, true, None),
+                ("viewer", &viewer, false, Some("VIEWER")),
+            ] {
+                let bytes = buffa::Message::encode_to_vec(msg);
+                let json: Subaccount =
+                    serde_json::from_slice(&serde_json::to_vec(msg).unwrap()).unwrap();
+                assert_eq!(&json, msg, "proto JSON round trip");
+                for (path, got) in [
+                    (
+                        "from_bytes",
+                        crate::codecs::decode::subaccount_from_bytes(&bytes).unwrap(),
+                    ),
+                    ("from_json", subaccount_from_proto(&json)),
+                ] {
+                    if got.removed != want_removed || got.role.as_deref() != want_role {
+                        failures.push(format!(
+                            "{label} rev {revision} {path}: removed={} role={:?}",
+                            got.removed, got.role
+                        ));
+                    }
+                    assert_eq!(got.revision, revision);
+                }
+            }
+            let removal = crate::codecs::decode::subaccount_from_bytes(
+                &buffa::Message::encode_to_vec(&removal),
+            )
+            .unwrap();
+            let viewer = crate::codecs::decode::subaccount_from_bytes(
+                &buffa::Message::encode_to_vec(&viewer),
+            )
+            .unwrap();
+            if removal == viewer {
+                failures.push(format!("rev {revision}: removal decodes as the viewer"));
+            }
+        }
+        assert!(failures.is_empty(), "{failures:#?}");
+        // A role change applies as it arrives; each role is kept.
+        let trader = subaccount_from_proto(&update(false, SubaccountRole::TRADER, 3));
+        assert_eq!(trader.role.as_deref(), Some("TRADER"));
     }
 
     #[test]

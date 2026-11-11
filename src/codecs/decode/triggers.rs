@@ -18,7 +18,7 @@ use crate::proto::triggers::v1::{
     PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
     TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
     conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
-    twap_trigger,
+    twap_market_ioc, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -394,9 +394,16 @@ fn trigger_config_projection(
                     proj.time_in_force = "gtc".to_owned();
                     proj.limit_price = decode_price_ticks(limit.price_ticks, symbol);
                 }
-                Some(twap_trigger::Execution::MarketIoc(_)) => {
+                Some(twap_trigger::Execution::MarketIoc(market)) => {
                     proj.order_type = "market".to_owned();
                     proj.time_in_force = "ioc".to_owned();
+                    // Each slice's cap; `None` leaves the pair's default.
+                    proj.max_slippage = market.max_slippage.as_ref().map(|cap| match cap {
+                        twap_market_ioc::MaxSlippage::MaxSlippageTicks(ticks) => {
+                            MaxSlippage::Ticks(*ticks)
+                        }
+                        twap_market_ioc::MaxSlippage::MaxSlippageBps(bps) => MaxSlippage::Bps(*bps),
+                    });
                 }
                 None => {}
             }
@@ -411,6 +418,22 @@ fn trigger_config_projection(
         None => {}
     }
     proj
+}
+
+/// A trailing stop's cap from its runtime details, for a trigger that carries
+/// no configuration; the configuration's cap is read first.
+fn trailing_details_cap(
+    configuration: Option<&trigger::Configuration>,
+    details: Option<&TriggerDetails>,
+) -> Option<MaxSlippage> {
+    let (None, Some(TriggerDetails::Trailing(trailing))) = (configuration, details) else {
+        return None;
+    };
+    match (&trailing.max_slippage, trailing.max_slippage_bps) {
+        (Some(ticks), _) => Some(MaxSlippage::Ticks(ticks.as_ticks())),
+        (None, bps) if bps > 0 => Some(MaxSlippage::Bps(bps)),
+        _ => None,
+    }
 }
 
 pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
@@ -447,7 +470,9 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         ),
         post_only: proj.post_only,
         trigger_price,
-        max_slippage: proj.max_slippage,
+        max_slippage: proj
+            .max_slippage
+            .or_else(|| trailing_details_cap(msg.configuration.as_ref(), details.as_ref())),
         client_trigger_id: msg.client_trigger_id.clone(),
         created_at: clone_timestamp(msg.created_at.as_option()),
         updated_at: clone_timestamp(msg.updated_at.as_option()),
@@ -818,6 +843,160 @@ mod tests {
         })
         .unwrap();
         assert_eq!(got.max_slippage, Some(MaxSlippage::Bps(10)));
+    }
+
+    /// POLY-9396: a market TWAP's per-slice cap (`twap.market_ioc.max_slippage`)
+    /// reads back as `max_slippage`, in its own variant, through every decoder;
+    /// no cap reads `None` (each slice uses the pair's default slippage).
+    #[test]
+    fn poly_9396_trigger_reads_a_market_twap_slice_cap() {
+        use crate::proto::triggers::v1::{TwapMarketIoc, TwapTrigger, twap_market_ioc};
+
+        let twap = |cap: Option<twap_market_ioc::MaxSlippage>| ProtoTrigger {
+            trigger_id: 21,
+            symbol_id: 1,
+            qty_scaled: 100_000,
+            configuration: Some(trigger::Configuration::Twap(Box::new(TwapTrigger {
+                side: Side::Sell.into(),
+                duration_ms: 60_000,
+                slice_interval_ms: 5_000,
+                execution: Some(twap_trigger::Execution::MarketIoc(Box::new(
+                    TwapMarketIoc {
+                        max_slippage: cap,
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+        let cases = [
+            (
+                Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(10)),
+                Some(MaxSlippage::Bps(10)),
+            ),
+            (
+                Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(50)),
+                Some(MaxSlippage::Bps(50)),
+            ),
+            (
+                Some(twap_market_ioc::MaxSlippage::MaxSlippageTicks(
+                    25_000_000_000,
+                )),
+                Some(MaxSlippage::Ticks(25_000_000_000)),
+            ),
+            (None, None),
+        ];
+        let mut failures = Vec::new();
+        for (cap, want) in cases {
+            let msg = twap(cap);
+            // The generated wire keeps the cap; the typed read must too.
+            let bytes = buffa::Message::encode_to_vec(&msg);
+            let json = serde_json::to_vec(&msg).unwrap();
+            let from_json: ProtoTrigger = serde_json::from_slice(&json).unwrap();
+            assert_eq!(from_json, msg, "proto JSON round trip");
+            let reads = [
+                ("from_proto", trigger_from_proto(&msg)),
+                ("from_json", trigger_from_proto(&from_json)),
+                (
+                    "from_bytes",
+                    crate::codecs::decode::trigger_from_bytes(&bytes).unwrap(),
+                ),
+                (
+                    "list",
+                    triggers_list_from_proto(&ListTriggersResponse {
+                        triggers: vec![msg.clone()],
+                        ..Default::default()
+                    })
+                    .triggers
+                    .remove(0),
+                ),
+                (
+                    "get",
+                    get_trigger_from_proto(&GetTriggerResponse {
+                        trigger: buffa::MessageField::some(msg.clone()),
+                        ..Default::default()
+                    })
+                    .unwrap(),
+                ),
+            ];
+            for (path, read) in reads {
+                assert_eq!(read.trigger_type, "twap", "{path}");
+                assert_eq!(read.order_type, "market", "{path}");
+                if read.max_slippage != want {
+                    failures.push(format!(
+                        "{path}: got {:?}, want {want:?}",
+                        read.max_slippage
+                    ));
+                }
+            }
+        }
+        assert!(failures.is_empty(), "TWAP slice cap lost: {failures:#?}");
+    }
+
+    /// POLY-9425: a trailing stop's cap reads at the top level, from its
+    /// configuration, or from its runtime details when it has none; the
+    /// details keep their own copy.
+    #[test]
+    fn poly_9425_trailing_stop_cap_reads_at_the_top_level() {
+        use crate::proto::triggers::v1::{TrailingDetails, TrailingStopTrigger};
+
+        let configured = |cap| ProtoTrigger {
+            trigger_id: 31,
+            symbol_id: 1,
+            configuration: Some(trigger::Configuration::TrailingStop(Box::new(
+                TrailingStopTrigger {
+                    side: Side::Sell.into(),
+                    max_slippage: cap,
+                    ..Default::default()
+                },
+            ))),
+            runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(
+                TrailingDetails {
+                    max_slippage_bps: 100,
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let t = trigger_from_proto(&configured(Some(
+            trailing_stop_trigger::MaxSlippage::MaxSlippageBps(100),
+        )));
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Bps(100)));
+        let Some(TriggerDetails::Trailing(details)) = t.details.as_ref() else {
+            panic!("expected trailing details");
+        };
+        assert_eq!(details.max_slippage_bps, 100);
+        let t = trigger_from_proto(&configured(Some(
+            trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(7_000_000_000),
+        )));
+        assert_eq!(t.max_slippage, Some(MaxSlippage::Ticks(7_000_000_000)));
+
+        for (details, want) in [
+            (
+                TrailingDetails {
+                    max_slippage_bps: 100,
+                    ..Default::default()
+                },
+                Some(MaxSlippage::Bps(100)),
+            ),
+            (
+                TrailingDetails {
+                    max_slippage_ticks: 7_000_000_000,
+                    ..Default::default()
+                },
+                Some(MaxSlippage::Ticks(7_000_000_000)),
+            ),
+            (TrailingDetails::default(), None),
+        ] {
+            let msg = ProtoTrigger {
+                trigger_id: 32,
+                symbol_id: 1,
+                runtime_details: Some(trigger::RuntimeDetails::Trailing(Box::new(details))),
+                ..Default::default()
+            };
+            assert_eq!(trigger_from_proto(&msg).max_slippage, want);
+        }
     }
 
     #[test]
