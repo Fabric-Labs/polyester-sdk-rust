@@ -41,6 +41,7 @@ pub mod proto;
 pub mod connect;
 
 pub mod auth;
+mod catalog_startup;
 pub mod catalogs;
 pub mod client;
 pub mod codecs;
@@ -68,7 +69,10 @@ pub use environment::{
     PolyesterEnvironment, SafeDeploymentConfig, create_polyester_environment,
     environment_from_name,
 };
-pub use errors::{Error, Result, SubscriptionEndReason, auth_codes, order_codes, problem_codes};
+pub use errors::{
+    CatalogLoadFailure, Error, Result, SubscriptionEndReason, auth_codes, order_codes,
+    problem_codes,
+};
 pub use services::{
     PreparedTradingWithdraw, new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,
 };

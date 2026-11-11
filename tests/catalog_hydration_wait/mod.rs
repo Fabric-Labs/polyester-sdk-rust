@@ -91,6 +91,12 @@ struct Stub {
 
 impl Stub {
     async fn spawn() -> Self {
+        Self::spawn_holding_funding(false).await
+    }
+
+    /// With `hold_funding`, `GetDepositWithdrawConfig` waits for the same
+    /// release and fails with it.
+    async fn spawn_holding_funding(hold_funding: bool) -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let base_url = format!("http://{}", listener.local_addr().expect("addr"));
         let (release, released) = watch::channel(None::<bool>);
@@ -103,7 +109,7 @@ impl Stub {
                 let released = released.clone();
                 let requested = requested_tx.clone();
                 let sent = sent_task.clone();
-                tokio::spawn(serve(stream, released, requested, sent));
+                tokio::spawn(serve(stream, released, requested, sent, hold_funding));
             }
         });
         let refused = RefusedPort::bind();
@@ -157,6 +163,7 @@ async fn serve(
     mut released: watch::Receiver<Option<bool>>,
     requested: Arc<watch::Sender<bool>>,
     sent: SentLog,
+    hold_funding: bool,
 ) {
     let Some((path, body)) = read_request(&mut stream).await else {
         return;
@@ -176,7 +183,23 @@ async fn serve(
             (200, "application/proto", spot_config().encode_to_vec())
         }
     } else if path == ZIPPER_CONFIG {
-        (200, "application/proto", zipper_config().encode_to_vec())
+        let failed = if hold_funding {
+            let Ok(outcome) = released.wait_for(Option::is_some).await else {
+                return;
+            };
+            outcome.unwrap_or(false)
+        } else {
+            false
+        };
+        if failed {
+            (
+                500,
+                "application/json",
+                br#"{"code":"internal","message":"funding down"}"#.to_vec(),
+            )
+        } else {
+            (200, "application/proto", zipper_config().encode_to_vec())
+        }
     } else {
         sent.lock()
             .expect("sent")
@@ -586,7 +609,8 @@ async fn labelled_reads_wait_for_hydration_but_tolerate_failure() {
 #[tokio::test]
 async fn zipped_asset_supply_waits_for_the_scales_it_decodes_with() {
     for fail in [false, true] {
-        let stub = Stub::spawn().await;
+        // POLY-9228: the stream waits for the funding config.
+        let stub = Stub::spawn_holding_funding(true).await;
         let client = stub.client(true);
         let probe: Probe = |c, _| {
             Box::pin(async move { c.zipper.subscribe_zipped_asset_supply(true).await.map(drop) })
@@ -605,7 +629,28 @@ async fn zipped_asset_supply_waits_for_the_scales_it_decodes_with() {
             fail,
             "failed={fail}: {err:?}"
         );
+        if fail {
+            assert!(err.to_string().contains("funding config"), "{err}");
+        }
     }
+}
+
+/// POLY-9228: a failed spot config does not stop the supply stream, which
+/// decodes with the funding config only.
+#[tokio::test]
+async fn zipped_asset_supply_does_not_need_the_spot_config() {
+    let stub = Stub::spawn().await;
+    let client = stub.client(true);
+    stub.release(true);
+    client
+        .wait_for_funding_catalog()
+        .await
+        .expect("funding config");
+    let result = client.zipper.subscribe_zipped_asset_supply(true).await;
+    assert!(
+        !matches!(result, Err(Error::CatalogHydration(_))),
+        "the supply stream refused for the spot config"
+    );
 }
 
 #[tokio::test]

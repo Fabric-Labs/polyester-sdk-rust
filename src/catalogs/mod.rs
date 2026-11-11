@@ -411,11 +411,23 @@ impl Manager {
         Self::default()
     }
 
-    /// True only after both spot and zipper snapshots were validated and
-    /// installed atomically.
+    /// True once both the spot and the zipper (funding) snapshots are
+    /// installed.
     pub fn is_ready(&self) -> bool {
         let inner = read_unpoisoned(&self.inner);
         inner.spot_config.is_some() && inner.zipper_config.is_some()
+    }
+
+    /// True once a validated spot snapshot, which spot trading needs, is
+    /// installed.
+    pub fn is_spot_ready(&self) -> bool {
+        read_unpoisoned(&self.inner).spot_config.is_some()
+    }
+
+    /// True once a validated zipper (funding, deposit/withdraw) snapshot is
+    /// installed.
+    pub fn is_funding_ready(&self) -> bool {
+        read_unpoisoned(&self.inner).zipper_config.is_some()
     }
 
     /// Validate and install spot config atomically (no partial row mutation).
@@ -797,6 +809,12 @@ impl Manager {
             .unwrap_or_default()
     }
 
+    /// The asset's ledger ID from the funding (zipper) config.
+    ///
+    /// `None` means either that the funding config has not loaded (yet, or
+    /// its load failed) or that it does not know the asset; this does not
+    /// wait. Await [`crate::Client::wait_for_funding_catalog`] first to tell
+    /// the two apart.
     pub fn ledger_id_for_asset(&self, symbol: &str) -> Option<u32> {
         read_unpoisoned(&self.inner)
             .asset_to_ledger_id

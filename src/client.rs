@@ -58,6 +58,14 @@ pub struct Config {
     /// and the server applies 10000. Realtime token requests always use the
     /// default.
     pub recv_window_ms: Option<u32>,
+    /// Deadline of the catalog loads [`Self::hydrate_catalogs`] starts: the
+    /// spot config and the funding (deposit/withdraw) config each load on
+    /// their own, and a read that times out or loses its connection is read
+    /// again, at most 3 times in all, 250ms and then 500ms apart, each retry
+    /// on a new connection, all within this long of [`Client::new`]. `None`,
+    /// the default, means twice [`Self::timeout`]; [`Client::new`] refuses a
+    /// zero duration with [`crate::Error::Validation`].
+    pub catalog_timeout: Option<Duration>,
 }
 
 impl std::fmt::Debug for Config {
@@ -87,6 +95,7 @@ impl std::fmt::Debug for Config {
             .field("hydrate_catalogs", &self.hydrate_catalogs)
             .field("allow_insecure_http", &self.allow_insecure_http)
             .field("recv_window_ms", &self.recv_window_ms)
+            .field("catalog_timeout", &self.catalog_timeout)
             .finish()
     }
 }
@@ -106,6 +115,7 @@ impl Default for Config {
             hydrate_catalogs: true,
             allow_insecure_http: false,
             recv_window_ms: None,
+            catalog_timeout: None,
         }
     }
 }
@@ -147,10 +157,27 @@ pub struct Client {
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
     pub withdraw: WithdrawService,
+    /// Outcome of the spot config's load.
     catalog_ready: Arc<OnceCell<Result<()>>>,
     catalog_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
     catalog_last_error: Arc<std::sync::Mutex<Option<Error>>>,
+    /// Outcome of the funding (deposit/withdraw) config's load.
+    funding_ready: Arc<OnceCell<Result<()>>>,
+    funding_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
+    funding_last_error: Arc<std::sync::Mutex<Option<Error>>>,
     hydrate_catalogs_enabled: bool,
+    catalog_timeout: Duration,
+    factory: Factory,
+}
+
+fn catalog_timeout(config: &Config) -> Result<Duration> {
+    match config.catalog_timeout {
+        None => Ok(config.timeout * 2),
+        Some(timeout) if timeout.is_zero() => Err(Error::validation(
+            "catalog_timeout must be a positive duration",
+        )),
+        Some(timeout) => Ok(timeout),
+    }
 }
 
 fn resolve_environment(config: &Config) -> Result<(PolyesterEnvironment, String, String)> {
@@ -208,6 +235,10 @@ impl Client {
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
         let catalog_last_error = Arc::new(std::sync::Mutex::new(None));
+        let funding_ready = Arc::new(OnceCell::new());
+        let funding_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
+        let funding_last_error = Arc::new(std::sync::Mutex::new(None));
+        let catalog_timeout = catalog_timeout(&config)?;
         let ctx = ServiceContext {
             factory,
             catalogs: catalogs.clone(),
@@ -215,6 +246,7 @@ impl Client {
             default_account_id: config.default_account_id.clone(),
             realtime: realtime.clone(),
             catalog_ready: catalog_ready.clone(),
+            funding_ready: funding_ready.clone(),
             hydrate_catalogs_enabled,
         };
 
@@ -251,11 +283,16 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
             catalog_last_error,
+            funding_ready,
+            funding_hydrate_lock,
+            funding_last_error,
             hydrate_catalogs_enabled,
+            catalog_timeout,
         };
 
         client.start_catalog_hydration();
@@ -310,6 +347,10 @@ impl Client {
         let catalog_ready = Arc::new(OnceCell::new());
         let catalog_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
         let catalog_last_error = Arc::new(std::sync::Mutex::new(None));
+        let funding_ready = Arc::new(OnceCell::new());
+        let funding_hydrate_lock = Arc::new(tokio::sync::Mutex::new(()));
+        let funding_last_error = Arc::new(std::sync::Mutex::new(None));
+        let catalog_timeout = catalog_timeout(&config)?;
         let hydrate_catalogs_enabled = config.hydrate_catalogs;
         let ctx = ServiceContext {
             factory,
@@ -318,6 +359,7 @@ impl Client {
             default_account_id: config.default_account_id.clone(),
             realtime: realtime.clone(),
             catalog_ready: catalog_ready.clone(),
+            funding_ready: funding_ready.clone(),
             hydrate_catalogs_enabled,
         };
         let client = Self {
@@ -353,11 +395,16 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
             catalog_hydrate_lock,
             catalog_last_error,
+            funding_ready,
+            funding_hydrate_lock,
+            funding_last_error,
             hydrate_catalogs_enabled,
+            catalog_timeout,
         };
         client.start_catalog_hydration();
         Ok(client)
@@ -372,100 +419,130 @@ impl Client {
                 "catalog hydration was not started because Client was constructed outside a \
                  Tokio runtime; await client.wait_for_catalogs() before placing orders",
             );
-            *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = Some(error.clone());
-            let _ = self.catalog_ready.set(Err(error));
+            for (last_error, ready) in [
+                (&self.catalog_last_error, &self.catalog_ready),
+                (&self.funding_last_error, &self.funding_ready),
+            ] {
+                *crate::realtime::lock_unpoisoned(last_error) = Some(error.clone());
+                let _ = ready.set(Err(error.clone()));
+            }
             return;
         }
-
-        let ready = self.catalog_ready.clone();
-        let hydrate_lock = self.catalog_hydrate_lock.clone();
-        let last_error = self.catalog_last_error.clone();
-        let market_data = self.market_data.clone();
-        let zipper = self.zipper.clone();
-        let catalogs = self.catalogs.clone();
-        tokio::spawn(async move {
-            ready
-                .get_or_init(|| async move {
-                    let _guard = hydrate_lock.lock().await;
-                    let result = Self::hydrate_catalogs_with(market_data, zipper, catalogs).await;
-                    *crate::realtime::lock_unpoisoned(&last_error) = result.clone().err();
-                    result
-                })
-                .await;
-        });
+        // Both start now and load on their own, so spot trading never waits
+        // for, or fails with, the funding config.
+        let deadline = tokio::time::Instant::now() + self.catalog_timeout;
+        for kind in [CatalogKind::Spot, CatalogKind::Funding] {
+            let load = self.load_state(kind);
+            let factory = self.factory.clone();
+            let catalogs = self.catalogs.clone();
+            tokio::spawn(async move {
+                load.ready
+                    .get_or_init(|| async move {
+                        let _guard = load.lock.lock().await;
+                        let result = kind.load(&factory, &catalogs, deadline).await;
+                        *crate::realtime::lock_unpoisoned(&load.last_error) = result.clone().err();
+                        result
+                    })
+                    .await;
+            });
+        }
     }
 
-    async fn hydrate_catalogs_with(
-        market_data: MarketDataService,
-        zipper: ZipperService,
-        catalogs: Arc<CatalogManager>,
-    ) -> Result<()> {
-        // Fetch both configs before mutating catalogs so a zipper failure cannot
-        // leave a partially installed spot catalog.
-        let spot = market_data.get_spot_config().await.map_err(|e| {
-            Error::validation(format!("catalog hydration failed (spot config): {e}"))
-        })?;
-        let zipper_cfg = zipper.get_deposit_withdraw_config().await.map_err(|e| {
-            Error::validation(format!("catalog hydration failed (zipper config): {e}"))
-        })?;
-        let zipper_json = serde_json::to_value(&zipper_cfg).map_err(|e| {
-            Error::validation(format!("catalog hydration failed (zipper encode): {e}"))
-        })?;
-        catalogs.hydrate_spot_and_zipper_json(spot.raw, zipper_json)?;
-        Ok(())
+    fn load_state(&self, kind: CatalogKind) -> LoadState {
+        match kind {
+            CatalogKind::Spot => LoadState {
+                ready: self.catalog_ready.clone(),
+                lock: self.catalog_hydrate_lock.clone(),
+                last_error: self.catalog_last_error.clone(),
+            },
+            CatalogKind::Funding => LoadState {
+                ready: self.funding_ready.clone(),
+                lock: self.funding_hydrate_lock.clone(),
+                last_error: self.funding_last_error.clone(),
+            },
+        }
     }
 
-    /// Hydrate spot + zipper catalogs. Returns an error when either fetch or
-    /// parse leaves catalogs unusable.
-    pub async fn hydrate_catalogs(&self) -> Result<()> {
-        let _guard = self.catalog_hydrate_lock.lock().await;
-        let result = Self::hydrate_catalogs_with(
-            self.market_data.clone(),
-            self.zipper.clone(),
-            self.catalogs.clone(),
-        )
-        .await;
-        *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = result.clone().err();
-        let _ = self.catalog_ready.set(result.clone());
+    /// Load one catalog again now, within a new `catalog_timeout`.
+    async fn reload(&self, kind: CatalogKind) -> Result<()> {
+        let load = self.load_state(kind);
+        let _guard = load.lock.lock().await;
+        if kind.is_ready(&self.catalogs) {
+            return Ok(());
+        }
+        let deadline = tokio::time::Instant::now() + self.catalog_timeout;
+        let result = kind.load(&self.factory, &self.catalogs, deadline).await;
+        *crate::realtime::lock_unpoisoned(&load.last_error) = result.clone().err();
+        let _ = load.ready.set(result.clone());
         result
     }
 
-    /// Wait until construction-time catalog hydration finishes.
+    /// Load the spot and the funding catalogs again. Returns the spot
+    /// config's error when it failed, otherwise the funding config's.
+    pub async fn hydrate_catalogs(&self) -> Result<()> {
+        let (spot, funding) = tokio::join!(
+            self.reload_unconditionally(CatalogKind::Spot),
+            self.reload_unconditionally(CatalogKind::Funding)
+        );
+        spot.and(funding)
+    }
+
+    async fn reload_unconditionally(&self, kind: CatalogKind) -> Result<()> {
+        let load = self.load_state(kind);
+        let _guard = load.lock.lock().await;
+        let deadline = tokio::time::Instant::now() + self.catalog_timeout;
+        let result = kind.load(&self.factory, &self.catalogs, deadline).await;
+        *crate::realtime::lock_unpoisoned(&load.last_error) = result.clone().err();
+        let _ = load.ready.set(result.clone());
+        result
+    }
+
+    /// Wait until the spot config, which every spot trading call needs, is
+    /// ready.
     ///
-    /// Returns [`Err`] when hydration failed (HTTP/transport error, malformed
-    /// config, or invalid scales). Concurrent waiters share one attempt.
+    /// Returns `Ok` once it has loaded and validated, without waiting for the
+    /// funding config (see [`Self::wait_for_funding_catalog`]), so spot
+    /// trading can start while that one is still loading or failed to load.
+    /// Returns [`Error::CatalogLoad`] when the spot config could not be
+    /// loaded, naming the operation, the kind of failure and the response
+    /// reference; calls that name a market then fail closed. After a failed
+    /// load, each call loads it again first. Concurrent waiters share one
+    /// attempt.
     ///
     /// Returns immediately when hydration was disabled in [`Config`].
     pub async fn wait_for_catalogs(&self) -> Result<()> {
-        if !self.hydrate_catalogs_enabled {
+        self.wait_for(CatalogKind::Spot).await
+    }
+
+    /// Wait until the funding (deposit/withdraw) config is ready, as
+    /// [`Self::wait_for_catalogs`] does for the spot config. Read the zipper
+    /// catalog and [`CatalogManager::ledger_id_for_asset`] after it returns
+    /// `Ok`. Returns [`Error::CatalogLoad`] naming the funding config when it
+    /// could not be loaded.
+    pub async fn wait_for_funding_catalog(&self) -> Result<()> {
+        self.wait_for(CatalogKind::Funding).await
+    }
+
+    async fn wait_for(&self, kind: CatalogKind) -> Result<()> {
+        if !self.hydrate_catalogs_enabled || kind.is_ready(&self.catalogs) {
             return Ok(());
         }
-        if self.catalogs.is_ready() {
-            return Ok(());
+        let load = self.load_state(kind);
+        if matches!(load.ready.get(), Some(Err(_))) {
+            return self.reload(kind).await;
         }
-        if matches!(self.catalog_ready.get(), Some(Err(_))) {
-            let _guard = self.catalog_hydrate_lock.lock().await;
-            if self.catalogs.is_ready() {
-                return Ok(());
-            }
-            let result = Self::hydrate_catalogs_with(
-                self.market_data.clone(),
-                self.zipper.clone(),
-                self.catalogs.clone(),
-            )
-            .await;
-            *crate::realtime::lock_unpoisoned(&self.catalog_last_error) = result.clone().err();
-            return result;
-        }
-        let last_error = self.catalog_last_error.clone();
-        let hydrate_lock = self.catalog_hydrate_lock.clone();
-        let market_data = self.market_data.clone();
-        let zipper = self.zipper.clone();
+        let factory = self.factory.clone();
         let catalogs = self.catalogs.clone();
-        self.catalog_ready
+        let deadline = tokio::time::Instant::now() + self.catalog_timeout;
+        let LoadState {
+            ready,
+            lock,
+            last_error,
+        } = load;
+        ready
             .get_or_init(|| async move {
-                let _guard = hydrate_lock.lock().await;
-                let result = Self::hydrate_catalogs_with(market_data, zipper, catalogs).await;
+                let _guard = lock.lock().await;
+                let result = kind.load(&factory, &catalogs, deadline).await;
                 *crate::realtime::lock_unpoisoned(&last_error) = result.clone().err();
                 result
             })
@@ -473,7 +550,8 @@ impl Client {
             .clone()
     }
 
-    /// Most recent catalog hydration error, if any.
+    /// Why the spot config failed to load, if it did: the
+    /// [`Error::CatalogLoad`] that [`Self::wait_for_catalogs`] returns.
     pub fn catalogs_last_error(&self) -> Option<Error> {
         crate::realtime::lock_unpoisoned(&self.catalog_last_error).clone()
     }
@@ -555,6 +633,43 @@ impl Client {
             orders,
         })
     }
+}
+
+/// One of the two catalogs the client loads when it is created.
+#[derive(Clone, Copy)]
+enum CatalogKind {
+    Spot,
+    Funding,
+}
+
+impl CatalogKind {
+    async fn load(
+        self,
+        factory: &Factory,
+        catalogs: &CatalogManager,
+        deadline: tokio::time::Instant,
+    ) -> Result<()> {
+        match self {
+            Self::Spot => crate::catalog_startup::load_spot(factory, catalogs, deadline).await,
+            Self::Funding => {
+                crate::catalog_startup::load_funding(factory, catalogs, deadline).await
+            }
+        }
+    }
+
+    fn is_ready(self, catalogs: &CatalogManager) -> bool {
+        match self {
+            Self::Spot => catalogs.is_spot_ready(),
+            Self::Funding => catalogs.is_funding_ready(),
+        }
+    }
+}
+
+/// A catalog load's shared outcome, lock and last error.
+struct LoadState {
+    ready: Arc<OnceCell<Result<()>>>,
+    lock: Arc<tokio::sync::Mutex<()>>,
+    last_error: Arc<std::sync::Mutex<Option<Error>>>,
 }
 
 #[cfg(test)]
