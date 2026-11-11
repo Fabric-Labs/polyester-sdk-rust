@@ -36,6 +36,7 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
+| Server build version | Yes |
 | Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -845,6 +846,16 @@ let api_changes = client
 
 `examples/changelog.rs` runs these calls against devnet.
 
+## Server build version
+
+`client.get_version().await?` returns the exact build the API host serves
+(`system.v1.SystemService/GetVersion`): `version`, the full source revision
+`commit`, and the `environment` that answered (`"devnet"`, `"testnet"`,
+`"mainnet"` or `"local"`, kept as a string). It needs no API key. A release
+reads `"0.10.0"`; a build made after one reads `"0.10.0-12-g4e21a2f09670"`,
+which is not a semantic version, so compare `release()` (the part before the
+first `-`) rather than parsing it.
+
 ## Triggers
 
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
@@ -1032,6 +1043,12 @@ SDK notes:
   without creating a withdraw (create RPCs remain authoritative). An API key
   needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
   opens it.
+- **Smart account wallet:** `client.withdraw.get_wallet_balances(None).await?`
+  lists the zTokens the account's smart account wallet holds on Polyester
+  Chain, such as the refund of a withdrawal Zipper rejected (the amount less
+  the fee Zipper kept), with each balance in 18-decimal units (`amount_e18`)
+  and whole units (`amount`). Pass a sub-account ID to read that sub-account's
+  wallet. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The result's `flow_id` names the transfer's lifecycle flow
   (`client.lifecycle.get_flow`). Looking a transfer up by its request or

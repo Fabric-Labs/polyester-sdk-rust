@@ -550,6 +550,16 @@ impl Client {
             .clone()
     }
 
+    /// The exact build the API host serves: its version, full source
+    /// revision and environment (`system.v1.SystemService/GetVersion`). Needs
+    /// no API key and counts against the public per-IP read budget; the
+    /// answer changes only when the environment deploys a new build. Compare
+    /// [`crate::models::ServerVersion::release`] to tell which release a
+    /// build follows.
+    pub async fn get_version(&self) -> Result<crate::models::ServerVersion> {
+        crate::services::system::get_version(&self.factory).await
+    }
+
     /// Why the spot config failed to load, if it did: the
     /// [`Error::CatalogLoad`] that [`Self::wait_for_catalogs`] returns.
     pub fn catalogs_last_error(&self) -> Option<Error> {

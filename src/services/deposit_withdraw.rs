@@ -3,8 +3,9 @@ use super::scope;
 use super::unary;
 use crate::codecs::decode::{
     create_deposit_address_from_proto, deposit_addresses_list_from_proto,
-    deposit_withdraw_config_from_proto, withdraw_destination_validation_from_proto,
-    withdraw_intent_from_proto, withdraw_intent_from_wallet_proto,
+    deposit_withdraw_config_from_proto, wallet_balances_from_proto,
+    withdraw_destination_validation_from_proto, withdraw_intent_from_proto,
+    withdraw_intent_from_wallet_proto,
 };
 use crate::codecs::scalars::{LEDGER_SCALE, i128_to_u128, u128_to_proto};
 use crate::connect::chain::deposit::v1::DepositAddressServiceClient;
@@ -15,12 +16,12 @@ use crate::models::ZippedAssetSupplyBatch;
 use crate::models::{
     CreateApiKeyTradingWithdrawParams, CreateTradingWithdrawParams,
     CreateWalletTradingWithdrawParams, DepositAddress, DepositAddressesList, DepositWithdrawConfig,
-    WithdrawDestinationValidation, WithdrawIntentResult,
+    WalletBalances, WithdrawDestinationValidation, WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{CreateDepositAddressRequest, ListDepositAddressesRequest};
 use crate::proto::chain::withdraw::v1::{
-    CreateTradingWithdrawRequest, CreateWalletTradingWithdrawRequest, TradingWithdrawAction,
-    TradingWithdrawIntentPayload, ValidateWithdrawDestinationRequest,
+    CreateTradingWithdrawRequest, CreateWalletTradingWithdrawRequest, GetWalletBalancesRequest,
+    TradingWithdrawAction, TradingWithdrawIntentPayload, ValidateWithdrawDestinationRequest,
 };
 use crate::proto::chain::zipper::v1::GetDepositWithdrawConfigRequest;
 use crate::types::{AssetAmount, QuantityDomain, resolve_asset_amount_scaled_with_input_scale};
@@ -332,6 +333,31 @@ impl WithdrawService {
     ) -> Result<WithdrawIntentResult> {
         let prepared = self.prepare_api_key_to_external_chain(params, destination_chain_id)?;
         self.submit_prepared(&prepared).await
+    }
+
+    /// The zTokens the account's smart account wallet holds on Polyester
+    /// Chain, read live: for example the refund of a withdrawal Zipper
+    /// rejected, which comes back to the wallet less its kept fee. Reads the
+    /// configured default sub-account, or the root account without one, unless
+    /// `subaccount_id` names another. An API key needs `READ_BALANCES`. A
+    /// failed chain read is a retryable `unavailable`; an account without a
+    /// wallet is refused with `failed_precondition`
+    /// (`SOURCE_SMART_ACCOUNT_UNAVAILABLE`).
+    pub async fn get_wallet_balances(&self, subaccount_id: Option<u64>) -> Result<WalletBalances> {
+        let req = GetWalletBalancesRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?.unwrap_or(0),
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/chain.withdraw.v1.WithdrawService/GetWalletBalances",
+            req,
+            |req, opts| client.get_wallet_balances_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        wallet_balances_from_proto(&resp)
     }
 
     /// Check one external-chain destination without creating a withdraw.

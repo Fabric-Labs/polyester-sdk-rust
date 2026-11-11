@@ -1,19 +1,20 @@
 //! Deposit / withdraw / internal-transfer decoders.
 
 use super::money::decode_asset_amount_u128;
-use crate::codecs::scalars::LEDGER_SCALE;
+use crate::codecs::scalars::{LEDGER_SCALE, format_ledger_u128, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
-    DepositAddress, DepositAddressesList, InternalTransferResult, WithdrawDestinationValidation,
-    WithdrawIntentResult,
+    DepositAddress, DepositAddressesList, InternalTransferResult, WalletBalance, WalletBalances,
+    WithdrawDestinationValidation, WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{
     CreateDepositAddressResponse, DepositAddress as ProtoDepositAddress,
     ListDepositAddressesResponse,
 };
 use crate::proto::chain::withdraw::v1::{
-    CreateTradingWithdrawResponse, CreateWalletTradingWithdrawResponse,
-    ValidateWithdrawDestinationResponse, WithdrawDestinationValidationCode,
+    CreateTradingWithdrawResponse, CreateWalletTradingWithdrawResponse, GetWalletBalancesResponse,
+    ValidateWithdrawDestinationResponse, WalletBalance as ProtoWalletBalance,
+    WithdrawDestinationValidationCode,
 };
 use crate::proto::transfer::v1::{CreateInternalTransferResponse, InternalTransferStatus};
 use crate::types::QuantityDomain;
@@ -149,6 +150,39 @@ pub fn internal_transfer_from_proto(
         quantity,
         status: internal_transfer_status_label(&msg.status),
         flow_id: msg.flow_id.clone(),
+    })
+}
+
+fn wallet_balance_from_proto(msg: &ProtoWalletBalance) -> Result<WalletBalance> {
+    let amount = msg.amount_e18.as_option().ok_or_else(|| {
+        Error::response_contract(
+            "GetWalletBalances",
+            format!(
+                "balance of zipped asset {} has no amount_e18",
+                msg.zipped_asset_id
+            ),
+        )
+    })?;
+    let amount_e18 = u128_to_str(amount.hi, amount.lo);
+    let amount = format_ledger_u128(&amount_e18, LEDGER_SCALE)?;
+    Ok(WalletBalance {
+        zipped_asset_id: msg.zipped_asset_id,
+        unified_asset_id: msg.unified_asset_id,
+        chain_id: msg.chain_id,
+        ztoken_address: msg.ztoken_address.clone(),
+        amount_e18,
+        amount,
+    })
+}
+
+pub fn wallet_balances_from_proto(msg: &GetWalletBalancesResponse) -> Result<WalletBalances> {
+    Ok(WalletBalances {
+        smart_account_address: msg.smart_account_address.clone(),
+        balances: msg
+            .balances
+            .iter()
+            .map(wallet_balance_from_proto)
+            .collect::<Result<_>>()?,
     })
 }
 

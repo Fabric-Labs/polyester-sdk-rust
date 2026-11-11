@@ -90,6 +90,11 @@
       "supported": true
     },
     {
+      "id": "server_version",
+      "label": "Server build version",
+      "supported": true
+    },
+    {
       "id": "balances",
       "label": "Balances and equity history",
       "supported": true
