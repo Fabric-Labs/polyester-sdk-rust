@@ -55,7 +55,7 @@ pub struct Config {
     /// [`crate::order_codes::REQUEST_DEADLINE_EXCEEDED`] once authenticated.
     /// It must be from 1 to 60000; [`Client::new`] refuses any other value
     /// with [`crate::Error::Validation`]. `None`, the default, sends no header,
-    /// and the server applies 10000. Realtime token requests always use the
+    /// and the server applies 5000. Realtime token requests always use the
     /// default.
     pub recv_window_ms: Option<u32>,
     /// Deadline of the catalog loads [`Self::hydrate_catalogs`] starts: the

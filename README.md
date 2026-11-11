@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.20.0` (git tag `v0.20.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.20.1` (git tag `v0.20.1`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.20.0 is the release of Go 0.22.0 and Python 0.21.0.
+change breaks only one SDK's API: Rust 0.20.1 is the release of Go 0.22.1 and Python 0.21.1.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -98,7 +98,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.20.0"
+polyester-sdk = "0.20.1"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -108,7 +108,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.20.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.20.1" }
 ```
 
 For development from a git checkout:
@@ -205,9 +205,10 @@ some ledger writes.
 Automatic request signing gives concurrent identical calls distinct authentication tuples. Cloned
 and independently constructed credentials with the same key id share a process-wide allocator.
 The signing protocol has no cross-process nonce, so assign one API key per process; sharing a key
-between processes can produce identical authentication tuples. Timestamps can lead the local clock by at most five seconds;
-larger async bursts wait through Tokio-aware backpressure instead of blocking executor threads,
-reusing a signature, or drifting outside the API's 10-second freshness window. If the bounded
+between processes can produce identical authentication tuples. Timestamps can lead the local clock by at most half a
+second; larger async bursts wait through Tokio-aware backpressure instead of blocking executor threads,
+reusing a signature, or running past the API's limit, which refuses a timestamp more than one second
+ahead of the server clock as `Error::TimestampSkew`. Keep the host clock synchronized. If the bounded
 capacity wait is exhausted, the call returns retryable `Error::RateLimit`. Direct low-level
 `Credentials::sign_request` calls never sleep; use `sign_request_async` in async applications.
 
@@ -215,7 +216,7 @@ capacity wait is exhausted, the call returns retryable `Error::RateLimit`. Direc
 a request only until its signing timestamp plus that many milliseconds, sent as the signed
 `X-API-RECV-WINDOW` header. It must be from 1 to 60000, and `Client::new` refuses any other value
 with `Error::Validation` before anything is sent. `None`, the default, sends no header, and the
-server applies 10000. A request that arrives after its window is the retryable
+server applies 5000. A request that arrives after its window is the retryable
 `Error::TimestampSkew`; one that waited past it before admission is an `Error::Api` with code
 `order_codes::REQUEST_DEADLINE_EXCEEDED`, also retryable. Both changed nothing, and a retry signs
 again with a fresh timestamp. Realtime token requests always use the default window. To sign
