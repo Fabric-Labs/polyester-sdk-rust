@@ -274,7 +274,7 @@ fn recv_window_payload_and_bounds() {
             .unwrap(),
         polyester::auth::canonical_signing_string("123", "post", url, b"{}").unwrap()
     );
-    let creds = polyester::auth::Credentials::new("ak_test", TEST_KEY).unwrap();
+    let creds = polyester::auth::Credentials::new("ak_recv_window_bounds", TEST_KEY).unwrap();
     for bad in [0u32, 60_001, u32::MAX] {
         assert!(matches!(
             creds.sign_request_with_recv_window(
