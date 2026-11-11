@@ -1,6 +1,8 @@
 //! Public contract e339360: the build version endpoint, smart account wallet
 //! balances and the other additions this SDK maps.
 
+mod alerts;
+
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
 use polyester::{Client, Config};

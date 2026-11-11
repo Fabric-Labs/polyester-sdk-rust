@@ -37,6 +37,7 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Trading rate limits | Yes |
 | Product changelog (posts + changes) | Yes |
 | Server build version | Yes |
+| Price alerts (devnet) | Yes |
 | Balances and equity history | Yes |
 | Orders (create, cancel, modify, batch, cancel-all) | Yes |
 | User trades | Yes |
@@ -860,6 +861,60 @@ let api_changes = client
 ```
 
 `examples/changelog.rs` runs these calls against devnet.
+
+## Price alerts
+
+Price alerts are available on devnet; they are not yet routed on testnet,
+where these calls fail. `client.alerts` creates durable alerts ("tell me when
+BTC-USDT falls to 90,000") that the exchange evaluates and delivers in-app
+and/or to your linked Telegram account. Alerts belong to the main account:
+use an API key scoped to the main account. A key scoped to a sub-account is
+refused with `Error::PermissionDenied` and code `SUBACCOUNT_KEY_REFUSED`.
+
+```rust,ignore
+use polyester::models::{AlertChannel, AlertDirection, CreateAlertParams, ListAlertsOptions, UpdateAlertParams};
+use polyester::types::Price;
+
+let alert = client.alerts.create(
+    CreateAlertParams::new(
+        "BTC-USDT",
+        AlertDirection::Below, // inclusive: fires at a price <= the alert price
+        Price::from_decimal_str("90000", None)?,
+        vec![AlertChannel::InApp, AlertChannel::Telegram],
+    )
+    .with_idempotency_key("bot-7:alert-1"), // a retry returns the alert created first
+).await?;
+// Move the level, keyed so a retry applies at most once.
+let moved = client.alerts.update(
+    UpdateAlertParams::new(alert.alert_id.clone(), alert.revision)
+        .with_price(Price::from_decimal_str("91000", None)?)
+        .with_idempotency_key("bot-7:alert-1:move-1"),
+).await?;
+client.alerts.cancel(&alert.alert_id).await?;
+```
+
+An alert watches the market's last traded price or its index price
+(`AlertPriceSource`); without one it watches the index price where the market
+has one and the last price otherwise, and the returned alert states it. The
+market's price at creation is recorded as `reference_price`; an alert whose
+condition already holds then starts unarmed and fires only after the price
+moves to the other side and crosses back. It fires once: `status`
+`"triggered"`, with `triggered_at` and `triggered_price`. A late price or a
+stalled feed never fires it. Status values are `"active"`, `"triggered"` and
+`"cancelled"` (the contract's spelling).
+
+`update` sends only the fields set on `UpdateAlertParams` with the
+`expected_revision` you last read; a stale one is refused with code
+`REVISION_CONFLICT`, so read the alert again. An update that sets no field
+changes nothing on an active alert and sets a triggered one again as it is.
+`outcome` is `"applied"`, `"unchanged"` or `"replayed"` (the idempotency key
+was already used for this request; nothing was applied now): tell a retry
+from a fresh change by `outcome`, never by `revision`. `list` pages newest
+first, up to 200 per page; `all` streams every page. Refusals keep their
+contract codes (`polyester::errors::alert_codes`): `PRICE_UNAVAILABLE` changed
+nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
+cancel outcome unknown, so send it again with the same idempotency key
+(`cancel` is idempotent) or read the alerts back.
 
 ## Server build version
 

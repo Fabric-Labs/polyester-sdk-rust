@@ -2,6 +2,7 @@
 
 mod address_book;
 mod admin;
+mod alerts;
 mod auth;
 mod balances;
 mod changelog;
@@ -28,6 +29,7 @@ mod zipper;
 
 pub use address_book::*;
 pub use admin::*;
+pub use alerts::*;
 pub use auth::*;
 pub use balances::*;
 pub use changelog::*;

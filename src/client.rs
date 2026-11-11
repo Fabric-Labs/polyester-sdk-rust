@@ -12,11 +12,11 @@ use crate::models::{
     StopAllTradingScope,
 };
 use crate::services::{
-    AddressBookService, ApiKeysService, AuthService, BalancesService, ChainAnalyticsService,
-    ChangelogService, DepositService, FeeService, GuardSignerService, HeatmapService,
-    InternalTransfersService, LifecycleService, MarketDataService, MarketOverviewService,
-    OrderbookService, OrdersService, PoliciesService, RateLimitService, ServiceContext,
-    SocialVerificationService, SubAccountsService, TradesService, TransfersService,
+    AddressBookService, AlertsService, ApiKeysService, AuthService, BalancesService,
+    ChainAnalyticsService, ChangelogService, DepositService, FeeService, GuardSignerService,
+    HeatmapService, InternalTransfersService, LifecycleService, MarketDataService,
+    MarketOverviewService, OrderbookService, OrdersService, PoliciesService, RateLimitService,
+    ServiceContext, SocialVerificationService, SubAccountsService, TradesService, TransfersService,
     TriggersService, VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
@@ -157,6 +157,9 @@ pub struct Client {
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
     pub withdraw: WithdrawService,
+    /// Price alerts of the root account. Available on devnet; not yet routed
+    /// on testnet.
+    pub alerts: AlertsService,
     /// Outcome of the spot config's load.
     catalog_ready: Arc<OnceCell<Result<()>>>,
     catalog_hydrate_lock: Arc<tokio::sync::Mutex<()>>,
@@ -283,6 +286,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,
@@ -395,6 +399,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
             catalog_ready,

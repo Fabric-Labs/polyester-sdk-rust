@@ -8,6 +8,7 @@ use std::time::Duration;
 use thiserror::Error;
 
 use crate::models::{OrderFieldViolation, RateLimitDetail};
+use crate::proto::alerts::v1::{ErrorCode as AlertErrorCode, ErrorDetail as AlertErrorDetail};
 use crate::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
 use crate::proto::chain::withdraw::v1::{
     ErrorCode as WithdrawErrorCode, ErrorDetail as WithdrawErrorDetail,
@@ -374,13 +375,14 @@ pub mod auth_codes {
     /// sooner. See
     /// [`super::Error::is_replay_capacity_exhausted`].
     pub const REPLAY_CAPACITY_EXHAUSTED: &str = "AUTH_REPLAY_CAPACITY_EXHAUSTED";
-    /// A signed WebSocket login whose single-use nonce was already used
-    /// (REST `REPLAY_DETECTED`, HTTP 401). Only signed trading and market-data
-    /// WebSocket upgrades carry a login nonce; this SDK's private streams
-    /// authenticate with realtime tokens over a signed HTTP request, which
-    /// carries no nonce, so it does not answer this SDK's own requests. A
-    /// client that signs upgrades itself must sign every connection attempt
-    /// with a fresh nonce.
+    /// The server already saw this exact signed login or request (REST
+    /// `REPLAY_DETECTED`, HTTP 401): a final [`super::Error::ApiKeyRejected`],
+    /// not retryable as is, since the first copy may have been applied. Each
+    /// request this SDK signs gets its own timestamp, so it means one signed
+    /// request was sent twice; read a mutation back before sending it again.
+    /// Signed trading and market-data WebSocket upgrades also carry a
+    /// single-use login nonce; this SDK's private streams authenticate with
+    /// realtime tokens over signed HTTP and send none.
     pub const REPLAY_DETECTED: &str = "AUTH_REPLAY_DETECTED";
     /// A valid signed wallet login named an account address no account uses,
     /// and the signing wallet is already linked to another account
@@ -408,6 +410,34 @@ pub mod auth_codes {
             .or_else(|| AuthErrorCode::from_proto_name(&format!("AUTH_{code}")))
             .filter(|value| value.to_i32() != 0)
     }
+}
+
+/// Stable `alerts.v1.ErrorDetail` codes of the price alert service, read from
+/// [`Error::Api`]'s `code`. `SUBACCOUNT_KEY_REFUSED` (an API key scoped to a
+/// sub-account; alerts belong to the root account) is an
+/// [`Error::PermissionDenied`] with that code instead.
+pub mod alert_codes {
+    /// The market's price could not be read; nothing changed. Retryable.
+    pub const PRICE_UNAVAILABLE: &str = "PRICE_UNAVAILABLE";
+    /// The alert service cannot answer now. As for other services, the
+    /// outcome of a create, update or cancel is unknown
+    /// ([`super::Error::mutation_outcome_unknown`]): send it again with the
+    /// same idempotency key (cancel is idempotent), or read the alerts back.
+    pub const SERVICE_UNAVAILABLE: &str = "SERVICE_UNAVAILABLE";
+    /// `expected_revision` is stale: read the alert again.
+    pub const REVISION_CONFLICT: &str = "REVISION_CONFLICT";
+    /// The idempotency key was used for another request.
+    pub const IDEMPOTENCY_CONFLICT: &str = "IDEMPOTENCY_CONFLICT";
+    /// The alert already holds 1000 update keys; updates without a key, and
+    /// repeats of stored keys, still work.
+    pub const ALERT_UPDATE_LIMIT_REACHED: &str = "ALERT_UPDATE_LIMIT_REACHED";
+    /// The account holds as many alerts as it may.
+    pub const ALERT_LIMIT_REACHED: &str = "ALERT_LIMIT_REACHED";
+    /// No such alert; another account's alert reads the same.
+    pub const ALERT_NOT_FOUND: &str = "ALERT_NOT_FOUND";
+    /// The root account's API key was refused because it is scoped to a
+    /// sub-account.
+    pub const SUBACCOUNT_KEY_REFUSED: &str = "SUBACCOUNT_KEY_REFUSED";
 }
 
 /// Stable REST problem codes that every service answers alike.
@@ -496,7 +526,7 @@ pub mod order_codes {
 /// API-key credential refusals a service answers with an
 /// `auth.v1.AuthErrorDetail`. They map to [`Error::ApiKeyRejected`], as the
 /// API gateway's answers for the same reasons do.
-const API_KEY_REJECTIONS: [AuthErrorCode; 7] = [
+const API_KEY_REJECTIONS: [AuthErrorCode; 8] = [
     AuthErrorCode::AUTH_SIGNATURE_INVALID,
     AuthErrorCode::AUTH_MISSING_HEADERS,
     AuthErrorCode::AUTH_KEY_EXPIRED,
@@ -504,6 +534,7 @@ const API_KEY_REJECTIONS: [AuthErrorCode; 7] = [
     AuthErrorCode::AUTH_IP_NOT_ALLOWED,
     AuthErrorCode::AUTH_API_KEY_NOT_ACCEPTED,
     AuthErrorCode::AUTH_RECV_WINDOW_INVALID,
+    AuthErrorCode::AUTH_REPLAY_DETECTED,
 ];
 
 /// Whether a REST or API-gateway `code` refuses the API key's credentials,
@@ -608,6 +639,9 @@ fn is_placeholder_detail(detail: &ErrorDetail) -> bool {
     if let Some(transfer) = decode_transfer_error_detail(detail) {
         return transfer.code.to_i32() == 0;
     }
+    if let Some(alert) = decode_alert_error_detail(detail) {
+        return alert.code.to_i32() == 0;
+    }
     false
 }
 
@@ -642,6 +676,8 @@ fn future_code_label(detail: &ErrorDetail) -> Option<String> {
             .as_known()
             .is_none()
             .then(|| transfer.code.to_i32())
+    } else if let Some(alert) = decode_alert_error_detail(detail) {
+        alert.code.as_known().is_none().then(|| alert.code.to_i32())
     } else {
         None
     };
@@ -656,7 +692,8 @@ pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
         || decode_order_error_detail(detail).is_some()
         || decode_withdraw_error_detail(detail).is_some()
         || decode_ledger_error_detail(detail).is_some()
-        || decode_transfer_error_detail(detail).is_some();
+        || decode_transfer_error_detail(detail).is_some()
+        || decode_alert_error_detail(detail).is_some();
     decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
 }
 
@@ -951,6 +988,7 @@ impl Error {
                 code == auth_codes::TEMPORARILY_UNAVAILABLE
                     || code == order_codes::ACCOUNT_REPAIRING
                     || code == order_codes::REQUEST_DEADLINE_EXCEEDED
+                    || code == alert_codes::PRICE_UNAVAILABLE
             }
             _ => false,
         }
@@ -974,7 +1012,9 @@ impl Error {
             | Self::Server(_)
             | Self::GatewayTimeout { .. }
             | Self::RouteNotFound { .. } => true,
-            Self::Api { code, .. } => is_outcome_unknown_code(code),
+            Self::Api { code, .. } => {
+                is_outcome_unknown_code(code) || code == alert_codes::SERVICE_UNAVAILABLE
+            }
             _ => false,
         }
     }
@@ -1217,6 +1257,13 @@ fn decode_withdraw_error_detail(detail: &ErrorDetail) -> Option<WithdrawErrorDet
         return None;
     }
     WithdrawErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
+}
+
+fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
+    if !detail.type_url.ends_with("alerts.v1.ErrorDetail") {
+        return None;
+    }
+    AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
@@ -1731,6 +1778,28 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 message: fallback_message.clone(),
                 code,
                 metadata: withdraw_detail_metadata(&withdraw_detail),
+                violations: Vec::new(),
+            };
+        }
+        if let Some(alert_detail) = decode_alert_error_detail(detail) {
+            let code = known_or_unknown_code(
+                alert_detail.code.as_known().map(|c| c.proto_name()),
+                alert_detail.code.to_i32(),
+            );
+            if alert_detail.code.as_known() == Some(AlertErrorCode::SUBACCOUNT_KEY_REFUSED) {
+                return Error::PermissionDenied {
+                    message: raw_message.to_owned(),
+                    status,
+                    code,
+                    context: "alerts.v1.PriceAlertService".to_owned(),
+                    endpoint: String::new(),
+                    problem: None,
+                };
+            }
+            return Error::Api {
+                message: fallback_message.clone(),
+                code,
+                metadata: Vec::new(),
                 violations: Vec::new(),
             };
         }
@@ -2941,7 +3010,25 @@ mod tests {
             assert!(auth_codes::from_rest_code(name).is_some(), "{name}");
             assert!(is_recognised_rest_code(name), "{name}");
         }
-        assert!(!is_credential_refusal_code("REPLAY_DETECTED"));
+        // A replayed signed request is a final credential refusal: the server
+        // already saw that exact request, so the first may have applied.
+        assert!(is_credential_refusal_code("REPLAY_DETECTED"));
+        let replayed = map_connect_error(
+            ConnectError::new(ErrorCode::Unauthenticated, "request replay detected").with_detail(
+                ErrorDetail::from_message(
+                    "auth.v1.AuthErrorDetail",
+                    &AuthErrorDetail {
+                        code: EnumValue::Known(AuthErrorCode::AUTH_REPLAY_DETECTED),
+                        ..Default::default()
+                    },
+                ),
+            ),
+        );
+        assert!(
+            matches!(&replayed, Error::ApiKeyRejected { code, .. } if code == "REPLAY_DETECTED"),
+            "{replayed:?}"
+        );
+        assert!(!replayed.is_retryable());
     }
 
     /// A withdrawal from a broker vault to a destination still in its 24-hour

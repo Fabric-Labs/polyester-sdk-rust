@@ -95,6 +95,11 @@
       "supported": true
     },
     {
+      "id": "price_alerts",
+      "label": "Price alerts (devnet)",
+      "supported": true
+    },
+    {
       "id": "balances",
       "label": "Balances and equity history",
       "supported": true

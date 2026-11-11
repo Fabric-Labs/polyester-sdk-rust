@@ -134,17 +134,21 @@ impl ChangelogService {
         opts: ListChangelogPostsOptions,
     ) -> impl Stream<Item = Result<ChangelogPostSummary>> + Send + 'static {
         let svc = self.clone();
-        paginate(opts.page_token.clone(), move |page_token| {
-            let svc = svc.clone();
-            let opts = ListChangelogPostsOptions {
-                limit: opts.limit,
-                page_token: Some(page_token),
-            };
-            async move {
-                let page = svc.list_posts(opts).await?;
-                Ok((page.posts, page.next_page_token))
-            }
-        })
+        paginate(
+            "changelog pagination",
+            opts.page_token.clone(),
+            move |page_token| {
+                let svc = svc.clone();
+                let opts = ListChangelogPostsOptions {
+                    limit: opts.limit,
+                    page_token: Some(page_token),
+                };
+                async move {
+                    let page = svc.list_posts(opts).await?;
+                    Ok((page.posts, page.next_page_token))
+                }
+            },
+        )
     }
 
     /// Every change matching `opts` from `opts.page_token` on, fetching pages
@@ -169,17 +173,21 @@ impl ChangelogService {
         opts: ListChangelogChangesOptions,
     ) -> impl Stream<Item = Result<ChangelogChangeEntry>> + Send + 'static {
         let svc = self.clone();
-        paginate(opts.page_token.clone(), move |page_token| {
-            let svc = svc.clone();
-            let opts = ListChangelogChangesOptions {
-                page_token: Some(page_token),
-                ..opts.clone()
-            };
-            async move {
-                let page = svc.list_changes(opts).await?;
-                Ok((page.changes, page.next_page_token))
-            }
-        })
+        paginate(
+            "changelog pagination",
+            opts.page_token.clone(),
+            move |page_token| {
+                let svc = svc.clone();
+                let opts = ListChangelogChangesOptions {
+                    page_token: Some(page_token),
+                    ..opts.clone()
+                };
+                async move {
+                    let page = svc.list_changes(opts).await?;
+                    Ok((page.changes, page.next_page_token))
+                }
+            },
+        )
     }
 
     /// All breaking changes published at or after `since`, newest post first.
@@ -242,7 +250,8 @@ async fn collect_changes(
 /// Flatten token-paged results into one item stream. A next page token this
 /// stream already requested, including the caller's starting token, would
 /// cycle forever, so it fails the stream with a response-contract error.
-fn paginate<T, F, Fut>(
+pub(crate) fn paginate<T, F, Fut>(
+    context: &'static str,
     first_token: Option<String>,
     fetch: F,
 ) -> impl Stream<Item = Result<T>> + Send + 'static
@@ -265,7 +274,7 @@ where
             let (items, next) = fetch(token).await?;
             if requested.contains(&next) {
                 return Err(Error::response_contract(
-                    "changelog pagination",
+                    context,
                     "next_page_token repeats an earlier page_token",
                 ));
             }

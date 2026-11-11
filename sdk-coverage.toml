@@ -138,9 +138,6 @@ reason = "The auto-withdraw run preview accepts API keys with READ_AUTO_WITHDRAW
 service = "ai.v1.AssistantService"
 reason = "The Polyester assistant accepts only interactive session tokens; API keys are not accepted. Devnet only."
 
-[[allowlist]]
-service = "alerts.v1.PriceAlertService"
-reason = "Price alerts are devnet-only, not routed on testnet; revisit when routed there. The service accepts root-account API keys."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/SetAssistantKeys"
