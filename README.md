@@ -324,7 +324,10 @@ credentials. No SDK error prints a credential anywhere in its chain: every
 error mapped from a Connect call is redacted where it is mapped, so each URL an
 answer or a transport quotes loses its userinfo, query and fragment, and a
 proxy URL from the environment reads `[proxy]`, in `Display`, `Debug` and every
-`source()`, problem details and a rate limit's `detail` included. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
+`source()`, problem details and a rate limit's `detail` included. A URL that
+does not parse is dropped whole. The client's own secrets read `[REDACTED]`
+however an answer quotes them: the userinfo and password of its `api_url` and
+`ws_url` and of a proxy the environment sets, and its API private key. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
 (chain.zipper.v1.ZipperService/GetDepositWithdrawConfig) connection closed
 after 3 attempts in 0.8s: ...`.
 

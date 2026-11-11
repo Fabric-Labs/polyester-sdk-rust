@@ -146,16 +146,69 @@ async fn a_url_with_parentheses_or_quotes_is_redacted() {
         format!("http://{USER}:one'two-{SECRET}@proxy.example.test/x"),
         format!("http://proxy.example.test/x?{QUERY}one(two-{SECRET})"),
         format!("http://proxy.example.test/x?{QUERY}one'two-{SECRET}"),
+        format!("http://{USER}:{SECRET}?bad@proxy.example.test/x"),
+        format!("http://{USER}:{SECRET}#bad@proxy.example.test/x"),
     ];
     for url in urls {
         let body = serde_json::json!({"code": "unavailable", "message": format!("upstream {url} refused")})
             .to_string();
         let err = spot_config_error(503, "application/json", body).await;
-        assert!(
-            err.to_string().contains("proxy.example.test"),
-            "{url}: {err}"
-        );
+        // A URL the parser refuses is dropped whole.
+        let want = if url.contains("bad@") {
+            "[REDACTED INVALID URL]"
+        } else {
+            "proxy.example.test"
+        };
+        assert!(err.to_string().contains(want), "{url}: {err}");
         assert_chain_clean(&url, &err);
+    }
+}
+
+/// Client-held secrets: the userinfo of the client's own API and WebSocket
+/// URLs and its API private key never reach an error's text, however the
+/// answer quotes them.
+#[tokio::test]
+async fn client_held_secrets_never_reach_an_error() {
+    const API: (&str, &str) = ("sdk-api-user", "api-secret-9228");
+    const WS: (&str, &str) = ("sdk-ws-user", "ws-secret-9228");
+    const KEY: &str = "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318";
+    let message = format!(
+        "auth {}:{} via http//{}:{}@api ws {}:{} and {} key {KEY}",
+        API.0, API.1, API.0, API.1, WS.0, WS.1, WS.1
+    );
+    let body = serde_json::json!({"code": "unavailable", "message": message}).to_string();
+    let http = MockHttpServer::spawn(move |_| HttpScript::Json {
+        status: 503,
+        body: body.clone().into_bytes(),
+    })
+    .await;
+    let host = http.base_url().trim_start_matches("http://").to_owned();
+    let client = Client::new(Config {
+        api_url: format!("http://{}:{}@{host}", API.0, API.1),
+        ws_url: format!("ws://{}:{}@127.0.0.1:9/unused", WS.0, WS.1),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(KEY.into()),
+        timeout: Duration::from_secs(2),
+        hydrate_catalogs: false,
+        allow_insecure_http: true,
+        ..Default::default()
+    })
+    .expect("client");
+    let err = client
+        .market_data
+        .get_spot_config()
+        .await
+        .expect_err("the stub refuses");
+    let printed = format!("{err} {err:?} {err:#?}");
+    assert!(printed.contains("[REDACTED]"), "{printed}");
+    for secret in [
+        format!("{}:{}", API.0, API.1),
+        API.1.to_owned(),
+        format!("{}:{}", WS.0, WS.1),
+        WS.1.to_owned(),
+        KEY.to_owned(),
+    ] {
+        assert!(!printed.contains(&secret), "prints {secret}: {printed}");
     }
 }
 
