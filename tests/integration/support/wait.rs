@@ -28,10 +28,7 @@ pub fn is_open_status(status: &str) -> bool {
 
 pub fn is_terminal_status(status: &str) -> bool {
     let s = status.to_ascii_lowercase();
-    s.contains("canceled")
-        || s.contains("cancelled")
-        || s.contains("rejected")
-        || s.contains("filled")
+    s.contains("canceled") || s.contains("rejected") || s.contains("filled")
 }
 
 #[derive(Debug)]

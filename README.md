@@ -786,10 +786,11 @@ let api_changes = client
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
 status. Valid values:
 
-`created`, `armed`, `running`, `completed`, `cancelled`, `failed`, `paused`
+`created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
 Unknown values return a validation error (they do not silently return an empty
-list). Response `status` uses the same labels (British spelling `cancelled`).
+list). Response `status` uses the same labels, with `canceled` spelled as
+trigger events and order statuses spell it.
 
 `orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
@@ -869,14 +870,14 @@ order that was placed and expired (`CANCEL_REASON_STP_EXPIRE_TAKER` or
 `CANCEL_REASON_STP_EXPIRE_BOTH`); for every other reason `child_seq` is an
 attempt that placed no order and `child_order_id` is empty. A refusal
 that ends the trigger is still `failed` with `failure_reason`. A ladder whose
-levels were all canceled before any filled ends `cancelled` with
+levels were all canceled before any filled ends `canceled` with
 `user_request`.
 
 `TriggerEvent.event_type` is `fired`, `canceled`, `updated`, `failed`,
 `activated` (a trailing stop started tracking), `armed` (an attached
 take-profit, stop-loss or trailing stop started protecting its parent's filled
 quantity, once) or `fire_refused`. A ladder has no event types of its own: read
-its status, `completed`, `cancelled` or `failed`. A completed ladder may not
+its status, `completed`, `canceled` or `failed`. A completed ladder may not
 have filled: read its executed quantity and levels.
 
 A trigger change that names a listed pair other than the trigger's own is

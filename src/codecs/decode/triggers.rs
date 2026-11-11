@@ -30,7 +30,7 @@ pub fn trigger_status_label(status: TriggerStatus) -> &'static str {
         TriggerStatus::StatusArmed => "armed",
         TriggerStatus::StatusRunning => "running",
         TriggerStatus::StatusCompleted => "completed",
-        TriggerStatus::StatusCanceled => "cancelled",
+        TriggerStatus::StatusCanceled => "canceled",
         TriggerStatus::StatusFailed => "failed",
         TriggerStatus::StatusPaused => "paused",
         TriggerStatus::StatusUnspecified => "",
@@ -44,11 +44,11 @@ pub fn trigger_status_from_label(label: &str) -> Result<TriggerStatus, String> {
         "armed" => Ok(TriggerStatus::StatusArmed),
         "running" => Ok(TriggerStatus::StatusRunning),
         "completed" => Ok(TriggerStatus::StatusCompleted),
-        "cancelled" | "canceled" => Ok(TriggerStatus::StatusCanceled),
+        "canceled" => Ok(TriggerStatus::StatusCanceled),
         "failed" => Ok(TriggerStatus::StatusFailed),
         "paused" => Ok(TriggerStatus::StatusPaused),
         other => Err(format!(
-            "invalid trigger status {other:?}; expected one of: created, armed, running, completed, cancelled, failed, paused"
+            "invalid trigger status {other:?}; expected one of: created, armed, running, completed, canceled, failed, paused"
         )),
     }
 }
@@ -575,7 +575,7 @@ fn trigger_type_label(value: buffa::EnumValue<TriggerType>) -> String {
 pub fn trigger_event_type_from_label(label: &str) -> Result<TriggerEventType, String> {
     match label.trim().to_ascii_lowercase().as_str() {
         "fired" => Ok(TriggerEventType::EventFired),
-        "canceled" | "cancelled" => Ok(TriggerEventType::EventCanceled),
+        "canceled" => Ok(TriggerEventType::EventCanceled),
         "updated" => Ok(TriggerEventType::EventUpdated),
         "failed" => Ok(TriggerEventType::EventFailed),
         "activated" => Ok(TriggerEventType::EventActivated),
@@ -988,10 +988,45 @@ mod tests {
             TriggerStatus::StatusArmed
         );
         assert_eq!(
-            trigger_status_from_label("cancelled").unwrap(),
+            trigger_status_from_label("canceled").unwrap(),
             TriggerStatus::StatusCanceled
         );
         assert!(trigger_status_from_label("nope").is_err());
+    }
+
+    /// POLY-9303: a canceled trigger reads `canceled`, the contract's
+    /// spelling, as its events and the order statuses do. The British
+    /// `cancelled` is neither returned nor accepted as a filter.
+    #[test]
+    fn canceled_trigger_reads_and_filters_as_canceled() {
+        let read = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 5,
+            status: TriggerStatus::StatusCanceled.into(),
+            ..Default::default()
+        });
+        let canceled = trigger_mutation_from_cancel(&CancelTriggerResponse {
+            trigger_id: 5,
+            status: TriggerStatus::StatusCanceled.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let labels = [
+            (
+                "trigger_status_label",
+                trigger_status_label(TriggerStatus::StatusCanceled).to_owned(),
+            ),
+            ("trigger read", read.status),
+            ("cancel result", canceled.status),
+        ];
+        for (from, label) in labels {
+            assert_eq!(label, "canceled", "{from}");
+        }
+        assert!(crate::models::TRIGGER_STATUS_VALUES.contains(&"canceled"));
+        assert!(!crate::models::TRIGGER_STATUS_VALUES.contains(&"cancelled"));
+        let status = trigger_status_from_label("cancelled").expect_err("status alias");
+        assert!(status.contains("canceled, failed"), "{status}");
+        let event = trigger_event_type_from_label("cancelled").expect_err("event type alias");
+        assert!(event.contains("canceled"), "{event}");
     }
 
     #[test]
