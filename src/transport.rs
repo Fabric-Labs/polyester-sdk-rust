@@ -129,6 +129,178 @@ pub(crate) fn url_for_error(raw: &str) -> String {
     }
 }
 
+/// Proxy settings an HTTP client may read from the environment.
+const PROXY_ENV: [&str; 6] = [
+    "HTTPS_PROXY",
+    "https_proxy",
+    "HTTP_PROXY",
+    "http_proxy",
+    "ALL_PROXY",
+    "all_proxy",
+];
+
+/// `text` with every URL in it reduced as [`url_for_error`] reduces one, and
+/// every proxy URL from the environment as `[proxy]`. For text that quotes an answer or a
+/// transport, such as an error message.
+pub(crate) fn redact_text(text: &str) -> String {
+    let mut text = text.to_owned();
+    for name in PROXY_ENV {
+        let Ok(proxy) = std::env::var(name) else {
+            continue;
+        };
+        let proxy = proxy.trim();
+        if proxy.is_empty() {
+            continue;
+        }
+        let mut forms = vec![proxy.to_owned(), proxy.trim_end_matches('/').to_owned()];
+        let stripped = url_without_userinfo(proxy);
+        if stripped != "[REDACTED INVALID URL]" {
+            forms.push(stripped.trim_end_matches('/').to_owned());
+            forms.push(stripped);
+        }
+        forms.sort_by_key(|form| std::cmp::Reverse(form.len()));
+        for form in forms.iter().filter(|form| !form.is_empty()) {
+            text = text.replace(form.as_str(), "[proxy]");
+        }
+    }
+    // URLs first, so a registered secret inside one can't make it unparsable.
+    let mut text = strip_url_secrets(&text);
+    for secret in secrets_in_effect() {
+        text = text.replace(&secret, "[REDACTED]");
+    }
+    text
+}
+
+/// A client-held secret shorter than this is too common to replace in text.
+const MIN_SECRET_LENGTH: usize = 4;
+
+static KNOWN_SECRETS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Remember a client-held secret, such as an API private key, so
+/// [`redact_text`] removes it wherever it appears.
+pub(crate) fn register_secret(secret: &str) {
+    if secret.len() < MIN_SECRET_LENGTH {
+        return;
+    }
+    let mut known = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS);
+    if !known.iter().any(|item| item == secret) {
+        known.push(secret.to_owned());
+    }
+}
+
+/// Remember the userinfo of a URL the client holds, and its password, raw and
+/// decoded.
+pub(crate) fn register_url_secrets(raw: &str) {
+    for part in userinfo_parts(raw) {
+        register_secret(&part);
+        if let Ok(decoded) = urlencoding_decode(&part) {
+            register_secret(&decoded);
+        }
+    }
+}
+
+fn urlencoding_decode(text: &str) -> std::result::Result<String, ()> {
+    let bytes = text.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[i + 1..i + 3]).map_err(|_| ())?;
+            out.push(u8::from_str_radix(hex, 16).map_err(|_| ())?);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|_| ())
+}
+
+/// The exact userinfo of `raw` and its password: a user name alone is not
+/// secret and too common to replace in text.
+fn userinfo_parts(raw: &str) -> Vec<String> {
+    let Some((_, rest)) = raw.split_once("://") else {
+        return Vec::new();
+    };
+    let authority = rest.split('/').next().unwrap_or_default();
+    let Some(at) = authority.rfind('@') else {
+        return Vec::new();
+    };
+    let userinfo = &authority[..at];
+    if userinfo.is_empty() {
+        return Vec::new();
+    }
+    let password = userinfo
+        .split_once(':')
+        .map_or("", |(_, password)| password);
+    vec![userinfo.to_owned(), password.to_owned()]
+}
+
+/// The registered secrets and the userinfo of the proxies the environment
+/// sets, longest first.
+fn secrets_in_effect() -> Vec<String> {
+    let mut secrets = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS).clone();
+    for name in PROXY_ENV {
+        if let Ok(proxy) = std::env::var(name) {
+            secrets.extend(proxy_secrets(proxy.trim()));
+        }
+    }
+    secrets.sort_by_key(|secret| std::cmp::Reverse(secret.len()));
+    secrets
+}
+
+/// The userinfo and password of a proxy URL from the environment, raw and
+/// decoded, as [`register_url_secrets`] keeps them.
+fn proxy_secrets(proxy: &str) -> Vec<String> {
+    userinfo_parts(proxy)
+        .into_iter()
+        .flat_map(|part| {
+            let decoded = urlencoding_decode(&part).ok();
+            std::iter::once(part).chain(decoded)
+        })
+        .filter(|part| part.len() >= MIN_SECRET_LENGTH)
+        .collect()
+}
+
+/// After each `://`, up to the next whitespace, drop everything up to the last
+/// `@` (the userinfo, whatever it holds), and everything from the next `?` or
+/// `#` on (the query and fragment). A URL [`url_for_error`] refuses is
+/// replaced whole. The URL is not parsed, so a userinfo or
+/// query holding parentheses or quotes is dropped whole.
+fn strip_url_secrets(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut position = 0;
+    while let Some(found) = text[position..].find("://") {
+        let start = position + found + 3;
+        let end = text[start..]
+            .find(char::is_whitespace)
+            .map_or(text.len(), |i| start + i);
+        let mut token = &text[start..end];
+        let separator = start - 3;
+        let scheme = text[position..separator]
+            .rfind(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
+            .map_or(position, |i| position + i + 1);
+        if url_for_error(&text[scheme..end]) == "[REDACTED INVALID URL]" {
+            // What the URL parser refuses stays refused: dropped whole.
+            out.push_str(&text[position..scheme]);
+            out.push_str("[REDACTED INVALID URL]");
+            position = end;
+            continue;
+        }
+        // Fail closed: the last `@` anywhere ends a userinfo, even one that
+        // holds `?` or `#`.
+        if let Some(at) = token.rfind('@') {
+            token = &token[at + 1..];
+        }
+        let cut = token.find(['?', '#']).unwrap_or(token.len());
+        out.push_str(&text[position..start]);
+        out.push_str(&token[..cut]);
+        position = end;
+    }
+    out.push_str(&text[position..]);
+    out
+}
+
 fn redact_url_for_log(url: &url::Url) -> String {
     let mut redacted = url.clone();
     let _ = redacted.set_username("");
@@ -711,6 +883,9 @@ pub struct Factory {
 impl Factory {
     pub fn new(config: Config, credentials: Option<Credentials>) -> Result<Self> {
         auth::validate_recv_window_ms(config.recv_window_ms)?;
+        // Client-held secrets never reach an error's text (see redact_text).
+        register_url_secrets(&config.api_url);
+        register_url_secrets(&config.ws_url);
         let parsed = validate_http_url(&config.api_url, config.allow_insecure_http)?;
         if parsed.query().is_some() || parsed.fragment().is_some() {
             return Err(Error::validation(
@@ -750,6 +925,13 @@ impl Factory {
 
     pub(crate) fn connect_config(&self) -> ClientConfig {
         self.connect_config.clone()
+    }
+
+    /// A transport like [`Self::transport`] with a connection pool of its
+    /// own, so a read retried through it opens a new connection instead of
+    /// queueing behind one that dropped or stalled.
+    pub(crate) fn fresh_transport(&self) -> Result<SharedTransport> {
+        build_http_client(&self.config.api_url)
     }
 
     pub fn require_credentials(&self) -> Result<&Credentials> {
@@ -1036,7 +1218,7 @@ mod tests {
 
 #[cfg(test)]
 mod url_userinfo_tests {
-    use super::url_without_userinfo;
+    use super::{proxy_secrets, url_without_userinfo};
 
     #[test]
     fn url_for_error_keeps_only_scheme_host_port_and_path() {
@@ -1055,6 +1237,21 @@ mod url_userinfo_tests {
             ),
         ] {
             assert_eq!(super::url_for_error(raw), want, "{raw}");
+        }
+    }
+
+    #[test]
+    fn environment_proxy_userinfo_is_redacted_decoded() {
+        let secrets =
+            proxy_secrets("http://decoded%2Denv%2Duser:decoded%2Denv%2Dsecret%2DA73x@127.0.0.1:9");
+        for secret in [
+            "decoded-env-user:decoded-env-secret-A73x",
+            "decoded-env-secret-A73x",
+        ] {
+            assert!(
+                secrets.iter().any(|item| item == secret),
+                "{secret} not in {secrets:?}"
+            );
         }
     }
 

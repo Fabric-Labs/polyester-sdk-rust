@@ -155,6 +155,9 @@ impl Credentials {
             return Err(Error::auth("API key ID must not be empty"));
         }
         let seed = normalize_private_key(private_key_hex)?;
+        // The private key never reaches an error's text (see redact_text).
+        crate::transport::register_secret(private_key_hex.trim());
+        crate::transport::register_secret(&hex::encode(seed));
         let signing_key = SigningKey::from_bytes(&seed);
         let timestamp_allocator = allocator_for_key(&key_id);
         Ok(Self {

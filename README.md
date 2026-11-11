@@ -274,12 +274,74 @@ tests.
 ## Catalog readiness
 
 `Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio
-runtime, the client starts spot and zipper catalog hydration in the background.
+runtime, the client starts loading two catalogs in the background, each on its
+own: the **spot config** (`marketdata.v1.MarketDataService/GetSpotConfig`:
+pairs, symbol IDs, scales), which every spot trading call needs, and the
+**funding config** (`chain.zipper.v1.ZipperService/GetDepositWithdrawConfig`:
+deposit and withdrawal assets and chains).
 Every method that names a market by symbol, or needs a pair's catalog scales,
-waits for that hydration itself, so it can be called right after the client is
-created. When hydration failed, such a method returns `Error::CatalogHydration`,
+waits for the spot config itself, so it can be called right after the client is
+created. When that load failed, such a method returns `Error::CatalogHydration`,
 which holds the failure; a symbol the hydrated catalogs don't know returns the
-`Error::Validation` "unknown symbol". Methods that only label their results from
+`Error::Validation` "unknown symbol". `zipper.subscribe_zipped_asset_supply`
+waits for the funding config the same way, and spot calls never wait for, or
+fail with, the funding config.
+
+`wait_for_catalogs()` reports **spot readiness**: it returns `Ok` once the spot
+config has loaded and validated, without waiting for the funding config.
+`wait_for_funding_catalog()` reports the funding config; read the zipper
+catalog and `catalogs.ledger_id_for_asset` after it returns `Ok`. Each returns
+`Error::CatalogLoad` when its catalog could not be loaded, and loads it again
+on the next call.
+
+Only what reads the funding config waits for it: the zipper supply stream,
+which decodes with its scales. A waiting call sends nothing until the config
+loads, and returns `Error::CatalogHydration` naming the funding config,
+without sending, when it failed. Deposit addresses and withdrawals
+(`deposit.list_addresses`, `deposit.create_address`, `withdraw.create_*`) and
+`zipper.get_deposit_withdraw_config` read nothing from it and work while it is
+loading or failed. `catalogs.ledger_id_for_asset` doesn't wait: `None` means
+either that the funding config has not loaded (yet, or its load failed) or
+that it does not know the asset, so await `wait_for_funding_catalog()` first.
+With `hydrate_catalogs: false` nothing loads and nothing waits, as before.
+
+These two reads change nothing, so a read that times out or loses its
+connection (`client error (SendRequest)`) is read again: at most 3 reads per
+catalog, 250ms and then 500ms apart, each retry on a connection pool of its
+own, all within `Config::catalog_timeout` of `Client::new` (default twice
+`Config::timeout`). A read that keeps stalling fails within that deadline. Any
+other error answer, and a catalog that does not validate, fails at once. No
+other call is retried this way, and mutations never are.
+
+`Error::CatalogLoad` holds a `CatalogLoadFailure` that names the catalog
+(`catalog`: `"spot"` or `"funding"`), the `operation`, the kind of failure
+(`failure`: `"timeout"`, `"connection_closed"`, `"connect_failed"`,
+`"unavailable"`, `"invalid"` or `"error"`), the number of reads (`attempts`),
+`elapsed`, and the edge's reference of the last failed response
+(`response_ref`, the `cf-ray` header) when one arrived; `source` is the last
+failure, also returned by `std::error::Error::source`. Its message drops URL
+credentials. No SDK error prints a credential anywhere in its chain: every
+error mapped from a Connect call is redacted where it is mapped, so each URL an
+answer or a transport quotes loses its userinfo, query and fragment, and a
+proxy URL from the environment reads `[proxy]`, in `Display`, `Debug` and every
+`source()`, problem details and a rate limit's `detail` included. A URL that
+does not parse is dropped whole. The client's own secrets read `[REDACTED]`
+however an answer quotes them: the userinfo and password of its `api_url` and
+`ws_url` and of a proxy the environment sets (raw and percent-decoded), and
+its API private key. Limitations: a password shorter than 4 characters is not
+replaced where it stands alone, since replacing so short a string would
+mangle ordinary text; and a request signature is not redacted when the server
+echoes it back, since it is single-use and expires with its receive window. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
+(chain.zipper.v1.ZipperService/GetDepositWithdrawConfig) connection closed
+after 3 attempts in 0.8s: ...`.
+
+Timeouts, from the outside in: `Config::catalog_timeout` bounds the startup
+reads of each catalog, retries included; `Config::timeout` (default 10s) is
+each request's deadline, enforced locally and sent as `Connect-Timeout-Ms`;
+the HTTP client allows 5s for the TCP connect and 20s to establish a
+connection (DNS, TCP and TLS), negotiates HTTP/2 or HTTP/1.1 by ALPN, and has
+no read timeout of its own. This SDK does not use HTTP proxies:
+`HTTPS_PROXY` and the like are ignored. Methods that only label their results from
 the catalogs, such as `market_overview.subscribe` and `fees.get_spot_fee_rates`,
 wait too and leave the labels empty when hydration failed. With
 `hydrate_catalogs: false` nothing waits. Await readiness yourself to learn early

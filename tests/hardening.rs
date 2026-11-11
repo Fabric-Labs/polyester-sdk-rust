@@ -7,11 +7,15 @@
 mod batch_replace_status_errors;
 #[path = "catalog_hydration_wait/mod.rs"]
 mod catalog_hydration_wait;
+#[path = "catalog_startup_recovery/mod.rs"]
+mod catalog_startup_recovery;
 #[allow(dead_code)]
 #[path = "hardening_support/centrifugo.rs"]
 mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
+#[path = "error_chain_redaction/mod.rs"]
+mod error_chain_redaction;
 mod hardening_support;
 #[path = "limit_market_ref_price/mod.rs"]
 mod limit_market_ref_price;
@@ -3166,7 +3170,9 @@ async fn l2_wait_for_catalogs_can_retry_after_transient_failure() {
     let zipper = zipper_config_fixture();
     let http = MockHttpServer::spawn(move |req| {
         if req.path == SPOT_CONFIG_PATH {
-            if attempts_h.fetch_add(1, Ordering::SeqCst) == 0 {
+            // POLY-9228: startup reads a 503 again up to 3 times; fail all of
+            // them so the load itself fails.
+            if attempts_h.fetch_add(1, Ordering::SeqCst) < 3 {
                 hardening_support::HttpScript::Json {
                     status: 503,
                     body: br#"{"error":"temporary"}"#.to_vec(),
@@ -3192,11 +3198,16 @@ async fn l2_wait_for_catalogs_can_retry_after_transient_failure() {
     client
         .wait_for_catalogs()
         .await
-        .expect_err("first catalog attempt must surface the transient failure");
+        .expect_err("first catalog load must surface the failure");
+    assert_eq!(attempts.load(Ordering::SeqCst), 3);
     client
         .wait_for_catalogs()
         .await
-        .expect("second catalog attempt must recover");
+        .expect("second catalog load must recover");
+    client
+        .wait_for_funding_catalog()
+        .await
+        .expect("funding catalog");
     assert!(client.catalogs.is_ready());
     assert!(client.catalogs_last_error().is_none());
     assert_eq!(
@@ -3205,8 +3216,9 @@ async fn l2_wait_for_catalogs_can_retry_after_transient_failure() {
     );
 }
 
+/// POLY-9228: a funding (zipper) failure no longer blocks spot trading.
 #[tokio::test]
-async fn l2_wait_for_catalogs_zipper_failure_leaves_spot_unhydrated() {
+async fn l2_wait_for_catalogs_zipper_failure_leaves_spot_ready() {
     let spot = spot_config_fixture();
     let http = MockHttpServer::spawn(move |req| {
         if req.path == SPOT_CONFIG_PATH {
@@ -3228,16 +3240,20 @@ async fn l2_wait_for_catalogs_zipper_failure_leaves_spot_unhydrated() {
         ..Default::default()
     })
     .expect("client");
-    let err = client
+    client
         .wait_for_catalogs()
         .await
-        .expect_err("zipper 500 must fail closed");
-    assert!(err.to_string().contains("catalog"), "{err}");
+        .expect("the spot config loads without the funding config");
     assert_eq!(
         client.catalogs.base_quantity_scale_for_symbol("BTC-USDT"),
-        None,
-        "spot must not install when zipper fails"
+        Some(8)
     );
+    let err = client
+        .wait_for_funding_catalog()
+        .await
+        .expect_err("zipper 500 must fail the funding config closed");
+    assert!(err.to_string().contains("funding config"), "{err}");
+    assert_eq!(client.catalogs.ledger_id_for_asset("USDT"), None);
 }
 
 #[tokio::test]

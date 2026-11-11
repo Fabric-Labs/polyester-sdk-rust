@@ -38,6 +38,14 @@ fn tolerant_json<F: Future>(call: F) -> TolerantJson<F> {
     }
 }
 
+/// [`await_public`], keeping the [`ConnectError`] (its code, message and
+/// response headers) for a caller that classifies it itself.
+pub(crate) async fn await_public_connect<R>(
+    call: impl Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,
+) -> std::result::Result<UnaryResponse<R>, ConnectError> {
+    tolerant_json(call).await
+}
+
 #[inline]
 pub async fn await_public<R>(
     call: impl Future<Output = std::result::Result<UnaryResponse<R>, ConnectError>>,

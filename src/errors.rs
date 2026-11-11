@@ -31,6 +31,84 @@ fn catalog_hydration_message(failure: &Error) -> String {
     }
 }
 
+/// Why a catalog the client loads when it is created could not be loaded;
+/// see [`Error::CatalogLoad`].
+#[derive(Debug, Clone)]
+pub struct CatalogLoadFailure {
+    /// `"spot"` or `"funding"`.
+    pub catalog: &'static str,
+    /// The Connect procedure, such as
+    /// `chain.zipper.v1.ZipperService/GetDepositWithdrawConfig`.
+    pub operation: &'static str,
+    /// `"timeout"`, `"connection_closed"`, `"connect_failed"`,
+    /// `"unavailable"`, `"invalid"` (the response did not validate) or
+    /// `"error"`.
+    pub failure: &'static str,
+    /// How many times the catalog was read.
+    pub attempts: u32,
+    /// How long the reads took.
+    pub elapsed: Duration,
+    /// The edge's reference of the last failed response (its `cf-ray`
+    /// header), when one arrived.
+    pub response_ref: Option<String>,
+    /// The last failure.
+    pub source: Error,
+}
+
+impl CatalogLoadFailure {
+    fn catalog_name(&self) -> &'static str {
+        if self.catalog == "spot" {
+            "spot config"
+        } else {
+            "funding config"
+        }
+    }
+}
+
+impl std::fmt::Display for CatalogLoadFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let cause = crate::transport::redact_text(&self.source.to_string());
+        if self.failure == "invalid" {
+            return write!(
+                f,
+                "catalog hydration failed: {} ({}) is invalid: {cause}",
+                self.catalog_name(),
+                self.operation
+            );
+        }
+        let words = match self.failure {
+            "timeout" => "timed out",
+            "connection_closed" => "connection closed",
+            "connect_failed" => "could not connect",
+            "unavailable" => "server unavailable",
+            _ => "request failed",
+        };
+        let noun = if self.attempts == 1 {
+            "attempt"
+        } else {
+            "attempts"
+        };
+        write!(
+            f,
+            "catalog hydration failed: {} ({}) {words} after {} {noun} in {:.1}s",
+            self.catalog_name(),
+            self.operation,
+            self.attempts,
+            self.elapsed.as_secs_f64()
+        )?;
+        if let Some(reference) = &self.response_ref {
+            write!(f, "; response ref {reference}")?;
+        }
+        write!(f, ": {cause}")
+    }
+}
+
+impl std::error::Error for CatalogLoadFailure {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.source)
+    }
+}
+
 /// Root result alias for the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -65,6 +143,15 @@ pub enum Error {
     /// hydrates the catalogs again.
     #[error("{}", catalog_hydration_message(.0))]
     CatalogHydration(Box<Error>),
+    /// A catalog the client loads when it is created could not be loaded:
+    /// [`crate::Client::wait_for_catalogs`] returns it for the spot config,
+    /// [`crate::Client::wait_for_funding_catalog`] for the funding
+    /// (deposit/withdraw) config, and a call that needs that catalog returns
+    /// it inside [`Error::CatalogHydration`]. It names the catalog, the
+    /// operation, the kind of failure and the response reference, and keeps
+    /// the last failure as its [`std::error::Error::source`].
+    #[error(transparent)]
+    CatalogLoad(Box<CatalogLoadFailure>),
     #[error("{0}")]
     Transport(String),
     /// A successful RPC returned a payload that violates the documented
@@ -614,6 +701,158 @@ impl Error {
         self
     }
 
+    /// This error with every URL its fields quote as
+    /// [`crate::transport::redact_text`] names it: no userinfo, query or
+    /// fragment, and a proxy URL from the environment as `[proxy]`. The
+    /// variant, codes and causes stay as they are.
+    pub(crate) fn redacted(self) -> Self {
+        fn text(value: String) -> String {
+            crate::transport::redact_text(&value)
+        }
+        fn problem(
+            value: Option<Box<crate::problem::HttpProblem>>,
+        ) -> Option<Box<crate::problem::HttpProblem>> {
+            value.map(|mut problem| {
+                problem.code = text(std::mem::take(&mut problem.code));
+                problem.detail = text(std::mem::take(&mut problem.detail));
+                problem.problem_type = text(std::mem::take(&mut problem.problem_type));
+                problem
+            })
+        }
+        match self {
+            Self::Auth(message) => Self::Auth(text(message)),
+            Self::PermissionDenied {
+                message,
+                status,
+                code,
+                context,
+                endpoint,
+                problem: p,
+            } => Self::PermissionDenied {
+                message: text(message),
+                status,
+                code,
+                context: text(context),
+                endpoint: text(endpoint),
+                problem: problem(p),
+            },
+            Self::Validation(message) => Self::Validation(text(message)),
+            Self::CatalogHydration(inner) => Self::CatalogHydration(Box::new(inner.redacted())),
+            Self::CatalogLoad(mut failure) => {
+                failure.source = failure.source.redacted();
+                Self::CatalogLoad(failure)
+            }
+            Self::Transport(message) => Self::Transport(text(message)),
+            Self::ResponseContract { context, message } => Self::ResponseContract {
+                context: text(context),
+                message: text(message),
+            },
+            Self::RateLimit {
+                code,
+                message,
+                retry_after,
+                detail,
+            } => Self::RateLimit {
+                code,
+                message: text(message),
+                retry_after,
+                detail: detail.map(|mut detail| {
+                    for field in [
+                        &mut detail.reason,
+                        &mut detail.operation_id,
+                        &mut detail.policy_class,
+                        &mut detail.scope,
+                        &mut detail.refill_model,
+                    ] {
+                        *field = text(std::mem::take(field));
+                    }
+                    detail
+                }),
+            },
+            Self::Server(message) => Self::Server(text(message)),
+            Self::AdmissionUnavailable {
+                message,
+                code,
+                problem: p,
+            } => Self::AdmissionUnavailable {
+                message: text(message),
+                code,
+                problem: problem(p),
+            },
+            Self::GatewayTimeout {
+                message,
+                problem: p,
+            } => Self::GatewayTimeout {
+                message: text(message),
+                problem: problem(p),
+            },
+            Self::Api {
+                message,
+                code,
+                metadata,
+                violations,
+            } => Self::Api {
+                message: text(message),
+                code,
+                metadata: metadata
+                    .into_iter()
+                    .map(|(key, value)| (key, text(value)))
+                    .collect(),
+                violations: violations
+                    .into_iter()
+                    .map(|mut violation| {
+                        violation.message = text(violation.message);
+                        violation
+                    })
+                    .collect(),
+            },
+            Self::RouteNotFound { procedure } => Self::RouteNotFound {
+                procedure: text(procedure),
+            },
+            Self::NotImplemented { message } => Self::NotImplemented {
+                message: text(message),
+            },
+            Self::TimestampSkew { status, problem: p } => Self::TimestampSkew {
+                status,
+                problem: problem(p),
+            },
+            Self::ApiKeyRejected {
+                status,
+                code,
+                problem: p,
+            } => Self::ApiKeyRejected {
+                status,
+                code,
+                problem: problem(p),
+            },
+            Self::SessionRequired {
+                message,
+                problem: p,
+            } => Self::SessionRequired {
+                message: text(message),
+                problem: problem(p),
+            },
+            Self::Realtime(message) => Self::Realtime(text(message)),
+            Self::QueueOverflow(message) => Self::QueueOverflow(text(message)),
+            Self::RealtimeSetupTimeout { channel, deadline } => {
+                Self::RealtimeSetupTimeout { channel, deadline }
+            }
+            Self::SubscriptionEnded {
+                channel,
+                code,
+                server_reason,
+                reason,
+                cause,
+            } => Self::SubscriptionEnded {
+                channel,
+                code,
+                server_reason: text(server_reason),
+                reason,
+                cause: cause.map(|cause| Box::new(cause.redacted())),
+            },
+        }
+    }
+
     pub fn auth(msg: impl Into<String>) -> Self {
         Self::Auth(msg.into())
     }
@@ -1073,11 +1312,14 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         .and_then(|d| d.debug.as_ref())
         .and_then(|v| serde_json::from_value(v.clone()).ok());
     let mapped = map_connect_error_inner(err);
-    if let Some(problem) = problem {
+    let mapped = if let Some(problem) = problem {
         mapped.with_http_problem(problem)
     } else {
         mapped
-    }
+    };
+    // Every SDK error for a call is mapped here: redact it once, so no field
+    // its Display, Debug or source() prints holds a credential.
+    mapped.redacted()
 }
 
 /// The `rate_limit` object of a REST rate-limit problem. Every field is

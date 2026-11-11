@@ -12,7 +12,7 @@ mod profile;
 mod scope;
 mod thin;
 mod triggers;
-mod unary;
+pub(crate) mod unary;
 
 pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
@@ -62,7 +62,10 @@ pub struct ServiceContext {
     pub default_sub_account_id: Option<String>,
     pub default_account_id: Option<String>,
     pub realtime: RealtimeClient,
+    /// Outcome of the spot config's load.
     pub catalog_ready: Arc<OnceCell<Result<()>>>,
+    /// Outcome of the funding (deposit/withdraw) config's load.
+    pub funding_ready: Arc<OnceCell<Result<()>>>,
     pub hydrate_catalogs_enabled: bool,
 }
 
@@ -78,6 +81,15 @@ impl ServiceContext {
             .map_err(Error::catalog_hydration)
     }
 
+    /// Wait for the funding (deposit/withdraw) config the client began
+    /// loading when it was created, for a call that decodes with it. A failed
+    /// load is returned as [`Error::CatalogHydration`] naming it.
+    pub async fn wait_for_funding_catalog(&self) -> Result<()> {
+        self.outcome_of(&self.funding_ready, || self.catalogs.is_funding_ready())
+            .await
+            .map_err(Error::catalog_hydration)
+    }
+
     /// Wait for construction-time catalog hydration, whatever its outcome, for
     /// a call that only labels or scales its results from the catalogs and
     /// works without them.
@@ -86,18 +98,29 @@ impl ServiceContext {
     }
 
     async fn hydration_outcome(&self) -> Result<()> {
+        self.outcome_of(&self.catalog_ready, || self.catalogs.is_spot_ready())
+            .await
+    }
+
+    /// The outcome of one catalog's load: `Ok` once `is_ready`, otherwise
+    /// what the load ended with.
+    async fn outcome_of(
+        &self,
+        load: &OnceCell<Result<()>>,
+        is_ready: impl Fn() -> bool,
+    ) -> Result<()> {
         if !self.hydrate_catalogs_enabled {
             return Ok(());
         }
-        if self.catalogs.is_ready() {
+        if is_ready() {
             return Ok(());
         }
-        if let Some(result) = self.catalog_ready.get() {
+        if let Some(result) = load.get() {
             return result.clone();
         }
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-        while self.catalog_ready.get().is_none() {
-            if self.catalogs.is_ready() {
+        while load.get().is_none() {
+            if is_ready() {
                 return Ok(());
             }
             if tokio::time::Instant::now() >= deadline {
@@ -107,10 +130,10 @@ impl ServiceContext {
             }
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
-        if self.catalogs.is_ready() {
+        if is_ready() {
             return Ok(());
         }
-        self.catalog_ready.get().cloned().unwrap_or_else(|| {
+        load.get().cloned().unwrap_or_else(|| {
             Err(Error::validation(
                 "catalogs are not ready; await client.wait_for_catalogs() before placing orders",
             ))
