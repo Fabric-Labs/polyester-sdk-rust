@@ -30,7 +30,7 @@ pub struct ClientFrame {
     /// recv_window_ms: a command that arrives, or waits to be sent on for
     /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
     /// changes nothing, but it has taken its seq, so the next command uses the
-    /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+    /// next seq. A timestamp more than 1 second ahead of the server clock is
     /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
     /// deadline. Ping ignores it.
     ///
@@ -43,7 +43,7 @@ pub struct ClientFrame {
     )]
     pub timestamp_ms: i64,
     /// Optional receive window in milliseconds, from 1 to 60000, applied to
-    /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+    /// timestamp_ms. Zero uses 5000. Setting it without timestamp_ms is
     /// rejected with BAD_REQUEST.
     ///
     /// Field 4: `recv_window_ms`
@@ -2895,14 +2895,14 @@ pub mod __buffa {
             /// recv_window_ms: a command that arrives, or waits to be sent on for
             /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
             /// changes nothing, but it has taken its seq, so the next command uses the
-            /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+            /// next seq. A timestamp more than 1 second ahead of the server clock is
             /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
             /// deadline. Ping ignores it.
             ///
             /// Field 3: `timestamp_ms`
             pub timestamp_ms: i64,
             /// Optional receive window in milliseconds, from 1 to 60000, applied to
-            /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+            /// timestamp_ms. Zero uses 5000. Setting it without timestamp_ms is
             /// rejected with BAD_REQUEST.
             ///
             /// Field 4: `recv_window_ms`
@@ -3826,7 +3826,7 @@ pub mod __buffa {
             /// recv_window_ms: a command that arrives, or waits to be sent on for
             /// admission, past then is rejected with REQUEST_DEADLINE_EXCEEDED and
             /// changes nothing, but it has taken its seq, so the next command uses the
-            /// next seq. A timestamp more than 10 seconds ahead of the server clock is
+            /// next seq. A timestamp more than 1 second ahead of the server clock is
             /// rejected with BAD_REQUEST, without taking the seq. Zero sets no
             /// deadline. Ping ignores it.
             ///
@@ -3836,7 +3836,7 @@ pub mod __buffa {
                 self.0.reborrow().timestamp_ms
             }
             /// Optional receive window in milliseconds, from 1 to 60000, applied to
-            /// timestamp_ms. Zero uses 10000. Setting it without timestamp_ms is
+            /// timestamp_ms. Zero uses 5000. Setting it without timestamp_ms is
             /// rejected with BAD_REQUEST.
             ///
             /// Field 4: `recv_window_ms`

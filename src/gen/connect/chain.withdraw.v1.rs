@@ -12,15 +12,15 @@ pub type OwnedSetAutoWithdrawRuleResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<DisableAutoWithdrawRuleRequestView<'static>>`.
-pub type OwnedDisableAutoWithdrawRuleRequestView = ::buffa::view::OwnedView<
-    crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleRequestView<
+///Shorthand for `OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>>`.
+pub type OwnedSetAutoWithdrawRuleEnabledRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledRequestView<
         'static,
     >,
 >;
-///Shorthand for `OwnedView<DisableAutoWithdrawRuleResponseView<'static>>`.
-pub type OwnedDisableAutoWithdrawRuleResponseView = ::buffa::view::OwnedView<
-    crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleResponseView<
+///Shorthand for `OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>>`.
+pub type OwnedSetAutoWithdrawRuleEnabledResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledResponseView<
         'static,
     >,
 >;
@@ -45,6 +45,18 @@ pub type OwnedListAutoWithdrawRunsRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<ListAutoWithdrawRunsResponseView<'static>>`.
 pub type OwnedListAutoWithdrawRunsResponseView = ::buffa::view::OwnedView<
     crate::proto::chain::withdraw::v1::__buffa::view::ListAutoWithdrawRunsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PreviewAutoWithdrawRunRequestView<'static>>`.
+pub type OwnedPreviewAutoWithdrawRunRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<PreviewAutoWithdrawRunResponseView<'static>>`.
+pub type OwnedPreviewAutoWithdrawRunResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunResponseView<
         'static,
     >,
 >;
@@ -77,9 +89,9 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleResponse,
+    crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledResponse,
 >
-for crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleResponseView<
+for crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledResponseView<
     '_,
 > {
     fn encode(
@@ -90,10 +102,10 @@ for crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleRes
     }
 }
 impl ::connectrpc::Encodable<
-    crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleResponse,
+    crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledResponse,
 >
 for ::buffa::view::OwnedView<
-    crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleResponseView<
+    crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledResponseView<
         'static,
     >,
 > {
@@ -160,6 +172,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunResponse,
+>
+for crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const AUTO_WITHDRAW_SERVICE_SERVICE_NAME: &str = "chain.withdraw.v1.AutoWithdrawService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `SetAutoWithdrawRule` RPC.
@@ -171,12 +211,12 @@ pub const AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_SPEC: ::connectrpc::Spec 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `DisableAutoWithdrawRule` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetAutoWithdrawRuleEnabled` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const AUTO_WITHDRAW_SERVICE_DISABLE_AUTO_WITHDRAW_RULE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule",
+pub const AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_ENABLED_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRuleEnabled",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -198,14 +238,24 @@ pub const AUTO_WITHDRAW_SERVICE_LIST_AUTO_WITHDRAW_RUNS_SPEC: ::connectrpc::Spec
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `PreviewAutoWithdrawRun` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const AUTO_WITHDRAW_SERVICE_PREVIEW_AUTO_WITHDRAW_RUN_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.withdraw.v1.AutoWithdrawService/PreviewAutoWithdrawRun",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// AutoWithdrawService manages scheduled in-kind auto-withdraw rules for a
 /// root account or subaccount. A rule pays each asset's balance out on an
 /// hourly, daily, weekly, biweekly or monthly UTC slot, through the normal
 /// withdraw path, only to destinations on the account's external withdraw
-/// whitelist. Changing a
-/// rule requires a person with withdraw rights and a fresh single-use MFA
-/// step-up; API keys can read rules and runs but never change them. An API
-/// key reads only when its policy grants READ_AUTO_WITHDRAW (or
+/// whitelist. Changing or
+/// resuming a rule requires a person with withdraw rights and a fresh
+/// single-use MFA step-up, and pausing it requires such a person without a
+/// step-up; API keys can read rules, runs and previews but never change
+/// them. An API key reads only when its policy grants READ_AUTO_WITHDRAW (or
 /// MANAGE_AUTO_WITHDRAW), and only its own account: a root-account key reads
 /// the root account, and a subaccount key reads its subaccount.
 ///
@@ -262,6 +312,13 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
     /// one. Requires a session login with withdraw rights on the account and
     /// a fresh single-use step-up; every destination must be on the account's
     /// external withdraw whitelist.
+    /// A refused destination answers a typed code whose ErrorDetail.field_path
+    /// names the field, such as destinations[0].min_amount_e18:
+    /// EXTERNAL_DESTINATION_NOT_WHITELISTED, DESTINATION_INVALID (not a valid
+    /// address on its chain), ROUTE_UNSUPPORTED (no enabled withdrawal route
+    /// pays the asset to that chain) or MIN_AMOUNT_BELOW_FLOOR (its
+    /// ErrorDetail.min_floor_e18 is the floor). A stale expected_version
+    /// answers VERSION_CONFLICT.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -284,8 +341,15 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Disable the account's rule. Requires a session login with withdraw
-    /// rights on the account and a fresh single-use step-up.
+    /// Pause or resume the account's rule, keeping its schedule and
+    /// destinations. Requires a session login with withdraw rights on the
+    /// account. Pausing needs no step-up. Resuming needs a fresh single-use
+    /// step-up, checks again that every destination is still a valid
+    /// destination on the account's external withdraw whitelist, and clears a
+    /// pause the rule set itself; a refused destination answers the typed codes
+    /// of SetAutoWithdrawRule, and the rule stays paused. A rule already in the
+    /// requested state is returned unchanged. A stale expected_version answers
+    /// VERSION_CONFLICT.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -294,17 +358,17 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn disable_auto_withdraw_rule<'a>(
+    fn set_auto_withdraw_rule_enabled<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+            crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleResponse,
+                crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -361,6 +425,42 @@ pub trait AutoWithdrawService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::chain::withdraw::v1::ListAutoWithdrawRunsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Preview the account's next auto-withdraw run from its balances now:
+    /// when it starts, whether it would pay, and per asset what it would pay,
+    /// what would stay and why, its USD value and the expected network fee. It
+    /// plans exactly as the run does; balances, prices and fees can change
+    /// before the run starts. A price that is not current leaves the value
+    /// unset instead of failing the read. When prices cannot be read at all,
+    /// the values stay unset too, unless the rule has a USD minimum: prices
+    /// then decide what pays, so the read answers UNAVAILABLE and can be
+    /// retried.
+    /// An API key needs READ_AUTO_WITHDRAW in its policy and reads only its own
+    /// account. Both refusals answer PERMISSION_DENIED: a key whose policy lacks
+    /// the action gets "api key policy does not allow READ_AUTO_WITHDRAW", and a
+    /// key that names an account other than its own, such as a root-account key
+    /// naming a subaccount, gets "api key target scope mismatch".
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn preview_auto_withdraw_run<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -427,13 +527,13 @@ impl<S: AutoWithdrawService> AutoWithdrawServiceExt for S {
             .with_spec(AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_SPEC)
             .route_view(
                 AUTO_WITHDRAW_SERVICE_SERVICE_NAME,
-                "DisableAutoWithdrawRule",
+                "SetAutoWithdrawRuleEnabled",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleRequestView<
+                            crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledRequestView<
                                 'static,
                             >,
                         >,
@@ -442,18 +542,18 @@ impl<S: AutoWithdrawService> AutoWithdrawServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+                                crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.disable_auto_withdraw_rule(ctx, sreq)
+                            svc.set_auto_withdraw_rule_enabled(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleResponse,
+                                    crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(AUTO_WITHDRAW_SERVICE_DISABLE_AUTO_WITHDRAW_RULE_SPEC)
+            .with_spec(AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_ENABLED_SPEC)
             .route_view(
                 AUTO_WITHDRAW_SERVICE_SERVICE_NAME,
                 "GetAutoWithdrawRule",
@@ -512,6 +612,35 @@ impl<S: AutoWithdrawService> AutoWithdrawServiceExt for S {
                 },
             )
             .with_spec(AUTO_WITHDRAW_SERVICE_LIST_AUTO_WITHDRAW_RUNS_SPEC)
+            .route_view(
+                AUTO_WITHDRAW_SERVICE_SERVICE_NAME,
+                "PreviewAutoWithdrawRun",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.preview_auto_withdraw_run(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(AUTO_WITHDRAW_SERVICE_PREVIEW_AUTO_WITHDRAW_RUN_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -574,10 +703,12 @@ impl<T: AutoWithdrawService> ::connectrpc::Dispatcher for AutoWithdrawServiceSer
                         .with_spec(AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_SPEC),
                 )
             }
-            "DisableAutoWithdrawRule" => {
+            "SetAutoWithdrawRuleEnabled" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(AUTO_WITHDRAW_SERVICE_DISABLE_AUTO_WITHDRAW_RULE_SPEC),
+                        .with_spec(
+                            AUTO_WITHDRAW_SERVICE_SET_AUTO_WITHDRAW_RULE_ENABLED_SPEC,
+                        ),
                 )
             }
             "GetAutoWithdrawRule" => {
@@ -590,6 +721,12 @@ impl<T: AutoWithdrawService> ::connectrpc::Dispatcher for AutoWithdrawServiceSer
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(AUTO_WITHDRAW_SERVICE_LIST_AUTO_WITHDRAW_RUNS_SPEC),
+                )
+            }
+            "PreviewAutoWithdrawRun" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(AUTO_WITHDRAW_SERVICE_PREVIEW_AUTO_WITHDRAW_RUN_SPEC),
                 )
             }
             _ => None,
@@ -629,24 +766,24 @@ impl<T: AutoWithdrawService> ::connectrpc::Dispatcher for AutoWithdrawServiceSer
                         >(format)
                 })
             }
-            "DisableAutoWithdrawRule" => {
+            "SetAutoWithdrawRuleEnabled" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+                        crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleRequestView<
+                    let req: crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+                        crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
                     >::from_parts(&req, &body);
-                    svc.disable_auto_withdraw_rule(ctx, req)
+                    svc.set_auto_withdraw_rule_enabled(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleResponse,
+                            crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledResponse,
                         >(format)
                 })
             }
@@ -689,6 +826,27 @@ impl<T: AutoWithdrawService> ::connectrpc::Dispatcher for AutoWithdrawServiceSer
                         .await?
                         .encode::<
                             crate::proto::chain::withdraw::v1::ListAutoWithdrawRunsResponse,
+                        >(format)
+                })
+            }
+            "PreviewAutoWithdrawRun" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+                    >::from_parts(&req, &body);
+                    svc.preview_auto_withdraw_run(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunResponse,
                         >(format)
                 })
             }
@@ -842,35 +1000,35 @@ where
             )
             .await
     }
-    /// Call the DisableAutoWithdrawRule RPC. Sends a request to /chain.withdraw.v1.AutoWithdrawService/DisableAutoWithdrawRule.
-    pub async fn disable_auto_withdraw_rule(
+    /// Call the SetAutoWithdrawRuleEnabled RPC. Sends a request to /chain.withdraw.v1.AutoWithdrawService/SetAutoWithdrawRuleEnabled.
+    pub async fn set_auto_withdraw_rule_enabled(
         &self,
-        request: crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+        request: crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleResponseView<
+                crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.disable_auto_withdraw_rule_with_options(
+        self.set_auto_withdraw_rule_enabled_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the DisableAutoWithdrawRule RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn disable_auto_withdraw_rule_with_options(
+    /// Call the SetAutoWithdrawRuleEnabled RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_auto_withdraw_rule_enabled_with_options(
         &self,
-        request: crate::proto::chain::withdraw::v1::DisableAutoWithdrawRuleRequest,
+        request: crate::proto::chain::withdraw::v1::SetAutoWithdrawRuleEnabledRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::chain::withdraw::v1::__buffa::view::DisableAutoWithdrawRuleResponseView<
+                crate::proto::chain::withdraw::v1::__buffa::view::SetAutoWithdrawRuleEnabledResponseView<
                     'static,
                 >,
             >,
@@ -881,7 +1039,7 @@ where
                 &self.transport,
                 &self.config,
                 AUTO_WITHDRAW_SERVICE_SERVICE_NAME,
-                "DisableAutoWithdrawRule",
+                "SetAutoWithdrawRuleEnabled",
                 request,
                 options,
             )
@@ -977,8 +1135,65 @@ where
             )
             .await
     }
+    /// Call the PreviewAutoWithdrawRun RPC. Sends a request to /chain.withdraw.v1.AutoWithdrawService/PreviewAutoWithdrawRun.
+    pub async fn preview_auto_withdraw_run(
+        &self,
+        request: crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.preview_auto_withdraw_run_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the PreviewAutoWithdrawRun RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn preview_auto_withdraw_run_with_options(
+        &self,
+        request: crate::proto::chain::withdraw::v1::PreviewAutoWithdrawRunRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::PreviewAutoWithdrawRunResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                AUTO_WITHDRAW_SERVICE_SERVICE_NAME,
+                "PreviewAutoWithdrawRun",
+                request,
+                options,
+            )
+            .await
+    }
 }
 
+///Shorthand for `OwnedView<GetWalletBalancesRequestView<'static>>`.
+pub type OwnedGetWalletBalancesRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetWalletBalancesResponseView<'static>>`.
+pub type OwnedGetWalletBalancesResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<ValidateWithdrawDestinationRequestView<'static>>`.
 pub type OwnedValidateWithdrawDestinationRequestView = ::buffa::view::OwnedView<
     crate::proto::chain::withdraw::v1::__buffa::view::ValidateWithdrawDestinationRequestView<
@@ -1015,6 +1230,32 @@ pub type OwnedCreateWalletTradingWithdrawResponseView = ::buffa::view::OwnedView
         'static,
     >,
 >;
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
+>
+for crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<
     crate::proto::chain::withdraw::v1::ValidateWithdrawDestinationResponse,
 >
@@ -1101,6 +1342,15 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const WITHDRAW_SERVICE_SERVICE_NAME: &str = "chain.withdraw.v1.WithdrawService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetWalletBalances` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const WITHDRAW_SERVICE_GET_WALLET_BALANCES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.withdraw.v1.WithdrawService/GetWalletBalances",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ValidateWithdrawDestination` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -1179,6 +1429,32 @@ pub const WITHDRAW_SERVICE_CREATE_WALLET_TRADING_WITHDRAW_SPEC: ::connectrpc::Sp
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait WithdrawService: Send + Sync + 'static {
+    /// Read the zTokens the account's smart account wallet holds on Polyester
+    /// Chain, such as a rejected withdrawal's refund, which stays there until
+    /// the account moves it. Balances are read live from the chain. An API key
+    /// needs READ_BALANCES within its scope.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_wallet_balances<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Validate an external-chain withdraw destination for an authenticated
     /// caller without creating, signing, or reserving a withdraw. An API key
     /// needs READ_WITHDRAW_VALIDATION within its scope.
@@ -1285,6 +1561,35 @@ impl<S: WithdrawService> WithdrawServiceExt for S {
         router: ::connectrpc::Router,
     ) -> ::connectrpc::Router {
         router
+            .route_view(
+                WITHDRAW_SERVICE_SERVICE_NAME,
+                "GetWalletBalances",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_wallet_balances(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WITHDRAW_SERVICE_GET_WALLET_BALANCES_SPEC)
             .route_view(
                 WITHDRAW_SERVICE_SERVICE_NAME,
                 "ValidateWithdrawDestination",
@@ -1426,6 +1731,12 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("chain.withdraw.v1.WithdrawService/")?;
         match method {
+            "GetWalletBalances" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(WITHDRAW_SERVICE_GET_WALLET_BALANCES_SPEC),
+                )
+            }
             "ValidateWithdrawDestination" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -1459,6 +1770,27 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
         };
         let _ = (&ctx, &request, &format);
         match method {
+            "GetWalletBalances" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_wallet_balances(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
+                        >(format)
+                })
+            }
             "ValidateWithdrawDestination" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
@@ -1585,7 +1917,7 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.validate_withdraw_destination(request).await?;
+/// let resp = client.get_wallet_balances(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -1593,7 +1925,7 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.validate_withdraw_destination(request).await?.into_owned();
+/// let owned = client.get_wallet_balances(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -1623,6 +1955,51 @@ where
     /// Get a mutable reference to the client configuration.
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
+    }
+    /// Call the GetWalletBalances RPC. Sends a request to /chain.withdraw.v1.WithdrawService/GetWalletBalances.
+    pub async fn get_wallet_balances(
+        &self,
+        request: crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_wallet_balances_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetWalletBalances RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_wallet_balances_with_options(
+        &self,
+        request: crate::proto::chain::withdraw::v1::GetWalletBalancesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::GetWalletBalancesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WITHDRAW_SERVICE_SERVICE_NAME,
+                "GetWalletBalances",
+                request,
+                options,
+            )
+            .await
     }
     /// Call the ValidateWithdrawDestination RPC. Sends a request to /chain.withdraw.v1.WithdrawService/ValidateWithdrawDestination.
     pub async fn validate_withdraw_destination(

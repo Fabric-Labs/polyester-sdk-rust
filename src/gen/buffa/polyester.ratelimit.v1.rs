@@ -180,6 +180,13 @@ pub enum PolicyClass {
     GUARD_SIGN = 12i32,
     /// External social-provider work.
     SOCIAL_PROVIDER = 13i32,
+    /// Messages to the trading assistant, each of which starts an assistant run.
+    ASSISTANT_MESSAGE = 14i32,
+    /// Trading assistant controls: cancelling a run, deciding an approval and
+    /// deleting a memory.
+    ASSISTANT_CONTROL = 15i32,
+    /// Trading assistant reads, including run event streams.
+    ASSISTANT_READ = 16i32,
 }
 impl PolicyClass {
     ///Idiomatic alias for [`Self::CLASS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -224,6 +231,15 @@ impl PolicyClass {
     ///Idiomatic alias for [`Self::SOCIAL_PROVIDER`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SocialProvider: Self = Self::SOCIAL_PROVIDER;
+    ///Idiomatic alias for [`Self::ASSISTANT_MESSAGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AssistantMessage: Self = Self::ASSISTANT_MESSAGE;
+    ///Idiomatic alias for [`Self::ASSISTANT_CONTROL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AssistantControl: Self = Self::ASSISTANT_CONTROL;
+    ///Idiomatic alias for [`Self::ASSISTANT_READ`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AssistantRead: Self = Self::ASSISTANT_READ;
 }
 impl ::core::default::Default for PolicyClass {
     fn default() -> Self {
@@ -333,6 +349,9 @@ impl ::buffa::Enumeration for PolicyClass {
             11i32 => ::core::option::Option::Some(Self::WITHDRAW_VALIDATE),
             12i32 => ::core::option::Option::Some(Self::GUARD_SIGN),
             13i32 => ::core::option::Option::Some(Self::SOCIAL_PROVIDER),
+            14i32 => ::core::option::Option::Some(Self::ASSISTANT_MESSAGE),
+            15i32 => ::core::option::Option::Some(Self::ASSISTANT_CONTROL),
+            16i32 => ::core::option::Option::Some(Self::ASSISTANT_READ),
             _ => ::core::option::Option::None,
         }
     }
@@ -355,6 +374,9 @@ impl ::buffa::Enumeration for PolicyClass {
             Self::WITHDRAW_VALIDATE => "WITHDRAW_VALIDATE",
             Self::GUARD_SIGN => "GUARD_SIGN",
             Self::SOCIAL_PROVIDER => "SOCIAL_PROVIDER",
+            Self::ASSISTANT_MESSAGE => "ASSISTANT_MESSAGE",
+            Self::ASSISTANT_CONTROL => "ASSISTANT_CONTROL",
+            Self::ASSISTANT_READ => "ASSISTANT_READ",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -373,6 +395,9 @@ impl ::buffa::Enumeration for PolicyClass {
             "WITHDRAW_VALIDATE" => ::core::option::Option::Some(Self::WITHDRAW_VALIDATE),
             "GUARD_SIGN" => ::core::option::Option::Some(Self::GUARD_SIGN),
             "SOCIAL_PROVIDER" => ::core::option::Option::Some(Self::SOCIAL_PROVIDER),
+            "ASSISTANT_MESSAGE" => ::core::option::Option::Some(Self::ASSISTANT_MESSAGE),
+            "ASSISTANT_CONTROL" => ::core::option::Option::Some(Self::ASSISTANT_CONTROL),
+            "ASSISTANT_READ" => ::core::option::Option::Some(Self::ASSISTANT_READ),
             _ => ::core::option::Option::None,
         }
     }
@@ -392,6 +417,9 @@ impl ::buffa::Enumeration for PolicyClass {
             Self::WITHDRAW_VALIDATE,
             Self::GUARD_SIGN,
             Self::SOCIAL_PROVIDER,
+            Self::ASSISTANT_MESSAGE,
+            Self::ASSISTANT_CONTROL,
+            Self::ASSISTANT_READ,
         ]
     }
 }

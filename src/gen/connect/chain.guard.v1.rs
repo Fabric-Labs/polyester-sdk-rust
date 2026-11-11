@@ -362,7 +362,10 @@ pub trait GuardSignerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Handle the GetGuardSignerStatus RPC.
+    /// Return stored and live guard signer status. An API key needs
+    /// READ_GUARD_SIGNER_STATUS and reads only within its own main account: a
+    /// sub-account another main account owns is refused, even when that main
+    /// account shares it.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

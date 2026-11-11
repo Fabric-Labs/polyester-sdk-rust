@@ -398,9 +398,11 @@ pub enum AutoWithdrawRunState {
     RUN_PAYING = 2i32,
     /// Every payout completed or was skipped, and at least one paid.
     RUN_COMPLETED = 3i32,
-    /// Some payouts failed; their funds are back on the account.
+    /// Some payouts failed. Each failed step says where its funds are
+    /// (STEP_FAILED).
     RUN_PARTIALLY_FAILED = 4i32,
-    /// Every attempted payout failed; the funds are back on the account.
+    /// Every attempted payout failed. Each failed step says where its funds are
+    /// (STEP_FAILED).
     RUN_FAILED = 5i32,
     /// Nothing was paid: every asset was below its minimum, no current price
     /// valued it, or the rule was no longer current.
@@ -592,7 +594,16 @@ pub enum AutoWithdrawStepState {
     STEP_SUBMITTED = 3i32,
     /// The withdrawal completed on chain.
     STEP_COMPLETED = 4i32,
-    /// The withdrawal failed; its funds are back on the account.
+    /// The withdrawal failed. Where its funds are depends on when it failed,
+    /// which its withdrawal flow shows:
+    /// - before it left the account: they stay on the account;
+    /// - rejected by Zipper (flow REFUNDED, reason ZIPPER_VALIDATION_REJECTED or
+    ///   ZIPPER_EXECUTION_REJECTED): amount_e18 less network_fee_e18 is
+    ///   refunded, as zTokens, to the account's smart account wallet, not to
+    ///   the account's balance, and the network fee is not refunded;
+    /// - its execution failed after its destination transaction was sent (flow
+    ///   FAILED, reason ZIPPER_WITHDRAW_EXECUTION_FAILED): Zipper reviews it and
+    ///   settles it outside Polyester Chain; nothing is returned to the account.
     STEP_FAILED = 5i32,
     /// Nothing was paid for this asset in this run.
     STEP_SKIPPED = 6i32,
@@ -764,6 +775,192 @@ impl ::buffa::Enumeration for AutoWithdrawStepState {
             Self::STEP_COMPLETED,
             Self::STEP_FAILED,
             Self::STEP_SKIPPED,
+        ]
+    }
+}
+/// AutoWithdrawPreviewStatus is whether the next run would pay, judged from
+/// the account's balances now.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AutoWithdrawPreviewStatus {
+    /// Never returned.
+    PREVIEW_STATUS_UNSPECIFIED = 0i32,
+    /// At least one asset would pay.
+    WILL_PAY = 1i32,
+    /// Nothing would pay: every asset with a destination is below its minimum
+    /// or the rule's USD minimum, has no current price for that minimum, or
+    /// pays a broker vault's destination that is still cooling down. The
+    /// balance stays on the account for a later run.
+    ROLLS_OVER = 2i32,
+    /// Nothing would pay, and every positive balance is in an asset the rule
+    /// has no destination for.
+    NO_DESTINATION = 3i32,
+    /// The rule is paused, by a person or by itself (see pause); no run starts
+    /// until it is resumed.
+    PAUSED = 4i32,
+    /// The account has no rule.
+    NO_RULE = 5i32,
+}
+impl AutoWithdrawPreviewStatus {
+    ///Idiomatic alias for [`Self::PREVIEW_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PreviewStatusUnspecified: Self = Self::PREVIEW_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::WILL_PAY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const WillPay: Self = Self::WILL_PAY;
+    ///Idiomatic alias for [`Self::ROLLS_OVER`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RollsOver: Self = Self::ROLLS_OVER;
+    ///Idiomatic alias for [`Self::NO_DESTINATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NoDestination: Self = Self::NO_DESTINATION;
+    ///Idiomatic alias for [`Self::PAUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Paused: Self = Self::PAUSED;
+    ///Idiomatic alias for [`Self::NO_RULE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NoRule: Self = Self::NO_RULE;
+}
+impl ::core::default::Default for AutoWithdrawPreviewStatus {
+    fn default() -> Self {
+        Self::PREVIEW_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AutoWithdrawPreviewStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AutoWithdrawPreviewStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AutoWithdrawPreviewStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(AutoWithdrawPreviewStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AutoWithdrawPreviewStatus, E> {
+                <AutoWithdrawPreviewStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AutoWithdrawPreviewStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AutoWithdrawPreviewStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AutoWithdrawPreviewStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AutoWithdrawPreviewStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AutoWithdrawPreviewStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AutoWithdrawPreviewStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AutoWithdrawPreviewStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PREVIEW_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::WILL_PAY),
+            2i32 => ::core::option::Option::Some(Self::ROLLS_OVER),
+            3i32 => ::core::option::Option::Some(Self::NO_DESTINATION),
+            4i32 => ::core::option::Option::Some(Self::PAUSED),
+            5i32 => ::core::option::Option::Some(Self::NO_RULE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PREVIEW_STATUS_UNSPECIFIED => "PREVIEW_STATUS_UNSPECIFIED",
+            Self::WILL_PAY => "WILL_PAY",
+            Self::ROLLS_OVER => "ROLLS_OVER",
+            Self::NO_DESTINATION => "NO_DESTINATION",
+            Self::PAUSED => "PAUSED",
+            Self::NO_RULE => "NO_RULE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PREVIEW_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PREVIEW_STATUS_UNSPECIFIED)
+            }
+            "WILL_PAY" => ::core::option::Option::Some(Self::WILL_PAY),
+            "ROLLS_OVER" => ::core::option::Option::Some(Self::ROLLS_OVER),
+            "NO_DESTINATION" => ::core::option::Option::Some(Self::NO_DESTINATION),
+            "PAUSED" => ::core::option::Option::Some(Self::PAUSED),
+            "NO_RULE" => ::core::option::Option::Some(Self::NO_RULE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::PREVIEW_STATUS_UNSPECIFIED,
+            Self::WILL_PAY,
+            Self::ROLLS_OVER,
+            Self::NO_DESTINATION,
+            Self::PAUSED,
+            Self::NO_RULE,
         ]
     }
 }
@@ -1079,7 +1276,7 @@ pub struct AutoWithdrawDestination {
     /// A run pays this asset only when the payable amount reaches this
     /// minimum, in 18-decimal asset units, and the rule's min_usd_value_e18;
     /// otherwise the balance stays on the account for a later run. Must be at
-    /// least the route's withdrawal minimum.
+    /// least min_floor_e18 when the rule is set.
     ///
     /// Field 4: `min_amount_e18`
     #[serde(
@@ -1103,6 +1300,24 @@ pub struct AutoWithdrawDestination {
     pub max_amount_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// Returned in responses only; ignored in requests. The least amount one
+    /// payout to this destination can pay now, in 18-decimal asset units: the
+    /// route's withdrawal minimum, and more than its current network fee. It
+    /// follows the network fee, so it can change between reads. A run pays at
+    /// least this floor and min_amount_e18, and a new rule needs a
+    /// min_amount_e18 of at least the floor. Unset when the route or its network
+    /// fee is not known now; a new rule for that destination is then refused
+    /// with FEE_UNAVAILABLE or a route code.
+    ///
+    /// Field 6: `min_floor_e18`
+    #[serde(
+        rename = "minFloorE18",
+        alias = "min_floor_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub min_floor_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1115,6 +1330,7 @@ impl ::core::fmt::Debug for AutoWithdrawDestination {
             .field("destination_address", &self.destination_address)
             .field("min_amount_e18", &self.min_amount_e18)
             .field("max_amount_e18", &self.max_amount_e18)
+            .field("min_floor_e18", &self.min_floor_e18)
             .finish()
     }
 }
@@ -1174,6 +1390,14 @@ impl ::buffa::Message for AutoWithdrawDestination {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.min_floor_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.min_floor_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1200,6 +1424,10 @@ impl ::buffa::Message for AutoWithdrawDestination {
         if self.max_amount_e18.is_set() {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             self.max_amount_e18.write_to(__cache, buf);
+        }
+        if self.min_floor_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.min_floor_e18.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1257,6 +1485,17 @@ impl ::buffa::Message for AutoWithdrawDestination {
                     ctx,
                 )?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.min_floor_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1270,6 +1509,7 @@ impl ::buffa::Message for AutoWithdrawDestination {
         self.destination_address.clear();
         self.min_amount_e18 = ::buffa::MessageField::none();
         self.max_amount_e18 = ::buffa::MessageField::none();
+        self.min_floor_e18 = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1307,7 +1547,7 @@ pub const __AUTO_WITHDRAW_DESTINATION_JSON_ANY: ::buffa::type_registry::JsonAnyE
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct AutoWithdrawPause {
-    /// Asset whose payout paused the rule.
+    /// Asset whose payout paused the rule; zero when no payout did.
     ///
     /// Field 1: `asset_id`
     #[serde(
@@ -1321,7 +1561,11 @@ pub struct AutoWithdrawPause {
     /// destination left the account's external withdraw whitelist,
     /// destination_invalid when it is no longer a valid destination, or
     /// authority_revoked when the person who set the rule may no longer change
-    /// it or withdraw from the account.
+    /// it or withdraw from the account. On a broker vault the rule pauses with
+    /// authority_revoked as soon as its author's broker role changes in any
+    /// way: removed, demoted, or promoted (for example Finance to Owner), and
+    /// also when the author is removed and added back. An Owner or Finance
+    /// member resumes it with a fresh step-up.
     ///
     /// Field 2: `reason`
     #[serde(
@@ -1493,9 +1737,9 @@ pub const __AUTO_WITHDRAW_PAUSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     is_wkt: false,
 };
 /// AutoWithdrawRule is one version of an account's auto-withdraw rule. Each
-/// change or disable creates the next version; only the latest version runs,
-/// and a run in progress keeps the version it started with but pays nothing
-/// further once that version is no longer the latest.
+/// change, pause or resume creates the next version; only the latest version
+/// runs, and a run in progress keeps the version it started with but pays
+/// nothing further once that version is no longer the latest.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -1519,7 +1763,9 @@ pub struct AutoWithdrawRule {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub version: u32,
-    /// Whether the rule runs. A disabled version has no destinations.
+    /// Whether the rule runs. A paused version (enabled false) keeps its
+    /// schedule and destinations, so it resumes to the same destinations. The
+    /// rule runs only while enabled and without a pause.
     ///
     /// Field 3: `enabled`
     #[serde(
@@ -1536,7 +1782,8 @@ pub struct AutoWithdrawRule {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub schedule: ::buffa::MessageField<AutoWithdrawSchedule>,
-    /// One destination per paid asset, ordered by asset_id.
+    /// One destination per paid asset, ordered by asset_id. Empty only on a
+    /// version that was disabled before pausing kept destinations.
     ///
     /// Field 5: `destinations`
     #[serde(
@@ -1554,7 +1801,8 @@ pub struct AutoWithdrawRule {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub created_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Set when the rule paused itself; a new version resumes it.
+    /// Set when the rule paused itself; resuming it or setting a new rule
+    /// clears it.
     ///
     /// Field 7: `pause`
     #[serde(
@@ -1574,6 +1822,16 @@ pub struct AutoWithdrawRule {
     pub min_usd_value_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// Public account ID of the person who created this version.
+    ///
+    /// Field 9: `created_by_account_id`
+    #[serde(
+        rename = "createdByAccountId",
+        alias = "created_by_account_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub created_by_account_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1589,6 +1847,7 @@ impl ::core::fmt::Debug for AutoWithdrawRule {
             .field("created_at", &self.created_at)
             .field("pause", &self.pause)
             .field("min_usd_value_e18", &self.min_usd_value_e18)
+            .field("created_by_account_id", &self.created_by_account_id)
             .finish()
     }
 }
@@ -1666,6 +1925,9 @@ impl ::buffa::Message for AutoWithdrawRule {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.created_by_account_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1704,6 +1966,9 @@ impl ::buffa::Message for AutoWithdrawRule {
         if self.min_usd_value_e18.is_set() {
             ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
             self.min_usd_value_e18.write_to(__cache, buf);
+        }
+        if self.created_by_account_id != 0u64 {
+            ::buffa::types::put_fixed64_field(9u32, self.created_by_account_id, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1792,6 +2057,13 @@ impl ::buffa::Message for AutoWithdrawRule {
                     ctx,
                 )?;
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.created_by_account_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1808,6 +2080,7 @@ impl ::buffa::Message for AutoWithdrawRule {
         self.created_at = ::buffa::MessageField::none();
         self.pause = ::buffa::MessageField::none();
         self.min_usd_value_e18 = ::buffa::MessageField::none();
+        self.created_by_account_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2238,12 +2511,12 @@ pub const __SET_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY: ::buffa::type_registry::Js
     from_json: ::buffa::type_registry::any_from_json::<SetAutoWithdrawRuleResponse>,
     is_wkt: false,
 };
-/// DisableAutoWithdrawRuleRequest stops the rule of the root account or one
-/// subaccount.
+/// SetAutoWithdrawRuleEnabledRequest pauses or resumes the rule of the root
+/// account or one subaccount, keeping its schedule and destinations.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DisableAutoWithdrawRuleRequest {
+pub struct SetAutoWithdrawRuleEnabledRequest {
     /// Public subaccount ID; omit for the root account.
     ///
     /// Field 1: `subaccount_id`
@@ -2254,7 +2527,8 @@ pub struct DisableAutoWithdrawRuleRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
-    /// The account's latest rule version.
+    /// The account's latest rule version. A mismatch is rejected so concurrent
+    /// changes never overwrite each other.
     ///
     /// Field 2: `expected_version`
     #[serde(
@@ -2264,33 +2538,43 @@ pub struct DisableAutoWithdrawRuleRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub expected_version: u32,
+    /// false pauses the rule; true resumes it.
+    ///
+    /// Field 3: `enabled`
+    #[serde(
+        rename = "enabled",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub enabled: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DisableAutoWithdrawRuleRequest {
+impl ::core::fmt::Debug for SetAutoWithdrawRuleEnabledRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DisableAutoWithdrawRuleRequest")
+        f.debug_struct("SetAutoWithdrawRuleEnabledRequest")
             .field("subaccount_id", &self.subaccount_id)
             .field("expected_version", &self.expected_version)
+            .field("enabled", &self.enabled)
             .finish()
     }
 }
-impl DisableAutoWithdrawRuleRequest {
+impl SetAutoWithdrawRuleEnabledRequest {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
 }
-::buffa::impl_default_instance!(DisableAutoWithdrawRuleRequest);
-impl ::buffa::MessageName for DisableAutoWithdrawRuleRequest {
+::buffa::impl_default_instance!(SetAutoWithdrawRuleEnabledRequest);
+impl ::buffa::MessageName for SetAutoWithdrawRuleEnabledRequest {
     const PACKAGE: &'static str = "chain.withdraw.v1";
-    const NAME: &'static str = "DisableAutoWithdrawRuleRequest";
-    const FULL_NAME: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
+    const NAME: &'static str = "SetAutoWithdrawRuleEnabledRequest";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
 }
-impl ::buffa::Message for DisableAutoWithdrawRuleRequest {
+impl ::buffa::Message for SetAutoWithdrawRuleEnabledRequest {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -2309,6 +2593,9 @@ impl ::buffa::Message for DisableAutoWithdrawRuleRequest {
                 += 1u32
                     + ::buffa::types::uint32_encoded_len(self.expected_version) as u32;
         }
+        if self.enabled {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2324,6 +2611,9 @@ impl ::buffa::Message for DisableAutoWithdrawRuleRequest {
         }
         if self.expected_version != 0u32 {
             ::buffa::types::put_uint32_field(2u32, self.expected_version, buf);
+        }
+        if self.enabled {
+            ::buffa::types::put_bool_field(3u32, self.enabled, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2352,6 +2642,13 @@ impl ::buffa::Message for DisableAutoWithdrawRuleRequest {
                 )?;
                 self.expected_version = ::buffa::types::decode_uint32(buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.enabled = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2362,11 +2659,12 @@ impl ::buffa::Message for DisableAutoWithdrawRuleRequest {
     fn clear(&mut self) {
         self.subaccount_id = 0u64;
         self.expected_version = 0u32;
+        self.enabled = false;
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DisableAutoWithdrawRuleRequest {
-    const PROTO_FQN: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
+impl ::buffa::ExtensionSet for SetAutoWithdrawRuleEnabledRequest {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -2374,7 +2672,7 @@ impl ::buffa::ExtensionSet for DisableAutoWithdrawRuleRequest {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DisableAutoWithdrawRuleRequest {
+impl ::buffa::json_helpers::ProtoElemJson for SetAutoWithdrawRuleEnabledRequest {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -2388,18 +2686,21 @@ impl ::buffa::json_helpers::ProtoElemJson for DisableAutoWithdrawRuleRequest {
     }
 }
 #[doc(hidden)]
-pub const __DISABLE_AUTO_WITHDRAW_RULE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleRequest",
-    to_json: ::buffa::type_registry::any_to_json::<DisableAutoWithdrawRuleRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<DisableAutoWithdrawRuleRequest>,
+pub const __SET_AUTO_WITHDRAW_RULE_ENABLED_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetAutoWithdrawRuleEnabledRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        SetAutoWithdrawRuleEnabledRequest,
+    >,
     is_wkt: false,
 };
-/// DisableAutoWithdrawRuleResponse returns the disabled version.
+/// SetAutoWithdrawRuleEnabledResponse returns the rule's latest version.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
-pub struct DisableAutoWithdrawRuleResponse {
-    /// The created, disabled version.
+pub struct SetAutoWithdrawRuleEnabledResponse {
+    /// The created version, or the latest version unchanged when the rule was
+    /// already in the requested state.
     ///
     /// Field 1: `rule`
     #[serde(
@@ -2411,28 +2712,28 @@ pub struct DisableAutoWithdrawRuleResponse {
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
-impl ::core::fmt::Debug for DisableAutoWithdrawRuleResponse {
+impl ::core::fmt::Debug for SetAutoWithdrawRuleEnabledResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("DisableAutoWithdrawRuleResponse")
+        f.debug_struct("SetAutoWithdrawRuleEnabledResponse")
             .field("rule", &self.rule)
             .finish()
     }
 }
-impl DisableAutoWithdrawRuleResponse {
+impl SetAutoWithdrawRuleEnabledResponse {
     /// Protobuf type URL for this message, for use with `Any::pack` and
     /// `Any::unpack_if`.
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
 }
-::buffa::impl_default_instance!(DisableAutoWithdrawRuleResponse);
-impl ::buffa::MessageName for DisableAutoWithdrawRuleResponse {
+::buffa::impl_default_instance!(SetAutoWithdrawRuleEnabledResponse);
+impl ::buffa::MessageName for SetAutoWithdrawRuleEnabledResponse {
     const PACKAGE: &'static str = "chain.withdraw.v1";
-    const NAME: &'static str = "DisableAutoWithdrawRuleResponse";
-    const FULL_NAME: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
+    const NAME: &'static str = "SetAutoWithdrawRuleEnabledResponse";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
 }
-impl ::buffa::Message for DisableAutoWithdrawRuleResponse {
+impl ::buffa::Message for SetAutoWithdrawRuleEnabledResponse {
     /// Returns the total encoded size in bytes.
     ///
     /// The result is a `u32`; the protobuf specification requires all
@@ -2501,8 +2802,8 @@ impl ::buffa::Message for DisableAutoWithdrawRuleResponse {
         self.__buffa_unknown_fields.clear();
     }
 }
-impl ::buffa::ExtensionSet for DisableAutoWithdrawRuleResponse {
-    const PROTO_FQN: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
+impl ::buffa::ExtensionSet for SetAutoWithdrawRuleEnabledResponse {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
     fn unknown_fields(&self) -> &::buffa::UnknownFields {
         &self.__buffa_unknown_fields
     }
@@ -2510,7 +2811,7 @@ impl ::buffa::ExtensionSet for DisableAutoWithdrawRuleResponse {
         &mut self.__buffa_unknown_fields
     }
 }
-impl ::buffa::json_helpers::ProtoElemJson for DisableAutoWithdrawRuleResponse {
+impl ::buffa::json_helpers::ProtoElemJson for SetAutoWithdrawRuleEnabledResponse {
     fn serialize_proto_json<S: ::serde::Serializer>(
         v: &Self,
         s: S,
@@ -2524,10 +2825,12 @@ impl ::buffa::json_helpers::ProtoElemJson for DisableAutoWithdrawRuleResponse {
     }
 }
 #[doc(hidden)]
-pub const __DISABLE_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleResponse",
-    to_json: ::buffa::type_registry::any_to_json::<DisableAutoWithdrawRuleResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<DisableAutoWithdrawRuleResponse>,
+pub const __SET_AUTO_WITHDRAW_RULE_ENABLED_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetAutoWithdrawRuleEnabledResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        SetAutoWithdrawRuleEnabledResponse,
+    >,
     is_wkt: false,
 };
 /// GetAutoWithdrawRuleRequest reads the latest rule version.
@@ -2864,9 +3167,11 @@ pub struct AutoWithdrawStep {
     /// Machine-readable reason for a skipped or failed step, such as
     /// below_minimum, price_unavailable (the rule has a USD minimum and no
     /// current price valued the asset; the funds stay for a later run),
-    /// rule_superseded, destination_not_whitelisted, authority_revoked,
-    /// gateway_capacity_insufficient (the funds stay for a later run),
-    /// withdrawal_released or withdrawal_failed; empty otherwise.
+    /// rule_superseded, destination_not_whitelisted, destination_cooling_down
+    /// (a broker vault's destination added to its external withdraw whitelist
+    /// less than 24 hours ago; the funds stay for a later run),
+    /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
+    /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
     ///
     /// Field 7: `reason`
     #[serde(
@@ -2909,6 +3214,22 @@ pub struct AutoWithdrawStep {
     pub value_usd_e18: ::buffa::MessageField<
         super::super::super::polyester::r#type::v1::U128,
     >,
+    /// The network fee charged on the withdrawal, in 18-decimal asset units.
+    /// Once it completed: taken out of amount_e18, so the destination received
+    /// amount_e18 minus this fee. Once Zipper rejected it or its execution
+    /// failed: the fee Zipper kept, which is not refunded. Unset until the step
+    /// is final, when it was skipped or failed before it reached Zipper, and
+    /// when the fee was not reported.
+    ///
+    /// Field 11: `network_fee_e18`
+    #[serde(
+        rename = "networkFeeE18",
+        alias = "network_fee_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub network_fee_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2926,6 +3247,7 @@ impl ::core::fmt::Debug for AutoWithdrawStep {
             .field("intent_id", &self.intent_id)
             .field("tx_hash", &self.tx_hash)
             .field("value_usd_e18", &self.value_usd_e18)
+            .field("network_fee_e18", &self.network_fee_e18)
             .finish()
     }
 }
@@ -3008,6 +3330,14 @@ impl ::buffa::Message for AutoWithdrawStep {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.network_fee_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.network_fee_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3053,6 +3383,10 @@ impl ::buffa::Message for AutoWithdrawStep {
         if self.value_usd_e18.is_set() {
             ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
             self.value_usd_e18.write_to(__cache, buf);
+        }
+        if self.network_fee_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(11u32, __cache.consume_next(), buf);
+            self.network_fee_e18.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3151,6 +3485,17 @@ impl ::buffa::Message for AutoWithdrawStep {
                     ctx,
                 )?;
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.network_fee_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3169,6 +3514,7 @@ impl ::buffa::Message for AutoWithdrawStep {
         self.intent_id.clear();
         self.tx_hash.clear();
         self.value_usd_e18 = ::buffa::MessageField::none();
+        self.network_fee_e18 = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3888,6 +4234,1027 @@ pub const __LIST_AUTO_WITHDRAW_RUNS_RESPONSE_JSON_ANY: ::buffa::type_registry::J
     from_json: ::buffa::type_registry::any_from_json::<ListAutoWithdrawRunsResponse>,
     is_wkt: false,
 };
+/// PreviewAutoWithdrawRunRequest previews the next run of the rule of the
+/// root account or one subaccount.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PreviewAutoWithdrawRunRequest {
+    /// Public subaccount ID; omit for the root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PreviewAutoWithdrawRunRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PreviewAutoWithdrawRunRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
+    }
+}
+impl PreviewAutoWithdrawRunRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+}
+::buffa::impl_default_instance!(PreviewAutoWithdrawRunRequest);
+impl ::buffa::MessageName for PreviewAutoWithdrawRunRequest {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "PreviewAutoWithdrawRunRequest";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+}
+impl ::buffa::Message for PreviewAutoWithdrawRunRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PreviewAutoWithdrawRunRequest {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PreviewAutoWithdrawRunRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREVIEW_AUTO_WITHDRAW_RUN_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunRequest",
+    to_json: ::buffa::type_registry::any_to_json::<PreviewAutoWithdrawRunRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<PreviewAutoWithdrawRunRequest>,
+    is_wkt: false,
+};
+/// AutoWithdrawPreviewAsset is what the next run would do with one asset,
+/// sized from the account's balance now.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AutoWithdrawPreviewAsset {
+    /// Ledger asset.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// External destination chain identifier; zero when the rule has no
+    /// destination for the asset.
+    ///
+    /// Field 2: `destination_chain_id`
+    #[serde(
+        rename = "destinationChainId",
+        alias = "destination_chain_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub destination_chain_id: u64,
+    /// Canonical destination address; empty when the rule has no destination
+    /// for the asset.
+    ///
+    /// Field 3: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    /// The account's available balance of the asset now, in 18-decimal asset
+    /// units.
+    ///
+    /// Field 4: `available_e18`
+    #[serde(
+        rename = "availableE18",
+        alias = "available_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub available_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// What the run would pay, in 18-decimal asset units: the available balance
+    /// up to max_amount_e18, rounded down to whole on-chain units, or zero when
+    /// it holds. The network fee is taken out of it on the way.
+    ///
+    /// Field 5: `payable_e18`
+    #[serde(
+        rename = "payableE18",
+        alias = "payable_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payable_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// What would stay on the account, in 18-decimal asset units:
+    /// available_e18 minus payable_e18.
+    ///
+    /// Field 6: `held_back_e18`
+    #[serde(
+        rename = "heldBackE18",
+        alias = "held_back_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub held_back_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Why held_back_e18 stays, or why nothing pays: below_minimum (below
+    /// minimum_e18 or the rule's min_usd_value_e18), price_unavailable (the
+    /// rule has a USD minimum and no current price values the asset),
+    /// no_destination (the rule pays no destination for the asset),
+    /// destination_cooling_down (a broker vault pays a destination only once
+    /// it has been on the vault's external withdraw whitelist for 24 hours;
+    /// see payable_from), above_max (the balance above max_amount_e18 stays)
+    /// or dust (less than one whole on-chain unit stays); empty when the whole
+    /// balance pays.
+    ///
+    /// Field 7: `hold_reason`
+    #[serde(
+        rename = "holdReason",
+        alias = "hold_reason",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub hold_reason: ::buffa::alloc::string::String,
+    /// The least one payout of the asset pays, in 18-decimal asset units: the
+    /// destination's min_amount_e18, or its min_floor_e18 when that is higher
+    /// and known now. Unset when the rule has no destination for the asset.
+    ///
+    /// Field 8: `minimum_e18`
+    #[serde(
+        rename = "minimumE18",
+        alias = "minimum_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub minimum_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// USD value, in 18-decimal USD units, of what the asset pays before its
+    /// minimums (the available balance up to max_amount_e18, rounded down to
+    /// whole on-chain units), at the current price as of priced_at. A rule with
+    /// a USD minimum compares this value with it. Unset when no current price
+    /// values the asset or the rule has no destination for it.
+    ///
+    /// Field 9: `value_usd_e18`
+    #[serde(
+        rename = "valueUsdE18",
+        alias = "value_usd_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub value_usd_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// When the price behind value_usd_e18 was observed; unset with it.
+    ///
+    /// Field 10: `priced_at`
+    #[serde(
+        rename = "pricedAt",
+        alias = "priced_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub priced_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// The network fee a payout to the destination is expected to be charged
+    /// now, in 18-decimal asset units: the route's latest sampled network fee,
+    /// the same figure min_floor_e18 stays above. It is taken out of the
+    /// payout, so the destination receives about payable_e18 minus this fee.
+    /// Unset when the rule has no destination for the asset or the fee is not
+    /// known now.
+    ///
+    /// Field 11: `network_fee_e18`
+    #[serde(
+        rename = "networkFeeE18",
+        alias = "network_fee_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub network_fee_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// When network_fee_e18 was sampled; unset with it.
+    ///
+    /// Field 12: `network_fee_sampled_at`
+    #[serde(
+        rename = "networkFeeSampledAt",
+        alias = "network_fee_sampled_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub network_fee_sampled_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
+    /// Set only on a broker vault while the destination is cooling down: when
+    /// it can be paid, 24 hours after it was added to the vault's external
+    /// withdraw whitelist. Unset with hold_reason destination_cooling_down
+    /// when that time is not known yet.
+    ///
+    /// Field 13: `payable_from`
+    #[serde(
+        rename = "payableFrom",
+        alias = "payable_from",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payable_from: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AutoWithdrawPreviewAsset {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AutoWithdrawPreviewAsset")
+            .field("asset_id", &self.asset_id)
+            .field("destination_chain_id", &self.destination_chain_id)
+            .field("destination_address", &self.destination_address)
+            .field("available_e18", &self.available_e18)
+            .field("payable_e18", &self.payable_e18)
+            .field("held_back_e18", &self.held_back_e18)
+            .field("hold_reason", &self.hold_reason)
+            .field("minimum_e18", &self.minimum_e18)
+            .field("value_usd_e18", &self.value_usd_e18)
+            .field("priced_at", &self.priced_at)
+            .field("network_fee_e18", &self.network_fee_e18)
+            .field("network_fee_sampled_at", &self.network_fee_sampled_at)
+            .field("payable_from", &self.payable_from)
+            .finish()
+    }
+}
+impl AutoWithdrawPreviewAsset {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewAsset";
+}
+::buffa::impl_default_instance!(AutoWithdrawPreviewAsset);
+impl ::buffa::MessageName for AutoWithdrawPreviewAsset {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "AutoWithdrawPreviewAsset";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewAsset";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewAsset";
+}
+impl ::buffa::Message for AutoWithdrawPreviewAsset {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.destination_chain_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.destination_chain_id)
+                        as u32;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        if self.available_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.available_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payable_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payable_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.held_back_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.held_back_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.hold_reason.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.hold_reason) as u32;
+        }
+        if self.minimum_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.minimum_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.value_usd_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.value_usd_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.priced_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.priced_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.network_fee_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.network_fee_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.network_fee_sampled_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.network_fee_sampled_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payable_from.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payable_from.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.destination_chain_id != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.destination_chain_id, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.destination_address, buf);
+        }
+        if self.available_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.available_e18.write_to(__cache, buf);
+        }
+        if self.payable_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.payable_e18.write_to(__cache, buf);
+        }
+        if self.held_back_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.held_back_e18.write_to(__cache, buf);
+        }
+        if !self.hold_reason.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.hold_reason, buf);
+        }
+        if self.minimum_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
+            self.minimum_e18.write_to(__cache, buf);
+        }
+        if self.value_usd_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            self.value_usd_e18.write_to(__cache, buf);
+        }
+        if self.priced_at.is_set() {
+            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            self.priced_at.write_to(__cache, buf);
+        }
+        if self.network_fee_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(11u32, __cache.consume_next(), buf);
+            self.network_fee_e18.write_to(__cache, buf);
+        }
+        if self.network_fee_sampled_at.is_set() {
+            ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
+            self.network_fee_sampled_at.write_to(__cache, buf);
+        }
+        if self.payable_from.is_set() {
+            ::buffa::types::put_len_delimited_header(13u32, __cache.consume_next(), buf);
+            self.payable_from.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.destination_chain_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.available_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payable_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.held_back_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.hold_reason, buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.minimum_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.value_usd_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.priced_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.network_fee_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.network_fee_sampled_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payable_from.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.destination_chain_id = 0u64;
+        self.destination_address.clear();
+        self.available_e18 = ::buffa::MessageField::none();
+        self.payable_e18 = ::buffa::MessageField::none();
+        self.held_back_e18 = ::buffa::MessageField::none();
+        self.hold_reason.clear();
+        self.minimum_e18 = ::buffa::MessageField::none();
+        self.value_usd_e18 = ::buffa::MessageField::none();
+        self.priced_at = ::buffa::MessageField::none();
+        self.network_fee_e18 = ::buffa::MessageField::none();
+        self.network_fee_sampled_at = ::buffa::MessageField::none();
+        self.payable_from = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AutoWithdrawPreviewAsset {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewAsset";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AutoWithdrawPreviewAsset {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __AUTO_WITHDRAW_PREVIEW_ASSET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewAsset",
+    to_json: ::buffa::type_registry::any_to_json::<AutoWithdrawPreviewAsset>,
+    from_json: ::buffa::type_registry::any_from_json::<AutoWithdrawPreviewAsset>,
+    is_wkt: false,
+};
+/// PreviewAutoWithdrawRunResponse previews the next run.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PreviewAutoWithdrawRunResponse {
+    /// Whether the next run would pay.
+    ///
+    /// Field 1: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<AutoWithdrawPreviewStatus>,
+    /// When the next run starts: its UTC slot, or, while a due slot waits for
+    /// the scheduler, that slot. For an hourly rule, the next hourly check.
+    /// Unset when the account has no rule or the rule is paused.
+    ///
+    /// Field 2: `next_run_at`
+    #[serde(
+        rename = "nextRunAt",
+        alias = "next_run_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub next_run_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// The latest rule version; zero when the account has no rule.
+    ///
+    /// Field 3: `rule_version`
+    #[serde(
+        rename = "ruleVersion",
+        alias = "rule_version",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub rule_version: u32,
+    /// Set when the rule paused itself; a rule paused by a person has none.
+    ///
+    /// Field 4: `pause`
+    #[serde(
+        rename = "pause",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub pause: ::buffa::MessageField<AutoWithdrawPause>,
+    /// The rule's least USD value of one payout, in 18-decimal USD units; zero
+    /// means no USD minimum. Unset when the account has no rule.
+    ///
+    /// Field 5: `min_usd_value_e18`
+    #[serde(
+        rename = "minUsdValueE18",
+        alias = "min_usd_value_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub min_usd_value_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// One entry per destination of the rule, then per other asset with a
+    /// positive balance, ordered by asset_id. Empty when the account has no
+    /// rule or the rule is paused.
+    ///
+    /// Field 6: `assets`
+    #[serde(
+        rename = "assets",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub assets: ::buffa::alloc::vec::Vec<AutoWithdrawPreviewAsset>,
+    /// When the balances, prices and fees the preview used were read.
+    ///
+    /// Field 7: `computed_at`
+    #[serde(
+        rename = "computedAt",
+        alias = "computed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub computed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PreviewAutoWithdrawRunResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PreviewAutoWithdrawRunResponse")
+            .field("status", &self.status)
+            .field("next_run_at", &self.next_run_at)
+            .field("rule_version", &self.rule_version)
+            .field("pause", &self.pause)
+            .field("min_usd_value_e18", &self.min_usd_value_e18)
+            .field("assets", &self.assets)
+            .field("computed_at", &self.computed_at)
+            .finish()
+    }
+}
+impl PreviewAutoWithdrawRunResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+}
+::buffa::impl_default_instance!(PreviewAutoWithdrawRunResponse);
+impl ::buffa::MessageName for PreviewAutoWithdrawRunResponse {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "PreviewAutoWithdrawRunResponse";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+}
+impl ::buffa::Message for PreviewAutoWithdrawRunResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.next_run_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.next_run_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.rule_version != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.rule_version) as u32;
+        }
+        if self.pause.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.pause.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.min_usd_value_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.min_usd_value_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.assets {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.computed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.computed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.next_run_at.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.next_run_at.write_to(__cache, buf);
+        }
+        if self.rule_version != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.rule_version, buf);
+        }
+        if self.pause.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.pause.write_to(__cache, buf);
+        }
+        if self.min_usd_value_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.min_usd_value_e18.write_to(__cache, buf);
+        }
+        for v in &self.assets {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.computed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.computed_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.next_run_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.rule_version = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.pause.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.min_usd_value_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.assets.push(elem);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.computed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.status = ::buffa::EnumValue::from(0);
+        self.next_run_at = ::buffa::MessageField::none();
+        self.rule_version = 0u32;
+        self.pause = ::buffa::MessageField::none();
+        self.min_usd_value_e18 = ::buffa::MessageField::none();
+        self.assets.clear();
+        self.computed_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PreviewAutoWithdrawRunResponse {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PreviewAutoWithdrawRunResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PREVIEW_AUTO_WITHDRAW_RUN_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunResponse",
+    to_json: ::buffa::type_registry::any_to_json::<PreviewAutoWithdrawRunResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<PreviewAutoWithdrawRunResponse>,
+    is_wkt: false,
+};
 /// ErrorCode identifies stable, machine-readable Withdraw API errors.
 /// Values mirror the REST problem+json code field.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -3987,6 +5354,24 @@ pub enum ErrorCode {
     /// amount_e18 down to a whole number of that token's smallest units before
     /// signing.
     ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION = 44i32,
+    /// An auto-withdraw destination address is not a valid withdrawal
+    /// destination on its chain. ErrorDetail.field_path names the destination.
+    ERROR_CODE_DESTINATION_INVALID = 45i32,
+    /// An auto-withdraw destination's min_amount_e18 is below the least amount
+    /// a payout to it can pay. ErrorDetail.min_floor_e18 is that floor and
+    /// ErrorDetail.field_path names the field.
+    ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR = 46i32,
+    /// No enabled withdrawal route pays an auto-withdraw destination's asset to
+    /// its destination chain. ErrorDetail.field_path names the field.
+    ERROR_CODE_ROUTE_UNSUPPORTED = 47i32,
+    /// expected_version is not the auto-withdraw rule's latest version: another
+    /// change landed first. Read the rule again before retrying.
+    ERROR_CODE_VERSION_CONFLICT = 48i32,
+    /// A broker vault pays an external destination only once it has been on the
+    /// vault's external withdraw whitelist for 24 hours, and this one was added
+    /// more recently. ErrorDetail.payable_from is when it can be paid; unset
+    /// when that time is not known yet. Retry after it.
+    ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN = 49i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4124,6 +5509,21 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AmountExceedsRoutePrecision: Self = Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DESTINATION_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DestinationInvalid: Self = Self::ERROR_CODE_DESTINATION_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MinAmountBelowFloor: Self = Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ROUTE_UNSUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RouteUnsupported: Self = Self::ERROR_CODE_ROUTE_UNSUPPORTED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_VERSION_CONFLICT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const VersionConflict: Self = Self::ERROR_CODE_VERSION_CONFLICT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ExternalDestinationCoolingDown: Self = Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -4324,6 +5724,17 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
                 )
             }
+            45i32 => ::core::option::Option::Some(Self::ERROR_CODE_DESTINATION_INVALID),
+            46i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR)
+            }
+            47i32 => ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_UNSUPPORTED),
+            48i32 => ::core::option::Option::Some(Self::ERROR_CODE_VERSION_CONFLICT),
+            49i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4412,6 +5823,15 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION => {
                 "ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION"
+            }
+            Self::ERROR_CODE_DESTINATION_INVALID => "ERROR_CODE_DESTINATION_INVALID",
+            Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR => {
+                "ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR"
+            }
+            Self::ERROR_CODE_ROUTE_UNSUPPORTED => "ERROR_CODE_ROUTE_UNSUPPORTED",
+            Self::ERROR_CODE_VERSION_CONFLICT => "ERROR_CODE_VERSION_CONFLICT",
+            Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN => {
+                "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN"
             }
         }
     }
@@ -4576,6 +5996,23 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
                 )
             }
+            "ERROR_CODE_DESTINATION_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DESTINATION_INVALID)
+            }
+            "ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR)
+            }
+            "ERROR_CODE_ROUTE_UNSUPPORTED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_UNSUPPORTED)
+            }
+            "ERROR_CODE_VERSION_CONFLICT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_VERSION_CONFLICT)
+            }
+            "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4626,6 +6063,11 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CONFLICT,
             Self::ERROR_CODE_INVALID_AUTO_WITHDRAW_SCHEDULE,
             Self::ERROR_CODE_AMOUNT_EXCEEDS_ROUTE_PRECISION,
+            Self::ERROR_CODE_DESTINATION_INVALID,
+            Self::ERROR_CODE_MIN_AMOUNT_BELOW_FLOOR,
+            Self::ERROR_CODE_ROUTE_UNSUPPORTED,
+            Self::ERROR_CODE_VERSION_CONFLICT,
+            Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
         ]
     }
 }
@@ -5252,13 +6694,55 @@ pub struct ErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ErrorCode>,
+    /// Field the error is about, as a protobuf field path such as
+    /// destinations\[0\].min_amount_e18; empty when the error concerns no single
+    /// field. Usually a field of the request. A refused auto-withdraw resume
+    /// names a field of the stored rule instead, such as
+    /// destinations\[1\].destination_address of AutoWithdrawRule, which the
+    /// request does not carry.
+    ///
+    /// Field 2: `field_path`
+    #[serde(
+        rename = "fieldPath",
+        alias = "field_path",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub field_path: ::buffa::alloc::string::String,
+    /// Set only with MIN_AMOUNT_BELOW_FLOOR: the least amount, in 18-decimal
+    /// asset units, the destination's min_amount_e18 may be.
+    ///
+    /// Field 3: `min_floor_e18`
+    #[serde(
+        rename = "minFloorE18",
+        alias = "min_floor_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub min_floor_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Set only with EXTERNAL_DESTINATION_COOLING_DOWN, when known: the time
+    /// from which the destination can be paid.
+    ///
+    /// Field 4: `payable_from`
+    #[serde(
+        rename = "payableFrom",
+        alias = "payable_from",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payable_from: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ErrorDetail {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ErrorDetail").field("code", &self.code).finish()
+        f.debug_struct("ErrorDetail")
+            .field("code", &self.code)
+            .field("field_path", &self.field_path)
+            .field("min_floor_e18", &self.min_floor_e18)
+            .field("payable_from", &self.payable_from)
+            .finish()
     }
 }
 impl ErrorDetail {
@@ -5282,7 +6766,7 @@ impl ::buffa::Message for ErrorDetail {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -5292,12 +6776,31 @@ impl ::buffa::Message for ErrorDetail {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.field_path.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.field_path) as u32;
+        }
+        if self.min_floor_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.min_floor_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payable_from.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payable_from.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -5307,6 +6810,17 @@ impl ::buffa::Message for ErrorDetail {
             if val != 0 {
                 ::buffa::types::put_int32_field(1u32, val, buf);
             }
+        }
+        if !self.field_path.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.field_path, buf);
+        }
+        if self.min_floor_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.min_floor_e18.write_to(__cache, buf);
+        }
+        if self.payable_from.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.payable_from.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5328,6 +6842,35 @@ impl ::buffa::Message for ErrorDetail {
                 )?;
                 self.code = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
             }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.field_path, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.min_floor_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payable_from.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5337,6 +6880,9 @@ impl ::buffa::Message for ErrorDetail {
     }
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
+        self.field_path.clear();
+        self.min_floor_e18 = ::buffa::MessageField::none();
+        self.payable_from = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6488,6 +8034,548 @@ pub const __VALIDATE_WITHDRAW_DESTINATION_RESPONSE_JSON_ANY: ::buffa::type_regis
     >,
     is_wkt: false,
 };
+/// GetWalletBalancesRequest selects the account whose smart account wallet
+/// to read.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetWalletBalancesRequest {
+    /// Public subaccount ID; omit for the root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetWalletBalancesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetWalletBalancesRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
+    }
+}
+impl GetWalletBalancesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesRequest";
+}
+::buffa::impl_default_instance!(GetWalletBalancesRequest);
+impl ::buffa::MessageName for GetWalletBalancesRequest {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "GetWalletBalancesRequest";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.GetWalletBalancesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesRequest";
+}
+impl ::buffa::Message for GetWalletBalancesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetWalletBalancesRequest {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.GetWalletBalancesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetWalletBalancesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_WALLET_BALANCES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetWalletBalancesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetWalletBalancesRequest>,
+    is_wkt: false,
+};
+/// WalletBalance is one zToken the smart account wallet holds.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct WalletBalance {
+    /// Zipped asset of the zToken: the network-specific asset, as
+    /// chain.lifecycle.v1.AssetIds.zipped_asset_id names it.
+    ///
+    /// Field 1: `zipped_asset_id`
+    #[serde(
+        rename = "zippedAssetId",
+        alias = "zipped_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub zipped_asset_id: u32,
+    /// Unified asset the zToken stands for, as
+    /// chain.lifecycle.v1.AssetIds.unified_asset_id names it.
+    ///
+    /// Field 2: `unified_asset_id`
+    #[serde(
+        rename = "unifiedAssetId",
+        alias = "unified_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub unified_asset_id: u32,
+    /// External network of the zipped asset, as the `chain_id` of a chain
+    /// returned by `GetDepositWithdrawConfig`.
+    ///
+    /// Field 3: `chain_id`
+    #[serde(
+        rename = "chainId",
+        alias = "chain_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub chain_id: u32,
+    /// zToken contract address on Polyester Chain.
+    ///
+    /// Field 4: `ztoken_address`
+    #[serde(
+        rename = "ztokenAddress",
+        alias = "ztoken_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub ztoken_address: ::buffa::alloc::string::String,
+    /// Balance in 18-decimal units: every zToken has 18 decimals.
+    ///
+    /// Field 5: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for WalletBalance {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("WalletBalance")
+            .field("zipped_asset_id", &self.zipped_asset_id)
+            .field("unified_asset_id", &self.unified_asset_id)
+            .field("chain_id", &self.chain_id)
+            .field("ztoken_address", &self.ztoken_address)
+            .field("amount_e18", &self.amount_e18)
+            .finish()
+    }
+}
+impl WalletBalance {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.WalletBalance";
+}
+::buffa::impl_default_instance!(WalletBalance);
+impl ::buffa::MessageName for WalletBalance {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "WalletBalance";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.WalletBalance";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.WalletBalance";
+}
+impl ::buffa::Message for WalletBalance {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.zipped_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.zipped_asset_id) as u32;
+        }
+        if self.unified_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.unified_asset_id) as u32;
+        }
+        if self.chain_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.chain_id) as u32;
+        }
+        if !self.ztoken_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.ztoken_address) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.zipped_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.zipped_asset_id, buf);
+        }
+        if self.unified_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.unified_asset_id, buf);
+        }
+        if self.chain_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.chain_id, buf);
+        }
+        if !self.ztoken_address.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.ztoken_address, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.zipped_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.unified_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.chain_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.ztoken_address, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.zipped_asset_id = 0u32;
+        self.unified_asset_id = 0u32;
+        self.chain_id = 0u32;
+        self.ztoken_address.clear();
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for WalletBalance {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.WalletBalance";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WalletBalance {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __WALLET_BALANCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.WalletBalance",
+    to_json: ::buffa::type_registry::any_to_json::<WalletBalance>,
+    from_json: ::buffa::type_registry::any_from_json::<WalletBalance>,
+    is_wkt: false,
+};
+/// GetWalletBalancesResponse is the smart account wallet's zToken balances,
+/// read from Polyester Chain at its latest block.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetWalletBalancesResponse {
+    /// Smart account wallet whose balances these are.
+    ///
+    /// Field 1: `smart_account_address`
+    #[serde(
+        rename = "smartAccountAddress",
+        alias = "smart_account_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub smart_account_address: ::buffa::alloc::string::String,
+    /// Every zToken the wallet holds a nonzero balance of, ordered by
+    /// zipped_asset_id. Empty when it holds none.
+    ///
+    /// Field 2: `balances`
+    #[serde(
+        rename = "balances",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub balances: ::buffa::alloc::vec::Vec<WalletBalance>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetWalletBalancesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetWalletBalancesResponse")
+            .field("smart_account_address", &self.smart_account_address)
+            .field("balances", &self.balances)
+            .finish()
+    }
+}
+impl GetWalletBalancesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesResponse";
+}
+::buffa::impl_default_instance!(GetWalletBalancesResponse);
+impl ::buffa::MessageName for GetWalletBalancesResponse {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "GetWalletBalancesResponse";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.GetWalletBalancesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesResponse";
+}
+impl ::buffa::Message for GetWalletBalancesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.smart_account_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.smart_account_address)
+                        as u32;
+        }
+        for v in &self.balances {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.smart_account_address.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.smart_account_address, buf);
+        }
+        for v in &self.balances {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.smart_account_address, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.balances.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.smart_account_address.clear();
+        self.balances.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetWalletBalancesResponse {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.GetWalletBalancesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetWalletBalancesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_WALLET_BALANCES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetWalletBalancesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetWalletBalancesResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -6988,7 +9076,7 @@ pub mod __buffa {
             /// A run pays this asset only when the payable amount reaches this
             /// minimum, in 18-decimal asset units, and the rule's min_usd_value_e18;
             /// otherwise the balance stays on the account for a later run. Must be at
-            /// least the route's withdrawal minimum.
+            /// least min_floor_e18 when the rule is set.
             ///
             /// Field 4: `min_amount_e18`
             pub min_amount_e18: ::buffa::MessageFieldView<
@@ -7002,6 +9090,21 @@ pub mod __buffa {
             ///
             /// Field 5: `max_amount_e18`
             pub max_amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Returned in responses only; ignored in requests. The least amount one
+            /// payout to this destination can pay now, in 18-decimal asset units: the
+            /// route's withdrawal minimum, and more than its current network fee. It
+            /// follows the network fee, so it can change between reads. A run pays at
+            /// least this floor and min_amount_e18, and a new rule needs a
+            /// min_amount_e18 of at least the floor. Unset when the route or its network
+            /// fee is not known now; a new rule for that destination is then refused
+            /// with FEE_UNAVAILABLE or a route code.
+            ///
+            /// Field 6: `min_floor_e18`
+            pub min_floor_e18: ::buffa::MessageFieldView<
                 super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
                     'a,
                 >,
@@ -7112,6 +9215,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.min_floor_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.min_floor_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -7153,6 +9281,14 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     max_amount_e18: match self.max_amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    min_floor_e18: match self.min_floor_e18.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 super::super::super::super::super::polyester::r#type::v1::U128,
@@ -7209,6 +9345,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.min_floor_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.min_floor_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -7252,6 +9396,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.max_amount_e18.write_to(__cache, buf);
+                }
+                if self.min_floor_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.min_floor_e18.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -7313,6 +9465,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("maxAmountE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .min_floor_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("minFloorE18", __v)?;
                     }
                 }
                 __map.end()
@@ -7439,7 +9599,7 @@ pub mod __buffa {
             /// A run pays this asset only when the payable amount reaches this
             /// minimum, in 18-decimal asset units, and the rule's min_usd_value_e18;
             /// otherwise the balance stays on the account for a later run. Must be at
-            /// least the route's withdrawal minimum.
+            /// least min_floor_e18 when the rule is set.
             ///
             /// Field 4: `min_amount_e18`
             #[must_use]
@@ -7466,6 +9626,26 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().max_amount_e18
+            }
+            /// Returned in responses only; ignored in requests. The least amount one
+            /// payout to this destination can pay now, in 18-decimal asset units: the
+            /// route's withdrawal minimum, and more than its current network fee. It
+            /// follows the network fee, so it can change between reads. A run pays at
+            /// least this floor and min_amount_e18, and a new rule needs a
+            /// min_amount_e18 of at least the floor. Unset when the route or its network
+            /// fee is not known now; a new rule for that destination is then refused
+            /// with FEE_UNAVAILABLE or a route code.
+            ///
+            /// Field 6: `min_floor_e18`
+            #[must_use]
+            pub fn min_floor_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().min_floor_e18
             }
         }
         impl ::core::convert::From<
@@ -7507,7 +9687,7 @@ pub mod __buffa {
         /// AutoWithdrawPause reports why a rule stopped running on its own.
         #[derive(Clone, Debug, Default)]
         pub struct AutoWithdrawPauseView<'a> {
-            /// Asset whose payout paused the rule.
+            /// Asset whose payout paused the rule; zero when no payout did.
             ///
             /// Field 1: `asset_id`
             pub asset_id: u32,
@@ -7515,7 +9695,11 @@ pub mod __buffa {
             /// destination left the account's external withdraw whitelist,
             /// destination_invalid when it is no longer a valid destination, or
             /// authority_revoked when the person who set the rule may no longer change
-            /// it or withdraw from the account.
+            /// it or withdraw from the account. On a broker vault the rule pauses with
+            /// authority_revoked as soon as its author's broker role changes in any
+            /// way: removed, demoted, or promoted (for example Finance to Owner), and
+            /// also when the author is removed and added back. An Owner or Finance
+            /// member resumes it with a fresh step-up.
             ///
             /// Field 2: `reason`
             pub reason: &'a str,
@@ -7826,7 +10010,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Asset whose payout paused the rule.
+            /// Asset whose payout paused the rule; zero when no payout did.
             ///
             /// Field 1: `asset_id`
             #[must_use]
@@ -7837,7 +10021,11 @@ pub mod __buffa {
             /// destination left the account's external withdraw whitelist,
             /// destination_invalid when it is no longer a valid destination, or
             /// authority_revoked when the person who set the rule may no longer change
-            /// it or withdraw from the account.
+            /// it or withdraw from the account. On a broker vault the rule pauses with
+            /// authority_revoked as soon as its author's broker role changes in any
+            /// way: removed, demoted, or promoted (for example Finance to Owner), and
+            /// also when the author is removed and added back. An Owner or Finance
+            /// member resumes it with a fresh step-up.
             ///
             /// Field 2: `reason`
             #[must_use]
@@ -7887,9 +10075,9 @@ pub mod __buffa {
             }
         }
         /// AutoWithdrawRule is one version of an account's auto-withdraw rule. Each
-        /// change or disable creates the next version; only the latest version runs,
-        /// and a run in progress keeps the version it started with but pays nothing
-        /// further once that version is no longer the latest.
+        /// change, pause or resume creates the next version; only the latest version
+        /// runs, and a run in progress keeps the version it started with but pays
+        /// nothing further once that version is no longer the latest.
         #[derive(Clone, Debug, Default)]
         pub struct AutoWithdrawRuleView<'a> {
             /// Public subaccount ID the rule belongs to; zero for the root account.
@@ -7900,7 +10088,9 @@ pub mod __buffa {
             ///
             /// Field 2: `version`
             pub version: u32,
-            /// Whether the rule runs. A disabled version has no destinations.
+            /// Whether the rule runs. A paused version (enabled false) keeps its
+            /// schedule and destinations, so it resumes to the same destinations. The
+            /// rule runs only while enabled and without a pause.
             ///
             /// Field 3: `enabled`
             pub enabled: bool,
@@ -7910,7 +10100,8 @@ pub mod __buffa {
             pub schedule: ::buffa::MessageFieldView<
                 super::super::__buffa::view::AutoWithdrawScheduleView<'a>,
             >,
-            /// One destination per paid asset, ordered by asset_id.
+            /// One destination per paid asset, ordered by asset_id. Empty only on a
+            /// version that was disabled before pausing kept destinations.
             ///
             /// Field 5: `destinations`
             pub destinations: ::buffa::RepeatedView<
@@ -7923,7 +10114,8 @@ pub mod __buffa {
             pub created_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Set when the rule paused itself; a new version resumes it.
+            /// Set when the rule paused itself; resuming it or setting a new rule
+            /// clears it.
             ///
             /// Field 7: `pause`
             pub pause: ::buffa::MessageFieldView<
@@ -7938,6 +10130,10 @@ pub mod __buffa {
                     'a,
                 >,
             >,
+            /// Public account ID of the person who created this version.
+            ///
+            /// Field 9: `created_by_account_id`
+            pub created_by_account_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AutoWithdrawRuleView<'a> {
@@ -8092,6 +10288,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.created_by_account_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -8176,6 +10381,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    created_by_account_id: self.created_by_account_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -8241,6 +10447,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.created_by_account_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -8300,6 +10509,13 @@ pub mod __buffa {
                         buf,
                     );
                     self.min_usd_value_e18.write_to(__cache, buf);
+                }
+                if self.created_by_account_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        9u32,
+                        self.created_by_account_id,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -8368,6 +10584,17 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("minUsdValueE18", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.created_by_account_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "createdByAccountId",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.created_by_account_id,
+                            ),
+                        )?;
                 }
                 __map.end()
             }
@@ -8479,7 +10706,9 @@ pub mod __buffa {
             pub fn version(&self) -> u32 {
                 self.0.reborrow().version
             }
-            /// Whether the rule runs. A disabled version has no destinations.
+            /// Whether the rule runs. A paused version (enabled false) keeps its
+            /// schedule and destinations, so it resumes to the same destinations. The
+            /// rule runs only while enabled and without a pause.
             ///
             /// Field 3: `enabled`
             #[must_use]
@@ -8497,7 +10726,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().schedule
             }
-            /// One destination per paid asset, ordered by asset_id.
+            /// One destination per paid asset, ordered by asset_id. Empty only on a
+            /// version that was disabled before pausing kept destinations.
             ///
             /// Field 5: `destinations`
             #[must_use]
@@ -8520,7 +10750,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().created_at
             }
-            /// Set when the rule paused itself; a new version resumes it.
+            /// Set when the rule paused itself; resuming it or setting a new rule
+            /// clears it.
             ///
             /// Field 7: `pause`
             #[must_use]
@@ -8544,6 +10775,13 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().min_usd_value_e18
+            }
+            /// Public account ID of the person who created this version.
+            ///
+            /// Field 9: `created_by_account_id`
+            #[must_use]
+            pub fn created_by_account_id(&self) -> u64 {
+                self.0.reborrow().created_by_account_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AutoWithdrawRuleView<'static>>>
@@ -9433,22 +11671,27 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// DisableAutoWithdrawRuleRequest stops the rule of the root account or one
-        /// subaccount.
+        /// SetAutoWithdrawRuleEnabledRequest pauses or resumes the rule of the root
+        /// account or one subaccount, keeping its schedule and destinations.
         #[derive(Clone, Debug, Default)]
-        pub struct DisableAutoWithdrawRuleRequestView<'a> {
+        pub struct SetAutoWithdrawRuleEnabledRequestView<'a> {
             /// Public subaccount ID; omit for the root account.
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
-            /// The account's latest rule version.
+            /// The account's latest rule version. A mismatch is rejected so concurrent
+            /// changes never overwrite each other.
             ///
             /// Field 2: `expected_version`
             pub expected_version: u32,
+            /// false pauses the rule; true resumes it.
+            ///
+            /// Field 3: `enabled`
+            pub enabled: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DisableAutoWithdrawRuleRequestView<'a> {
-            type Owned = super::super::DisableAutoWithdrawRuleRequest;
+        impl<'a> ::buffa::MessageView<'a> for SetAutoWithdrawRuleEnabledRequestView<'a> {
+            type Owned = super::super::SetAutoWithdrawRuleEnabledRequest;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -9492,6 +11735,13 @@ pub mod __buffa {
                         )?;
                         view.expected_version = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.enabled = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -9504,7 +11754,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleRequest,
+                super::super::SetAutoWithdrawRuleEnabledRequest,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -9514,15 +11764,16 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleRequest,
+                super::super::SetAutoWithdrawRuleEnabledRequest,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DisableAutoWithdrawRuleRequest {
+                ::core::result::Result::Ok(super::super::SetAutoWithdrawRuleEnabledRequest {
                     subaccount_id: self.subaccount_id,
                     expected_version: self.expected_version,
+                    enabled: self.enabled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -9531,7 +11782,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DisableAutoWithdrawRuleRequestView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for SetAutoWithdrawRuleEnabledRequestView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -9545,6 +11796,9 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.expected_version)
                                 as u32;
+                }
+                if self.enabled {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -9563,6 +11817,9 @@ pub mod __buffa {
                 if self.expected_version != 0u32 {
                     ::buffa::types::put_uint32_field(2u32, self.expected_version, buf);
                 }
+                if self.enabled {
+                    ::buffa::types::put_bool_field(3u32, self.enabled, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -9577,7 +11834,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DisableAutoWithdrawRuleRequestView<'__a> {
+        impl<'__a> ::serde::Serialize for SetAutoWithdrawRuleEnabledRequestView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -9598,27 +11855,30 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.expected_version),
                         )?;
                 }
+                if self.enabled {
+                    __map.serialize_entry("enabled", &self.enabled)?;
+                }
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DisableAutoWithdrawRuleRequestView<'a> {
+        impl<'a> ::buffa::MessageName for SetAutoWithdrawRuleEnabledRequestView<'a> {
             const PACKAGE: &'static str = "chain.withdraw.v1";
-            const NAME: &'static str = "DisableAutoWithdrawRuleRequest";
-            const FULL_NAME: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleRequest";
+            const NAME: &'static str = "SetAutoWithdrawRuleEnabledRequest";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledRequest";
         }
-        ::buffa::impl_default_view_instance!(DisableAutoWithdrawRuleRequestView);
-        ::buffa::impl_view_reborrow!(DisableAutoWithdrawRuleRequestView);
-        /** Self-contained, `'static` owned view of a `DisableAutoWithdrawRuleRequest` message.
+        ::buffa::impl_default_view_instance!(SetAutoWithdrawRuleEnabledRequestView);
+        ::buffa::impl_view_reborrow!(SetAutoWithdrawRuleEnabledRequestView);
+        /** Self-contained, `'static` owned view of a `SetAutoWithdrawRuleEnabledRequest` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DisableAutoWithdrawRuleRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`SetAutoWithdrawRuleEnabledRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DisableAutoWithdrawRuleRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetAutoWithdrawRuleEnabledRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DisableAutoWithdrawRuleRequestOwnedView(
-            ::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>>,
+        pub struct SetAutoWithdrawRuleEnabledRequestOwnedView(
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>>,
         );
-        impl DisableAutoWithdrawRuleRequestOwnedView {
+        impl SetAutoWithdrawRuleEnabledRequestOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -9632,7 +11892,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleRequestOwnedView(
+                    SetAutoWithdrawRuleEnabledRequestOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -9649,7 +11909,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleRequestOwnedView(
+                    SetAutoWithdrawRuleEnabledRequestOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -9661,17 +11921,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DisableAutoWithdrawRuleRequest,
+                msg: &super::super::SetAutoWithdrawRuleEnabledRequest,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleRequestOwnedView(
+                    SetAutoWithdrawRuleEnabledRequestOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`DisableAutoWithdrawRuleRequestView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`SetAutoWithdrawRuleEnabledRequestView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DisableAutoWithdrawRuleRequestView<'_> {
+            pub fn view(&self) -> &SetAutoWithdrawRuleEnabledRequestView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -9683,7 +11943,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleRequest,
+                super::super::SetAutoWithdrawRuleEnabledRequest,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -9705,43 +11965,52 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
             }
-            /// The account's latest rule version.
+            /// The account's latest rule version. A mismatch is rejected so concurrent
+            /// changes never overwrite each other.
             ///
             /// Field 2: `expected_version`
             #[must_use]
             pub fn expected_version(&self) -> u32 {
                 self.0.reborrow().expected_version
             }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>>,
-        > for DisableAutoWithdrawRuleRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>>,
-            ) -> Self {
-                DisableAutoWithdrawRuleRequestOwnedView(inner)
+            /// false pauses the rule; true resumes it.
+            ///
+            /// Field 3: `enabled`
+            #[must_use]
+            pub fn enabled(&self) -> bool {
+                self.0.reborrow().enabled
             }
         }
-        impl ::core::convert::From<DisableAutoWithdrawRuleRequestOwnedView>
-        for ::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>> {
-            fn from(wrapper: DisableAutoWithdrawRuleRequestOwnedView) -> Self {
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>>,
+        > for SetAutoWithdrawRuleEnabledRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>>,
+            ) -> Self {
+                SetAutoWithdrawRuleEnabledRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetAutoWithdrawRuleEnabledRequestOwnedView>
+        for ::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>> {
+            fn from(wrapper: SetAutoWithdrawRuleEnabledRequestOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>>,
-        > for DisableAutoWithdrawRuleRequestOwnedView {
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>>,
+        > for SetAutoWithdrawRuleEnabledRequestOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<DisableAutoWithdrawRuleRequestView<'static>> {
+            ) -> &::buffa::OwnedView<SetAutoWithdrawRuleEnabledRequestView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DisableAutoWithdrawRuleRequest {
-            type View<'a> = DisableAutoWithdrawRuleRequestView<'a>;
-            type ViewHandle = DisableAutoWithdrawRuleRequestOwnedView;
+        impl ::buffa::HasMessageView
+        for super::super::SetAutoWithdrawRuleEnabledRequest {
+            type View<'a> = SetAutoWithdrawRuleEnabledRequestView<'a>;
+            type ViewHandle = SetAutoWithdrawRuleEnabledRequestOwnedView;
         }
-        impl ::serde::Serialize for DisableAutoWithdrawRuleRequestOwnedView {
+        impl ::serde::Serialize for SetAutoWithdrawRuleEnabledRequestOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -9749,10 +12018,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// DisableAutoWithdrawRuleResponse returns the disabled version.
+        /// SetAutoWithdrawRuleEnabledResponse returns the rule's latest version.
         #[derive(Clone, Debug, Default)]
-        pub struct DisableAutoWithdrawRuleResponseView<'a> {
-            /// The created, disabled version.
+        pub struct SetAutoWithdrawRuleEnabledResponseView<'a> {
+            /// The created version, or the latest version unchanged when the rule was
+            /// already in the requested state.
             ///
             /// Field 1: `rule`
             pub rule: ::buffa::MessageFieldView<
@@ -9760,8 +12030,9 @@ pub mod __buffa {
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
-        impl<'a> ::buffa::MessageView<'a> for DisableAutoWithdrawRuleResponseView<'a> {
-            type Owned = super::super::DisableAutoWithdrawRuleResponse;
+        impl<'a> ::buffa::MessageView<'a>
+        for SetAutoWithdrawRuleEnabledResponseView<'a> {
+            type Owned = super::super::SetAutoWithdrawRuleEnabledResponse;
             fn decode_view(
                 buf: &'a [u8],
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
@@ -9828,7 +12099,7 @@ pub mod __buffa {
             fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleResponse,
+                super::super::SetAutoWithdrawRuleEnabledResponse,
                 ::buffa::DecodeError,
             > {
                 self.to_owned_from_source(None)
@@ -9838,13 +12109,13 @@ pub mod __buffa {
                 &self,
                 __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleResponse,
+                super::super::SetAutoWithdrawRuleEnabledResponse,
                 ::buffa::DecodeError,
             > {
                 #[allow(unused_imports)]
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::DisableAutoWithdrawRuleResponse {
+                ::core::result::Result::Ok(super::super::SetAutoWithdrawRuleEnabledResponse {
                     rule: match self.rule.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -9861,7 +12132,7 @@ pub mod __buffa {
                 })
             }
         }
-        impl<'a> ::buffa::ViewEncode<'a> for DisableAutoWithdrawRuleResponseView<'a> {
+        impl<'a> ::buffa::ViewEncode<'a> for SetAutoWithdrawRuleEnabledResponseView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
             fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
@@ -9908,7 +12179,7 @@ pub mod __buffa {
         /// fields depends on default-omission rules; serializers that require
         /// known map lengths (e.g. `bincode`) will return a runtime error.
         /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for DisableAutoWithdrawRuleResponseView<'__a> {
+        impl<'__a> ::serde::Serialize for SetAutoWithdrawRuleEnabledResponseView<'__a> {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -9923,24 +12194,24 @@ pub mod __buffa {
                 __map.end()
             }
         }
-        impl<'a> ::buffa::MessageName for DisableAutoWithdrawRuleResponseView<'a> {
+        impl<'a> ::buffa::MessageName for SetAutoWithdrawRuleEnabledResponseView<'a> {
             const PACKAGE: &'static str = "chain.withdraw.v1";
-            const NAME: &'static str = "DisableAutoWithdrawRuleResponse";
-            const FULL_NAME: &'static str = "chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.DisableAutoWithdrawRuleResponse";
+            const NAME: &'static str = "SetAutoWithdrawRuleEnabledResponse";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.SetAutoWithdrawRuleEnabledResponse";
         }
-        ::buffa::impl_default_view_instance!(DisableAutoWithdrawRuleResponseView);
-        ::buffa::impl_view_reborrow!(DisableAutoWithdrawRuleResponseView);
-        /** Self-contained, `'static` owned view of a `DisableAutoWithdrawRuleResponse` message.
+        ::buffa::impl_default_view_instance!(SetAutoWithdrawRuleEnabledResponseView);
+        ::buffa::impl_view_reborrow!(SetAutoWithdrawRuleEnabledResponseView);
+        /** Self-contained, `'static` owned view of a `SetAutoWithdrawRuleEnabledResponse` message.
 
- Wraps [`::buffa::OwnedView`]`<`[`DisableAutoWithdrawRuleResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+ Wraps [`::buffa::OwnedView`]`<`[`SetAutoWithdrawRuleEnabledResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
 
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DisableAutoWithdrawRuleResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetAutoWithdrawRuleEnabledResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
         #[derive(Clone, Debug)]
-        pub struct DisableAutoWithdrawRuleResponseOwnedView(
-            ::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>>,
+        pub struct SetAutoWithdrawRuleEnabledResponseOwnedView(
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>>,
         );
-        impl DisableAutoWithdrawRuleResponseOwnedView {
+        impl SetAutoWithdrawRuleEnabledResponseOwnedView {
             /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
             ///
             /// The view borrows directly from the buffer's data; the buffer is
@@ -9954,7 +12225,7 @@ pub mod __buffa {
                 bytes: ::buffa::bytes::Bytes,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleResponseOwnedView(
+                    SetAutoWithdrawRuleEnabledResponseOwnedView(
                         ::buffa::OwnedView::decode(bytes)?,
                     ),
                 )
@@ -9971,7 +12242,7 @@ pub mod __buffa {
                 opts: &::buffa::DecodeOptions,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleResponseOwnedView(
+                    SetAutoWithdrawRuleEnabledResponseOwnedView(
                         ::buffa::OwnedView::decode_with_options(bytes, opts)?,
                     ),
                 )
@@ -9983,17 +12254,17 @@ pub mod __buffa {
             /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
             /// somehow invalid (should not happen for well-formed messages).
             pub fn from_owned(
-                msg: &super::super::DisableAutoWithdrawRuleResponse,
+                msg: &super::super::SetAutoWithdrawRuleEnabledResponse,
             ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
                 ::core::result::Result::Ok(
-                    DisableAutoWithdrawRuleResponseOwnedView(
+                    SetAutoWithdrawRuleEnabledResponseOwnedView(
                         ::buffa::OwnedView::from_owned(msg)?,
                     ),
                 )
             }
-            /// Borrow the full [`DisableAutoWithdrawRuleResponseView`] with its lifetime tied to `&self`.
+            /// Borrow the full [`SetAutoWithdrawRuleEnabledResponseView`] with its lifetime tied to `&self`.
             #[must_use]
-            pub fn view(&self) -> &DisableAutoWithdrawRuleResponseView<'_> {
+            pub fn view(&self) -> &SetAutoWithdrawRuleEnabledResponseView<'_> {
                 self.0.reborrow()
             }
             /// Convert to the owned message type.
@@ -10005,7 +12276,7 @@ pub mod __buffa {
             pub fn to_owned_message(
                 &self,
             ) -> ::core::result::Result<
-                super::super::DisableAutoWithdrawRuleResponse,
+                super::super::SetAutoWithdrawRuleEnabledResponse,
                 ::buffa::DecodeError,
             > {
                 self.0.to_owned_message()
@@ -10020,7 +12291,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// The created, disabled version.
+            /// The created version, or the latest version unchanged when the rule was
+            /// already in the requested state.
             ///
             /// Field 1: `rule`
             #[must_use]
@@ -10033,34 +12305,37 @@ pub mod __buffa {
             }
         }
         impl ::core::convert::From<
-            ::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>>,
-        > for DisableAutoWithdrawRuleResponseOwnedView {
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>>,
+        > for SetAutoWithdrawRuleEnabledResponseOwnedView {
             fn from(
-                inner: ::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>>,
+                inner: ::buffa::OwnedView<
+                    SetAutoWithdrawRuleEnabledResponseView<'static>,
+                >,
             ) -> Self {
-                DisableAutoWithdrawRuleResponseOwnedView(inner)
+                SetAutoWithdrawRuleEnabledResponseOwnedView(inner)
             }
         }
-        impl ::core::convert::From<DisableAutoWithdrawRuleResponseOwnedView>
-        for ::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>> {
-            fn from(wrapper: DisableAutoWithdrawRuleResponseOwnedView) -> Self {
+        impl ::core::convert::From<SetAutoWithdrawRuleEnabledResponseOwnedView>
+        for ::buffa::OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>> {
+            fn from(wrapper: SetAutoWithdrawRuleEnabledResponseOwnedView) -> Self {
                 wrapper.0
             }
         }
         impl ::core::convert::AsRef<
-            ::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>>,
-        > for DisableAutoWithdrawRuleResponseOwnedView {
+            ::buffa::OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>>,
+        > for SetAutoWithdrawRuleEnabledResponseOwnedView {
             fn as_ref(
                 &self,
-            ) -> &::buffa::OwnedView<DisableAutoWithdrawRuleResponseView<'static>> {
+            ) -> &::buffa::OwnedView<SetAutoWithdrawRuleEnabledResponseView<'static>> {
                 &self.0
             }
         }
-        impl ::buffa::HasMessageView for super::super::DisableAutoWithdrawRuleResponse {
-            type View<'a> = DisableAutoWithdrawRuleResponseView<'a>;
-            type ViewHandle = DisableAutoWithdrawRuleResponseOwnedView;
+        impl ::buffa::HasMessageView
+        for super::super::SetAutoWithdrawRuleEnabledResponse {
+            type View<'a> = SetAutoWithdrawRuleEnabledResponseView<'a>;
+            type ViewHandle = SetAutoWithdrawRuleEnabledResponseOwnedView;
         }
-        impl ::serde::Serialize for DisableAutoWithdrawRuleResponseOwnedView {
+        impl ::serde::Serialize for SetAutoWithdrawRuleEnabledResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -10708,9 +12983,11 @@ pub mod __buffa {
             /// Machine-readable reason for a skipped or failed step, such as
             /// below_minimum, price_unavailable (the rule has a USD minimum and no
             /// current price valued the asset; the funds stay for a later run),
-            /// rule_superseded, destination_not_whitelisted, authority_revoked,
-            /// gateway_capacity_insufficient (the funds stay for a later run),
-            /// withdrawal_released or withdrawal_failed; empty otherwise.
+            /// rule_superseded, destination_not_whitelisted, destination_cooling_down
+            /// (a broker vault's destination added to its external withdraw whitelist
+            /// less than 24 hours ago; the funds stay for a later run),
+            /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
+            /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
             ///
             /// Field 7: `reason`
             pub reason: &'a str,
@@ -10729,6 +13006,19 @@ pub mod __buffa {
             ///
             /// Field 10: `value_usd_e18`
             pub value_usd_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The network fee charged on the withdrawal, in 18-decimal asset units.
+            /// Once it completed: taken out of amount_e18, so the destination received
+            /// amount_e18 minus this fee. Once Zipper rejected it or its execution
+            /// failed: the fee Zipper kept, which is not refunded. Unset until the step
+            /// is final, when it was skipped or failed before it reached Zipper, and
+            /// when the fee was not reported.
+            ///
+            /// Field 11: `network_fee_e18`
+            pub network_fee_e18: ::buffa::MessageFieldView<
                 super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
                     'a,
                 >,
@@ -10894,6 +13184,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.network_fee_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.network_fee_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -10947,6 +13262,14 @@ pub mod __buffa {
                     intent_id: self.intent_id.to_string(),
                     tx_hash: self.tx_hash.to_string(),
                     value_usd_e18: match self.value_usd_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    network_fee_e18: match self.network_fee_e18.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 super::super::super::super::super::polyester::r#type::v1::U128,
@@ -11032,6 +13355,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.network_fee_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.network_fee_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -11098,6 +13429,14 @@ pub mod __buffa {
                         buf,
                     );
                     self.value_usd_e18.write_to(__cache, buf);
+                }
+                if self.network_fee_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.network_fee_e18.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -11179,6 +13518,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("valueUsdE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .network_fee_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("networkFeeE18", __v)?;
                     }
                 }
                 __map.end()
@@ -11339,9 +13686,11 @@ pub mod __buffa {
             /// Machine-readable reason for a skipped or failed step, such as
             /// below_minimum, price_unavailable (the rule has a USD minimum and no
             /// current price valued the asset; the funds stay for a later run),
-            /// rule_superseded, destination_not_whitelisted, authority_revoked,
-            /// gateway_capacity_insufficient (the funds stay for a later run),
-            /// withdrawal_released or withdrawal_failed; empty otherwise.
+            /// rule_superseded, destination_not_whitelisted, destination_cooling_down
+            /// (a broker vault's destination added to its external withdraw whitelist
+            /// less than 24 hours ago; the funds stay for a later run),
+            /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
+            /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
             ///
             /// Field 7: `reason`
             #[must_use]
@@ -11377,6 +13726,24 @@ pub mod __buffa {
                 >,
             > {
                 &self.0.reborrow().value_usd_e18
+            }
+            /// The network fee charged on the withdrawal, in 18-decimal asset units.
+            /// Once it completed: taken out of amount_e18, so the destination received
+            /// amount_e18 minus this fee. Once Zipper rejected it or its execution
+            /// failed: the fee Zipper kept, which is not refunded. Unset until the step
+            /// is final, when it was skipped or failed before it reached Zipper, and
+            /// when the fee was not reported.
+            ///
+            /// Field 11: `network_fee_e18`
+            #[must_use]
+            pub fn network_fee_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().network_fee_e18
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AutoWithdrawStepView<'static>>>
@@ -12754,6 +15121,2116 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// PreviewAutoWithdrawRunRequest previews the next run of the rule of the
+        /// root account or one subaccount.
+        #[derive(Clone, Debug, Default)]
+        pub struct PreviewAutoWithdrawRunRequestView<'a> {
+            /// Public subaccount ID; omit for the root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PreviewAutoWithdrawRunRequestView<'a> {
+            type Owned = super::super::PreviewAutoWithdrawRunRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PreviewAutoWithdrawRunRequest {
+                    subaccount_id: self.subaccount_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PreviewAutoWithdrawRunRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PreviewAutoWithdrawRunRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PreviewAutoWithdrawRunRequestView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "PreviewAutoWithdrawRunRequest";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunRequest";
+        }
+        ::buffa::impl_default_view_instance!(PreviewAutoWithdrawRunRequestView);
+        ::buffa::impl_view_reborrow!(PreviewAutoWithdrawRunRequestView);
+        /** Self-contained, `'static` owned view of a `PreviewAutoWithdrawRunRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PreviewAutoWithdrawRunRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreviewAutoWithdrawRunRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PreviewAutoWithdrawRunRequestOwnedView(
+            ::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>>,
+        );
+        impl PreviewAutoWithdrawRunRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PreviewAutoWithdrawRunRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PreviewAutoWithdrawRunRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PreviewAutoWithdrawRunRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public subaccount ID; omit for the root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>>,
+        > for PreviewAutoWithdrawRunRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>>,
+            ) -> Self {
+                PreviewAutoWithdrawRunRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PreviewAutoWithdrawRunRequestOwnedView>
+        for ::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>> {
+            fn from(wrapper: PreviewAutoWithdrawRunRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>>,
+        > for PreviewAutoWithdrawRunRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PreviewAutoWithdrawRunRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PreviewAutoWithdrawRunRequest {
+            type View<'a> = PreviewAutoWithdrawRunRequestView<'a>;
+            type ViewHandle = PreviewAutoWithdrawRunRequestOwnedView;
+        }
+        impl ::serde::Serialize for PreviewAutoWithdrawRunRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AutoWithdrawPreviewAsset is what the next run would do with one asset,
+        /// sized from the account's balance now.
+        #[derive(Clone, Debug, Default)]
+        pub struct AutoWithdrawPreviewAssetView<'a> {
+            /// Ledger asset.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// External destination chain identifier; zero when the rule has no
+            /// destination for the asset.
+            ///
+            /// Field 2: `destination_chain_id`
+            pub destination_chain_id: u64,
+            /// Canonical destination address; empty when the rule has no destination
+            /// for the asset.
+            ///
+            /// Field 3: `destination_address`
+            pub destination_address: &'a str,
+            /// The account's available balance of the asset now, in 18-decimal asset
+            /// units.
+            ///
+            /// Field 4: `available_e18`
+            pub available_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// What the run would pay, in 18-decimal asset units: the available balance
+            /// up to max_amount_e18, rounded down to whole on-chain units, or zero when
+            /// it holds. The network fee is taken out of it on the way.
+            ///
+            /// Field 5: `payable_e18`
+            pub payable_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// What would stay on the account, in 18-decimal asset units:
+            /// available_e18 minus payable_e18.
+            ///
+            /// Field 6: `held_back_e18`
+            pub held_back_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Why held_back_e18 stays, or why nothing pays: below_minimum (below
+            /// minimum_e18 or the rule's min_usd_value_e18), price_unavailable (the
+            /// rule has a USD minimum and no current price values the asset),
+            /// no_destination (the rule pays no destination for the asset),
+            /// destination_cooling_down (a broker vault pays a destination only once
+            /// it has been on the vault's external withdraw whitelist for 24 hours;
+            /// see payable_from), above_max (the balance above max_amount_e18 stays)
+            /// or dust (less than one whole on-chain unit stays); empty when the whole
+            /// balance pays.
+            ///
+            /// Field 7: `hold_reason`
+            pub hold_reason: &'a str,
+            /// The least one payout of the asset pays, in 18-decimal asset units: the
+            /// destination's min_amount_e18, or its min_floor_e18 when that is higher
+            /// and known now. Unset when the rule has no destination for the asset.
+            ///
+            /// Field 8: `minimum_e18`
+            pub minimum_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// USD value, in 18-decimal USD units, of what the asset pays before its
+            /// minimums (the available balance up to max_amount_e18, rounded down to
+            /// whole on-chain units), at the current price as of priced_at. A rule with
+            /// a USD minimum compares this value with it. Unset when no current price
+            /// values the asset or the rule has no destination for it.
+            ///
+            /// Field 9: `value_usd_e18`
+            pub value_usd_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// When the price behind value_usd_e18 was observed; unset with it.
+            ///
+            /// Field 10: `priced_at`
+            pub priced_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The network fee a payout to the destination is expected to be charged
+            /// now, in 18-decimal asset units: the route's latest sampled network fee,
+            /// the same figure min_floor_e18 stays above. It is taken out of the
+            /// payout, so the destination receives about payable_e18 minus this fee.
+            /// Unset when the rule has no destination for the asset or the fee is not
+            /// known now.
+            ///
+            /// Field 11: `network_fee_e18`
+            pub network_fee_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// When network_fee_e18 was sampled; unset with it.
+            ///
+            /// Field 12: `network_fee_sampled_at`
+            pub network_fee_sampled_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Set only on a broker vault while the destination is cooling down: when
+            /// it can be paid, 24 hours after it was added to the vault's external
+            /// withdraw whitelist. Unset with hold_reason destination_cooling_down
+            /// when that time is not known yet.
+            ///
+            /// Field 13: `payable_from`
+            pub payable_from: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AutoWithdrawPreviewAssetView<'a> {
+            type Owned = super::super::AutoWithdrawPreviewAsset;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.destination_chain_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.available_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.available_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payable_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payable_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.held_back_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.held_back_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.hold_reason = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.minimum_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.minimum_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.value_usd_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.value_usd_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.priced_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.priced_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.network_fee_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.network_fee_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.network_fee_sampled_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.network_fee_sampled_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payable_from.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payable_from = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewAsset,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewAsset,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AutoWithdrawPreviewAsset {
+                    asset_id: self.asset_id,
+                    destination_chain_id: self.destination_chain_id,
+                    destination_address: self.destination_address.to_string(),
+                    available_e18: match self.available_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    payable_e18: match self.payable_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    held_back_e18: match self.held_back_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    hold_reason: self.hold_reason.to_string(),
+                    minimum_e18: match self.minimum_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    value_usd_e18: match self.value_usd_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    priced_at: match self.priced_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    network_fee_e18: match self.network_fee_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    network_fee_sampled_at: match self.network_fee_sampled_at.as_option()
+                    {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    payable_from: match self.payable_from.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AutoWithdrawPreviewAssetView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.destination_chain_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.destination_chain_id,
+                            ) as u32;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                if self.available_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.available_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payable_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payable_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.held_back_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.held_back_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.hold_reason.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.hold_reason)
+                                as u32;
+                }
+                if self.minimum_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.minimum_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.value_usd_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.value_usd_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.priced_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.priced_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.network_fee_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.network_fee_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.network_fee_sampled_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.network_fee_sampled_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payable_from.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payable_from.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.destination_chain_id != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        2u32,
+                        self.destination_chain_id,
+                        buf,
+                    );
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        3u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                if self.available_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.available_e18.write_to(__cache, buf);
+                }
+                if self.payable_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payable_e18.write_to(__cache, buf);
+                }
+                if self.held_back_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.held_back_e18.write_to(__cache, buf);
+                }
+                if !self.hold_reason.is_empty() {
+                    ::buffa::types::put_string_field(7u32, &self.hold_reason, buf);
+                }
+                if self.minimum_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.minimum_e18.write_to(__cache, buf);
+                }
+                if self.value_usd_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.value_usd_e18.write_to(__cache, buf);
+                }
+                if self.priced_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.priced_at.write_to(__cache, buf);
+                }
+                if self.network_fee_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.network_fee_e18.write_to(__cache, buf);
+                }
+                if self.network_fee_sampled_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.network_fee_sampled_at.write_to(__cache, buf);
+                }
+                if self.payable_from.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payable_from.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AutoWithdrawPreviewAssetView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.destination_chain_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationChainId",
+                            &::buffa::json_helpers::ProtoJson(&self.destination_chain_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .available_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("availableE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payable_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("payableE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .held_back_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("heldBackE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.hold_reason) {
+                    __map.serialize_entry("holdReason", self.hold_reason)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .minimum_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("minimumE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .value_usd_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("valueUsdE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.priced_at.as_option()
+                    {
+                        __map.serialize_entry("pricedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .network_fee_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("networkFeeE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .network_fee_sampled_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("networkFeeSampledAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payable_from
+                        .as_option()
+                    {
+                        __map.serialize_entry("payableFrom", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AutoWithdrawPreviewAssetView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "AutoWithdrawPreviewAsset";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.AutoWithdrawPreviewAsset";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.AutoWithdrawPreviewAsset";
+        }
+        ::buffa::impl_default_view_instance!(AutoWithdrawPreviewAssetView);
+        ::buffa::impl_view_reborrow!(AutoWithdrawPreviewAssetView);
+        /** Self-contained, `'static` owned view of a `AutoWithdrawPreviewAsset` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AutoWithdrawPreviewAssetView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AutoWithdrawPreviewAssetView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AutoWithdrawPreviewAssetOwnedView(
+            ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>>,
+        );
+        impl AutoWithdrawPreviewAssetOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewAssetOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewAssetOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AutoWithdrawPreviewAsset,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AutoWithdrawPreviewAssetOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`AutoWithdrawPreviewAssetView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AutoWithdrawPreviewAssetView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AutoWithdrawPreviewAsset,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Ledger asset.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// External destination chain identifier; zero when the rule has no
+            /// destination for the asset.
+            ///
+            /// Field 2: `destination_chain_id`
+            #[must_use]
+            pub fn destination_chain_id(&self) -> u64 {
+                self.0.reborrow().destination_chain_id
+            }
+            /// Canonical destination address; empty when the rule has no destination
+            /// for the asset.
+            ///
+            /// Field 3: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+            /// The account's available balance of the asset now, in 18-decimal asset
+            /// units.
+            ///
+            /// Field 4: `available_e18`
+            #[must_use]
+            pub fn available_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().available_e18
+            }
+            /// What the run would pay, in 18-decimal asset units: the available balance
+            /// up to max_amount_e18, rounded down to whole on-chain units, or zero when
+            /// it holds. The network fee is taken out of it on the way.
+            ///
+            /// Field 5: `payable_e18`
+            #[must_use]
+            pub fn payable_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().payable_e18
+            }
+            /// What would stay on the account, in 18-decimal asset units:
+            /// available_e18 minus payable_e18.
+            ///
+            /// Field 6: `held_back_e18`
+            #[must_use]
+            pub fn held_back_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().held_back_e18
+            }
+            /// Why held_back_e18 stays, or why nothing pays: below_minimum (below
+            /// minimum_e18 or the rule's min_usd_value_e18), price_unavailable (the
+            /// rule has a USD minimum and no current price values the asset),
+            /// no_destination (the rule pays no destination for the asset),
+            /// destination_cooling_down (a broker vault pays a destination only once
+            /// it has been on the vault's external withdraw whitelist for 24 hours;
+            /// see payable_from), above_max (the balance above max_amount_e18 stays)
+            /// or dust (less than one whole on-chain unit stays); empty when the whole
+            /// balance pays.
+            ///
+            /// Field 7: `hold_reason`
+            #[must_use]
+            pub fn hold_reason(&self) -> &'_ str {
+                self.0.reborrow().hold_reason
+            }
+            /// The least one payout of the asset pays, in 18-decimal asset units: the
+            /// destination's min_amount_e18, or its min_floor_e18 when that is higher
+            /// and known now. Unset when the rule has no destination for the asset.
+            ///
+            /// Field 8: `minimum_e18`
+            #[must_use]
+            pub fn minimum_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().minimum_e18
+            }
+            /// USD value, in 18-decimal USD units, of what the asset pays before its
+            /// minimums (the available balance up to max_amount_e18, rounded down to
+            /// whole on-chain units), at the current price as of priced_at. A rule with
+            /// a USD minimum compares this value with it. Unset when no current price
+            /// values the asset or the rule has no destination for it.
+            ///
+            /// Field 9: `value_usd_e18`
+            #[must_use]
+            pub fn value_usd_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().value_usd_e18
+            }
+            /// When the price behind value_usd_e18 was observed; unset with it.
+            ///
+            /// Field 10: `priced_at`
+            #[must_use]
+            pub fn priced_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().priced_at
+            }
+            /// The network fee a payout to the destination is expected to be charged
+            /// now, in 18-decimal asset units: the route's latest sampled network fee,
+            /// the same figure min_floor_e18 stays above. It is taken out of the
+            /// payout, so the destination receives about payable_e18 minus this fee.
+            /// Unset when the rule has no destination for the asset or the fee is not
+            /// known now.
+            ///
+            /// Field 11: `network_fee_e18`
+            #[must_use]
+            pub fn network_fee_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().network_fee_e18
+            }
+            /// When network_fee_e18 was sampled; unset with it.
+            ///
+            /// Field 12: `network_fee_sampled_at`
+            #[must_use]
+            pub fn network_fee_sampled_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().network_fee_sampled_at
+            }
+            /// Set only on a broker vault while the destination is cooling down: when
+            /// it can be paid, 24 hours after it was added to the vault's external
+            /// withdraw whitelist. Unset with hold_reason destination_cooling_down
+            /// when that time is not known yet.
+            ///
+            /// Field 13: `payable_from`
+            #[must_use]
+            pub fn payable_from(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().payable_from
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>>,
+        > for AutoWithdrawPreviewAssetOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>>,
+            ) -> Self {
+                AutoWithdrawPreviewAssetOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AutoWithdrawPreviewAssetOwnedView>
+        for ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>> {
+            fn from(wrapper: AutoWithdrawPreviewAssetOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>>,
+        > for AutoWithdrawPreviewAssetOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<AutoWithdrawPreviewAssetView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AutoWithdrawPreviewAsset {
+            type View<'a> = AutoWithdrawPreviewAssetView<'a>;
+            type ViewHandle = AutoWithdrawPreviewAssetOwnedView;
+        }
+        impl ::serde::Serialize for AutoWithdrawPreviewAssetOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// PreviewAutoWithdrawRunResponse previews the next run.
+        #[derive(Clone, Debug, Default)]
+        pub struct PreviewAutoWithdrawRunResponseView<'a> {
+            /// Whether the next run would pay.
+            ///
+            /// Field 1: `status`
+            pub status: ::buffa::EnumValue<super::super::AutoWithdrawPreviewStatus>,
+            /// When the next run starts: its UTC slot, or, while a due slot waits for
+            /// the scheduler, that slot. For an hourly rule, the next hourly check.
+            /// Unset when the account has no rule or the rule is paused.
+            ///
+            /// Field 2: `next_run_at`
+            pub next_run_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The latest rule version; zero when the account has no rule.
+            ///
+            /// Field 3: `rule_version`
+            pub rule_version: u32,
+            /// Set when the rule paused itself; a rule paused by a person has none.
+            ///
+            /// Field 4: `pause`
+            pub pause: ::buffa::MessageFieldView<
+                super::super::__buffa::view::AutoWithdrawPauseView<'a>,
+            >,
+            /// The rule's least USD value of one payout, in 18-decimal USD units; zero
+            /// means no USD minimum. Unset when the account has no rule.
+            ///
+            /// Field 5: `min_usd_value_e18`
+            pub min_usd_value_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// One entry per destination of the rule, then per other asset with a
+            /// positive balance, ordered by asset_id. Empty when the account has no
+            /// rule or the rule is paused.
+            ///
+            /// Field 6: `assets`
+            pub assets: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::AutoWithdrawPreviewAssetView<'a>,
+            >,
+            /// When the balances, prices and fees the preview used were read.
+            ///
+            /// Field 7: `computed_at`
+            pub computed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PreviewAutoWithdrawRunResponseView<'a> {
+            type Owned = super::super::PreviewAutoWithdrawRunResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.next_run_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.next_run_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.rule_version = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.pause.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.pause = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::AutoWithdrawPauseView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.min_usd_value_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.min_usd_value_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.computed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.computed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.assets
+                            .push(
+                                <super::super::__buffa::view::AutoWithdrawPreviewAssetView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PreviewAutoWithdrawRunResponse {
+                    status: self.status,
+                    next_run_at: match self.next_run_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    rule_version: self.rule_version,
+                    pause: match self.pause.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::AutoWithdrawPause,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    min_usd_value_e18: match self.min_usd_value_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    assets: self
+                        .assets
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    computed_at: match self.computed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PreviewAutoWithdrawRunResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.next_run_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.next_run_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.rule_version != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.rule_version)
+                                as u32;
+                }
+                if self.pause.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.pause.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.min_usd_value_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.min_usd_value_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.assets {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.computed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.computed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.next_run_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.next_run_at.write_to(__cache, buf);
+                }
+                if self.rule_version != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.rule_version, buf);
+                }
+                if self.pause.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.pause.write_to(__cache, buf);
+                }
+                if self.min_usd_value_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.min_usd_value_e18.write_to(__cache, buf);
+                }
+                for v in &self.assets {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.computed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.computed_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PreviewAutoWithdrawRunResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .next_run_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("nextRunAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.rule_version) {
+                    __map
+                        .serialize_entry(
+                            "ruleVersion",
+                            &::buffa::json_helpers::ProtoJson(&self.rule_version),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.pause.as_option() {
+                        __map.serialize_entry("pause", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .min_usd_value_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("minUsdValueE18", __v)?;
+                    }
+                }
+                if !self.assets.is_empty() {
+                    __map.serialize_entry("assets", &*self.assets)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .computed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("computedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PreviewAutoWithdrawRunResponseView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "PreviewAutoWithdrawRunResponse";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.PreviewAutoWithdrawRunResponse";
+        }
+        ::buffa::impl_default_view_instance!(PreviewAutoWithdrawRunResponseView);
+        ::buffa::impl_view_reborrow!(PreviewAutoWithdrawRunResponseView);
+        /** Self-contained, `'static` owned view of a `PreviewAutoWithdrawRunResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PreviewAutoWithdrawRunResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PreviewAutoWithdrawRunResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PreviewAutoWithdrawRunResponseOwnedView(
+            ::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>>,
+        );
+        impl PreviewAutoWithdrawRunResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PreviewAutoWithdrawRunResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PreviewAutoWithdrawRunResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`PreviewAutoWithdrawRunResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PreviewAutoWithdrawRunResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::PreviewAutoWithdrawRunResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Whether the next run would pay.
+            ///
+            /// Field 1: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::AutoWithdrawPreviewStatus> {
+                self.0.reborrow().status
+            }
+            /// When the next run starts: its UTC slot, or, while a due slot waits for
+            /// the scheduler, that slot. For an hourly rule, the next hourly check.
+            /// Unset when the account has no rule or the rule is paused.
+            ///
+            /// Field 2: `next_run_at`
+            #[must_use]
+            pub fn next_run_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().next_run_at
+            }
+            /// The latest rule version; zero when the account has no rule.
+            ///
+            /// Field 3: `rule_version`
+            #[must_use]
+            pub fn rule_version(&self) -> u32 {
+                self.0.reborrow().rule_version
+            }
+            /// Set when the rule paused itself; a rule paused by a person has none.
+            ///
+            /// Field 4: `pause`
+            #[must_use]
+            pub fn pause(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::AutoWithdrawPauseView<'_>,
+            > {
+                &self.0.reborrow().pause
+            }
+            /// The rule's least USD value of one payout, in 18-decimal USD units; zero
+            /// means no USD minimum. Unset when the account has no rule.
+            ///
+            /// Field 5: `min_usd_value_e18`
+            #[must_use]
+            pub fn min_usd_value_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().min_usd_value_e18
+            }
+            /// One entry per destination of the rule, then per other asset with a
+            /// positive balance, ordered by asset_id. Empty when the account has no
+            /// rule or the rule is paused.
+            ///
+            /// Field 6: `assets`
+            #[must_use]
+            pub fn assets(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::AutoWithdrawPreviewAssetView<'_>,
+            > {
+                &self.0.reborrow().assets
+            }
+            /// When the balances, prices and fees the preview used were read.
+            ///
+            /// Field 7: `computed_at`
+            #[must_use]
+            pub fn computed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().computed_at
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>>,
+        > for PreviewAutoWithdrawRunResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>>,
+            ) -> Self {
+                PreviewAutoWithdrawRunResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PreviewAutoWithdrawRunResponseOwnedView>
+        for ::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>> {
+            fn from(wrapper: PreviewAutoWithdrawRunResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>>,
+        > for PreviewAutoWithdrawRunResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<PreviewAutoWithdrawRunResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PreviewAutoWithdrawRunResponse {
+            type View<'a> = PreviewAutoWithdrawRunResponseView<'a>;
+            type ViewHandle = PreviewAutoWithdrawRunResponseOwnedView;
+        }
+        impl ::serde::Serialize for PreviewAutoWithdrawRunResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// CreateTradingWithdrawResponse returns the accepted durable intent identifier
         /// for the withdraw lifecycle.
         #[derive(Clone, Debug, Default)]
@@ -13328,6 +17805,31 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Field the error is about, as a protobuf field path such as
+            /// destinations\[0\].min_amount_e18; empty when the error concerns no single
+            /// field. Usually a field of the request. A refused auto-withdraw resume
+            /// names a field of the stored rule instead, such as
+            /// destinations\[1\].destination_address of AutoWithdrawRule, which the
+            /// request does not carry.
+            ///
+            /// Field 2: `field_path`
+            pub field_path: &'a str,
+            /// Set only with MIN_AMOUNT_BELOW_FLOOR: the least amount, in 18-decimal
+            /// asset units, the destination's min_amount_e18 may be.
+            ///
+            /// Field 3: `min_floor_e18`
+            pub min_floor_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Set only with EXTERNAL_DESTINATION_COOLING_DOWN, when known: the time
+            /// from which the destination can be paid.
+            ///
+            /// Field 4: `payable_from`
+            pub payable_from: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -13370,6 +17872,63 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.field_path = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.min_floor_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.min_floor_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payable_from.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payable_from = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -13400,6 +17959,23 @@ pub mod __buffa {
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ErrorDetail {
                     code: self.code,
+                    field_path: self.field_path.to_string(),
+                    min_floor_e18: match self.min_floor_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    payable_from: match self.payable_from.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -13410,7 +17986,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ErrorDetailView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -13420,13 +17996,35 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.field_path.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.field_path)
+                                as u32;
+                }
+                if self.min_floor_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.min_floor_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payable_from.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payable_from.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -13436,6 +18034,25 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(1u32, val, buf);
                     }
+                }
+                if !self.field_path.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.field_path, buf);
+                }
+                if self.min_floor_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.min_floor_e18.write_to(__cache, buf);
+                }
+                if self.payable_from.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payable_from.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -13460,6 +18077,25 @@ pub mod __buffa {
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.code) {
                     __map.serialize_entry("code", &self.code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.field_path) {
+                    __map.serialize_entry("fieldPath", self.field_path)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .min_floor_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("minFloorE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payable_from
+                        .as_option()
+                    {
+                        __map.serialize_entry("payableFrom", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -13561,6 +18197,44 @@ pub mod __buffa {
             #[must_use]
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
                 self.0.reborrow().code
+            }
+            /// Field the error is about, as a protobuf field path such as
+            /// destinations\[0\].min_amount_e18; empty when the error concerns no single
+            /// field. Usually a field of the request. A refused auto-withdraw resume
+            /// names a field of the stored rule instead, such as
+            /// destinations\[1\].destination_address of AutoWithdrawRule, which the
+            /// request does not carry.
+            ///
+            /// Field 2: `field_path`
+            #[must_use]
+            pub fn field_path(&self) -> &'_ str {
+                self.0.reborrow().field_path
+            }
+            /// Set only with MIN_AMOUNT_BELOW_FLOOR: the least amount, in 18-decimal
+            /// asset units, the destination's min_amount_e18 may be.
+            ///
+            /// Field 3: `min_floor_e18`
+            #[must_use]
+            pub fn min_floor_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().min_floor_e18
+            }
+            /// Set only with EXTERNAL_DESTINATION_COOLING_DOWN, when known: the time
+            /// from which the destination can be paid.
+            ///
+            /// Field 4: `payable_from`
+            #[must_use]
+            pub fn payable_from(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().payable_from
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
@@ -15772,6 +20446,1095 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetWalletBalancesRequest selects the account whose smart account wallet
+        /// to read.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetWalletBalancesRequestView<'a> {
+            /// Public subaccount ID; omit for the root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetWalletBalancesRequestView<'a> {
+            type Owned = super::super::GetWalletBalancesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetWalletBalancesRequest {
+                    subaccount_id: self.subaccount_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetWalletBalancesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetWalletBalancesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetWalletBalancesRequestView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "GetWalletBalancesRequest";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.GetWalletBalancesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetWalletBalancesRequestView);
+        ::buffa::impl_view_reborrow!(GetWalletBalancesRequestView);
+        /** Self-contained, `'static` owned view of a `GetWalletBalancesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetWalletBalancesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetWalletBalancesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetWalletBalancesRequestOwnedView(
+            ::buffa::OwnedView<GetWalletBalancesRequestView<'static>>,
+        );
+        impl GetWalletBalancesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetWalletBalancesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetWalletBalancesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetWalletBalancesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public subaccount ID; omit for the root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetWalletBalancesRequestView<'static>>,
+        > for GetWalletBalancesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetWalletBalancesRequestView<'static>>,
+            ) -> Self {
+                GetWalletBalancesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetWalletBalancesRequestOwnedView>
+        for ::buffa::OwnedView<GetWalletBalancesRequestView<'static>> {
+            fn from(wrapper: GetWalletBalancesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetWalletBalancesRequestView<'static>>,
+        > for GetWalletBalancesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetWalletBalancesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetWalletBalancesRequest {
+            type View<'a> = GetWalletBalancesRequestView<'a>;
+            type ViewHandle = GetWalletBalancesRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetWalletBalancesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// WalletBalance is one zToken the smart account wallet holds.
+        #[derive(Clone, Debug, Default)]
+        pub struct WalletBalanceView<'a> {
+            /// Zipped asset of the zToken: the network-specific asset, as
+            /// chain.lifecycle.v1.AssetIds.zipped_asset_id names it.
+            ///
+            /// Field 1: `zipped_asset_id`
+            pub zipped_asset_id: u32,
+            /// Unified asset the zToken stands for, as
+            /// chain.lifecycle.v1.AssetIds.unified_asset_id names it.
+            ///
+            /// Field 2: `unified_asset_id`
+            pub unified_asset_id: u32,
+            /// External network of the zipped asset, as the `chain_id` of a chain
+            /// returned by `GetDepositWithdrawConfig`.
+            ///
+            /// Field 3: `chain_id`
+            pub chain_id: u32,
+            /// zToken contract address on Polyester Chain.
+            ///
+            /// Field 4: `ztoken_address`
+            pub ztoken_address: &'a str,
+            /// Balance in 18-decimal units: every zToken has 18 decimals.
+            ///
+            /// Field 5: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for WalletBalanceView<'a> {
+            type Owned = super::super::WalletBalance;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.zipped_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.unified_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.chain_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.ztoken_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WalletBalance,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::WalletBalance,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::WalletBalance {
+                    zipped_asset_id: self.zipped_asset_id,
+                    unified_asset_id: self.unified_asset_id,
+                    chain_id: self.chain_id,
+                    ztoken_address: self.ztoken_address.to_string(),
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for WalletBalanceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.zipped_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.zipped_asset_id)
+                                as u32;
+                }
+                if self.unified_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.unified_asset_id)
+                                as u32;
+                }
+                if self.chain_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.chain_id) as u32;
+                }
+                if !self.ztoken_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.ztoken_address)
+                                as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.zipped_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.zipped_asset_id, buf);
+                }
+                if self.unified_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.unified_asset_id, buf);
+                }
+                if self.chain_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.chain_id, buf);
+                }
+                if !self.ztoken_address.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.ztoken_address, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for WalletBalanceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.zipped_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "zippedAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.zipped_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.unified_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "unifiedAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.unified_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.chain_id) {
+                    __map
+                        .serialize_entry(
+                            "chainId",
+                            &::buffa::json_helpers::ProtoJson(&self.chain_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.ztoken_address) {
+                    __map.serialize_entry("ztokenAddress", self.ztoken_address)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for WalletBalanceView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "WalletBalance";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.WalletBalance";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.WalletBalance";
+        }
+        ::buffa::impl_default_view_instance!(WalletBalanceView);
+        ::buffa::impl_view_reborrow!(WalletBalanceView);
+        /** Self-contained, `'static` owned view of a `WalletBalance` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`WalletBalanceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`WalletBalanceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct WalletBalanceOwnedView(
+            ::buffa::OwnedView<WalletBalanceView<'static>>,
+        );
+        impl WalletBalanceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WalletBalanceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WalletBalanceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::WalletBalance,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    WalletBalanceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`WalletBalanceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &WalletBalanceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::WalletBalance,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Zipped asset of the zToken: the network-specific asset, as
+            /// chain.lifecycle.v1.AssetIds.zipped_asset_id names it.
+            ///
+            /// Field 1: `zipped_asset_id`
+            #[must_use]
+            pub fn zipped_asset_id(&self) -> u32 {
+                self.0.reborrow().zipped_asset_id
+            }
+            /// Unified asset the zToken stands for, as
+            /// chain.lifecycle.v1.AssetIds.unified_asset_id names it.
+            ///
+            /// Field 2: `unified_asset_id`
+            #[must_use]
+            pub fn unified_asset_id(&self) -> u32 {
+                self.0.reborrow().unified_asset_id
+            }
+            /// External network of the zipped asset, as the `chain_id` of a chain
+            /// returned by `GetDepositWithdrawConfig`.
+            ///
+            /// Field 3: `chain_id`
+            #[must_use]
+            pub fn chain_id(&self) -> u32 {
+                self.0.reborrow().chain_id
+            }
+            /// zToken contract address on Polyester Chain.
+            ///
+            /// Field 4: `ztoken_address`
+            #[must_use]
+            pub fn ztoken_address(&self) -> &'_ str {
+                self.0.reborrow().ztoken_address
+            }
+            /// Balance in 18-decimal units: every zToken has 18 decimals.
+            ///
+            /// Field 5: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<WalletBalanceView<'static>>>
+        for WalletBalanceOwnedView {
+            fn from(inner: ::buffa::OwnedView<WalletBalanceView<'static>>) -> Self {
+                WalletBalanceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<WalletBalanceOwnedView>
+        for ::buffa::OwnedView<WalletBalanceView<'static>> {
+            fn from(wrapper: WalletBalanceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<WalletBalanceView<'static>>>
+        for WalletBalanceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<WalletBalanceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::WalletBalance {
+            type View<'a> = WalletBalanceView<'a>;
+            type ViewHandle = WalletBalanceOwnedView;
+        }
+        impl ::serde::Serialize for WalletBalanceOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetWalletBalancesResponse is the smart account wallet's zToken balances,
+        /// read from Polyester Chain at its latest block.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetWalletBalancesResponseView<'a> {
+            /// Smart account wallet whose balances these are.
+            ///
+            /// Field 1: `smart_account_address`
+            pub smart_account_address: &'a str,
+            /// Every zToken the wallet holds a nonzero balance of, ordered by
+            /// zipped_asset_id. Empty when it holds none.
+            ///
+            /// Field 2: `balances`
+            pub balances: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::WalletBalanceView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetWalletBalancesResponseView<'a> {
+            type Owned = super::super::GetWalletBalancesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.smart_account_address = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.balances
+                            .push(
+                                <super::super::__buffa::view::WalletBalanceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetWalletBalancesResponse {
+                    smart_account_address: self.smart_account_address.to_string(),
+                    balances: self
+                        .balances
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetWalletBalancesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.smart_account_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.smart_account_address,
+                            ) as u32;
+                }
+                for v in &self.balances {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.smart_account_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        1u32,
+                        &self.smart_account_address,
+                        buf,
+                    );
+                }
+                for v in &self.balances {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetWalletBalancesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.smart_account_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "smartAccountAddress",
+                            self.smart_account_address,
+                        )?;
+                }
+                if !self.balances.is_empty() {
+                    __map.serialize_entry("balances", &*self.balances)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetWalletBalancesResponseView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "GetWalletBalancesResponse";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.GetWalletBalancesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetWalletBalancesResponseView);
+        ::buffa::impl_view_reborrow!(GetWalletBalancesResponseView);
+        /** Self-contained, `'static` owned view of a `GetWalletBalancesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetWalletBalancesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetWalletBalancesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetWalletBalancesResponseOwnedView(
+            ::buffa::OwnedView<GetWalletBalancesResponseView<'static>>,
+        );
+        impl GetWalletBalancesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetWalletBalancesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetWalletBalancesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetWalletBalancesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetWalletBalancesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetWalletBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Smart account wallet whose balances these are.
+            ///
+            /// Field 1: `smart_account_address`
+            #[must_use]
+            pub fn smart_account_address(&self) -> &'_ str {
+                self.0.reborrow().smart_account_address
+            }
+            /// Every zToken the wallet holds a nonzero balance of, ordered by
+            /// zipped_asset_id. Empty when it holds none.
+            ///
+            /// Field 2: `balances`
+            #[must_use]
+            pub fn balances(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::WalletBalanceView<'_>,
+            > {
+                &self.0.reborrow().balances
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetWalletBalancesResponseView<'static>>,
+        > for GetWalletBalancesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetWalletBalancesResponseView<'static>>,
+            ) -> Self {
+                GetWalletBalancesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetWalletBalancesResponseOwnedView>
+        for ::buffa::OwnedView<GetWalletBalancesResponseView<'static>> {
+            fn from(wrapper: GetWalletBalancesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetWalletBalancesResponseView<'static>>,
+        > for GetWalletBalancesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetWalletBalancesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetWalletBalancesResponse {
+            type View<'a> = GetWalletBalancesResponseView<'a>;
+            type ViewHandle = GetWalletBalancesResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetWalletBalancesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -15781,14 +21544,17 @@ pub mod __buffa {
         reg.register_json_any(super::__AUTO_WITHDRAW_RULE_JSON_ANY);
         reg.register_json_any(super::__SET_AUTO_WITHDRAW_RULE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__DISABLE_AUTO_WITHDRAW_RULE_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__DISABLE_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_AUTO_WITHDRAW_RULE_ENABLED_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_AUTO_WITHDRAW_RULE_ENABLED_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_AUTO_WITHDRAW_RULE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_AUTO_WITHDRAW_RULE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__AUTO_WITHDRAW_STEP_JSON_ANY);
         reg.register_json_any(super::__AUTO_WITHDRAW_RUN_JSON_ANY);
         reg.register_json_any(super::__LIST_AUTO_WITHDRAW_RUNS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_AUTO_WITHDRAW_RUNS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__PREVIEW_AUTO_WITHDRAW_RUN_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__AUTO_WITHDRAW_PREVIEW_ASSET_JSON_ANY);
+        reg.register_json_any(super::__PREVIEW_AUTO_WITHDRAW_RUN_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRADING_WITHDRAW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CREATE_WALLET_TRADING_WITHDRAW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
@@ -15797,6 +21563,9 @@ pub mod __buffa {
         reg.register_json_any(super::__CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY);
         reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_REQUEST_JSON_ANY);
         reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_WALLET_BALANCES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__WALLET_BALANCE_JSON_ANY);
+        reg.register_json_any(super::__GET_WALLET_BALANCES_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -15824,13 +21593,13 @@ pub use self::__buffa::view::SetAutoWithdrawRuleResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetAutoWithdrawRuleResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DisableAutoWithdrawRuleRequestView;
+pub use self::__buffa::view::SetAutoWithdrawRuleEnabledRequestView;
 #[doc(inline)]
-pub use self::__buffa::view::DisableAutoWithdrawRuleRequestOwnedView;
+pub use self::__buffa::view::SetAutoWithdrawRuleEnabledRequestOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::DisableAutoWithdrawRuleResponseView;
+pub use self::__buffa::view::SetAutoWithdrawRuleEnabledResponseView;
 #[doc(inline)]
-pub use self::__buffa::view::DisableAutoWithdrawRuleResponseOwnedView;
+pub use self::__buffa::view::SetAutoWithdrawRuleEnabledResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetAutoWithdrawRuleRequestView;
 #[doc(inline)]
@@ -15855,6 +21624,18 @@ pub use self::__buffa::view::ListAutoWithdrawRunsRequestOwnedView;
 pub use self::__buffa::view::ListAutoWithdrawRunsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListAutoWithdrawRunsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewAutoWithdrawRunRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewAutoWithdrawRunRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawPreviewAssetView;
+#[doc(inline)]
+pub use self::__buffa::view::AutoWithdrawPreviewAssetOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewAutoWithdrawRunResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::PreviewAutoWithdrawRunResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateTradingWithdrawResponseView;
 #[doc(inline)]
@@ -15887,5 +21668,17 @@ pub use self::__buffa::view::ValidateWithdrawDestinationRequestOwnedView;
 pub use self::__buffa::view::ValidateWithdrawDestinationResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ValidateWithdrawDestinationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWalletBalancesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWalletBalancesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::WalletBalanceView;
+#[doc(inline)]
+pub use self::__buffa::view::WalletBalanceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWalletBalancesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetWalletBalancesResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;
