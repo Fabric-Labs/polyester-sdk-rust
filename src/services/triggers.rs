@@ -23,15 +23,17 @@ use crate::proto::triggers::v1::{
     GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
     ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
     TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc,
-    TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution, modify_trigger_request,
-    trailing_stop_trigger, trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
+    TriggerType, TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution,
+    modify_trigger_request, trailing_stop_trigger, trigger_intent, trigger_market_ioc,
+    twap_market_ioc, twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
 const MAX_BPS: i32 = 10_000;
-/// Slippage cap shared by every trailing stop, every child that sells, and a
-/// modify (which does not say what it changes): a 100% cap would leave a sell
-/// no positive price to sell at.
+/// Slippage cap shared by every trailing stop and every child that sells: a
+/// 100% cap would leave a sell no positive price to sell at. A modify does
+/// not say which trigger it changes, so it takes up to [`MAX_BPS`], as the
+/// contract does, and the server refuses 10000 where it does not apply.
 const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
 
 fn validate_bps(field: &str, bps: i32, allow_clear: bool) -> Result<()> {
@@ -110,6 +112,13 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
                 "{option} applies only to {label}"
             )));
         }
+    }
+    // The contract's ladder is LINEAR limit GTC only: a market order type is
+    // refused, never sent as resting limit orders.
+    if p.trigger_type == Ladder && p.order_type == CreateOrderType::Market {
+        return Err(Error::validation(
+            "order_type=market does not apply to a ladder: a ladder places limit GTC orders only",
+        ));
     }
     if p.trigger_price.is_some() && !matches!(p.trigger_type, StopLoss | TakeProfit) {
         return Err(Error::validation(
@@ -229,6 +238,9 @@ impl TriggersService {
         Ok(list)
     }
 
+    /// List triggers with typed filters: symbol, status, trigger type and
+    /// parent order (see [`ListTriggersOpts`]). A filter that does not parse
+    /// is refused with `Error::Validation` before anything is sent.
     pub async fn list_with(&self, opts: ListTriggersOpts) -> Result<TriggersList> {
         use crate::codecs::decode::trigger_status_from_label;
         let mut req = ListTriggersRequest {
@@ -250,6 +262,25 @@ impl TriggersService {
         for label in &opts.status {
             let status = trigger_status_from_label(label).map_err(Error::validation)?;
             req.status.push(status.into());
+        }
+        if let Some(trigger_type) = opts.trigger_type {
+            req.trigger_type = match trigger_type {
+                CreateTriggerType::StopLoss => TriggerType::STOP_LOSS,
+                CreateTriggerType::TakeProfit => TriggerType::TAKE_PROFIT,
+                CreateTriggerType::TrailingStop => TriggerType::TRAILING_STOP,
+                CreateTriggerType::Twap => TriggerType::TWAP,
+                CreateTriggerType::Ladder => TriggerType::LADDER,
+            }
+            .into();
+        }
+        if let Some(parent) = opts.parent_order_id.as_deref() {
+            let id = id_to_u64(parent, "parent_order_id")?;
+            if id == 0 {
+                return Err(Error::validation(
+                    "parent_order_id must be a non-zero order ID",
+                ));
+            }
+            req.parent_order_id = Some(id);
         }
         self.list(req).await
     }
@@ -757,7 +788,10 @@ impl TriggersService {
             }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
-            validate_bps_at_most("max_slippage_bps", bps, true, MAX_SELLING_SLIPPAGE_BPS)?;
+            // 0 clears; up to 10000 for a buy stop-loss or take-profit market
+            // child, as at creation. The server refuses 10000 for a trailing
+            // stop and a sell one with MAX_SLIPPAGE_INVALID.
+            validate_bps("max_slippage_bps", bps, true)?;
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
@@ -973,13 +1007,14 @@ impl TriggersService {
     ) -> Result<crate::realtime::TypedSubscription<Trigger>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:spot:triggers:{account}:proto");
-        // Each trigger takes its pair's base quantity scale from the catalogs
-        // loaded when it arrives, as `get` and `list` do.
+        // Each trigger takes its pair's symbol and base quantity scale from
+        // the catalogs loaded when it arrives, as `get` and `list` do.
         let catalogs = self.ctx.catalogs.clone();
         self.ctx
             .realtime
             .subscribe_proto(&channel, move |bytes: &[u8]| {
                 let mut trigger = crate::codecs::decode::trigger_from_bytes(bytes)?;
+                trigger.symbol = catalogs.display_symbol(trigger.symbol_id);
                 let scale = catalogs.base_quantity_scale_for_symbol_id(trigger.symbol_id);
                 attach_trigger_scale(&mut trigger, scale);
                 Ok(trigger)
@@ -1650,17 +1685,30 @@ mod tests {
                 .is_err()
         );
 
-        let modify_too_high = ModifyTriggerParams {
+        // POLY-9426: a modify takes 10000 (a buy stop-loss or take-profit
+        // market child's cap) and leaves the side check to the server.
+        let modify_full = ModifyTriggerParams {
             trigger_id: "1".into(),
             symbol: Some("BTC-USDT".into()),
             max_slippage_bps: Some(10_000),
             ..modify_params(None, None)
         };
+        client
+            .triggers
+            .encode_modify_params(&modify_full)
+            .expect("modify takes 10000 bps");
+        let modify_too_high = ModifyTriggerParams {
+            max_slippage_bps: Some(10_001),
+            ..modify_full
+        };
+        let err = client
+            .triggers
+            .encode_modify_params(&modify_too_high)
+            .unwrap_err();
         assert!(
-            client
-                .triggers
-                .encode_modify_params(&modify_too_high)
-                .is_err()
+            err.to_string()
+                .contains("max_slippage_bps must be between 1 and 10000"),
+            "{err}"
         );
     }
 
@@ -1752,7 +1800,10 @@ mod tests {
             symbol: Some("BTC-USDT".into()),
             ..modify_params(None, None)
         };
-        for bps in [1, 9_999] {
+        // A modify does not say which trigger it changes: it takes 1 to
+        // 10000 as the contract does (POLY-9426), and the server refuses
+        // 10000 for a trailing stop.
+        for bps in [1, 9_999, 10_000] {
             client
                 .triggers
                 .encode_modify_params(&ModifyTriggerParams {
@@ -1772,7 +1823,7 @@ mod tests {
             client
                 .triggers
                 .encode_modify_params(&ModifyTriggerParams {
-                    max_slippage_bps: Some(10_000),
+                    max_slippage_bps: Some(10_001),
                     ..base
                 })
                 .is_err()

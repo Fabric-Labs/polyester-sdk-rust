@@ -43,6 +43,8 @@ mod recv_window_replay;
 mod request_size_rate_limit;
 #[path = "signed_redirects/mod.rs"]
 mod signed_redirects;
+#[path = "trigger_reads_and_filters/mod.rs"]
+mod trigger_reads_and_filters;
 #[path = "url_userinfo/mod.rs"]
 mod url_userinfo;
 #[path = "zipper_supply/mod.rs"]
@@ -6374,13 +6376,14 @@ async fn poly_8539_trigger_option_applicability() {
                 Some(1),
             )
             .unwrap();
-            let mut params = CreateTriggerParams::new(
-                "BTC-USDT",
-                kind,
-                CreateSide::Sell,
-                CreateOrderType::Market,
-                qty,
-            );
+            // A ladder places limit orders only (POLY-9423).
+            let order_type = if kind == CreateTriggerType::Ladder {
+                CreateOrderType::Limit
+            } else {
+                CreateOrderType::Market
+            };
+            let mut params =
+                CreateTriggerParams::new("BTC-USDT", kind, CreateSide::Sell, order_type, qty);
             params.client_trigger_id = "capture-option".into();
             match kind {
                 CreateTriggerType::StopLoss | CreateTriggerType::TakeProfit => {
@@ -6563,6 +6566,11 @@ async fn poly_8539_trigger_execution_applicability() {
             if kind == CreateTriggerType::TrailingStop && order_type == CreateOrderType::Limit {
                 continue;
             }
+            // A market ladder is refused whatever its options (POLY-9423,
+            // trigger_reads_and_filters); its limit options are checked here.
+            if kind == CreateTriggerType::Ladder && order_type == CreateOrderType::Market {
+                continue;
+            }
             for field in [
                 "post_only",
                 "limit_price",
@@ -6689,7 +6697,8 @@ async fn poly_8539_trigger_execution_applicability() {
             }
         }
     }
-    assert_eq!(executed, 45);
+    // 9 kind/order-type pairs (a market ladder is refused outright) x 5 fields.
+    assert_eq!(executed, 40);
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 

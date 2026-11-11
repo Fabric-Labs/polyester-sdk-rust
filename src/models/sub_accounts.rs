@@ -11,6 +11,19 @@ pub struct SubAccount {
     pub updated_at: Option<Timestamp>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
+    /// The caller's role on this sub-account as its proto name (`"VIEWER"`,
+    /// `"TRADER"`, `"LEVERAGED_TRADER"`, `"TREASURY"`, `"ADMIN"`, `"OWNER"`),
+    /// as member and invite roles read; `"UNKNOWN(n)"` for a role this
+    /// version does not know. `None` when the server sends none, as on a
+    /// removal: no role is assumed.
+    pub role: Option<String>,
+    /// The caller no longer has access to this sub-account, for example after
+    /// its owner removed the caller as a member: drop it from the caller's
+    /// list. Only real-time updates (`sub_accounts.subscribe`) set it;
+    /// reads list only accessible sub-accounts. A role or access change does
+    /// not change `revision` or `updated_at`, so apply each update as it
+    /// arrives.
+    pub removed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
