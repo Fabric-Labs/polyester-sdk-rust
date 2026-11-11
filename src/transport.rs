@@ -139,8 +139,8 @@ const PROXY_ENV: [&str; 6] = [
     "all_proxy",
 ];
 
-/// `text` with every URL in it as [`url_for_error`] names it, and every proxy
-/// URL from the environment as `[proxy]`. For text that quotes an answer or a
+/// `text` with every URL in it reduced as [`url_for_error`] reduces one, and
+/// every proxy URL from the environment as `[proxy]`. For text that quotes an answer or a
 /// transport, such as an error message.
 pub(crate) fn redact_text(text: &str) -> String {
     let mut text = text.to_owned();
@@ -163,26 +163,32 @@ pub(crate) fn redact_text(text: &str) -> String {
             text = text.replace(form.as_str(), "[proxy]");
         }
     }
+    strip_url_secrets(&text)
+}
+
+/// After each `://`, up to the next whitespace, drop everything up to the last
+/// `@` before any `?` or `#` (the userinfo), and everything from that `?` or
+/// `#` on (the query and fragment). The URL is not parsed, so a userinfo or
+/// query holding parentheses or quotes is dropped whole.
+fn strip_url_secrets(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut rest = text.as_str();
-    while let Some(separator) = rest.find("://") {
-        let scheme_start = rest[..separator]
-            .rfind(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')))
-            .map_or(0, |i| i + 1);
-        let end = rest[separator + 3..]
-            .find(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '<' | '>' | '(' | ')'))
-            .map_or(rest.len(), |i| separator + 3 + i);
-        if scheme_start == separator {
-            // No scheme before "://": not a URL.
-            out.push_str(&rest[..separator + 3]);
-            rest = &rest[separator + 3..];
-            continue;
+    let mut position = 0;
+    while let Some(found) = text[position..].find("://") {
+        let start = position + found + 3;
+        let end = text[start..]
+            .find(char::is_whitespace)
+            .map_or(text.len(), |i| start + i);
+        let mut token = &text[start..end];
+        let mut cut = token.find(['?', '#']).unwrap_or(token.len());
+        if let Some(at) = token[..cut].rfind('@') {
+            token = &token[at + 1..];
+            cut -= at + 1;
         }
-        out.push_str(&rest[..scheme_start]);
-        out.push_str(&url_for_error(&rest[scheme_start..end]));
-        rest = &rest[end..];
+        out.push_str(&text[position..start]);
+        out.push_str(&token[..cut]);
+        position = end;
     }
-    out.push_str(rest);
+    out.push_str(&text[position..]);
     out
 }
 

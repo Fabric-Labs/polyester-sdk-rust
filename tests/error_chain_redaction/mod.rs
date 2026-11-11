@@ -113,3 +113,84 @@ async fn catalog_startup_chains_no_credential() {
         assert_chain_clean(name, &err);
     }
 }
+
+// Round 2: URLs whose userinfo or query holds a parenthesis or an
+// apostrophe, and structured diagnostics.
+
+async fn spot_config_error(status: u16, content_type: &'static str, body: String) -> Error {
+    let http = MockHttpServer::spawn(move |_| HttpScript::Raw {
+        status,
+        headers: vec![("Content-Type".into(), content_type.into())],
+        body: body.clone().into_bytes(),
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        timeout: Duration::from_secs(2),
+        hydrate_catalogs: false,
+        allow_insecure_http: true,
+        ..Default::default()
+    })
+    .expect("client");
+    client
+        .market_data
+        .get_spot_config()
+        .await
+        .expect_err("the stub refuses")
+}
+
+#[tokio::test]
+async fn a_url_with_parentheses_or_quotes_is_redacted() {
+    let urls = [
+        format!("http://{USER}:one(two-{SECRET})@proxy.example.test/x"),
+        format!("http://{USER}:one'two-{SECRET}@proxy.example.test/x"),
+        format!("http://proxy.example.test/x?{QUERY}one(two-{SECRET})"),
+        format!("http://proxy.example.test/x?{QUERY}one'two-{SECRET}"),
+    ];
+    for url in urls {
+        let body = serde_json::json!({"code": "unavailable", "message": format!("upstream {url} refused")})
+            .to_string();
+        let err = spot_config_error(503, "application/json", body).await;
+        assert!(
+            err.to_string().contains("proxy.example.test"),
+            "{url}: {err}"
+        );
+        assert_chain_clean(&url, &err);
+    }
+}
+
+#[tokio::test]
+async fn structured_diagnostics_are_redacted() {
+    let cases = [
+        (
+            "timestamp-skew-problem",
+            401,
+            serde_json::json!({"code": "TIMESTAMP_SKEW", "detail": format!("upstream {} refused", proxy_url())}),
+        ),
+        (
+            "rate-limit-detail",
+            429,
+            serde_json::json!({
+                "code": "RATE_LIMIT_EXCEEDED",
+                "detail": format!("upstream {}", proxy_url()),
+                "rate_limit": {"reason": "ip", "operation_id": proxy_url()},
+            }),
+        ),
+    ];
+    for (name, status, body) in cases {
+        let err = spot_config_error(status, "application/problem+json", body.to_string()).await;
+        let structured = match &err {
+            Error::TimestampSkew { problem, .. } => format!("{problem:?} {problem:#?}"),
+            Error::RateLimit { detail, .. } => format!("{detail:?} {detail:#?}"),
+            other => panic!("{name}: unexpected {other:?}"),
+        };
+        assert!(structured.len() > 10, "{name}: no diagnostic in {err:?}");
+        for secret in [USER, SECRET, QUERY] {
+            assert!(
+                !structured.contains(secret),
+                "{name}: prints {secret}: {structured}"
+            );
+        }
+        assert_chain_clean(name, &err);
+    }
+}

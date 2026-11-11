@@ -322,9 +322,9 @@ other call is retried this way, and mutations never are.
 failure, also returned by `std::error::Error::source`. Its message drops URL
 credentials. No SDK error prints a credential anywhere in its chain: every
 error mapped from a Connect call is redacted where it is mapped, so each URL an
-answer or a transport quotes keeps only its scheme, host, port and path, and a
+answer or a transport quotes loses its userinfo, query and fragment, and a
 proxy URL from the environment reads `[proxy]`, in `Display`, `Debug` and every
-`source()`. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
+`source()`, problem details and a rate limit's `detail` included. A `CatalogLoadFailure` message reads, for example, `catalog hydration failed: funding config
 (chain.zipper.v1.ZipperService/GetDepositWithdrawConfig) connection closed
 after 3 attempts in 0.8s: ...`.
 

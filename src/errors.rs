@@ -713,6 +713,7 @@ impl Error {
             value: Option<Box<crate::problem::HttpProblem>>,
         ) -> Option<Box<crate::problem::HttpProblem>> {
             value.map(|mut problem| {
+                problem.code = text(std::mem::take(&mut problem.code));
                 problem.detail = text(std::mem::take(&mut problem.detail));
                 problem.problem_type = text(std::mem::take(&mut problem.problem_type));
                 problem
@@ -755,7 +756,18 @@ impl Error {
                 code,
                 message: text(message),
                 retry_after,
-                detail,
+                detail: detail.map(|mut detail| {
+                    for field in [
+                        &mut detail.reason,
+                        &mut detail.operation_id,
+                        &mut detail.policy_class,
+                        &mut detail.scope,
+                        &mut detail.refill_model,
+                    ] {
+                        *field = text(std::mem::take(field));
+                    }
+                    detail
+                }),
             },
             Self::Server(message) => Self::Server(text(message)),
             Self::AdmissionUnavailable {
