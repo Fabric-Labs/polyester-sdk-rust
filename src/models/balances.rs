@@ -85,6 +85,17 @@ pub struct LedgerTransfer {
     pub transfer_type: i32,
     pub account_code: i32,
     pub timestamp: i64,
+    /// The transfer's lifecycle flow ID (the contract's `flow_id`), the ID
+    /// the lifecycle reads take; empty when it has none.
+    ///
+    /// New transfers from the Trading to the Funding account carry it from
+    /// their first realtime update. The `withdraw_failed` (1075) debit of a
+    /// rejected or failed withdrawal carries its withdrawal's flow ID in
+    /// `balances.list_transfers`, joined when the history is read, so a read made
+    /// before the withdrawal's outcome was recorded can return it empty and a
+    /// later read returns it; the realtime transfer stream sends that debit
+    /// once, without it. Withdrawals that ended before this link existed keep
+    /// it empty. Reload recent transfers with `balances.list_transfers` to see it.
     pub tx_id: String,
     pub is_debit: bool,
     pub source: Option<TransferSide>,

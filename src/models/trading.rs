@@ -21,6 +21,14 @@ pub struct Order {
     pub orig_qty: Option<Quantity>,
     pub cum_qty: Option<Quantity>,
     pub leaves_qty: Option<Quantity>,
+    /// Iceberg display quantity the order was placed with, at the pair's base
+    /// quantity scale: the most of the order the order book shows at once.
+    /// Zero for a plain order. A replace keeps it.
+    pub display_qty: Option<Quantity>,
+    /// Part of `leaves_qty` an iceberg order keeps hidden from the order
+    /// book, at the pair's base quantity scale: the book shows `leaves_qty`
+    /// minus this. Zero for a plain order and once the order has ended.
+    pub hidden_qty: Option<Quantity>,
     /// Filled base quantity this replacement inherited from its predecessors
     /// when it was accepted; zero for an original order. `cum_qty` minus
     /// this is what this generation executed itself.
@@ -60,13 +68,21 @@ pub struct Order {
     /// `UNKNOWN(<number>)` forward-compatible enum value.
     pub fee_asset: String,
     /// The order's self-trade prevention mode: `expire_taker`,
-    /// `expire_maker` or `expire_both`, empty when the read does not carry
-    /// it, or `UNKNOWN(<number>)` for a mode this SDK does not know. Its
-    /// attached take-profit, stop-loss and trailing-stop exits use the same
-    /// mode.
+    /// `expire_maker`, `expire_both` or `decrement`, empty when the read does
+    /// not carry it, or `UNKNOWN(<number>)` for a mode this SDK does not
+    /// know. Its attached take-profit, stop-loss and trailing-stop exits use
+    /// the same mode. A `decrement` order that self-trade prevention reduced
+    /// reads its lowered quantity; one it reduced to nothing ends `canceled`
+    /// with `CANCEL_REASON_STP_DECREMENT`.
     pub self_trade_prevention_mode: String,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
+    /// Quote proceeds target a SELL was sized by
+    /// ([`CreateOrderParams::quote_proceeds_scaled`]), at the pair's quote
+    /// quantity scale; `None` for an order sized otherwise. On such a SELL,
+    /// `cum_notional` ([`Order::cum_quote`]) is the proceeds it received before
+    /// fees, never above the target.
+    pub submitted_quote_proceeds_scaled: Option<i64>,
     /// Attached risk policy when requested via `include_attached_risk`.
     pub attached_risk: Option<AttachedRisk>,
     pub lineage: Option<OrderLineage>,
@@ -94,9 +110,13 @@ pub struct Order {
     /// code this SDK does not know). `None` for every other status.
     pub reject_reason: Option<String>,
     /// Why a `canceled` order ended: an `orders.v1.CancelReason` proto name
-    /// (for example `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_REPLACED` or
-    /// `CANCEL_REASON_GTD_EXPIRED`), or `UNKNOWN(<number>)` for a reason this
-    /// SDK does not know. `None` for every other status.
+    /// (for example `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_REPLACED`,
+    /// `CANCEL_REASON_GTD_EXPIRED`, `CANCEL_REASON_STP_DECREMENT` for an order
+    /// `decrement` self-trade prevention reduced to nothing,
+    /// `CANCEL_REASON_PRICE_BAND` for the remainder of a market order the
+    /// pair's price band stopped, or `CANCEL_REASON_CANCEL_ON_DISCONNECT`), or
+    /// `UNKNOWN(<number>)` for a reason this SDK does not know. `None` for
+    /// every other status.
     pub cancel_reason: Option<String>,
 }
 
@@ -298,6 +318,9 @@ pub struct OrderMutationResult {
     pub resolved_base_qty: Option<Quantity>,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
+    /// Quote proceeds target submitted with quote-proceeds sizing, at the
+    /// pair's quote quantity scale, when used.
+    pub submitted_quote_proceeds_scaled: Option<i64>,
     /// Public ID of the attached take-profit trigger, when the order has one.
     pub take_profit_trigger_id: Option<String>,
     /// Public ID of the attached stop-loss trigger, when the order has one.
@@ -406,6 +429,12 @@ pub struct BatchCreateResultItem {
     /// and the server knows the holder. Absent for a duplicate within the
     /// same batch.
     pub existing_order_id: Option<String>,
+    /// Hard all-in quote debit an accepted item was sized by, at the pair's
+    /// quote quantity scale; `None` when it was sized otherwise or rejected.
+    pub submitted_max_quote_debit_scaled: Option<i64>,
+    /// Quote proceeds target an accepted item was sized by, at the pair's
+    /// quote quantity scale; `None` when it was sized otherwise or rejected.
+    pub submitted_quote_proceeds_scaled: Option<i64>,
     /// Public ID of the attached take-profit trigger, when an accepted order has one.
     pub take_profit_trigger_id: Option<String>,
     /// Public ID of the attached stop-loss trigger, when an accepted order has one.
@@ -1018,13 +1047,60 @@ pub struct CreateOrderParams {
     pub symbol_id: Option<u32>,
     pub side: CreateSide,
     pub order_type: CreateOrderType,
-    /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
+    /// Base quantity. Set exactly one of this, `max_quote_debit_scaled` and
+    /// `quote_proceeds_scaled`.
     pub quantity: Option<Quantity>,
-    /// Hard all-in quote debit limit. The [`Quantity`] must use
+    /// Iceberg display quantity: the most of the order the order book shows
+    /// at once. Once that shown part is fully executed, the next part is
+    /// shown at the same price, behind the orders already resting there.
+    /// Base quantity at the pair's base quantity scale, as `quantity`.
+    ///
+    /// Only a limit GTC or GTD order takes one: on a market, limit IOC or
+    /// limit FOK order, and when it is not positive, it is refused with
+    /// [`crate::Error::Validation`] before sending. `None` places a plain
+    /// order. The API checks the rest: below `quantity`, a multiple of the
+    /// pair's quantity step and at least its minimum quantity
+    /// (`ICEBERG_DISPLAY_INVALID`, `ICEBERG_DISPLAY_TOO_SMALL`), at least
+    /// `quantity` / 100 rounded up, so at most 100 parts
+    /// (`ICEBERG_DISPLAY_TOO_SMALL`), and no attached risk
+    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified; a replace
+    /// keeps it.
+    pub display_quantity: Option<Quantity>,
+    /// Hard all-in quote debit limit of a BUY. The [`Quantity`] must use
     /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
-    /// catalog quote scale. Set exactly one of this and `quantity`.
+    /// catalog quote scale. Set exactly one of this, `quantity` and
+    /// `quote_proceeds_scaled`.
     pub max_quote_debit_scaled: Option<Quantity>,
+    /// Quote proceeds target of a SELL: "sell 100 USDT worth". The order
+    /// sells whole quantity steps until its proceeds before fees reach the
+    /// target, and never receives more; the fee is charged in quote on those
+    /// proceeds. The [`Quantity`] must use
+    /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
+    /// catalog quote scale, as `max_quote_debit_scaled`. Set exactly one of
+    /// this, `quantity` and `max_quote_debit_scaled`.
+    ///
+    /// Only a SELL market order or SELL limit IOC order takes one; any other
+    /// order, and a target that is not positive, is refused with
+    /// [`crate::Error::Validation`] before sending. The API refuses one with
+    /// attached risk (`VALIDATION_ERROR`, rule `no_attached_risk`) and a
+    /// target too small for one step (`QUOTE_SIZE_TOO_SMALL`). The order
+    /// holds the base its target sells at its limit price, or a market
+    /// order's maximum slippage price (`INSUFFICIENT_FUNDS` when that base
+    /// is not free).
+    pub quote_proceeds_scaled: Option<Quantity>,
     pub price: Option<Price>,
+    /// Static entry peg: the order's price is taken once, at entry, from the
+    /// best bid or best ask plus a signed number of the pair's price
+    /// increments, and never follows the book afterwards. `price` is still
+    /// required, as the BUY's highest or the SELL's lowest acceptable price
+    /// (`PEG_LIMIT_VIOLATION` when the pegged price is beyond it).
+    ///
+    /// A peg on a market order, together with `max_quote_debit_scaled` or
+    /// `quote_proceeds_scaled`, or together with `attached_risk` is refused
+    /// with [`crate::Error::Validation`] before sending. An empty reference
+    /// side is refused `PEG_REFERENCE_UNAVAILABLE`, other unsupported terms
+    /// `INVALID_PEG`. Read the order for the price it took.
+    pub peg: Option<OrderPeg>,
     pub time_in_force: Option<CreateTimeInForce>,
     /// Optional client order id (API-optional).
     ///
@@ -1040,7 +1116,8 @@ pub struct CreateOrderParams {
     pub market_client_ref_price: Option<Price>,
     /// Fee asset. `Base` is valid only for BUY orders; SELL orders use `Quote`.
     pub fee_asset: Option<FeeAsset>,
-    /// Self-trade prevention policy for this order.
+    /// Self-trade prevention policy for this order; `None` sends
+    /// `expire_maker`, the API's default.
     pub self_trade_prevention: Option<OrderSelfTradePrevention>,
     /// Optional market-order slippage guard.
     pub market_max_slippage: Option<MaxSlippage>,
@@ -1052,8 +1129,8 @@ pub struct CreateOrderParams {
 
 impl CreateOrderParams {
     /// Params with only the required fields set; assign the optional fields
-    /// (`quantity` or `max_quote_debit_scaled`, `price`, `time_in_force`, …)
-    /// afterwards.
+    /// (`quantity`, `max_quote_debit_scaled` or `quote_proceeds_scaled`,
+    /// `price`, `time_in_force`, …) afterwards.
     pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
         Self {
             symbol: symbol.into(),
@@ -1061,8 +1138,11 @@ impl CreateOrderParams {
             side,
             order_type,
             quantity: None,
+            display_quantity: None,
             max_quote_debit_scaled: None,
+            quote_proceeds_scaled: None,
             price: None,
+            peg: None,
             time_in_force: None,
             client_order_id: None,
             subaccount_id: None,
@@ -1118,13 +1198,60 @@ pub struct PreviewOrderParams {
     pub symbol_id: Option<u32>,
     pub side: CreateSide,
     pub order_type: CreateOrderType,
-    /// Base quantity. Set exactly one of this and `max_quote_debit_scaled`.
+    /// Base quantity. Set exactly one of this, `max_quote_debit_scaled` and
+    /// `quote_proceeds_scaled`.
     pub quantity: Option<Quantity>,
-    /// Hard all-in quote debit limit. The [`Quantity`] must use
+    /// Iceberg display quantity: the most of the order the order book shows
+    /// at once. Once that shown part is fully executed, the next part is
+    /// shown at the same price, behind the orders already resting there.
+    /// Base quantity at the pair's base quantity scale, as `quantity`.
+    ///
+    /// Only a limit GTC or GTD order takes one: on a market, limit IOC or
+    /// limit FOK order, and when it is not positive, it is refused with
+    /// [`crate::Error::Validation`] before sending. `None` places a plain
+    /// order. The API checks the rest: below `quantity`, a multiple of the
+    /// pair's quantity step and at least its minimum quantity
+    /// (`ICEBERG_DISPLAY_INVALID`, `ICEBERG_DISPLAY_TOO_SMALL`), at least
+    /// `quantity` / 100 rounded up, so at most 100 parts
+    /// (`ICEBERG_DISPLAY_TOO_SMALL`), and no attached risk
+    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified; a replace
+    /// keeps it.
+    pub display_quantity: Option<Quantity>,
+    /// Hard all-in quote debit limit of a BUY. The [`Quantity`] must use
     /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
-    /// catalog quote scale. Set exactly one of this and `quantity`.
+    /// catalog quote scale. Set exactly one of this, `quantity` and
+    /// `quote_proceeds_scaled`.
     pub max_quote_debit_scaled: Option<Quantity>,
+    /// Quote proceeds target of a SELL: "sell 100 USDT worth". The order
+    /// sells whole quantity steps until its proceeds before fees reach the
+    /// target, and never receives more; the fee is charged in quote on those
+    /// proceeds. The [`Quantity`] must use
+    /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
+    /// catalog quote scale, as `max_quote_debit_scaled`. Set exactly one of
+    /// this, `quantity` and `max_quote_debit_scaled`.
+    ///
+    /// Only a SELL market order or SELL limit IOC order takes one; any other
+    /// order, and a target that is not positive, is refused with
+    /// [`crate::Error::Validation`] before sending. The API refuses one with
+    /// attached risk (`VALIDATION_ERROR`, rule `no_attached_risk`) and a
+    /// target too small for one step (`QUOTE_SIZE_TOO_SMALL`). The order
+    /// holds the base its target sells at its limit price, or a market
+    /// order's maximum slippage price (`INSUFFICIENT_FUNDS` when that base
+    /// is not free).
+    pub quote_proceeds_scaled: Option<Quantity>,
     pub price: Option<Price>,
+    /// Static entry peg: the order's price is taken once, at entry, from the
+    /// best bid or best ask plus a signed number of the pair's price
+    /// increments, and never follows the book afterwards. `price` is still
+    /// required, as the BUY's highest or the SELL's lowest acceptable price
+    /// (`PEG_LIMIT_VIOLATION` when the pegged price is beyond it).
+    ///
+    /// A peg on a market order, together with `max_quote_debit_scaled` or
+    /// `quote_proceeds_scaled`, or together with `attached_risk` is refused
+    /// with [`crate::Error::Validation`] before sending. An empty reference
+    /// side is refused `PEG_REFERENCE_UNAVAILABLE`, other unsupported terms
+    /// `INVALID_PEG`. Read the order for the price it took.
+    pub peg: Option<OrderPeg>,
     pub time_in_force: Option<CreateTimeInForce>,
     /// Optional client order id. Accepted for shape parity with create; preview
     /// does not claim it.
@@ -1145,8 +1272,8 @@ pub struct PreviewOrderParams {
 /// One actionable field-level validation failure from preview/create rejection.
 impl PreviewOrderParams {
     /// Params with only the required fields set; assign the optional fields
-    /// (`quantity` or `max_quote_debit_scaled`, `price`, `time_in_force`, …)
-    /// afterwards.
+    /// (`quantity`, `max_quote_debit_scaled` or `quote_proceeds_scaled`,
+    /// `price`, `time_in_force`, …) afterwards.
     pub fn new(symbol: impl Into<String>, side: CreateSide, order_type: CreateOrderType) -> Self {
         Self {
             symbol: symbol.into(),
@@ -1154,8 +1281,11 @@ impl PreviewOrderParams {
             side,
             order_type,
             quantity: None,
+            display_quantity: None,
             max_quote_debit_scaled: None,
+            quote_proceeds_scaled: None,
             price: None,
+            peg: None,
             time_in_force: None,
             client_order_id: None,
             subaccount_id: None,
@@ -1212,11 +1342,62 @@ pub struct PreviewOrderResult {
     pub evaluated_at_ms: i64,
 }
 
+/// What happens when an order would trade against another order of the same
+/// root account, including another sub-account of that root. The incoming
+/// order's mode decides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OrderSelfTradePrevention {
+    /// Cancel the incoming (taker) order.
     ExpireTaker,
+    /// Cancel the resting (maker) order. The API's default.
     ExpireMaker,
+    /// Cancel both orders.
     ExpireBoth,
+    /// Reduce both orders by the quantity that would have traded, with no
+    /// trade. The order left with no quantity is canceled with
+    /// `CANCEL_REASON_STP_DECREMENT` (both, when their quantities are equal);
+    /// a resting order that keeps a quantity keeps its place in the queue,
+    /// and an incoming one goes on matching and may rest. A fill-or-kill
+    /// order that would meet such an order before it is completely filled is
+    /// rejected `FOK_INSUFFICIENT_LIQUIDITY` instead. Valid with attached
+    /// risk and on trigger creates.
+    Decrement,
+}
+
+/// The book side a static entry peg ([`OrderPeg`]) takes its price from.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PegReference {
+    /// The highest live bid when the order enters.
+    BestBid,
+    /// The lowest live ask when the order enters.
+    BestAsk,
+}
+
+/// Static entry peg of a limit order ([`CreateOrderParams::peg`]): its price
+/// is `reference` plus `offset_ticks` price increments, taken once when the
+/// order enters.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OrderPeg {
+    /// The book side the price is taken from.
+    pub reference: PegReference,
+    /// Signed number of the pair's configured price increments (its tick
+    /// size) added to the reference, sent as given: `-2` is two tick-size
+    /// increments below the reference. It counts price increments, not
+    /// 1e-9 price ticks, and does not select occupied price levels. Zero
+    /// takes the reference price itself.
+    pub offset_ticks: i64,
+}
+
+impl OrderPeg {
+    /// A peg `offset_ticks` price increments from `reference`.
+    pub fn new(reference: PegReference, offset_ticks: i64) -> Self {
+        Self {
+            reference,
+            offset_ticks,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1030,6 +1030,52 @@ pub type OwnedListVaultPayoutRulesResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<ListVaultLedgerRequestView<'static>>`.
+pub type OwnedListVaultLedgerRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListVaultLedgerResponseView<'static>>`.
+pub type OwnedListVaultLedgerResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListVaultAllowlistRequestView<'static>>`.
+pub type OwnedListVaultAllowlistRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListVaultAllowlistResponseView<'static>>`.
+pub type OwnedListVaultAllowlistResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListVaultAllowlistChangesRequestView<'static>>`.
+pub type OwnedListVaultAllowlistChangesRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListVaultAllowlistChangesResponseView<'static>>`.
+pub type OwnedListVaultAllowlistChangesResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RequestVaultAllowlistChangeRequestView<'static>>`.
+pub type OwnedRequestVaultAllowlistChangeRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<RequestVaultAllowlistChangeResponseView<'static>>`.
+pub type OwnedRequestVaultAllowlistChangeResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::GetBrokerResponse>
 for crate::proto::swap::quickswap::v1::__buffa::view::GetBrokerResponseView<'_> {
     fn encode(
@@ -1576,6 +1622,112 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListVaultLedgerResponse>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::swap::quickswap::v1::ListVaultLedgerResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListVaultAllowlistResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListVaultAllowlistResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME: &str = "swap.quickswap.v1.QuickSwapBrokerService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBroker` RPC.
@@ -1803,6 +1955,42 @@ pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_PAYOUT_RULES_SPEC: ::connectrpc::
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListVaultLedger` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_LEDGER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultLedger",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListVaultAllowlist` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlist",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListVaultAllowlistChanges` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_CHANGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlistChanges",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RequestVaultAllowlistChange` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_BROKER_SERVICE_REQUEST_VAULT_ALLOWLIST_CHANGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapBrokerService/RequestVaultAllowlistChange",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// QuickSwapBrokerService administers a broker org, over ConnectRPC and REST.
 /// Every request names its broker. The caller is either the broker's API key,
 /// sent as a bearer token (see QuickSwapService), or a member's interactive
@@ -1810,12 +1998,14 @@ pub const QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_PAYOUT_RULES_SPEC: ::connectrpc::
 /// BROKER_NOT_FOUND. Each RPC maps to one broker action:
 /// | Action | Owner | Admin | Finance | Affiliate manager | Viewer | API key |
 /// | --- | --- | --- | --- | --- | --- | --- |
-/// | Read (GetBroker, ListKeys, ListVaults, GetVault, ListMembers, ListQuickSwaps, GetQuickSwap, GetFeeTotals, GetBrokerStats, ListVaultBalances, ListPayouts, GetPayout, ListUpcomingPayouts, ListVaultPayoutRules) | yes | yes | yes | yes | yes | yes, except ListMembers |
+/// | Read (GetBroker, ListKeys, ListVaults, GetVault, ListMembers, ListQuickSwaps, GetQuickSwap, GetFeeTotals, GetBrokerStats, ListVaultBalances, ListPayouts, GetPayout, ListUpcomingPayouts, ListVaultPayoutRules, ListVaultAllowlist, ListVaultAllowlistChanges) | yes | yes | yes | yes | yes | yes, except ListMembers |
 /// | Create vaults (CreateAffiliateVault, SetVaultStatus) | yes | yes | no | yes | no | yes |
 /// | Manage keys (CreateKey, RotateKey, RevokeKey) | yes | yes | no | no | no | RotateKey of itself only |
 /// | Manage members (InviteMember, SetMemberRole, RemoveMember) | yes | yes, never the Owner | no | no | no | no |
 /// | Transfer ownership | yes | no | no | no | no | no |
-/// A member managing keys or members must also send a fresh step-up proof in
+/// | Manage the payout address allowlist (RequestVaultAllowlistChange) | yes | no | yes | no | no | no |
+/// A member managing keys, members or the payout address allowlist must also
+/// send a fresh step-up proof in
 /// the X-Auth-Step-Up header, obtained by completing an MFA challenge for
 /// fresh step-up; each proof authorizes one change. Reads, vaults and a key
 /// rotating itself need none. A denied action fails with PERMISSION_DENIED /
@@ -2577,6 +2767,139 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// ListVaultLedger lists the movements of the broker's vaults' funds,
+    /// newest first: each fee a QuickSwap credited, each payout that left a
+    /// vault with how it ended, and each refund of a rejected payout to the
+    /// vault's smart account. It carries no running balance; read the current
+    /// balance with ListVaultBalances. Every broker role and the broker's API
+    /// keys can read, without step-up.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND, or VAULT_NOT_FOUND for a vault that is
+    /// not the broker's.
+    /// - INVALID_ARGUMENT: a page_token from another broker, other filters or
+    /// malformed.
+    /// - UNAVAILABLE: the ledger cannot be read; retry the same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_vault_ledger<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListVaultLedgerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListVaultAllowlist reads one vault's payout address allowlist: the
+    /// destinations its payouts and withdrawals may pay, each with when it
+    /// becomes payable. A destination is payable 24 hours after it is listed.
+    /// Every broker role and the broker's API keys can read, without step-up.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
+    /// - UNAVAILABLE: the allowlist or the vault's payout rule cannot be read;
+    /// no partial list is returned.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_vault_allowlist<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListVaultAllowlistResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListVaultAllowlistChanges lists one vault's payout address allowlist
+    /// changes, newest first, pending ones included. Every broker role and the
+    /// broker's API keys can read, without step-up.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another broker or vault, or
+    /// malformed.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_vault_allowlist_changes<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// RequestVaultAllowlistChange asks to add one destination to, or remove
+    /// one from, a vault's payout address allowlist. Only Owner and Finance
+    /// members can, each change with its own fresh step-up proof. The change
+    /// is returned PENDING; ListVaultAllowlistChanges shows how it ends. A
+    /// vault has at most one pending change. An added
+    /// destination becomes payable 24 hours after it is listed
+    /// (VaultAllowlistEntry.payable_from).
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND;
+    /// ALLOWLIST_DESTINATION_NOT_LISTED for a removal.
+    /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
+    /// - INVALID_ARGUMENT: ALLOWLIST_DESTINATION_INVALID, or a label on a
+    /// removal or with leading or trailing whitespace.
+    /// - ALREADY_EXISTS: ALLOWLIST_DESTINATION_EXISTS.
+    /// - FAILED_PRECONDITION: ALLOWLIST_FULL, ALLOWLIST_DESTINATION_IN_USE,
+    /// ALLOWLIST_CHANGE_PENDING or VAULT_ALLOWLIST_NOT_READY.
+    /// - UNAVAILABLE: outcome unknown; read ListVaultAllowlistChanges before
+    /// requesting again.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn request_vault_allowlist_change<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -3334,6 +3657,122 @@ impl<S: QuickSwapBrokerService> QuickSwapBrokerServiceExt for S {
                 },
             )
             .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_PAYOUT_RULES_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultLedger",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_vault_ledger(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListVaultLedgerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_LEDGER_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultAllowlist",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_vault_allowlist(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListVaultAllowlistResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultAllowlistChanges",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_vault_allowlist_changes(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_CHANGES_SPEC)
+            .route_view(
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RequestVaultAllowlistChange",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.request_vault_allowlist_change(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_BROKER_SERVICE_REQUEST_VAULT_ALLOWLIST_CHANGE_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -3540,6 +3979,34 @@ for QuickSwapBrokerServiceServer<T> {
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(
                             QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_PAYOUT_RULES_SPEC,
+                        ),
+                )
+            }
+            "ListVaultLedger" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_LEDGER_SPEC),
+                )
+            }
+            "ListVaultAllowlist" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_SPEC),
+                )
+            }
+            "ListVaultAllowlistChanges" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            QUICK_SWAP_BROKER_SERVICE_LIST_VAULT_ALLOWLIST_CHANGES_SPEC,
+                        ),
+                )
+            }
+            "RequestVaultAllowlistChange" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            QUICK_SWAP_BROKER_SERVICE_REQUEST_VAULT_ALLOWLIST_CHANGE_SPEC,
                         ),
                 )
             }
@@ -4081,6 +4548,90 @@ for QuickSwapBrokerServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::swap::quickswap::v1::ListVaultPayoutRulesResponse,
+                        >(format)
+                })
+            }
+            "ListVaultLedger" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_vault_ledger(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListVaultLedgerResponse,
+                        >(format)
+                })
+            }
+            "ListVaultAllowlist" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_vault_allowlist(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListVaultAllowlistResponse,
+                        >(format)
+                })
+            }
+            "ListVaultAllowlistChanges" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_vault_allowlist_changes(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesResponse,
+                        >(format)
+                })
+            }
+            "RequestVaultAllowlistChange" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+                    >::from_parts(&req, &body);
+                    svc.request_vault_allowlist_change(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeResponse,
                         >(format)
                 })
             }
@@ -5309,6 +5860,186 @@ where
                 &self.config,
                 QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
                 "ListVaultPayoutRules",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListVaultLedger RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListVaultLedger.
+    pub async fn list_vault_ledger(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_vault_ledger_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListVaultLedger RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_vault_ledger_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultLedgerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultLedgerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultLedger",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListVaultAllowlist RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlist.
+    pub async fn list_vault_allowlist(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_vault_allowlist_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListVaultAllowlist RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_vault_allowlist_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultAllowlistRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultAllowlist",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListVaultAllowlistChanges RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/ListVaultAllowlistChanges.
+    pub async fn list_vault_allowlist_changes(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_vault_allowlist_changes_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListVaultAllowlistChanges RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_vault_allowlist_changes_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListVaultAllowlistChangesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListVaultAllowlistChangesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "ListVaultAllowlistChanges",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RequestVaultAllowlistChange RPC. Sends a request to /swap.quickswap.v1.QuickSwapBrokerService/RequestVaultAllowlistChange.
+    pub async fn request_vault_allowlist_change(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.request_vault_allowlist_change_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RequestVaultAllowlistChange RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn request_vault_allowlist_change_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::RequestVaultAllowlistChangeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::RequestVaultAllowlistChangeResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_BROKER_SERVICE_SERVICE_NAME,
+                "RequestVaultAllowlistChange",
                 request,
                 options,
             )

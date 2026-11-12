@@ -8,6 +8,22 @@ pub type OwnedCreateTriggerRequestView = ::buffa::view::OwnedView<
 pub type OwnedCreateTriggerResponseView = ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::CreateTriggerResponseView<'static>,
 >;
+///Shorthand for `OwnedView<CreateOcoRequestView<'static>>`.
+pub type OwnedCreateOcoRequestView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CreateOcoRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateOcoResponseView<'static>>`.
+pub type OwnedCreateOcoResponseView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CreateOcoResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CancelOcoRequestView<'static>>`.
+pub type OwnedCancelOcoRequestView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelOcoRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CancelOcoResponseView<'static>>`.
+pub type OwnedCancelOcoResponseView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelOcoResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<GetTriggerRequestView<'static>>`.
 pub type OwnedGetTriggerRequestView = ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::GetTriggerRequestView<'static>,
@@ -39,6 +55,14 @@ pub type OwnedCancelTriggerRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<CancelTriggerResponseView<'static>>`.
 pub type OwnedCancelTriggerResponseView = ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::CancelTriggerResponseView<'static>,
+>;
+///Shorthand for `OwnedView<BatchCancelTriggersRequestView<'static>>`.
+pub type OwnedBatchCancelTriggersRequestView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersRequestView<'static>,
+>;
+///Shorthand for `OwnedView<BatchCancelTriggersResponseView<'static>>`.
+pub type OwnedBatchCancelTriggersResponseView = ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<ModifyTriggerRequestView<'static>>`.
 pub type OwnedModifyTriggerRequestView = ::buffa::view::OwnedView<
@@ -76,6 +100,46 @@ for crate::proto::triggers::v1::__buffa::view::CreateTriggerResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::triggers::v1::CreateTriggerResponse>
 for ::buffa::view::OwnedView<
     crate::proto::triggers::v1::__buffa::view::CreateTriggerResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CreateOcoResponse>
+for crate::proto::triggers::v1::__buffa::view::CreateOcoResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CreateOcoResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CreateOcoResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CancelOcoResponse>
+for crate::proto::triggers::v1::__buffa::view::CancelOcoResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::CancelOcoResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::CancelOcoResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -164,6 +228,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::BatchCancelTriggersResponse>
+for crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::triggers::v1::BatchCancelTriggersResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 impl ::connectrpc::Encodable<crate::proto::triggers::v1::ModifyTriggerResponse>
 for crate::proto::triggers::v1::__buffa::view::ModifyTriggerResponseView<'_> {
     fn encode(
@@ -235,6 +319,24 @@ pub const TRIGGERS_SERVICE_CREATE_TRIGGER_SPEC: ::connectrpc::Spec = ::connectrp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateOco` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const TRIGGERS_SERVICE_CREATE_OCO_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/triggers.v1.TriggersService/CreateOco",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CancelOco` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const TRIGGERS_SERVICE_CANCEL_OCO_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/triggers.v1.TriggersService/CancelOco",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetTrigger` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -268,6 +370,15 @@ pub const TRIGGERS_SERVICE_LIST_TRIGGER_EVENTS_SPEC: ::connectrpc::Spec = ::conn
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const TRIGGERS_SERVICE_CANCEL_TRIGGER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/triggers.v1.TriggersService/CancelTrigger",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BatchCancelTriggers` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/triggers.v1.TriggersService/BatchCancelTriggers",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -372,6 +483,53 @@ pub trait TriggersService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Create an OCO: a take-profit and a stop-loss over a quantity the account
+    /// already holds, which cancel each other.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_oco<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::triggers::v1::CreateOcoRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::triggers::v1::CreateOcoResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Cancel both legs of an OCO.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_oco<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::triggers::v1::CancelOcoRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::triggers::v1::CancelOcoResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
     /// Get a trigger by ID.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -452,6 +610,15 @@ pub trait TriggersService: Send + Sync + 'static {
     /// after either, armed stops and running TWAPs can still place orders. To
     /// stop them, cancel each live trigger with this method; ListTriggers lists
     /// them.
+    /// A trigger that has ended (completed, canceled or failed) answers a
+    /// cancel with ERROR_CODE_TRIGGER_STATUS_INVALID for at least 60 s after it
+    /// ends, including a repeat of a cancel that succeeded and a cancel retried
+    /// after a timeout: treat it as already done, and read the trigger to see
+    /// how it ended. After that it may answer ERROR_CODE_TRIGGER_NOT_FOUND
+    /// instead, which then means the same. Pausing, resuming or modifying an
+    /// ended trigger answers the same way. A trigger ID that names none of the
+    /// caller's triggers returns ERROR_CODE_TRIGGER_NOT_FOUND. Cancelling
+    /// either leg of an OCO cancels both.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -471,6 +638,38 @@ pub trait TriggersService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::triggers::v1::CancelTriggerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Cancel up to 50 of the account's triggers in one request, each canceled
+    /// as CancelTrigger cancels it: a TWAP's or ladder's open child orders are
+    /// canceled with it. Results come back per trigger, in request order: an
+    /// accepted item's trigger events report when it is canceled;
+    /// ERROR_CODE_TRIGGER_NOT_FOUND names an ID that is none of the account's
+    /// triggers, and ERROR_CODE_TRIGGER_STATUS_INVALID a trigger that has
+    /// already ended. Each trigger counts one against the account's cancel rate
+    /// limit, as a CancelTrigger does. A request_id identifies the request for 2
+    /// minutes: a retry with the same trigger_ids returns the original results,
+    /// so retry a request that timed out unchanged.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn batch_cancel_triggers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::triggers::v1::BatchCancelTriggersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::triggers::v1::BatchCancelTriggersResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -606,6 +805,64 @@ impl<S: TriggersService> TriggersServiceExt for S {
             .with_spec(TRIGGERS_SERVICE_CREATE_TRIGGER_SPEC)
             .route_view(
                 TRIGGERS_SERVICE_SERVICE_NAME,
+                "CreateOco",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::triggers::v1::__buffa::view::CreateOcoRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::triggers::v1::CreateOcoRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_oco(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::triggers::v1::CreateOcoResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(TRIGGERS_SERVICE_CREATE_OCO_SPEC)
+            .route_view(
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "CancelOco",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::triggers::v1::__buffa::view::CancelOcoRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::triggers::v1::CancelOcoRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_oco(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::triggers::v1::CancelOcoResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(TRIGGERS_SERVICE_CANCEL_OCO_SPEC)
+            .route_view(
+                TRIGGERS_SERVICE_SERVICE_NAME,
                 "GetTrigger",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -720,6 +977,35 @@ impl<S: TriggersService> TriggersServiceExt for S {
                 },
             )
             .with_spec(TRIGGERS_SERVICE_CANCEL_TRIGGER_SPEC)
+            .route_view(
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "BatchCancelTriggers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::triggers::v1::BatchCancelTriggersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.batch_cancel_triggers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::triggers::v1::BatchCancelTriggersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC)
             .route_view(
                 TRIGGERS_SERVICE_SERVICE_NAME,
                 "ModifyTrigger",
@@ -867,6 +1153,18 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                         .with_spec(TRIGGERS_SERVICE_CREATE_TRIGGER_SPEC),
                 )
             }
+            "CreateOco" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(TRIGGERS_SERVICE_CREATE_OCO_SPEC),
+                )
+            }
+            "CancelOco" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(TRIGGERS_SERVICE_CANCEL_OCO_SPEC),
+                )
+            }
             "GetTrigger" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -889,6 +1187,12 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(TRIGGERS_SERVICE_CANCEL_TRIGGER_SPEC),
+                )
+            }
+            "BatchCancelTriggers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(TRIGGERS_SERVICE_BATCH_CANCEL_TRIGGERS_SPEC),
                 )
             }
             "ModifyTrigger" => {
@@ -943,6 +1247,44 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                         .encode::<
                             crate::proto::triggers::v1::CreateTriggerResponse,
                         >(format)
+                })
+            }
+            "CreateOco" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::triggers::v1::CreateOcoRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::triggers::v1::__buffa::view::CreateOcoRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::triggers::v1::CreateOcoRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_oco(ctx, req)
+                        .await?
+                        .encode::<crate::proto::triggers::v1::CreateOcoResponse>(format)
+                })
+            }
+            "CancelOco" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::triggers::v1::CancelOcoRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::triggers::v1::__buffa::view::CancelOcoRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::triggers::v1::CancelOcoRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_oco(ctx, req)
+                        .await?
+                        .encode::<crate::proto::triggers::v1::CancelOcoResponse>(format)
                 })
             }
             "GetTrigger" => {
@@ -1024,6 +1366,27 @@ impl<T: TriggersService> ::connectrpc::Dispatcher for TriggersServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::triggers::v1::CancelTriggerResponse,
+                        >(format)
+                })
+            }
+            "BatchCancelTriggers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::triggers::v1::BatchCancelTriggersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::triggers::v1::BatchCancelTriggersRequest,
+                    >::from_parts(&req, &body);
+                    svc.batch_cancel_triggers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::triggers::v1::BatchCancelTriggersResponse,
                         >(format)
                 })
             }
@@ -1237,6 +1600,88 @@ where
             )
             .await
     }
+    /// Call the CreateOco RPC. Sends a request to /triggers.v1.TriggersService/CreateOco.
+    pub async fn create_oco(
+        &self,
+        request: crate::proto::triggers::v1::CreateOcoRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CreateOcoResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_oco_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateOco RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_oco_with_options(
+        &self,
+        request: crate::proto::triggers::v1::CreateOcoRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CreateOcoResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "CreateOco",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelOco RPC. Sends a request to /triggers.v1.TriggersService/CancelOco.
+    pub async fn cancel_oco(
+        &self,
+        request: crate::proto::triggers::v1::CancelOcoRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CancelOcoResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_oco_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelOco RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_oco_with_options(
+        &self,
+        request: crate::proto::triggers::v1::CancelOcoRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::CancelOcoResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "CancelOco",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the GetTrigger RPC. Sends a request to /triggers.v1.TriggersService/GetTrigger.
     pub async fn get_trigger(
         &self,
@@ -1412,6 +1857,51 @@ where
                 &self.config,
                 TRIGGERS_SERVICE_SERVICE_NAME,
                 "CancelTrigger",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BatchCancelTriggers RPC. Sends a request to /triggers.v1.TriggersService/BatchCancelTriggers.
+    pub async fn batch_cancel_triggers(
+        &self,
+        request: crate::proto::triggers::v1::BatchCancelTriggersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.batch_cancel_triggers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BatchCancelTriggers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn batch_cancel_triggers_with_options(
+        &self,
+        request: crate::proto::triggers::v1::BatchCancelTriggersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::triggers::v1::__buffa::view::BatchCancelTriggersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                TRIGGERS_SERVICE_SERVICE_NAME,
+                "BatchCancelTriggers",
                 request,
                 options,
             )

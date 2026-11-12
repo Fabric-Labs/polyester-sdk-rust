@@ -471,6 +471,13 @@ pub mod order_codes {
     /// The order has already ended; see
     /// [`super::Error::is_order_already_terminal`].
     pub const ORDER_ALREADY_TERMINAL: &str = "ERROR_CODE_ORDER_ALREADY_TERMINAL";
+    /// The trigger has already ended (completed, canceled or failed); see
+    /// [`super::Error::is_trigger_already_ended`].
+    pub const TRIGGER_STATUS_INVALID: &str = "ERROR_CODE_TRIGGER_STATUS_INVALID";
+    /// The trigger ID names none of the account's triggers. More than 60
+    /// seconds after a trigger ended, a cancel, pause, resume or modify of it
+    /// may answer this too.
+    pub const TRIGGER_NOT_FOUND: &str = "ERROR_CODE_TRIGGER_NOT_FOUND";
     /// The order is unknown, or a cancel named another market than the
     /// order's. A cancel by client order ID more than a minute after the
     /// order ended can answer this once the ID no longer names the order.
@@ -1092,6 +1099,51 @@ impl Error {
     /// done" and read the order for how it ended.
     pub fn is_order_already_terminal(&self) -> bool {
         self.auth_error_code() == Some(order_codes::ORDER_ALREADY_TERMINAL)
+    }
+
+    /// Names the called procedure (`/package.Service/Method`) on an
+    /// [`Error::PermissionDenied`] whose answer did not: a ConnectRPC error
+    /// carries no request path.
+    pub(crate) fn for_procedure(self, procedure: &str) -> Self {
+        match self {
+            Self::PermissionDenied {
+                message,
+                status,
+                code,
+                context,
+                endpoint,
+                problem,
+            } if endpoint.is_empty() => Self::PermissionDenied {
+                message,
+                status,
+                code,
+                context: if context.is_empty() {
+                    procedure.trim_start_matches('/').to_owned()
+                } else {
+                    context
+                },
+                endpoint: procedure.to_owned(),
+                problem,
+            },
+            other => other,
+        }
+    }
+
+    /// True when a trigger cancel, pause, resume or modify was refused
+    /// because the trigger has already ended
+    /// (`ERROR_CODE_TRIGGER_STATUS_INVALID`, HTTP 400): completed, canceled
+    /// or failed, by an earlier cancel or otherwise. A repeat of a cancel
+    /// that succeeded answers this too, for at least 60 seconds after the
+    /// trigger ended. Treat it as "already done" and read the trigger for
+    /// how it ended.
+    ///
+    /// After those 60 seconds the same call may answer
+    /// `ERROR_CODE_TRIGGER_NOT_FOUND` ([`order_codes::TRIGGER_NOT_FOUND`])
+    /// instead, which this does not report: that code also means the ID names
+    /// none of the account's triggers. Treat it as done only for a trigger
+    /// you know you created.
+    pub fn is_trigger_already_ended(&self) -> bool {
+        self.auth_error_code() == Some(order_codes::TRIGGER_STATUS_INVALID)
     }
 
     /// True when a request body over the endpoint's size limit was refused
@@ -1728,6 +1780,25 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     Error::Server(fallback_message.clone())
                 };
             }
+            // An order permission refusal (`permission_denied`, such as
+            // POLICY_SPOT_TRADE_DENY, API_KEY_SPOT_TRADE_DENY or
+            // SUBACCOUNT_READ_FORBIDDEN) keeps its code, spelled as the REST
+            // problem of the same refusal spells it: the credentials were
+            // accepted, the operation is not allowed.
+            if err.code == ErrorCode::PermissionDenied && order_detail.code.as_known().is_some() {
+                return Error::PermissionDenied {
+                    message: if raw_message.is_empty() {
+                        fallback_message.clone()
+                    } else {
+                        raw_message.to_owned()
+                    },
+                    status,
+                    code: code.trim_start_matches("ERROR_CODE_").to_owned(),
+                    context: String::new(),
+                    endpoint: String::new(),
+                    problem: None,
+                };
+            }
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
@@ -2249,6 +2320,11 @@ mod tests {
         }
     }
 
+    /// An order permission refusal is a final `Error::PermissionDenied` that
+    /// keeps its code, as the REST problem of the same refusal does: the
+    /// API key's own refusals (`API_KEY_SPOT_TRADE_DENY`,
+    /// `API_KEY_POLICY_REQUIRED`, `API_KEY_MARKET_DENY`) exactly as the
+    /// sub-account policy's (`POLICY_SPOT_TRADE_DENY`, `POLICY_MARKET_DENY`).
     #[test]
     fn order_policy_denial_classification() {
         for name in [
@@ -2256,12 +2332,106 @@ mod tests {
             "ERROR_CODE_POLICY_TRADING_HALTED",
             "ERROR_CODE_POLICY_SPOT_TRADE_DENY",
             "ERROR_CODE_POLICY_SPOT_READ_DENY",
+            "ERROR_CODE_API_KEY_SPOT_TRADE_DENY",
+            "ERROR_CODE_API_KEY_POLICY_REQUIRED",
+            "ERROR_CODE_API_KEY_MARKET_DENY",
+            "ERROR_CODE_API_KEY_SPOT_READ_DENY",
+            "ERROR_CODE_API_KEY_ROOT_SCOPE_ONLY",
+            "ERROR_CODE_PERMISSION_DENIED",
+            "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN",
+            "ERROR_CODE_QUICKSWAP_NOT_PERMITTED",
         ] {
             let code = OrderErrorCode::from_proto_name(name).unwrap();
             let mapped = map_order(code, ErrorCode::PermissionDenied);
-            assert!(matches!(mapped, Error::Auth(_)), "{name}: {mapped:?}");
+            let rest_code = name.trim_start_matches("ERROR_CODE_");
+            assert!(
+                matches!(
+                    &mapped,
+                    Error::PermissionDenied { code, status: 403, .. } if code == rest_code
+                ),
+                "{name}: {mapped:?}"
+            );
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
+            assert!(!mapped.mutation_outcome_unknown(), "{name}: {mapped:?}");
         }
+        assert_eq!(
+            OrderErrorCode::from_proto_name("ERROR_CODE_API_KEY_SPOT_TRADE_DENY")
+                .unwrap()
+                .to_i32(),
+            78
+        );
+        // An unauthenticated order refusal is still an authentication error.
+        let unauthenticated = map_order(
+            OrderErrorCode::from_proto_name("ERROR_CODE_UNAUTHENTICATED").unwrap(),
+            ErrorCode::Unauthenticated,
+        );
+        assert!(
+            matches!(unauthenticated, Error::Auth(_)),
+            "{unauthenticated:?}"
+        );
+        // A call names its procedure on the refusal, as a REST problem does.
+        let named = map_order(
+            OrderErrorCode::from_proto_name("ERROR_CODE_API_KEY_SPOT_TRADE_DENY").unwrap(),
+            ErrorCode::PermissionDenied,
+        )
+        .for_procedure("/orders.v1.OrdersService/CreateOrder");
+        assert!(
+            matches!(
+                &named,
+                Error::PermissionDenied { endpoint, context, .. }
+                    if endpoint == "/orders.v1.OrdersService/CreateOrder"
+                        && context == "orders.v1.OrdersService/CreateOrder"
+            ),
+            "{named:?}"
+        );
+    }
+
+    /// A trigger cancel, pause, resume or modify of an ended trigger answers
+    /// `TRIGGER_STATUS_INVALID`: already done. `TRIGGER_NOT_FOUND` can also
+    /// mean a wrong ID, so it is not reported as ended.
+    #[test]
+    fn trigger_status_invalid_is_already_ended() {
+        let ended = map_order(
+            OrderErrorCode::ERROR_CODE_TRIGGER_STATUS_INVALID,
+            ErrorCode::FailedPrecondition,
+        );
+        assert!(ended.is_trigger_already_ended(), "{ended:?}");
+        assert!(!ended.is_order_already_terminal());
+        assert!(!ended.is_retryable() && !ended.mutation_outcome_unknown());
+        assert_eq!(
+            ended.auth_error_code(),
+            Some(order_codes::TRIGGER_STATUS_INVALID)
+        );
+        let gone = map_order(
+            OrderErrorCode::ERROR_CODE_TRIGGER_NOT_FOUND,
+            ErrorCode::NotFound,
+        );
+        assert!(!gone.is_trigger_already_ended(), "{gone:?}");
+        assert_eq!(gone.auth_error_code(), Some(order_codes::TRIGGER_NOT_FOUND));
+        let order_ended = map_order(
+            OrderErrorCode::ERROR_CODE_ORDER_ALREADY_TERMINAL,
+            ErrorCode::FailedPrecondition,
+        );
+        assert!(!order_ended.is_trigger_already_ended());
+        assert!(!Error::transport("down").is_trigger_already_ended());
+    }
+
+    /// A price-alert call an API key's policy does not grant
+    /// (`READ_PRICE_ALERTS` to list, `MANAGE_PRICE_ALERTS` to create, update
+    /// or cancel) keeps the auth code `AUTH_API_KEY_ACCESS_DENIED`.
+    #[test]
+    fn price_alert_permission_refusal_keeps_its_auth_code() {
+        let mapped = map_auth(
+            AuthErrorCode::AUTH_API_KEY_ACCESS_DENIED,
+            "API key policy does not grant MANAGE_PRICE_ALERTS",
+        );
+        assert_eq!(
+            mapped.auth_error_code(),
+            Some("AUTH_API_KEY_ACCESS_DENIED"),
+            "{mapped:?}"
+        );
+        assert!(matches!(mapped, Error::Api { .. }), "{mapped:?}");
+        assert!(!mapped.is_retryable());
     }
 
     #[test]

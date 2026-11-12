@@ -3811,6 +3811,11 @@ pub enum PolicyAction {
     /// Allow reading the Guard Signer status within the key's scope; a key never
     /// reads another main account's Guard Signer. Account permission.
     READ_GUARD_SIGNER_STATUS = 35i32,
+    /// Allow listing the main account's price alerts. Main-account permission.
+    READ_PRICE_ALERTS = 36i32,
+    /// Allow creating, updating, and cancelling the main account's price alerts.
+    /// It does not allow listing them. Main-account permission.
+    MANAGE_PRICE_ALERTS = 37i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -3909,6 +3914,12 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::READ_GUARD_SIGNER_STATUS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadGuardSignerStatus: Self = Self::READ_GUARD_SIGNER_STATUS;
+    ///Idiomatic alias for [`Self::READ_PRICE_ALERTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadPriceAlerts: Self = Self::READ_PRICE_ALERTS;
+    ///Idiomatic alias for [`Self::MANAGE_PRICE_ALERTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManagePriceAlerts: Self = Self::MANAGE_PRICE_ALERTS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -4036,6 +4047,8 @@ impl ::buffa::Enumeration for PolicyAction {
             33i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_MEMBERS),
             34i32 => ::core::option::Option::Some(Self::READ_SUBACCOUNT_INVITES),
             35i32 => ::core::option::Option::Some(Self::READ_GUARD_SIGNER_STATUS),
+            36i32 => ::core::option::Option::Some(Self::READ_PRICE_ALERTS),
+            37i32 => ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -4076,6 +4089,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_SUBACCOUNT_MEMBERS => "READ_SUBACCOUNT_MEMBERS",
             Self::READ_SUBACCOUNT_INVITES => "READ_SUBACCOUNT_INVITES",
             Self::READ_GUARD_SIGNER_STATUS => "READ_GUARD_SIGNER_STATUS",
+            Self::READ_PRICE_ALERTS => "READ_PRICE_ALERTS",
+            Self::MANAGE_PRICE_ALERTS => "MANAGE_PRICE_ALERTS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4144,6 +4159,10 @@ impl ::buffa::Enumeration for PolicyAction {
             "READ_GUARD_SIGNER_STATUS" => {
                 ::core::option::Option::Some(Self::READ_GUARD_SIGNER_STATUS)
             }
+            "READ_PRICE_ALERTS" => ::core::option::Option::Some(Self::READ_PRICE_ALERTS),
+            "MANAGE_PRICE_ALERTS" => {
+                ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4181,6 +4200,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_SUBACCOUNT_MEMBERS,
             Self::READ_SUBACCOUNT_INVITES,
             Self::READ_GUARD_SIGNER_STATUS,
+            Self::READ_PRICE_ALERTS,
+            Self::MANAGE_PRICE_ALERTS,
         ]
     }
 }
@@ -11769,6 +11790,11 @@ pub enum ActivityEventAction {
     ACTIVITY_ACTION_HOLD_PLACED = 13i32,
     /// Security hold was released.
     ACTIVITY_ACTION_HOLD_RELEASED = 14i32,
+    /// A change was requested; a later APPLIED or FAILED event records how it
+    /// ended.
+    ACTIVITY_ACTION_REQUESTED = 15i32,
+    /// A requested change took effect.
+    ACTIVITY_ACTION_APPLIED = 16i32,
 }
 impl ActivityEventAction {
     ///Idiomatic alias for [`Self::ACTIVITY_ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -11816,6 +11842,12 @@ impl ActivityEventAction {
     ///Idiomatic alias for [`Self::ACTIVITY_ACTION_HOLD_RELEASED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ActivityActionHoldReleased: Self = Self::ACTIVITY_ACTION_HOLD_RELEASED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_REQUESTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionRequested: Self = Self::ACTIVITY_ACTION_REQUESTED;
+    ///Idiomatic alias for [`Self::ACTIVITY_ACTION_APPLIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ActivityActionApplied: Self = Self::ACTIVITY_ACTION_APPLIED;
 }
 impl ::core::default::Default for ActivityEventAction {
     fn default() -> Self {
@@ -11929,6 +11961,8 @@ impl ::buffa::Enumeration for ActivityEventAction {
             12i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_BLOCKED),
             13i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_PLACED),
             14i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_RELEASED),
+            15i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_REQUESTED),
+            16i32 => ::core::option::Option::Some(Self::ACTIVITY_ACTION_APPLIED),
             _ => ::core::option::Option::None,
         }
     }
@@ -11952,6 +11986,8 @@ impl ::buffa::Enumeration for ActivityEventAction {
             Self::ACTIVITY_ACTION_BLOCKED => "ACTIVITY_ACTION_BLOCKED",
             Self::ACTIVITY_ACTION_HOLD_PLACED => "ACTIVITY_ACTION_HOLD_PLACED",
             Self::ACTIVITY_ACTION_HOLD_RELEASED => "ACTIVITY_ACTION_HOLD_RELEASED",
+            Self::ACTIVITY_ACTION_REQUESTED => "ACTIVITY_ACTION_REQUESTED",
+            Self::ACTIVITY_ACTION_APPLIED => "ACTIVITY_ACTION_APPLIED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -12001,6 +12037,12 @@ impl ::buffa::Enumeration for ActivityEventAction {
             "ACTIVITY_ACTION_HOLD_RELEASED" => {
                 ::core::option::Option::Some(Self::ACTIVITY_ACTION_HOLD_RELEASED)
             }
+            "ACTIVITY_ACTION_REQUESTED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_REQUESTED)
+            }
+            "ACTIVITY_ACTION_APPLIED" => {
+                ::core::option::Option::Some(Self::ACTIVITY_ACTION_APPLIED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -12021,6 +12063,8 @@ impl ::buffa::Enumeration for ActivityEventAction {
             Self::ACTIVITY_ACTION_BLOCKED,
             Self::ACTIVITY_ACTION_HOLD_PLACED,
             Self::ACTIVITY_ACTION_HOLD_RELEASED,
+            Self::ACTIVITY_ACTION_REQUESTED,
+            Self::ACTIVITY_ACTION_APPLIED,
         ]
     }
 }

@@ -185,6 +185,22 @@ impl ::buffa::Message for ClientFrame {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::client_frame::Payload::CreateOco(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::client_frame::Payload::CancelOco(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -278,6 +294,22 @@ impl ::buffa::Message for ClientFrame {
                 __buffa::oneof::client_frame::Payload::CancelAllAfter(x) => {
                     ::buffa::types::put_len_delimited_header(
                         18u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::client_frame::Payload::CreateOco(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        19u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::client_frame::Payload::CancelOco(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        20u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -511,6 +543,46 @@ impl ::buffa::Message for ClientFrame {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.payload = ::core::option::Option::Some(
                         __buffa::oneof::client_frame::Payload::CancelAllAfter(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            19u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::CreateOco(ref mut existing),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::CreateOco(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            20u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::client_frame::Payload::CancelOco(ref mut existing),
+                ) = self.payload
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.payload = ::core::option::Option::Some(
+                        __buffa::oneof::client_frame::Payload::CancelOco(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -857,6 +929,58 @@ impl<'de> serde::Deserialize<'de> for ClientFrame {
                                 }
                                 __oneof_payload = Some(
                                     __buffa::oneof::client_frame::Payload::CancelAllAfter(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "createOco" | "create_oco" => {
+                            let v: ::core::option::Option<
+                                super::super::triggers::v1::CreateOcoRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::triggers::v1::CreateOcoRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::CreateOco(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "cancelOco" | "cancel_oco" => {
+                            let v: ::core::option::Option<
+                                super::super::triggers::v1::CancelOcoRequest,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::triggers::v1::CancelOcoRequest,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_payload.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'payload'",
+                                        ),
+                                    );
+                                }
+                                __oneof_payload = Some(
+                                    __buffa::oneof::client_frame::Payload::CancelOco(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -1822,6 +1946,22 @@ impl ::buffa::Message for AckResponse {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::ack_response::Result::CreateOco(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
+                __buffa::oneof::ack_response::Result::CancelOco(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1895,6 +2035,22 @@ impl ::buffa::Message for AckResponse {
                 __buffa::oneof::ack_response::Result::CancelAllAfter(x) => {
                     ::buffa::types::put_len_delimited_header(
                         8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::CreateOco(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::ack_response::Result::CancelOco(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -2080,6 +2236,46 @@ impl ::buffa::Message for AckResponse {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.result = ::core::option::Option::Some(
                         __buffa::oneof::ack_response::Result::CancelAllAfter(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::CreateOco(ref mut existing),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::CreateOco(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::ack_response::Result::CancelOco(ref mut existing),
+                ) = self.result
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.result = ::core::option::Option::Some(
+                        __buffa::oneof::ack_response::Result::CancelOco(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -2329,6 +2525,58 @@ impl<'de> serde::Deserialize<'de> for AckResponse {
                                 }
                                 __oneof_result = Some(
                                     __buffa::oneof::ack_response::Result::CancelAllAfter(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "createOco" | "create_oco" => {
+                            let v: ::core::option::Option<
+                                super::super::triggers::v1::CreateOcoResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::triggers::v1::CreateOcoResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::CreateOco(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "cancelOco" | "cancel_oco" => {
+                            let v: ::core::option::Option<
+                                super::super::triggers::v1::CancelOcoResponse,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            super::super::triggers::v1::CancelOcoResponse,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_result.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'result'",
+                                        ),
+                                    );
+                                }
+                                __oneof_result = Some(
+                                    __buffa::oneof::ack_response::Result::CancelOco(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -3250,6 +3498,68 @@ pub mod __buffa {
                             );
                         }
                     }
+                    19u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::triggers::v1::__buffa::view::CreateOcoRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    20u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                                ref mut existing,
+                            ),
+                        ) = view.payload
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.payload = Some(
+                                super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::triggers::v1::__buffa::view::CancelOcoRequestView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -3363,6 +3673,24 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::client_frame::Payload::CancelAllAfter(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::CreateOco(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::client_frame::Payload::CancelOco(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -3500,6 +3828,26 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -3617,6 +3965,26 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                19u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                20u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -3710,6 +4078,16 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("cancelAllAfter", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CreateOco(
+                            v,
+                        ) => {
+                            __map.serialize_entry("createOco", v)?;
+                        }
+                        super::super::__buffa::view::oneof::client_frame::Payload::CancelOco(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelOco", v)?;
                         }
                     }
                 }
@@ -5368,6 +5746,68 @@ pub mod __buffa {
                             );
                         }
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::triggers::v1::__buffa::view::CreateOcoResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                                ref mut existing,
+                            ),
+                        ) = view.result
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.result = Some(
+                                super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::super::super::triggers::v1::__buffa::view::CancelOcoResponseView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5468,6 +5908,24 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::ack_response::Result::CancelAllAfter(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::CreateOco(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::ack_response::Result::CancelOco(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -5574,6 +6032,26 @@ pub mod __buffa {
                                 += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -5669,6 +6147,26 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                9u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                10u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -5733,6 +6231,16 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("cancelAllAfter", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CreateOco(
+                            v,
+                        ) => {
+                            __map.serialize_entry("createOco", v)?;
+                        }
+                        super::super::__buffa::view::oneof::ack_response::Result::CancelOco(
+                            v,
+                        ) => {
+                            __map.serialize_entry("cancelOco", v)?;
                         }
                     }
                 }
@@ -6907,6 +7415,20 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    CreateOco(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::triggers::v1::__buffa::view::CreateOcoRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    CancelOco(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::triggers::v1::__buffa::view::CancelOcoRequestView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
             pub mod server_frame {
@@ -7012,6 +7534,20 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    CreateOco(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::triggers::v1::__buffa::view::CreateOcoResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    CancelOco(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::super::super::triggers::v1::__buffa::view::CancelOcoResponseView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -7063,6 +7599,16 @@ pub mod __buffa {
                 CancelAllAfter(
                     ::buffa::alloc::boxed::Box<
                         super::super::super::super::super::orders::v1::CancelAllAfterRequest,
+                    >,
+                ),
+                CreateOco(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::triggers::v1::CreateOcoRequest,
+                    >,
+                ),
+                CancelOco(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::triggers::v1::CancelOcoRequest,
                     >,
                 ),
             }
@@ -7216,6 +7762,38 @@ pub mod __buffa {
                     Self::Some(Payload::from(v))
                 }
             }
+            impl From<super::super::super::super::super::triggers::v1::CreateOcoRequest>
+            for Payload {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CreateOcoRequest,
+                ) -> Self {
+                    Self::CreateOco(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CreateOcoRequest>
+            for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CreateOcoRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CancelOcoRequest>
+            for Payload {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CancelOcoRequest,
+                ) -> Self {
+                    Self::CancelOco(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CancelOcoRequest>
+            for ::core::option::Option<Payload> {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CancelOcoRequest,
+                ) -> Self {
+                    Self::Some(Payload::from(v))
+                }
+            }
             impl serde::Serialize for Payload {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -7250,6 +7828,12 @@ pub mod __buffa {
                         }
                         Self::CancelAllAfter(v) => {
                             map.serialize_entry("cancelAllAfter", v)?;
+                        }
+                        Self::CreateOco(v) => {
+                            map.serialize_entry("createOco", v)?;
+                        }
+                        Self::CancelOco(v) => {
+                            map.serialize_entry("cancelOco", v)?;
                         }
                     }
                     map.end()
@@ -7400,6 +7984,16 @@ pub mod __buffa {
                         super::super::super::super::super::orders::v1::CancelAllAfterResponse,
                     >,
                 ),
+                CreateOco(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::triggers::v1::CreateOcoResponse,
+                    >,
+                ),
+                CancelOco(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::super::super::triggers::v1::CancelOcoResponse,
+                    >,
+                ),
             }
             impl ::buffa::Oneof for Result {}
             impl From<super::super::super::super::super::orders::v1::CreateOrderResponse>
@@ -7540,6 +8134,38 @@ pub mod __buffa {
                     Self::Some(Result::from(v))
                 }
             }
+            impl From<super::super::super::super::super::triggers::v1::CreateOcoResponse>
+            for Result {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CreateOcoResponse,
+                ) -> Self {
+                    Self::CreateOco(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CreateOcoResponse>
+            for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CreateOcoResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CancelOcoResponse>
+            for Result {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CancelOcoResponse,
+                ) -> Self {
+                    Self::CancelOco(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::super::super::triggers::v1::CancelOcoResponse>
+            for ::core::option::Option<Result> {
+                fn from(
+                    v: super::super::super::super::super::triggers::v1::CancelOcoResponse,
+                ) -> Self {
+                    Self::Some(Result::from(v))
+                }
+            }
             impl serde::Serialize for Result {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -7571,6 +8197,12 @@ pub mod __buffa {
                         }
                         Self::CancelAllAfter(v) => {
                             map.serialize_entry("cancelAllAfter", v)?;
+                        }
+                        Self::CreateOco(v) => {
+                            map.serialize_entry("createOco", v)?;
+                        }
+                        Self::CancelOco(v) => {
+                            map.serialize_entry("cancelOco", v)?;
                         }
                     }
                     map.end()

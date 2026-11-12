@@ -22,9 +22,9 @@ use crate::models::{
     CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
     CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
     ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
-    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PreviewOrderParams,
-    PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade,
-    UserTradesList,
+    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PegReference,
+    PreviewOrderParams, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop,
+    TriggerPriceSourceKind, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
@@ -32,11 +32,12 @@ use crate::proto::orders::v1::{
     CancelAllAfterRequest, CancelAllOrdersRequest, CancelOrderRequest, CreateOrderRequest,
     FeeAsset as ProtoFeeAsset, GetBatchReplaceStatusRequest, GetOpenOrdersRequest,
     GetOrderHistoryRequest, GetOrderRequest, GetUserTradesRequest, LimitFok, LimitGtc, LimitGtd,
-    LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent, PreviewOrderRequest,
-    RiskExecution, RiskLimitGtc, RiskPolicy, SelfTradePreventionMode, Side, StopLossPolicy,
-    TakeProfitPolicy, TrailingStopPolicy, TriggerPriceSource, batch_replace_order_item,
-    cancel_order_request, get_order_request, get_user_trades_request, market_ioc,
-    modify_order_request, order_intent, risk_execution, risk_policy, trailing_stop_policy,
+    LimitIoc, MarketIoc, ModifyBehavior, ModifyOrderRequest, OrderIntent,
+    PegReference as ProtoPegReference, PreviewOrderRequest, RiskExecution, RiskLimitGtc,
+    RiskPolicy, SelfTradePreventionMode, Side, StaticPeg, StopLossPolicy, TakeProfitPolicy,
+    TrailingStopPolicy, TriggerPriceSource, batch_replace_order_item, cancel_order_request,
+    get_order_request, get_user_trades_request, market_ioc, modify_order_request, order_intent,
+    risk_execution, risk_policy, trailing_stop_policy,
 };
 use crate::types::{
     Price, Quantity, resolve_price_ticks, resolve_qty_scaled, resolve_quote_qty_scaled,
@@ -452,7 +453,7 @@ impl OrdersService {
     fn require_quote_quantity_scale(market: &Market) -> Result<u32> {
         market.quote_quantity_scale.ok_or_else(|| {
             Error::validation(format!(
-                "quote quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before using a quote-debit budget",
+                "quote quantity scale for {:?} is unavailable; await client.wait_for_catalogs() before sizing an order by a quote amount",
                 market.symbol
             ))
         })
@@ -518,27 +519,76 @@ impl OrdersService {
         {
             intent.client_order_id = client_order_id;
         }
-        intent.sizing = Some(match (&params.quantity, &params.max_quote_debit_scaled) {
-            (Some(quantity), None) => order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
-                quantity,
-                pair.base_quantity_scale,
-                Some(symbol),
-                Some(pair.symbol_id),
-            )?),
-            (None, Some(max_quote_debit)) => {
-                order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
-                    max_quote_debit,
-                    Self::require_quote_quantity_scale(pair)?,
+        intent.sizing = Some(
+            match (
+                &params.quantity,
+                &params.max_quote_debit_scaled,
+                &params.quote_proceeds_scaled,
+            ) {
+                (Some(quantity), None, None) => {
+                    order_intent::Sizing::BaseQtyScaled(resolve_qty_scaled(
+                        quantity,
+                        pair.base_quantity_scale,
+                        Some(symbol),
+                        Some(pair.symbol_id),
+                    )?)
+                }
+                (None, Some(max_quote_debit), None) => {
+                    order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
+                        max_quote_debit,
+                        Self::require_quote_quantity_scale(pair)?,
+                        Some(symbol),
+                        Some(pair.symbol_id),
+                    )?)
+                }
+                (None, None, Some(quote_proceeds)) => {
+                    // The contract's `order_intent.quote_proceeds_eligibility`
+                    // rule: a SELL market IOC or SELL limit IOC only.
+                    let ioc = match params.order_type {
+                        CreateOrderType::Market => true,
+                        CreateOrderType::Limit => {
+                            matches!(params.time_in_force, Some(CreateTimeInForce::Ioc))
+                        }
+                    };
+                    if !matches!(params.side, CreateSide::Sell) || !ioc {
+                        return Err(Error::validation(
+                            "quote_proceeds_scaled is valid only for SELL market IOC or SELL limit IOC orders",
+                        ));
+                    }
+                    if quote_proceeds.as_scaled() <= 0 {
+                        return Err(Error::validation("quote_proceeds_scaled must be positive"));
+                    }
+                    order_intent::Sizing::QuoteProceedsScaled(resolve_quote_qty_scaled(
+                        quote_proceeds,
+                        Self::require_quote_quantity_scale(pair)?,
+                        Some(symbol),
+                        Some(pair.symbol_id),
+                    )?)
+                }
+                _ => {
+                    return Err(Error::validation(
+                        "set exactly one of quantity, max_quote_debit_scaled or quote_proceeds_scaled",
+                    ));
+                }
+            },
+        );
+        let display_qty_scaled = match params.display_quantity.as_ref() {
+            None => 0,
+            Some(display) => {
+                if display.as_scaled() <= 0 {
+                    return Err(Error::validation("display_quantity must be positive"));
+                }
+                resolve_qty_scaled(
+                    display,
+                    pair.base_quantity_scale,
                     Some(symbol),
                     Some(pair.symbol_id),
-                )?)
+                )?
             }
-            (Some(_), Some(_)) | (None, None) => {
-                return Err(Error::validation(
-                    "set exactly one of quantity or max_quote_debit_scaled",
-                ));
-            }
-        });
+        };
+        let display_refused = || {
+            Error::validation("display_quantity is valid only for limit GTC or limit GTD orders")
+        };
         intent.fee_asset = match params.fee_asset.unwrap_or(FeeAsset::Quote) {
             FeeAsset::Quote => ProtoFeeAsset::Quote.into(),
             FeeAsset::Base if matches!(params.side, CreateSide::Buy) => ProtoFeeAsset::Base.into(),
@@ -555,6 +605,7 @@ impl OrdersService {
             OrderSelfTradePrevention::ExpireTaker => SelfTradePreventionMode::ExpireTaker.into(),
             OrderSelfTradePrevention::ExpireMaker => SelfTradePreventionMode::ExpireMaker.into(),
             OrderSelfTradePrevention::ExpireBoth => SelfTradePreventionMode::ExpireBoth.into(),
+            OrderSelfTradePrevention::Decrement => SelfTradePreventionMode::Decrement.into(),
         };
         let post_only = params.post_only.unwrap_or(false);
         intent.execution = Some(match params.order_type {
@@ -587,6 +638,12 @@ impl OrdersService {
                     return Err(Error::validation(
                         "price is not valid for market orders; use market_client_ref_price for a reservation reference",
                     ));
+                }
+                if params.display_quantity.is_some() {
+                    return Err(display_refused());
+                }
+                if params.peg.is_some() {
+                    return Err(Error::validation("peg is valid only for limit orders"));
                 }
                 let mut market = MarketIoc::default();
                 if let Some(ref_price) = params.market_client_ref_price.as_ref() {
@@ -640,6 +697,9 @@ impl OrdersService {
                                 "expire_at is only valid for limit GTD orders",
                             ));
                         }
+                        if params.display_quantity.is_some() {
+                            return Err(display_refused());
+                        }
                         order_intent::Execution::LimitIoc(Box::new(LimitIoc {
                             price_ticks,
                             ..Default::default()
@@ -656,6 +716,9 @@ impl OrdersService {
                                 "expire_at is only valid for limit GTD orders",
                             ));
                         }
+                        if params.display_quantity.is_some() {
+                            return Err(display_refused());
+                        }
                         order_intent::Execution::LimitFok(Box::new(LimitFok {
                             price_ticks,
                             ..Default::default()
@@ -668,6 +731,7 @@ impl OrdersService {
                         let mut limit = LimitGtd {
                             price_ticks,
                             post_only,
+                            display_qty_scaled,
                             ..Default::default()
                         };
                         *limit.expire_at.get_or_insert_default() =
@@ -684,12 +748,35 @@ impl OrdersService {
                         order_intent::Execution::LimitGtc(Box::new(LimitGtc {
                             price_ticks,
                             post_only,
+                            display_qty_scaled,
                             ..Default::default()
                         }))
                     }
                 }
             }
         });
+        if let Some(peg) = params.peg.as_ref() {
+            // The contract never combines a peg with quote sizing or attached
+            // risk; a market order was refused above.
+            if params.max_quote_debit_scaled.is_some() || params.quote_proceeds_scaled.is_some() {
+                return Err(Error::validation(
+                    "peg needs base quantity sizing: it cannot be combined with max_quote_debit_scaled or quote_proceeds_scaled",
+                ));
+            }
+            if params.attached_risk.is_some() {
+                return Err(Error::validation(
+                    "peg cannot be combined with attached_risk",
+                ));
+            }
+            *intent.peg.get_or_insert_default() = StaticPeg {
+                reference: match peg.reference {
+                    PegReference::BestBid => ProtoPegReference::BEST_BID.into(),
+                    PegReference::BestAsk => ProtoPegReference::BEST_ASK.into(),
+                },
+                offset_ticks: peg.offset_ticks,
+                ..Default::default()
+            };
+        }
         if let Some(risk) = params.attached_risk.as_ref() {
             *intent.attached_risk.get_or_insert_default() = self.encode_attached_risk(
                 risk,
@@ -958,7 +1045,7 @@ impl OrdersService {
     }
 
     /// Prefer a trimmed caller-provided request id; otherwise generate one (TS/Go/Python parity).
-    fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
+    pub(super) fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
         if let Some(id) = optional_request_id(value.as_deref())? {
             return Ok(id);
         }
@@ -1100,8 +1187,11 @@ impl OrdersService {
             side: params.side,
             order_type: params.order_type,
             quantity: params.quantity.clone(),
+            display_quantity: params.display_quantity.clone(),
             max_quote_debit_scaled: params.max_quote_debit_scaled.clone(),
+            quote_proceeds_scaled: params.quote_proceeds_scaled.clone(),
             price: params.price.clone(),
+            peg: params.peg,
             time_in_force: params.time_in_force,
             client_order_id: params.client_order_id.clone(),
             subaccount_id: params.subaccount_id,
@@ -2072,8 +2162,11 @@ mod tests {
             side: CreateSide::Buy,
             order_type: CreateOrderType::Limit,
             quantity: Some(quantity),
+            display_quantity: None,
             max_quote_debit_scaled: None,
+            quote_proceeds_scaled: None,
             price: Some(price),
+            peg: None,
             time_in_force: None,
             client_order_id: Some("order-equivalence".into()),
             subaccount_id: None,
@@ -3136,8 +3229,11 @@ mod tests {
             side: create.side,
             order_type: create.order_type,
             quantity: create.quantity.clone(),
+            display_quantity: None,
             max_quote_debit_scaled: None,
+            quote_proceeds_scaled: None,
             price: create.price.clone(),
+            peg: None,
             time_in_force: create.time_in_force,
             client_order_id: Some("preview-cid".into()),
             subaccount_id: Some(9),
@@ -3303,6 +3399,320 @@ mod tests {
             Some(Quantity::from_quote_scaled(5_000_000, 8, None, None).unwrap());
         let err = client.orders.encode_create_params(&params).unwrap_err();
         assert!(err.to_string().contains("scale mismatch"));
+    }
+
+    fn btc_qty(scaled: i64) -> Quantity {
+        Quantity::from_scaled(
+            scaled,
+            Some(8),
+            crate::QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(7),
+        )
+        .unwrap()
+    }
+
+    fn btc_price(ticks: i64) -> Price {
+        Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap()
+    }
+
+    fn assert_refused(client: &crate::Client, params: &CreateOrderParams, want: &str) {
+        let err = client.orders.encode_create_params(params).unwrap_err();
+        assert!(
+            matches!(&err, Error::Validation(message) if message.contains(want)),
+            "want {want:?}, got {err:?}"
+        );
+    }
+
+    /// An iceberg display goes on a limit GTC or GTD order, at the pair's
+    /// base scale, in single creates, previews and batch items alike. Market,
+    /// IOC and FOK orders have no display; a display that is not positive is
+    /// refused. Display below qty, step and the 100-part rule are the API's.
+    #[test]
+    fn iceberg_display_encodes_on_gtc_and_gtd_only() {
+        let client = client();
+        let mut params = create_params(btc_qty(100_000_000), btc_price(61_000_000_000_000));
+        params.post_only = None;
+        params.display_quantity = Some(btc_qty(10_000_000));
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let Some(order_intent::Execution::LimitGtc(limit)) =
+            wire.order.as_option().unwrap().execution.as_ref()
+        else {
+            panic!("expected limit GTC");
+        };
+        assert_eq!(limit.display_qty_scaled, 10_000_000);
+
+        let decimal = Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7));
+        params.display_quantity = Some(decimal.unwrap());
+        assert_eq!(client.orders.encode_create_params(&params).unwrap(), wire);
+
+        // Not checked locally: a display at the order's quantity.
+        params.display_quantity = Some(btc_qty(100_000_000));
+        client.orders.encode_create_params(&params).unwrap();
+
+        params.time_in_force = Some(CreateTimeInForce::Gtd);
+        params.expire_at = Some(SystemTime::now() + Duration::from_secs(3600));
+        params.display_quantity = Some(btc_qty(20_000_000));
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        let Some(order_intent::Execution::LimitGtd(limit)) = intent.execution.as_ref() else {
+            panic!("expected limit GTD");
+        };
+        assert_eq!(limit.display_qty_scaled, 20_000_000);
+        params.expire_at = None;
+
+        // Plain orders send zero.
+        params.time_in_force = None;
+        params.display_quantity = None;
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        let Some(order_intent::Execution::LimitGtc(limit)) = intent.execution.as_ref() else {
+            panic!("expected limit GTC");
+        };
+        assert_eq!(limit.display_qty_scaled, 0);
+
+        for tif in [CreateTimeInForce::Ioc, CreateTimeInForce::Fok] {
+            let mut p = params.clone();
+            p.time_in_force = Some(tif);
+            p.display_quantity = Some(btc_qty(10_000_000));
+            assert_refused(&client, &p, "display_quantity is valid only for limit GTC");
+        }
+        let mut market = params.clone();
+        market.order_type = CreateOrderType::Market;
+        market.price = None;
+        market.display_quantity = Some(btc_qty(10_000_000));
+        assert_refused(
+            &client,
+            &market,
+            "display_quantity is valid only for limit GTC",
+        );
+
+        let mut zero = params.clone();
+        zero.display_quantity = Some(btc_qty(0));
+        assert_refused(&client, &zero, "display_quantity must be positive");
+
+        // Another pair's scale is refused, as for the quantity.
+        let mut other = params.clone();
+        other.display_quantity =
+            Some(Quantity::from_decimal_str("0.1", 6, Some("BTC-USDT".into()), Some(7)).unwrap());
+        assert!(client.orders.encode_create_params(&other).is_err());
+
+        // Preview takes the same display.
+        let mut preview =
+            PreviewOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        preview.quantity = Some(btc_qty(100_000_000));
+        preview.price = Some(btc_price(61_000_000_000_000));
+        preview.display_quantity = Some(btc_qty(10_000_000));
+        let wire = client.orders.encode_preview_params(&preview).unwrap();
+        let Some(order_intent::Execution::LimitGtc(limit)) =
+            wire.order.as_option().unwrap().execution.as_ref()
+        else {
+            panic!("expected limit GTC");
+        };
+        assert_eq!(limit.display_qty_scaled, 10_000_000);
+    }
+
+    /// A static peg rides on a limit order with base quantity; its offset is
+    /// a count of the pair's price increments, sent as given. A market
+    /// order, quote sizing and attached risk cannot carry one.
+    #[test]
+    fn static_peg_encodes_on_base_sized_limit_orders() {
+        use crate::models::{OrderPeg, RiskLeg};
+        use crate::proto::orders::v1::PegReference as WirePeg;
+
+        let client = client();
+        let mut params = create_params(btc_qty(1_000), btc_price(110_000_000_000));
+        params.peg = Some(OrderPeg::new(PegReference::BestBid, 0));
+        let wire = client.orders.encode_create_params(&params).unwrap();
+        let intent = wire.order.as_option().unwrap();
+        let peg = intent.peg.as_option().expect("peg");
+        assert_eq!(peg.reference, WirePeg::BEST_BID);
+        assert_eq!(peg.offset_ticks, 0);
+        assert!(matches!(
+            intent.execution,
+            Some(order_intent::Execution::LimitGtc(_))
+        ));
+
+        // Every limit time in force takes a peg; the offset is signed.
+        for tif in [CreateTimeInForce::Ioc, CreateTimeInForce::Fok] {
+            let mut p = params.clone();
+            p.post_only = None;
+            p.time_in_force = Some(tif);
+            p.peg = Some(OrderPeg::new(PegReference::BestAsk, -2));
+            let intent = client.orders.order_intent_from_params(&p).unwrap();
+            let peg = intent.peg.as_option().expect("peg");
+            assert_eq!(peg.reference, WirePeg::BEST_ASK);
+            assert_eq!(peg.offset_ticks, -2);
+        }
+
+        // Without a peg nothing is sent.
+        params.peg = None;
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        assert!(!intent.peg.is_set());
+        params.peg = Some(OrderPeg::new(PegReference::BestBid, 3));
+
+        // A pegged limit order still needs its cap or floor.
+        let mut no_price = params.clone();
+        no_price.price = None;
+        assert_refused(&client, &no_price, "price is required for limit orders");
+
+        let mut market = params.clone();
+        market.order_type = CreateOrderType::Market;
+        market.price = None;
+        market.post_only = None;
+        assert_refused(&client, &market, "peg is valid only for limit orders");
+
+        let mut quote = params.clone();
+        quote.post_only = None;
+        quote.time_in_force = Some(CreateTimeInForce::Ioc);
+        quote.quantity = None;
+        quote.max_quote_debit_scaled = Some(
+            Quantity::from_quote_scaled(5_000_000, 6, Some("BTC-USDT".into()), Some(7)).unwrap(),
+        );
+        assert_refused(&client, &quote, "peg needs base quantity sizing");
+        quote.max_quote_debit_scaled = None;
+        quote.side = CreateSide::Sell;
+        quote.quote_proceeds_scaled = quote_amount(5_000_000);
+        assert_refused(&client, &quote, "peg needs base quantity sizing");
+
+        let mut risky = params.clone();
+        risky.attached_risk = Some(AttachedRisk {
+            take_profit: Some(RiskLeg::market(btc_price(120_000_000_000))),
+            ..Default::default()
+        });
+        assert_refused(&client, &risky, "peg cannot be combined with attached_risk");
+
+        // Batch items share the builder.
+        let mut preview =
+            PreviewOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        preview.quantity = Some(btc_qty(1_000));
+        preview.price = Some(btc_price(110_000_000_000));
+        preview.peg = Some(OrderPeg::new(PegReference::BestAsk, 1));
+        let wire = client.orders.encode_preview_params(&preview).unwrap();
+        let peg = wire.order.as_option().unwrap().peg.as_option().unwrap();
+        assert_eq!(
+            (peg.reference, peg.offset_ticks),
+            (WirePeg::BEST_ASK.into(), 1)
+        );
+    }
+
+    fn quote_amount(scaled: i64) -> Option<Quantity> {
+        Some(Quantity::from_quote_scaled(scaled, 6, Some("BTC-USDT".into()), Some(7)).unwrap())
+    }
+
+    /// A SELL market or limit IOC can be sized by a quote proceeds target at
+    /// the pair's quote scale, as a quote budget is. Exactly one sizing; any
+    /// other side or time in force is refused before sending.
+    #[test]
+    fn quote_proceeds_sizing_encodes_on_sell_ioc_only() {
+        let client = client();
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Sell, CreateOrderType::Market);
+        params.quote_proceeds_scaled = quote_amount(100_000_000);
+        params.market_max_slippage = Some(MaxSlippage::Bps(50));
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        assert_eq!(
+            intent.sizing,
+            Some(order_intent::Sizing::QuoteProceedsScaled(100_000_000))
+        );
+        let decimal = Quantity::from_quote_decimal_str("100", 6, Some("BTC-USDT".into()), Some(7));
+        let mut same = params.clone();
+        same.quote_proceeds_scaled = Some(decimal.unwrap());
+        assert_eq!(
+            client.orders.order_intent_from_params(&same).unwrap(),
+            intent
+        );
+
+        let mut limit_ioc = params.clone();
+        limit_ioc.order_type = CreateOrderType::Limit;
+        limit_ioc.time_in_force = Some(CreateTimeInForce::Ioc);
+        limit_ioc.market_max_slippage = None;
+        limit_ioc.price = Some(btc_price(60_000_000_000_000));
+        let intent = client.orders.order_intent_from_params(&limit_ioc).unwrap();
+        assert!(matches!(
+            intent.sizing,
+            Some(order_intent::Sizing::QuoteProceedsScaled(100_000_000))
+        ));
+        assert!(matches!(
+            intent.execution,
+            Some(order_intent::Execution::LimitIoc(_))
+        ));
+
+        let eligibility =
+            "quote_proceeds_scaled is valid only for SELL market IOC or SELL limit IOC";
+        let mut buy = params.clone();
+        buy.side = CreateSide::Buy;
+        assert_refused(&client, &buy, eligibility);
+        for tif in [
+            None,
+            Some(CreateTimeInForce::Gtc),
+            Some(CreateTimeInForce::Fok),
+            Some(CreateTimeInForce::Gtd),
+        ] {
+            let mut resting = limit_ioc.clone();
+            resting.time_in_force = tif;
+            assert_refused(&client, &resting, eligibility);
+        }
+
+        let sizing = "set exactly one of quantity, max_quote_debit_scaled or quote_proceeds_scaled";
+        let mut both = params.clone();
+        both.quantity = Some(btc_qty(1_000));
+        assert_refused(&client, &both, sizing);
+        let mut both = params.clone();
+        both.max_quote_debit_scaled = quote_amount(1_000);
+        assert_refused(&client, &both, sizing);
+        let mut none = params.clone();
+        none.quote_proceeds_scaled = None;
+        assert_refused(&client, &none, sizing);
+
+        let mut zero = params.clone();
+        zero.quote_proceeds_scaled = quote_amount(0);
+        assert_refused(&client, &zero, "quote_proceeds_scaled must be positive");
+
+        // The quote scale, not the base scale.
+        let mut base_scale = params.clone();
+        base_scale.quote_proceeds_scaled =
+            Some(Quantity::from_quote_scaled(100, 8, Some("BTC-USDT".into()), Some(7)).unwrap());
+        assert!(client.orders.encode_create_params(&base_scale).is_err());
+
+        // Attached risk is the API's to refuse (rule `no_attached_risk`).
+        let mut risky = params.clone();
+        risky.attached_risk = Some(AttachedRisk {
+            stop_loss: Some(RiskLeg::market(btc_price(50_000_000_000_000))),
+            ..Default::default()
+        });
+        client.orders.encode_create_params(&risky).unwrap();
+
+        // Preview takes the same sizing.
+        let mut preview =
+            PreviewOrderParams::new("BTC-USDT", CreateSide::Sell, CreateOrderType::Market);
+        preview.quote_proceeds_scaled = quote_amount(100_000_000);
+        let wire = client.orders.encode_preview_params(&preview).unwrap();
+        assert_eq!(
+            wire.order.as_option().unwrap().sizing,
+            Some(order_intent::Sizing::QuoteProceedsScaled(100_000_000))
+        );
+    }
+
+    /// `Decrement` self-trade prevention is sent as DECREMENT, with attached
+    /// risk too.
+    #[test]
+    fn decrement_self_trade_prevention_encodes() {
+        let client = client();
+        let mut params = create_params(btc_qty(300_000), btc_price(61_000_250_000_000));
+        params.self_trade_prevention = Some(OrderSelfTradePrevention::Decrement);
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        assert_eq!(
+            intent.self_trade_prevention_mode,
+            SelfTradePreventionMode::DECREMENT
+        );
+        params.attached_risk = Some(AttachedRisk {
+            stop_loss: Some(RiskLeg::market(btc_price(50_000_000_000_000))),
+            ..Default::default()
+        });
+        let intent = client.orders.order_intent_from_params(&params).unwrap();
+        assert_eq!(
+            intent.self_trade_prevention_mode,
+            SelfTradePreventionMode::DECREMENT
+        );
     }
 
     // A buy sized by a quote amount may carry attached exits; the server
@@ -3598,6 +4008,8 @@ mod tests {
                     .unwrap(),
                 ),
                 leaves_qty: None,
+                display_qty: None,
+                hidden_qty: None,
                 inherited_cum_qty: None,
                 price: None,
                 avg_px: None,
@@ -3611,6 +4023,7 @@ mod tests {
                 fee_asset: "quote".into(),
                 self_trade_prevention_mode: String::new(),
                 submitted_max_quote_debit_scaled: None,
+                submitted_quote_proceeds_scaled: None,
                 attached_risk: None,
                 expire_at: None,
                 batch_request_id: String::new(),

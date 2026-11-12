@@ -365,6 +365,8 @@ pub enum Surface {
     QUICKSWAP = 9i32,
     /// Rewards: daily claims, campaigns, VIP tiers and fee discounts.
     REWARDS = 10i32,
+    /// The AI assistant: chats, approvals, memories and preferences.
+    ASSISTANT = 11i32,
 }
 impl Surface {
     ///Idiomatic alias for [`Self::SURFACE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -400,6 +402,9 @@ impl Surface {
     ///Idiomatic alias for [`Self::REWARDS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Rewards: Self = Self::REWARDS;
+    ///Idiomatic alias for [`Self::ASSISTANT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Assistant: Self = Self::ASSISTANT;
 }
 impl ::core::default::Default for Surface {
     fn default() -> Self {
@@ -506,6 +511,7 @@ impl ::buffa::Enumeration for Surface {
             8i32 => ::core::option::Option::Some(Self::MARKET_DATA),
             9i32 => ::core::option::Option::Some(Self::QUICKSWAP),
             10i32 => ::core::option::Option::Some(Self::REWARDS),
+            11i32 => ::core::option::Option::Some(Self::ASSISTANT),
             _ => ::core::option::Option::None,
         }
     }
@@ -525,6 +531,7 @@ impl ::buffa::Enumeration for Surface {
             Self::MARKET_DATA => "MARKET_DATA",
             Self::QUICKSWAP => "QUICKSWAP",
             Self::REWARDS => "REWARDS",
+            Self::ASSISTANT => "ASSISTANT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -542,6 +549,7 @@ impl ::buffa::Enumeration for Surface {
             "MARKET_DATA" => ::core::option::Option::Some(Self::MARKET_DATA),
             "QUICKSWAP" => ::core::option::Option::Some(Self::QUICKSWAP),
             "REWARDS" => ::core::option::Option::Some(Self::REWARDS),
+            "ASSISTANT" => ::core::option::Option::Some(Self::ASSISTANT),
             _ => ::core::option::Option::None,
         }
     }
@@ -558,6 +566,7 @@ impl ::buffa::Enumeration for Surface {
             Self::MARKET_DATA,
             Self::QUICKSWAP,
             Self::REWARDS,
+            Self::ASSISTANT,
         ]
     }
 }

@@ -162,3 +162,7 @@ reason = "Unlinking a social account requires an interactive session; API keys a
 [[allowlist]]
 service = "swap.quickswap.v1.QuickSwapReferralService"
 reason = "Quick Swap referrals authenticate with an interactive session; Quick Swap is outside the API-key SDK surface."
+
+[[allowlist]]
+service = "notifications.v1.NotificationService"
+reason = "The notification center is not part of the trading SDK surface yet."

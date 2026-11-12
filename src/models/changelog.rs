@@ -31,6 +31,8 @@ pub const CHANGELOG_SURFACE_MARKET_DATA: &str = "market_data";
 pub const CHANGELOG_SURFACE_QUICKSWAP: &str = "quickswap";
 /// Daily claims, campaigns, VIP tiers and fee discounts.
 pub const CHANGELOG_SURFACE_REWARDS: &str = "rewards";
+/// The AI assistant: chats, approvals, memories and preferences.
+pub const CHANGELOG_SURFACE_ASSISTANT: &str = "assistant";
 
 /// One product change in a changelog post.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

@@ -7,8 +7,8 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::{TsNs, format_price_ticks, format_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, SpotAsset, SpotConfig,
-    TradeEpochEnd,
+    Candle, CandlesResult, MarketTrade, MarketTradesResult, PairOrderLimits, PriceBand, SpotAsset,
+    SpotConfig, TradeEpochEnd,
 };
 use crate::proto::marketdata::v1::{
     CandlePoint, GetCandlesColumnsResponse, GetCandlesResponse, GetSpotConfigResponse,
@@ -104,6 +104,11 @@ fn pair_order_limits_from_proto(pair: &PairConfig) -> Result<PairOrderLimits> {
             &pair.max_market_notional_quote,
         )?,
         max_open_orders_per_pair: pair.max_open_orders_per_pair,
+        price_band: pair.price_band.as_option().map(|band| PriceBand {
+            lower_bps: band.lower_bps,
+            upper_bps: band.upper_bps,
+            reference_window_ms: band.reference_window_ms,
+        }),
     })
 }
 
@@ -441,6 +446,7 @@ mod tests {
                     max_order_notional_quote: Some("5000000".into()),
                     max_market_notional_quote: Some("250000.25".into()),
                     max_open_orders_per_pair: 200,
+                    price_band: None,
                 },
                 // Absent limits mean "no maximum", not zero.
                 PairOrderLimits {
@@ -450,6 +456,61 @@ mod tests {
                 },
             ]
         );
+    }
+
+    /// A pair's price band reads with its limits; a pair without one reads
+    /// `None`. The catalogs read the same band from the spot config.
+    #[test]
+    fn spot_config_exposes_the_price_band() {
+        use crate::proto::marketdata::v1::PriceBand as ProtoPriceBand;
+        let mut btc = limited_pair(1, "BTC-USDT");
+        btc.base_quantity_scale = 8;
+        btc.price_band = ProtoPriceBand {
+            lower_bps: 500,
+            upper_bps: 400,
+            reference_window_ms: 60_000,
+            ..Default::default()
+        }
+        .into();
+        // A band whose fields are all zero is still a band.
+        let mut eth = limited_pair(2, "ETH-USDT");
+        eth.base_quantity_scale = 8;
+        eth.price_band = ProtoPriceBand::default().into();
+        let mut sol = limited_pair(3, "SOL-USDT");
+        sol.base_quantity_scale = 8;
+        let msg = GetSpotConfigResponse {
+            pairs: vec![btc, eth, sol],
+            ..Default::default()
+        };
+        let spot = spot_config_from_proto(&msg).unwrap();
+        let bands: Vec<_> = spot
+            .pair_order_limits
+            .iter()
+            .map(|limits| limits.price_band)
+            .collect();
+        let want = vec![
+            Some(PriceBand {
+                lower_bps: 500,
+                upper_bps: 400,
+                reference_window_ms: 60_000,
+            }),
+            Some(PriceBand::default()),
+            None,
+        ];
+        assert_eq!(bands, want);
+
+        let catalogs = crate::catalogs::Manager::new();
+        catalogs.hydrate_spot_config_json(spot.raw.clone()).unwrap();
+        for (id, band) in (1..=3).zip(want) {
+            assert_eq!(
+                catalogs
+                    .pair_order_limits_for_symbol_id(id)
+                    .unwrap()
+                    .price_band,
+                band,
+                "{id}"
+            );
+        }
     }
 
     /// Each asset says whether it counts in total equity, keeping presence:

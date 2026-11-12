@@ -5036,8 +5036,9 @@ pub struct PairConfig {
     /// Maximum per-order notional as a decimal string in quote-asset units.
     /// Base-sized orders are checked using quantity times limit price, or market
     /// protection price, without rounding. For quote-sized buys, the entire all-in
-    /// maximum quote debit must also fit this maximum. Exceeding it returns
-    /// MAX_NOTIONAL. Absent when no maximum is configured.
+    /// maximum quote debit must also fit this maximum, and for quote-sized sells
+    /// the entire quote proceeds target. Exceeding it returns MAX_NOTIONAL.
+    /// Absent when no maximum is configured.
     ///
     /// Field 22: `max_order_notional_quote`
     #[serde(
@@ -5066,7 +5067,8 @@ pub struct PairConfig {
     /// quote-asset units. Base-sized market orders are valued at the buy protection
     /// price or the sell reference price before slippage, without rounding. For
     /// quote-sized market buys, the entire all-in maximum quote debit must also fit
-    /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+    /// this maximum, and for quote-sized market sells the entire quote proceeds
+    /// target. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
     /// configured.
     ///
     /// Field 24: `max_market_notional_quote`
@@ -5078,6 +5080,15 @@ pub struct PairConfig {
     pub max_market_notional_quote: ::core::option::Option<
         ::buffa::alloc::string::String,
     >,
+    /// The pair's price band. Absent when the pair has none.
+    ///
+    /// Field 25: `price_band`
+    #[serde(
+        rename = "priceBand",
+        alias = "price_band",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub price_band: ::buffa::MessageField<PriceBand>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5115,6 +5126,7 @@ impl ::core::fmt::Debug for PairConfig {
             .field("max_order_notional_quote", &self.max_order_notional_quote)
             .field("max_open_orders_per_pair", &self.max_open_orders_per_pair)
             .field("max_market_notional_quote", &self.max_market_notional_quote)
+            .field("price_band", &self.price_band)
             .finish()
     }
 }
@@ -5301,6 +5313,14 @@ impl ::buffa::Message for PairConfig {
         if let Some(ref v) = self.max_market_notional_quote {
             size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
+        if self.price_band.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.price_band.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5396,6 +5416,10 @@ impl ::buffa::Message for PairConfig {
         }
         if let Some(ref v) = self.max_market_notional_quote {
             ::buffa::types::put_string_field(24u32, v, buf);
+        }
+        if self.price_band.is_set() {
+            ::buffa::types::put_len_delimited_header(25u32, __cache.consume_next(), buf);
+            self.price_band.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5616,6 +5640,17 @@ impl ::buffa::Message for PairConfig {
                     buf,
                 )?;
             }
+            25u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.price_band.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5648,6 +5683,7 @@ impl ::buffa::Message for PairConfig {
         self.max_order_notional_quote = ::core::option::Option::None;
         self.max_open_orders_per_pair = 0u32;
         self.max_market_notional_quote = ::core::option::Option::None;
+        self.price_band = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5678,6 +5714,201 @@ pub const __PAIR_CONFIG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
     type_url: "type.googleapis.com/marketdata.v1.PairConfig",
     to_json: ::buffa::type_registry::any_to_json::<PairConfig>,
     from_json: ::buffa::type_registry::any_from_json::<PairConfig>,
+    is_wkt: false,
+};
+/// PriceBand limits how far from the market an order may be priced or trade.
+/// Its reference price follows the pair's last trade, updated at most once
+/// per reference window, and moves to the pair's index price when the two
+/// diverge by more than the band. A buy limit order priced above the upper
+/// limit, or a sell limit order priced below the lower limit, is rejected with
+/// PRICE_BAND_VIOLATION. A market order, or another order whose price the
+/// exchange sets, trades only up to the limit; its unfilled remainder is
+/// canceled with CANCEL_REASON_PRICE_BAND. A resting order is never canceled
+/// by the band, and a limit order priced away from the market on the passive
+/// side is accepted.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct PriceBand {
+    /// How far below the reference price a sell may be priced or trade, in
+    /// basis points (1 bp = 0.01%). The lower limit is the reference price times
+    /// (1 - lower_bps / 10000), rounded up to the tick size.
+    ///
+    /// Field 1: `lower_bps`
+    #[serde(
+        rename = "lowerBps",
+        alias = "lower_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub lower_bps: u32,
+    /// How far above the reference price a buy may be priced or trade, in basis
+    /// points. The upper limit is the reference price times
+    /// (1 + upper_bps / 10000), rounded down to the tick size.
+    ///
+    /// Field 2: `upper_bps`
+    #[serde(
+        rename = "upperBps",
+        alias = "upper_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub upper_bps: u32,
+    /// How long the reference price stays fixed before it can move to a newer
+    /// trade, in milliseconds. Zero moves it with every order.
+    ///
+    /// Field 3: `reference_window_ms`
+    #[serde(
+        rename = "referenceWindowMs",
+        alias = "reference_window_ms",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub reference_window_ms: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for PriceBand {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("PriceBand")
+            .field("lower_bps", &self.lower_bps)
+            .field("upper_bps", &self.upper_bps)
+            .field("reference_window_ms", &self.reference_window_ms)
+            .finish()
+    }
+}
+impl PriceBand {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.PriceBand";
+}
+::buffa::impl_default_instance!(PriceBand);
+impl ::buffa::MessageName for PriceBand {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "PriceBand";
+    const FULL_NAME: &'static str = "marketdata.v1.PriceBand";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.PriceBand";
+}
+impl ::buffa::Message for PriceBand {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.lower_bps != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.lower_bps) as u32;
+        }
+        if self.upper_bps != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.upper_bps) as u32;
+        }
+        if self.reference_window_ms != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.reference_window_ms)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.lower_bps != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.lower_bps, buf);
+        }
+        if self.upper_bps != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.upper_bps, buf);
+        }
+        if self.reference_window_ms != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.reference_window_ms, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.lower_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.upper_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference_window_ms = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.lower_bps = 0u32;
+        self.upper_bps = 0u32;
+        self.reference_window_ms = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for PriceBand {
+    const PROTO_FQN: &'static str = "marketdata.v1.PriceBand";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PriceBand {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __PRICE_BAND_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.PriceBand",
+    to_json: ::buffa::type_registry::any_to_json::<PriceBand>,
+    from_json: ::buffa::type_registry::any_from_json::<PriceBand>,
     is_wkt: false,
 };
 /// GetSpotConfigRequest has no parameters.
@@ -16032,8 +16263,9 @@ pub mod __buffa {
             /// Maximum per-order notional as a decimal string in quote-asset units.
             /// Base-sized orders are checked using quantity times limit price, or market
             /// protection price, without rounding. For quote-sized buys, the entire all-in
-            /// maximum quote debit must also fit this maximum. Exceeding it returns
-            /// MAX_NOTIONAL. Absent when no maximum is configured.
+            /// maximum quote debit must also fit this maximum, and for quote-sized sells
+            /// the entire quote proceeds target. Exceeding it returns MAX_NOTIONAL.
+            /// Absent when no maximum is configured.
             ///
             /// Field 22: `max_order_notional_quote`
             pub max_order_notional_quote: ::core::option::Option<&'a str>,
@@ -16051,11 +16283,18 @@ pub mod __buffa {
             /// quote-asset units. Base-sized market orders are valued at the buy protection
             /// price or the sell reference price before slippage, without rounding. For
             /// quote-sized market buys, the entire all-in maximum quote debit must also fit
-            /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+            /// this maximum, and for quote-sized market sells the entire quote proceeds
+            /// target. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
             /// configured.
             ///
             /// Field 24: `max_market_notional_quote`
             pub max_market_notional_quote: ::core::option::Option<&'a str>,
+            /// The pair's price band. Absent when the pair has none.
+            ///
+            /// Field 25: `price_band`
+            pub price_band: ::buffa::MessageFieldView<
+                super::super::__buffa::view::PriceBandView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PairConfigView<'a> {
@@ -16337,6 +16576,31 @@ pub mod __buffa {
                             ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
+                    25u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.price_band.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.price_band = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::PriceBandView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -16411,6 +16675,14 @@ pub mod __buffa {
                     max_market_notional_quote: self
                         .max_market_notional_quote
                         .map(|s| s.to_string()),
+                    price_band: match self.price_band.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::PriceBand,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -16564,6 +16836,14 @@ pub mod __buffa {
                 if let Some(ref v) = self.max_market_notional_quote {
                     size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
+                if self.price_band.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.price_band.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -16700,6 +16980,14 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.max_market_notional_quote {
                     ::buffa::types::put_string_field(24u32, v, buf);
+                }
+                if self.price_band.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        25u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.price_band.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -16872,6 +17160,14 @@ pub mod __buffa {
                 if let ::core::option::Option::Some(__v) = self.max_market_notional_quote
                 {
                     __map.serialize_entry("maxMarketNotionalQuote", __v)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .price_band
+                        .as_option()
+                    {
+                        __map.serialize_entry("priceBand", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -17142,8 +17438,9 @@ pub mod __buffa {
             /// Maximum per-order notional as a decimal string in quote-asset units.
             /// Base-sized orders are checked using quantity times limit price, or market
             /// protection price, without rounding. For quote-sized buys, the entire all-in
-            /// maximum quote debit must also fit this maximum. Exceeding it returns
-            /// MAX_NOTIONAL. Absent when no maximum is configured.
+            /// maximum quote debit must also fit this maximum, and for quote-sized sells
+            /// the entire quote proceeds target. Exceeding it returns MAX_NOTIONAL.
+            /// Absent when no maximum is configured.
             ///
             /// Field 22: `max_order_notional_quote`
             #[must_use]
@@ -17167,13 +17464,25 @@ pub mod __buffa {
             /// quote-asset units. Base-sized market orders are valued at the buy protection
             /// price or the sell reference price before slippage, without rounding. For
             /// quote-sized market buys, the entire all-in maximum quote debit must also fit
-            /// this maximum. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
+            /// this maximum, and for quote-sized market sells the entire quote proceeds
+            /// target. Exceeding it returns MAX_NOTIONAL. Absent when no maximum is
             /// configured.
             ///
             /// Field 24: `max_market_notional_quote`
             #[must_use]
             pub fn max_market_notional_quote(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().max_market_notional_quote
+            }
+            /// The pair's price band. Absent when the pair has none.
+            ///
+            /// Field 25: `price_band`
+            #[must_use]
+            pub fn price_band(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::PriceBandView<'_>,
+            > {
+                &self.0.reborrow().price_band
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PairConfigView<'static>>>
@@ -17199,6 +17508,364 @@ pub mod __buffa {
             type ViewHandle = PairConfigOwnedView;
         }
         impl ::serde::Serialize for PairConfigOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// PriceBand limits how far from the market an order may be priced or trade.
+        /// Its reference price follows the pair's last trade, updated at most once
+        /// per reference window, and moves to the pair's index price when the two
+        /// diverge by more than the band. A buy limit order priced above the upper
+        /// limit, or a sell limit order priced below the lower limit, is rejected with
+        /// PRICE_BAND_VIOLATION. A market order, or another order whose price the
+        /// exchange sets, trades only up to the limit; its unfilled remainder is
+        /// canceled with CANCEL_REASON_PRICE_BAND. A resting order is never canceled
+        /// by the band, and a limit order priced away from the market on the passive
+        /// side is accepted.
+        #[derive(Clone, Debug, Default)]
+        pub struct PriceBandView<'a> {
+            /// How far below the reference price a sell may be priced or trade, in
+            /// basis points (1 bp = 0.01%). The lower limit is the reference price times
+            /// (1 - lower_bps / 10000), rounded up to the tick size.
+            ///
+            /// Field 1: `lower_bps`
+            pub lower_bps: u32,
+            /// How far above the reference price a buy may be priced or trade, in basis
+            /// points. The upper limit is the reference price times
+            /// (1 + upper_bps / 10000), rounded down to the tick size.
+            ///
+            /// Field 2: `upper_bps`
+            pub upper_bps: u32,
+            /// How long the reference price stays fixed before it can move to a newer
+            /// trade, in milliseconds. Zero moves it with every order.
+            ///
+            /// Field 3: `reference_window_ms`
+            pub reference_window_ms: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for PriceBandView<'a> {
+            type Owned = super::super::PriceBand;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.lower_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.upper_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference_window_ms = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::PriceBand, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::PriceBand, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::PriceBand {
+                    lower_bps: self.lower_bps,
+                    upper_bps: self.upper_bps,
+                    reference_window_ms: self.reference_window_ms,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for PriceBandView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.lower_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.lower_bps) as u32;
+                }
+                if self.upper_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.upper_bps) as u32;
+                }
+                if self.reference_window_ms != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.reference_window_ms,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.lower_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.lower_bps, buf);
+                }
+                if self.upper_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.upper_bps, buf);
+                }
+                if self.reference_window_ms != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        3u32,
+                        self.reference_window_ms,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for PriceBandView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.lower_bps) {
+                    __map
+                        .serialize_entry(
+                            "lowerBps",
+                            &::buffa::json_helpers::ProtoJson(&self.lower_bps),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.upper_bps) {
+                    __map
+                        .serialize_entry(
+                            "upperBps",
+                            &::buffa::json_helpers::ProtoJson(&self.upper_bps),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.reference_window_ms,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "referenceWindowMs",
+                            &::buffa::json_helpers::ProtoJson(&self.reference_window_ms),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for PriceBandView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "PriceBand";
+            const FULL_NAME: &'static str = "marketdata.v1.PriceBand";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.PriceBand";
+        }
+        ::buffa::impl_default_view_instance!(PriceBandView);
+        ::buffa::impl_view_reborrow!(PriceBandView);
+        /** Self-contained, `'static` owned view of a `PriceBand` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`PriceBandView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`PriceBandView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct PriceBandOwnedView(::buffa::OwnedView<PriceBandView<'static>>);
+        impl PriceBandOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PriceBandOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PriceBandOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::PriceBand,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    PriceBandOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`PriceBandView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &PriceBandView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::PriceBand, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// How far below the reference price a sell may be priced or trade, in
+            /// basis points (1 bp = 0.01%). The lower limit is the reference price times
+            /// (1 - lower_bps / 10000), rounded up to the tick size.
+            ///
+            /// Field 1: `lower_bps`
+            #[must_use]
+            pub fn lower_bps(&self) -> u32 {
+                self.0.reborrow().lower_bps
+            }
+            /// How far above the reference price a buy may be priced or trade, in basis
+            /// points. The upper limit is the reference price times
+            /// (1 + upper_bps / 10000), rounded down to the tick size.
+            ///
+            /// Field 2: `upper_bps`
+            #[must_use]
+            pub fn upper_bps(&self) -> u32 {
+                self.0.reborrow().upper_bps
+            }
+            /// How long the reference price stays fixed before it can move to a newer
+            /// trade, in milliseconds. Zero moves it with every order.
+            ///
+            /// Field 3: `reference_window_ms`
+            #[must_use]
+            pub fn reference_window_ms(&self) -> u32 {
+                self.0.reborrow().reference_window_ms
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<PriceBandView<'static>>>
+        for PriceBandOwnedView {
+            fn from(inner: ::buffa::OwnedView<PriceBandView<'static>>) -> Self {
+                PriceBandOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<PriceBandOwnedView>
+        for ::buffa::OwnedView<PriceBandView<'static>> {
+            fn from(wrapper: PriceBandOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<PriceBandView<'static>>>
+        for PriceBandOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<PriceBandView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::PriceBand {
+            type View<'a> = PriceBandView<'a>;
+            type ViewHandle = PriceBandOwnedView;
+        }
+        impl ::serde::Serialize for PriceBandOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -22481,6 +23148,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ASSET_CONFIG_JSON_ANY);
         reg.register_json_any(super::__PAIR_MARKETDATA_CONFIG_JSON_ANY);
         reg.register_json_any(super::__PAIR_CONFIG_JSON_ANY);
+        reg.register_json_any(super::__PRICE_BAND_JSON_ANY);
         reg.register_json_any(super::__GET_SPOT_CONFIG_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_SPOT_CONFIG_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__HEATMAP_TIME_RANGE_JSON_ANY);
@@ -22550,6 +23218,10 @@ pub use self::__buffa::view::PairMarketdataConfigOwnedView;
 pub use self::__buffa::view::PairConfigView;
 #[doc(inline)]
 pub use self::__buffa::view::PairConfigOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::PriceBandView;
+#[doc(inline)]
+pub use self::__buffa::view::PriceBandOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSpotConfigRequestView;
 #[doc(inline)]
