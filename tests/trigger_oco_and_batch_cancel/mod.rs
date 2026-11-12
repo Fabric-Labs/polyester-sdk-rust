@@ -1,17 +1,20 @@
-//! OCO create and cancel and the batch trigger cancel through the public
-//! `triggers` service against a local server, in binary and JSON: what each
-//! call sends, what it returns, that a retry sends the identical request, and
-//! that a refused call sends nothing.
+//! OCO create and cancel, the batch trigger cancel, and the OCO fields and
+//! filters of trigger reads, through the public `triggers` service against a
+//! local server, in binary and JSON: what each call sends, what it returns,
+//! that a retry sends the identical request, and that a refused call sends
+//! nothing.
 
-use super::hardening_support::{HttpScript, MockHttpServer};
-use polyester::models::{CreateOcoParams, CreateSide, OcoLegParams};
+use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
+use buffa::Message as _;
+use polyester::models::{CreateOcoParams, CreateSide, ListTriggersOpts, OcoLegParams, Trigger};
 use polyester::proto::orders::v1::{
     ErrorDetail, FieldViolation, Side, TriggerPriceSource, risk_execution,
 };
 use polyester::proto::polyester::ratelimit::v1::RateLimitDetail;
 use polyester::proto::triggers::v1::{
     BatchCancelTriggersRequest, BatchCancelTriggersResponse, BatchCancelTriggersResultItem,
-    CancelOcoRequest, CancelOcoResponse, CreateOcoRequest, CreateOcoResponse, TriggerStatus,
+    CancelOcoRequest, CancelOcoResponse, CreateOcoRequest, CreateOcoResponse, GetTriggerResponse,
+    ListTriggersRequest, ListTriggersResponse, Trigger as ProtoTrigger, TriggerStatus,
     batch_cancel_triggers_result_item,
 };
 use polyester::transport::WireFormat;
@@ -24,6 +27,35 @@ const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef01234567
 const CREATE_OCO: &str = "/triggers.v1.TriggersService/CreateOco";
 const CANCEL_OCO: &str = "/triggers.v1.TriggersService/CancelOco";
 const BATCH_CANCEL: &str = "/triggers.v1.TriggersService/BatchCancelTriggers";
+const LIST: &str = "/triggers.v1.TriggersService/ListTriggers";
+const GET: &str = "/triggers.v1.TriggersService/GetTrigger";
+
+/// An OCO leg as trigger reads send it: it carries the OCO's ID and client
+/// OCO ID, and has no parent order.
+fn oco_leg(trigger_id: u64) -> ProtoTrigger {
+    ProtoTrigger {
+        trigger_id,
+        symbol_id: 1,
+        status: TriggerStatus::StatusArmed.into(),
+        order_list_id: Some(70),
+        client_list_id: "oco-btc-1".into(),
+        ..Default::default()
+    }
+}
+
+/// A trigger of no OCO.
+fn plain_trigger() -> ProtoTrigger {
+    ProtoTrigger {
+        trigger_id: 73,
+        symbol_id: 1,
+        status: TriggerStatus::StatusArmed.into(),
+        ..Default::default()
+    }
+}
+
+fn listed() -> Vec<ProtoTrigger> {
+    vec![oco_leg(71), oco_leg(72), plain_trigger()]
+}
 const WIRES: [WireFormat; 2] = [WireFormat::Binary, WireFormat::Json];
 
 /// A Connect answer in the client's wire format.
@@ -81,6 +113,7 @@ struct Server {
     creates: Arc<Mutex<Vec<Vec<u8>>>>,
     cancels: Arc<Mutex<Vec<CancelOcoRequest>>>,
     batches: Arc<Mutex<Vec<BatchCancelTriggersRequest>>>,
+    lists: Arc<Mutex<Vec<ListTriggersRequest>>>,
 }
 
 impl Server {
@@ -93,8 +126,31 @@ async fn server(wire: WireFormat) -> Server {
     let creates = Arc::new(Mutex::new(Vec::new()));
     let cancels = Arc::new(Mutex::new(Vec::new()));
     let batches = Arc::new(Mutex::new(Vec::new()));
-    let (c, x, b) = (creates.clone(), cancels.clone(), batches.clone());
+    let lists = Arc::new(Mutex::new(Vec::new()));
+    let (c, x, b, l) = (
+        creates.clone(),
+        cancels.clone(),
+        batches.clone(),
+        lists.clone(),
+    );
     let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
+        LIST => {
+            l.lock().unwrap().push(request(wire, &req.body));
+            answer(
+                wire,
+                &ListTriggersResponse {
+                    triggers: listed(),
+                    ..Default::default()
+                },
+            )
+        }
+        GET => answer(
+            wire,
+            &GetTriggerResponse {
+                trigger: oco_leg(71).into(),
+                ..Default::default()
+            },
+        ),
         CREATE_OCO => {
             c.lock().unwrap().push(req.body.clone());
             let sent: CreateOcoRequest = request(wire, &req.body);
@@ -171,6 +227,7 @@ async fn server(wire: WireFormat) -> Server {
         creates,
         cancels,
         batches,
+        lists,
     }
 }
 
@@ -266,20 +323,20 @@ async fn create_oco_sends_both_legs_and_a_retry_sends_the_same_request() {
 }
 
 /// A create the SDK can refuse is refused with `Error::Validation` before
-/// anything is sent: legs the wrong way round for the side, a missing client
-/// OCO ID, a limit leg without its limit price.
+/// anything is sent: a missing client OCO ID, a limit leg without its limit
+/// price, a price source label trigger reads do not use.
 #[tokio::test]
 async fn create_oco_refuses_invalid_params_before_sending() {
     for wire in WIRES {
         let s = server(wire).await;
-        let mut swapped = sell_oco();
-        swapped.side = CreateSide::Buy;
+        let mut unknown_source = sell_oco();
+        unknown_source.stop_loss.trigger_price_source = Some("oracle".into());
         let mut no_id = sell_oco();
         no_id.client_list_id = String::new();
         let mut no_limit = sell_oco();
         no_limit.take_profit.limit_price = None;
         for (params, want) in [
-            (swapped, "below its stop_loss"),
+            (unknown_source, "trigger_price_source"),
             (no_id, "client_list_id"),
             (no_limit, "limit_price"),
         ] {
@@ -412,5 +469,167 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
             assert!(err.to_string().contains(want), "{wire:?}: {err}");
         }
         assert_eq!(s.sent(), 0, "{wire:?}: a refused batch must send nothing");
+    }
+}
+
+/// Which way round the legs must be for the side, and which price sources a
+/// market supports, are the server's to refuse: a BUY OCO with a sell OCO's
+/// legs, and `mark` legs, are sent as given.
+#[tokio::test]
+async fn create_oco_sends_leg_order_and_sources_for_the_server_to_judge() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        let mut params = sell_oco();
+        params.side = CreateSide::Buy;
+        params.take_profit.trigger_price_source = Some("mark".into());
+        params.stop_loss.trigger_price_source = Some("mark".into());
+        s.client
+            .triggers
+            .create_oco(params)
+            .await
+            .expect("sent to the server");
+        let creates = s.creates.lock().unwrap().clone();
+        let sent: CreateOcoRequest = request(wire, &creates[0]);
+        let oco = sent.oco.as_option().unwrap();
+        assert_eq!(oco.side, Side::Buy, "{wire:?}");
+        let tp = oco.take_profit.as_option().unwrap();
+        let sl = oco.stop_loss.as_option().unwrap();
+        assert!(
+            tp.trigger_price_ticks > sl.trigger_price_ticks,
+            "{wire:?}: legs sent as given"
+        );
+        assert_eq!(tp.trigger_price_source, TriggerPriceSource::MarkPrice);
+        assert_eq!(sl.trigger_price_source, TriggerPriceSource::MarkPrice);
+    }
+}
+
+/// Trigger reads report the OCO a take-profit or stop-loss belongs to: both
+/// legs carry its public `order_list_id` and its `client_list_id`, and have
+/// no parent order; any other trigger reads `None` and empty.
+#[tokio::test]
+async fn trigger_reads_report_the_oco_of_each_leg() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        let got = s
+            .client
+            .triggers
+            .get_by_id(&id(71), None)
+            .await
+            .expect("get")
+            .expect("trigger");
+        assert_eq!(got.order_list_id, Some(id(70)), "{wire:?} get");
+        assert_eq!(got.client_list_id, "oco-btc-1", "{wire:?} get");
+        assert_eq!(got.parent_order_id, None, "{wire:?} get");
+
+        let list = s
+            .client
+            .triggers
+            .list_with(ListTriggersOpts::default())
+            .await
+            .expect("list");
+        let read: Vec<_> = list
+            .triggers
+            .iter()
+            .map(|t| (t.order_list_id.clone(), t.client_list_id.as_str()))
+            .collect();
+        assert_eq!(
+            read,
+            vec![
+                (Some(id(70)), "oco-btc-1"),
+                (Some(id(70)), "oco-btc-1"),
+                (None, ""),
+            ],
+            "{wire:?} list"
+        );
+    }
+
+    let ws = MockWsServer::spawn_centrifugo_publications_after_handshake(
+        Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+        vec![oco_leg(72).encode_to_vec(), plain_trigger().encode_to_vec()],
+    )
+    .await;
+    let (client, _http) = super::streaming_client(&ws).await;
+    let mut sub = client
+        .triggers
+        .subscribe(Some("acct"))
+        .await
+        .expect("subscribe");
+    let streamed: Vec<Trigger> = super::recv_n(&mut sub, 2).await;
+    assert_eq!(streamed[0].order_list_id, Some(id(70)), "stream");
+    assert_eq!(streamed[0].client_list_id, "oco-btc-1", "stream");
+    assert_eq!(streamed[1].order_list_id, None, "stream");
+    assert_eq!(streamed[1].client_list_id, "", "stream");
+    sub.close();
+}
+
+/// `list_with` sends the `order_list_id` and `client_list_id` filters as the
+/// contract's `ListTriggersRequest` fields; without them the request is as
+/// before. An OCO ID that is not one is refused before sending.
+#[tokio::test]
+async fn list_sends_the_oco_filters() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        s.client
+            .triggers
+            .list_with(ListTriggersOpts::default())
+            .await
+            .unwrap();
+        let unfiltered = s.lists.lock().unwrap()[0].clone();
+        assert_eq!(unfiltered.order_list_id, None, "{wire:?}");
+        assert_eq!(unfiltered.client_list_id, None, "{wire:?}");
+
+        // A `0` keeps the decimal ID from reading as base58.
+        for raw in [id(70), "70".into()] {
+            s.client
+                .triggers
+                .list_with(ListTriggersOpts {
+                    order_list_id: Some(raw.clone()),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+            let sent = s.lists.lock().unwrap().last().cloned().unwrap();
+            assert_eq!(sent.order_list_id, Some(70), "{wire:?} {raw}");
+            assert_eq!(sent.client_list_id, None, "{wire:?} {raw}");
+        }
+
+        s.client
+            .triggers
+            .list_with(ListTriggersOpts {
+                client_list_id: Some("oco-btc-1".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let sent = s.lists.lock().unwrap().last().cloned().unwrap();
+        assert_eq!(
+            sent.client_list_id.as_deref(),
+            Some("oco-btc-1"),
+            "{wire:?}"
+        );
+        assert_eq!(sent.order_list_id, None, "{wire:?}");
+
+        let sent_before = s.sent();
+        for bad in ["", "0", "not an id"] {
+            let err = s
+                .client
+                .triggers
+                .list_with(ListTriggersOpts {
+                    order_list_id: Some(bad.into()),
+                    ..Default::default()
+                })
+                .await
+                .expect_err("invalid OCO ID");
+            assert!(
+                matches!(err, Error::Validation(_)),
+                "{wire:?} {bad:?}: {err}"
+            );
+            assert!(err.to_string().contains("order_list_id"), "{err}");
+        }
+        assert_eq!(
+            s.sent(),
+            sent_before,
+            "{wire:?}: a refused filter must send nothing"
+        );
     }
 }

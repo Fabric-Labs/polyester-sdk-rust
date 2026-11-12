@@ -170,10 +170,11 @@ pub struct OcoLegParams {
     /// Limit price of a limit leg's order. Required for a limit leg; must be
     /// `None` for a market leg.
     pub limit_price: Option<Price>,
-    /// Price the leg watches, with the labels trigger reads use: `last` or
-    /// `index`. `None` or empty watches the last trade price. `mark` is
-    /// refused: spot markets have no mark price. On a market without an index
-    /// price, an `index` OCO is rejected on both legs.
+    /// Price the leg watches, with the labels trigger reads use: `last`,
+    /// `index` or `mark`. `None` or empty watches the last trade price. The
+    /// server decides which sources a market supports: on a market without an
+    /// index price, an `index` OCO is rejected on both legs, and `mark` is not
+    /// supported. Another label is refused before sending.
     pub trigger_price_source: Option<String>,
 }
 
@@ -228,8 +229,8 @@ pub struct CreateOcoParams {
     /// params and the same ID returns the same OCO, and different params with
     /// the same ID are refused with `CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID`.
     pub client_list_id: String,
-    /// The take-profit leg. Its trigger price must be above the stop-loss's
-    /// for a SELL OCO and below it for a BUY OCO.
+    /// The take-profit leg. The server requires its trigger price to be above
+    /// the stop-loss's for a SELL OCO and below it for a BUY OCO.
     pub take_profit: OcoLegParams,
     /// The stop-loss leg.
     pub stop_loss: OcoLegParams,
@@ -294,6 +295,17 @@ pub struct ListTriggersOpts {
     /// that does not parse, or names order 0, is refused before sending.
     /// `None` lists standalone and attached triggers alike.
     pub parent_order_id: Option<String>,
+    /// Only the take-profit and stop-loss of this OCO (the contract's
+    /// `order_list_id` filter), as `CreateOcoResult::order_list_id` and
+    /// [`Trigger::order_list_id`] spell it, in base58 or decimal. An ID that
+    /// does not parse, or names 0, is refused before sending. `None` lists
+    /// every trigger.
+    pub order_list_id: Option<String>,
+    /// Only the take-profit and stop-loss of the OCO created with this
+    /// `client_list_id` (the contract's `client_list_id` filter), sent as
+    /// given. Use it to learn whether a create whose outcome is unknown made
+    /// the OCO. `None` lists every trigger.
+    pub client_list_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -359,6 +371,14 @@ pub struct Trigger {
     pub trigger_type: String,
     pub status: String,
     pub parent_order_id: Option<String>,
+    /// Public ID of the OCO this take-profit or stop-loss belongs to: both
+    /// triggers of an OCO created with `triggers.create_oco` carry it, and
+    /// neither has a parent order. `None` for any other trigger.
+    pub order_list_id: Option<String>,
+    /// The `client_list_id` of the OCO this take-profit or stop-loss belongs
+    /// to, as given to `triggers.create_oco`; both triggers of the OCO carry
+    /// it. Empty for any other trigger.
+    pub client_list_id: String,
     pub side: String,
     pub order_type: String,
     pub time_in_force: String,

@@ -287,6 +287,14 @@ impl TriggersService {
             }
             req.parent_order_id = Some(id);
         }
+        if let Some(oco) = opts.order_list_id.as_deref() {
+            let id = id_to_u64(oco, "order_list_id")?;
+            if id == 0 {
+                return Err(Error::validation("order_list_id must be a non-zero OCO ID"));
+            }
+            req.order_list_id = Some(id);
+        }
+        req.client_list_id = opts.client_list_id;
         self.list(req).await
     }
 
@@ -735,27 +743,12 @@ impl TriggersService {
         let take_profit =
             self.encode_oco_leg(&params.take_profit, "take_profit", &market.symbol)?;
         let stop_loss = self.encode_oco_leg(&params.stop_loss, "stop_loss", &market.symbol)?;
-        // A SELL OCO takes profit above its stop-loss, a BUY OCO below it.
-        let (side, ordered) = match params.side {
-            CreateSide::Sell => (
-                Side::Sell,
-                take_profit.trigger_price_ticks > stop_loss.trigger_price_ticks,
-            ),
-            CreateSide::Buy => (
-                Side::Buy,
-                take_profit.trigger_price_ticks < stop_loss.trigger_price_ticks,
-            ),
+        // Which way round the legs must be for the side is the server's to
+        // refuse.
+        let side = match params.side {
+            CreateSide::Sell => Side::Sell,
+            CreateSide::Buy => Side::Buy,
         };
-        if !ordered {
-            return Err(Error::validation(match params.side {
-                CreateSide::Sell => {
-                    "a sell OCO's take_profit trigger_price must be above its stop_loss trigger_price"
-                }
-                CreateSide::Buy => {
-                    "a buy OCO's take_profit trigger_price must be below its stop_loss trigger_price"
-                }
-            }));
-        }
         let mut oco = OcoIntent {
             symbol_id: market.symbol_id,
             side: side.into(),
@@ -804,9 +797,23 @@ impl TriggersService {
                 )));
             }
         };
-        let trigger_price_source = match leg.trigger_price_source.as_deref() {
-            Some(label) => Self::trigger_price_source(label)?,
-            None => TriggerPriceSource::TriggerPriceSourceUnspecified,
+        // The labels trigger reads use, `mark` included: the server says which
+        // sources a market supports. Empty sends nothing (last trade price).
+        let trigger_price_source = match leg
+            .trigger_price_source
+            .as_deref()
+            .map(|label| label.trim().to_ascii_lowercase())
+            .as_deref()
+        {
+            None | Some("") => TriggerPriceSource::TriggerPriceSourceUnspecified,
+            Some("last") => TriggerPriceSource::LastPrice,
+            Some("index") => TriggerPriceSource::IndexPrice,
+            Some("mark") => TriggerPriceSource::MarkPrice,
+            Some(_) => {
+                return Err(Error::validation(format!(
+                    "{field} trigger_price_source must be last, index or mark"
+                )));
+            }
         };
         let mut out = OcoLeg {
             trigger_price_ticks,
@@ -1035,7 +1042,7 @@ impl TriggersService {
     /// with `TRIGGER_CREATE_OUTCOME_UNKNOWN`
     /// ([`Error::mutation_outcome_unknown`] is true): the OCO may exist, so
     /// list the triggers with its `client_list_id`
-    /// (`ListTriggersRequest::client_list_id`) before retrying. An OCO whose
+    /// ([`ListTriggersOpts::client_list_id`]) before retrying. An OCO whose
     /// trigger price the last price has already reached is rejected on both
     /// legs after the create answers; read the legs for their status.
     pub async fn create_oco(&self, params: CreateOcoParams) -> Result<CreateOcoResult> {
@@ -2590,15 +2597,58 @@ mod tests {
         let wire = client.triggers.encode_create_oco_params(&buy).unwrap();
         let oco = wire.oco.as_option().unwrap();
         assert_eq!(oco.side, Side::Buy);
+    }
 
-        // The sell OCO's legs, kept for a buy, are the wrong way round.
+    /// Which way round the legs must be for the side, and which price source
+    /// a market supports, are the server's to refuse: the SDK sends them.
+    #[test]
+    fn oco_create_leaves_leg_order_and_supported_sources_to_the_server() {
+        let client = client();
+        // The sell OCO's legs, kept for a buy, and equal trigger prices.
         let mut swapped = sell_oco();
         swapped.side = CreateSide::Buy;
-        let err = client
-            .triggers
-            .encode_create_oco_params(&swapped)
-            .unwrap_err();
-        assert!(err.to_string().contains("below its stop_loss"), "{err}");
+        let mut equal = sell_oco();
+        equal.stop_loss = OcoLegParams::market(btc_price("51000"));
+        for (params, side, sl_ticks) in [
+            (swapped, Side::Buy, 49_000_000_000_000),
+            (equal, Side::Sell, 51_000_000_000_000),
+        ] {
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            let oco = wire.oco.as_option().unwrap();
+            assert_eq!(oco.side, side);
+            assert_eq!(
+                oco.take_profit.as_option().unwrap().trigger_price_ticks,
+                51_000_000_000_000
+            );
+            assert_eq!(
+                oco.stop_loss.as_option().unwrap().trigger_price_ticks,
+                sl_ticks
+            );
+        }
+
+        for (label, want) in [
+            ("last", TriggerPriceSource::LastPrice),
+            ("index", TriggerPriceSource::IndexPrice),
+            ("mark", TriggerPriceSource::MarkPrice),
+            (" MARK ", TriggerPriceSource::MarkPrice),
+            ("", TriggerPriceSource::TriggerPriceSourceUnspecified),
+        ] {
+            let mut params = sell_oco();
+            params.take_profit.trigger_price_source = Some(label.into());
+            params.stop_loss.trigger_price_source = Some(label.into());
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            let oco = wire.oco.as_option().unwrap();
+            assert_eq!(
+                oco.take_profit.as_option().unwrap().trigger_price_source,
+                want,
+                "{label:?}"
+            );
+            assert_eq!(
+                oco.stop_loss.as_option().unwrap().trigger_price_source,
+                want,
+                "{label:?}"
+            );
+        }
     }
 
     #[test]
@@ -2612,13 +2662,6 @@ mod tests {
             assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
             assert!(err.to_string().contains(want), "{want}: {err}");
         };
-
-        let mut p = sell_oco();
-        p.stop_loss = OcoLegParams::market(btc_price("51000"));
-        refused(p, "above its stop_loss");
-        let mut p = sell_oco();
-        p.stop_loss = OcoLegParams::market(btc_price("52000"));
-        refused(p, "above its stop_loss");
 
         let mut p = sell_oco();
         p.client_list_id = " ".into();
@@ -2638,8 +2681,11 @@ mod tests {
         refused(p, "stop_loss trigger_price must be positive");
 
         let mut p = sell_oco();
-        p.take_profit.trigger_price_source = Some("mark".into());
-        refused(p, "no mark price");
+        p.take_profit.trigger_price_source = Some("oracle".into());
+        refused(
+            p,
+            "take_profit trigger_price_source must be last, index or mark",
+        );
         let mut p = sell_oco();
         p.self_trade_prevention_mode = Some("decrement".into());
         refused(p, "self_trade_prevention_mode");

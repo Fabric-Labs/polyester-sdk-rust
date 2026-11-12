@@ -461,6 +461,12 @@ pub fn trigger_from_proto(msg: &ProtoTrigger) -> Trigger {
         trigger_type: proj.trigger_type,
         status: enum_value_trigger_status(msg.status),
         parent_order_id: msg.parent_order_id.map(format_uint64_id),
+        // Zero is no OCO: it reads as `None`, never as an ID.
+        order_list_id: msg
+            .order_list_id
+            .filter(|id| *id != 0)
+            .map(format_uint64_id),
+        client_list_id: msg.client_list_id.clone(),
         side: proj.side,
         order_type: proj.order_type,
         time_in_force: proj.time_in_force,
@@ -1327,6 +1333,35 @@ mod tests {
         })
         .unwrap();
         assert_eq!(created.client_trigger_id, "stable-trigger");
+    }
+
+    #[test]
+    fn trigger_reads_name_the_oco_of_a_leg() {
+        let leg = ProtoTrigger {
+            trigger_id: 71,
+            order_list_id: Some(70),
+            client_list_id: "oco-1".into(),
+            ..Default::default()
+        };
+        for read in [
+            trigger_from_proto(&leg),
+            crate::codecs::decode::trigger_from_bytes(&buffa::Message::encode_to_vec(&leg))
+                .unwrap(),
+        ] {
+            assert_eq!(read.order_list_id, Some(format_uint64_id(70)));
+            assert_eq!(read.client_list_id, "oco-1");
+            assert_eq!(read.parent_order_id, None);
+        }
+        // Unset, or zero on the wire, is no OCO.
+        for order_list_id in [None, Some(0)] {
+            let read = trigger_from_proto(&ProtoTrigger {
+                trigger_id: 73,
+                order_list_id,
+                ..Default::default()
+            });
+            assert_eq!(read.order_list_id, None, "{order_list_id:?}");
+            assert_eq!(read.client_list_id, "", "{order_list_id:?}");
+        }
     }
 
     #[test]
