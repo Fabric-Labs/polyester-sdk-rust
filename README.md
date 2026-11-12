@@ -913,7 +913,11 @@ stalled feed never fires it. Status values are `"active"`, `"triggered"` and
 `"cancelled"` (the contract's spelling).
 
 `update` sends only the fields set on `UpdateAlertParams` with the
-`expected_revision` you last read; a stale one is refused with code
+`expected_revision` you last read. Its price must be unbound
+(`Price::from_decimal_str(.., None)`, `Price::from_ticks(.., None)`): a price
+bound to a market, including an alert's own `price`, is refused with
+`Error::Validation` before sending, since the update names the alert, not its
+market; a stale one is refused with code
 `REVISION_CONFLICT`, so read the alert again. An update that sets no field
 changes nothing on an active alert and sets a triggered one again as it is.
 `outcome` is `"applied"`, `"unchanged"` or `"replayed"` (the idempotency key
@@ -924,6 +928,15 @@ contract codes (`polyester::errors::alert_codes`): `PRICE_UNAVAILABLE` changed
 nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
 cancel outcome unknown, so send it again with the same idempotency key
 (`cancel` is idempotent) or read the alerts back.
+
+A price bound to a market (`Price::from_ticks(t, Some("ETH-USDT".into()))`)
+is checked against the catalogs' name for the market's ID; when the catalogs
+don't know that ID (never loaded, failed to load, or not listed) `create`
+refuses it with `Error::Validation` before sending. An unbound price works with
+any `symbol_id`. A `create`, `update` or `cancel` answer without the alert, or
+with an alert whose `alert_id` is 0, returns `Error::ResponseContract`
+(`mutation_outcome_unknown()` is true): read the alerts back rather than
+trusting it.
 
 ## Server build version
 

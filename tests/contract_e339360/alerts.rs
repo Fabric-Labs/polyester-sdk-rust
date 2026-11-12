@@ -514,3 +514,320 @@ async fn alert_refusals_map_to_sdk_errors() {
         }
     }
 }
+
+fn alert_field(alert: Option<ProtoAlert>) -> buffa::MessageField<ProtoAlert> {
+    alert.map_or_else(Default::default, Into::into)
+}
+
+fn assert_response_contract(err: &Error, operation: &str) {
+    assert!(
+        matches!(err, Error::ResponseContract { context, .. } if context == operation),
+        "{operation}: {err:?}"
+    );
+    assert!(err.mutation_outcome_unknown(), "{operation}: {err:?}");
+}
+
+/// POLY-9918: a create, update or cancel answer without its alert, or with an
+/// alert that has no ID, breaks the response contract instead of reading as a
+/// zero-ID alert. Every update outcome is checked.
+#[tokio::test]
+async fn alert_mutations_refuse_an_answer_without_the_alert() {
+    let outcomes = [
+        UpdateOutcome::UPDATE_OUTCOME_UNSPECIFIED,
+        UpdateOutcome::APPLIED,
+        UpdateOutcome::UNCHANGED,
+        UpdateOutcome::REPLAYED,
+    ];
+    for (name, alert) in [("missing", None), ("empty", Some(ProtoAlert::default()))] {
+        let outcome = Arc::new(Mutex::new(UpdateOutcome::APPLIED));
+        let handler_outcome = outcome.clone();
+        let handler_alert = alert.clone();
+        let server = MockHttpServer::spawn(move |request| match request.path.as_str() {
+            CREATE => connect_proto_ok(&CreateAlertResponse {
+                alert: alert_field(handler_alert.clone()),
+                ..Default::default()
+            }),
+            UPDATE => connect_proto_ok(&UpdateAlertResponse {
+                alert: alert_field(handler_alert.clone()),
+                outcome: (*handler_outcome.lock().unwrap()).into(),
+                ..Default::default()
+            }),
+            CANCEL => connect_proto_ok(&CancelAlertResponse {
+                alert: alert_field(handler_alert.clone()),
+                ..Default::default()
+            }),
+            _ => HttpScript::NotFound,
+        })
+        .await;
+        let client = client(&server);
+
+        let err = client
+            .alerts
+            .create(CreateAlertParams::new(
+                "BTC-USDT",
+                AlertDirection::Above,
+                price("1000000"),
+                vec![AlertChannel::InApp],
+            ))
+            .await
+            .unwrap_err();
+        assert_response_contract(&err, "CreateAlert");
+        for value in outcomes {
+            *outcome.lock().unwrap() = value;
+            let err = client
+                .alerts
+                .update(UpdateAlertParams::new("123", 1).with_price(price("1000000")))
+                .await
+                .unwrap_err();
+            assert_response_contract(&err, "UpdateAlert");
+        }
+        let err = client.alerts.cancel("123").await.unwrap_err();
+        assert_response_contract(&err, "CancelAlert");
+        assert_eq!(server.requests.load(Ordering::SeqCst), 6, "{name}");
+    }
+}
+
+/// A populated update answer keeps its alert and outcome, whatever the outcome.
+#[tokio::test]
+async fn update_alert_reads_a_populated_alert_for_every_outcome() {
+    let outcome = Arc::new(Mutex::new(UpdateOutcome::APPLIED));
+    let handler_outcome = outcome.clone();
+    let server = MockHttpServer::spawn(move |_| {
+        let mut alert = proto_alert();
+        alert.revision = 2;
+        connect_proto_ok(&UpdateAlertResponse {
+            alert: alert.into(),
+            outcome: (*handler_outcome.lock().unwrap()).into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = client(&server);
+    for (value, label) in [
+        (UpdateOutcome::UPDATE_OUTCOME_UNSPECIFIED, "unspecified"),
+        (UpdateOutcome::APPLIED, "applied"),
+        (UpdateOutcome::UNCHANGED, "unchanged"),
+        (UpdateOutcome::REPLAYED, "replayed"),
+    ] {
+        *outcome.lock().unwrap() = value;
+        let result = client
+            .alerts
+            .update(UpdateAlertParams::new("1234", 1).with_price(price("1000000")))
+            .await
+            .unwrap();
+        assert_eq!(result.outcome, label);
+        assert_eq!(
+            result.alert.alert_id,
+            polyester::codecs::scalars::format_uint64_id(1234)
+        );
+        assert_eq!(result.alert.symbol_id, 1);
+        assert_eq!(result.alert.revision, 2);
+    }
+}
+
+fn eth_bound() -> Price {
+    Price::from_ticks(3_000_000_000_000, Some("ETH-USDT".into())).unwrap()
+}
+
+fn bound_create(symbol: &str, symbol_id: u32, price: Price) -> CreateAlertParams {
+    let mut params = CreateAlertParams::for_symbol_id(
+        symbol_id,
+        AlertDirection::Below,
+        price,
+        vec![AlertChannel::InApp],
+    );
+    params.symbol = symbol.into();
+    params
+}
+
+fn uncatalogued_client(server: &MockHttpServer, hydrate_catalogs: bool) -> Client {
+    Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs,
+        timeout: std::time::Duration::from_millis(500),
+        ..Default::default()
+    })
+    .unwrap()
+}
+
+/// POLY-9919: without catalogs that name symbol_id 1, an ETH-bound price is
+/// never sent for it, whether the catalogs were never loaded or failed to
+/// load, and whatever symbol is named beside the ID. Unbound prices still go.
+#[tokio::test]
+async fn create_alert_refuses_a_bound_price_the_catalogs_cannot_check() {
+    let creates = Arc::new(Mutex::new(Vec::new()));
+    let handler_creates = creates.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path == CREATE {
+            handler_creates
+                .lock()
+                .unwrap()
+                .push(CreateAlertRequest::decode_from_slice(&request.body).unwrap());
+            return connect_proto_ok(&CreateAlertResponse {
+                alert: proto_alert().into(),
+                ..Default::default()
+            });
+        }
+        // Every catalog read fails, so a hydrating client's load fails.
+        HttpScript::Json {
+            status: 500,
+            body: br#"{"error":"unavailable"}"#.to_vec(),
+        }
+    })
+    .await;
+    for hydrate in [false, true] {
+        let client = uncatalogued_client(&server, hydrate);
+        let before = creates.lock().unwrap().len();
+        for symbol in ["", "ETH-USDT", "BTC-USDT"] {
+            let err = client
+                .alerts
+                .create(bound_create(symbol, 1, eth_bound()))
+                .await
+                .unwrap_err();
+            // By ID the price cannot be checked; a named market after the
+            // failed load reports the load.
+            let refused = match err {
+                Error::Validation(_) => true,
+                Error::CatalogHydration(_) => hydrate && !symbol.is_empty(),
+                _ => false,
+            };
+            assert!(refused, "hydrate={hydrate} symbol={symbol:?}: {err:?}");
+        }
+        assert_eq!(creates.lock().unwrap().len(), before, "hydrate={hydrate}");
+        let unbound = || Price::from_ticks(3_000_000_000_000, None).unwrap();
+        // A market named by symbol needs the catalogs, whatever the price.
+        let err = client
+            .alerts
+            .create(bound_create("ETH-USDT", 1, unbound()))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Validation(_) | Error::CatalogHydration(_)),
+            "hydrate={hydrate}: {err:?}"
+        );
+        assert_eq!(creates.lock().unwrap().len(), before, "hydrate={hydrate}");
+        // An unbound price by ID needs none.
+        client
+            .alerts
+            .create(bound_create("", 1, unbound()))
+            .await
+            .unwrap();
+    }
+    let sent = creates.lock().unwrap();
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent.iter()
+            .all(|req| req.symbol_id == 1 && req.price_ticks == 3_000_000_000_000)
+    );
+}
+
+/// With catalogs listing BTC-USDT (1) and ETH-USDT (2), an ETH-bound price is
+/// refused for ID 1, by ID or by a conflicting name and ID, and sent for 2.
+#[tokio::test]
+async fn create_alert_checks_a_bound_price_against_the_catalogued_market() {
+    let creates = Arc::new(Mutex::new(Vec::new()));
+    let handler_creates = creates.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        handler_creates
+            .lock()
+            .unwrap()
+            .push(CreateAlertRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&CreateAlertResponse {
+            alert: proto_alert().into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = uncatalogued_client(&server, false);
+    client
+        .catalogs
+        .hydrate_spot_config_json(json!({
+            "pairs": [
+                {"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 5, "quote_quantity_scale": 6},
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 5, "quote_quantity_scale": 6}
+            ]
+        }))
+        .unwrap();
+    for symbol in ["", "ETH-USDT"] {
+        let err = client
+            .alerts
+            .create(bound_create(symbol, 1, eth_bound()))
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{symbol:?}: {err:?}");
+    }
+    assert!(creates.lock().unwrap().is_empty());
+    for symbol in ["", "ETH-USDT"] {
+        client
+            .alerts
+            .create(bound_create(symbol, 2, eth_bound()))
+            .await
+            .unwrap();
+    }
+    let mut by_name = CreateAlertParams::new(
+        "ETH-USDT",
+        AlertDirection::Below,
+        eth_bound(),
+        vec![AlertChannel::InApp],
+    );
+    by_name.symbol_id = None;
+    client.alerts.create(by_name).await.unwrap();
+    let sent = creates.lock().unwrap();
+    assert_eq!(sent.len(), 3);
+    assert!(sent.iter().all(|req| req.symbol_id == 2));
+}
+
+/// The update names the alert, not its market: a bound price can't be checked
+/// without reading the alert, so it is refused before sending, even one bound
+/// to the alert's own market. Unbound prices are sent.
+#[tokio::test]
+async fn update_alert_refuses_a_market_bound_price() {
+    let updates = Arc::new(Mutex::new(Vec::new()));
+    let handler_updates = updates.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        handler_updates
+            .lock()
+            .unwrap()
+            .push(UpdateAlertRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&UpdateAlertResponse {
+            alert: proto_alert().into(),
+            outcome: UpdateOutcome::APPLIED.into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = client(&server);
+    for bound in [
+        eth_bound(),
+        Price::from_ticks(90_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+    ] {
+        let err = client
+            .alerts
+            .update(UpdateAlertParams::new("1234", 1).with_price(bound.clone()))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, Error::Validation(msg) if msg.contains("unbound price")),
+            "{bound:?}: {err:?}"
+        );
+    }
+    assert!(updates.lock().unwrap().is_empty());
+    for unbound in [
+        Price::from_ticks(91_000_000_000_000, None).unwrap(),
+        price("91000"),
+    ] {
+        client
+            .alerts
+            .update(UpdateAlertParams::new("1234", 1).with_price(unbound))
+            .await
+            .unwrap();
+    }
+    let sent = updates.lock().unwrap();
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent.iter()
+            .all(|req| req.update.price_ticks == 91_000_000_000_000)
+    );
+}

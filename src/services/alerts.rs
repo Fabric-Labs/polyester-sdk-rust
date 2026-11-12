@@ -57,6 +57,10 @@ impl AlertsService {
     /// unarmed. Refused before sending: no or repeated channels, more than
     /// two, a price that is not positive or is bound to another market, a
     /// malformed idempotency key, or a market the catalogs don't know by name.
+    /// A price bound to a market is checked against the catalogs' name for
+    /// the ID sent, and refused when they don't know it. An answer without
+    /// the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`].
     pub async fn create(&self, params: CreateAlertParams) -> Result<PriceAlert> {
         let channels = channels(&params.channels)?;
         let price_ticks = positive_price(&params.price)?;
@@ -121,7 +125,12 @@ impl AlertsService {
     /// Change an alert's direction, price or channels: the fields set on
     /// `params` are sent with an update mask naming them. With none set the
     /// mask is empty, which sets a fired alert again (and leaves an active
-    /// one `"unchanged"`). Updating a fired alert sets it again.
+    /// one `"unchanged"`). Updating a fired alert sets it again. The price
+    /// must be unbound: a price bound to a market, such as an alert's own
+    /// `price`, is refused with [`Error::Validation`] before sending, since
+    /// the update names the alert, not its market. An answer
+    /// without the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`] whatever its outcome.
     pub async fn update(&self, params: UpdateAlertParams) -> Result<UpdateAlertResult> {
         let alert_id = alert_id(&params.alert_id)?;
         if params.expected_revision == 0 {
@@ -135,6 +144,13 @@ impl AlertsService {
             paths.push("direction".to_owned());
         }
         if let Some(price) = &params.price {
+            // The update names the alert, not its market, so nothing proves a
+            // bound price is for that market.
+            if let Some(bound) = price.symbol() {
+                return Err(Error::validation(format!(
+                    "update alert cannot check a price bound to {bound} against the alert's market; pass an unbound price: Price::from_decimal_str(.., None) or Price::from_ticks(.., None)"
+                )));
+            }
             update.price_ticks = positive_price(price)?;
             paths.push("price_ticks".to_owned());
         }
@@ -168,7 +184,9 @@ impl AlertsService {
     }
 
     /// Cancel an active alert. Cancelling a cancelled alert returns it
-    /// unchanged; a fired one is refused with `ALERT_TRIGGERED`.
+    /// unchanged; a fired one is refused with `ALERT_TRIGGERED`. An answer
+    /// without the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`].
     pub async fn cancel(&self, alert_id: &str) -> Result<PriceAlert> {
         let req = CancelAlertRequest {
             alert_id: self::alert_id(alert_id)?,

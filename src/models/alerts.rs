@@ -261,6 +261,10 @@ impl UpdateAlertParams {
         self
     }
 
+    /// Move the alert to `price`, which must be unbound
+    /// (`Price::from_decimal_str(.., None)`, `Price::from_ticks(.., None)`):
+    /// the update names the alert, not its market, so a bound price is
+    /// refused before sending.
     pub fn with_price(mut self, price: Price) -> Self {
         self.price = Some(price);
         self
