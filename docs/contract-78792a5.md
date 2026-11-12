@@ -14,10 +14,10 @@ Based on `78792a5` (exchange release 0.93.0); the previous contract is `e339360`
 | 2026-11-08T0634Z-orders-v1 | Description of `ATTACHED_RISK_NOT_SUPPORTED` only; the code already passes through. |
 | 2026-11-08T2026Z-orders-v1 | `CANCEL_REASON_CANCEL_ON_DISCONNECT` reads by name. |
 | 2026-11-08T2040Z-orders-v1 | `CreateOrderParams::peg` (`OrderPeg`, `PegReference`); `offset_ticks` is a count of the pair's price increments, sent as given. Market, quote sizing and attached risk with a peg are refused locally. |
-| 2026-11-08T2220Z-triggers-v1 | OCO create and cancel and OCO trigger fields were added before this follow-up. `decrement` on an OCO is sent; the server decides. |
+| 2026-11-08T2220Z-triggers-v1 | OCO create and cancel and OCO trigger fields were added before this follow-up. This follow-up checks `client_list_id` as the contract does, any 1 to 36 bytes of UTF-8 sent unchanged on the create and the `client_list_id` listing filter alike, and keeps the create's `accepted_ts_ns` and the cancel's `ts_ns`. `decrement` on an OCO is sent; the server decides. |
 | 2026-11-08T2256Z-orders-v1 | Covered: order decoders read `origin` on every revision. |
 | 2026-11-09T1435Z-ledger-read-v1 | Docs only: `LedgerTransfer::tx_id` carries the flow ID from the first realtime update of a Trading to Funding transfer. |
-| 2026-11-09T1527Z-triggers-v1 | Batch trigger cancel was added before this follow-up. |
+| 2026-11-09T1527Z-triggers-v1 | Batch trigger cancel was added before this follow-up; this follow-up keeps the answer's `ts_ns`. |
 | 2026-11-09T1555Z-swap-quickswap-v1 | Skipped: Quick Swap is served by the TypeScript SDK only. |
 | 2026-11-10T0141Z-tradews-v1 | No SDK wrapper for the trading WebSocket; `REQUEST_DEADLINE_EXCEEDED` at admission was already handled. |
 | 2026-11-10T0504Z-orders-v1 | `Decrement` is accepted with attached risk and on trigger creates. |

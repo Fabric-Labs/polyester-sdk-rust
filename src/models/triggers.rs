@@ -232,6 +232,10 @@ pub struct CreateOcoParams {
     /// and for 60 seconds after both legs ended, a create with the identical
     /// params and the same ID returns the same OCO, and different params with
     /// the same ID are refused with `CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID`.
+    /// Any 1 to 36 bytes of UTF-8, sent exactly as given (never trimmed), so
+    /// [`ListTriggersOpts::client_list_id`] finds the OCO with the same
+    /// string; another length is refused with [`crate::Error::Validation`]
+    /// before sending.
     pub client_list_id: String,
     /// The take-profit leg. The server requires its trigger price to be above
     /// the stop-loss's for a SELL OCO and below it for a BUY OCO.
@@ -308,9 +312,11 @@ pub struct ListTriggersOpts {
     /// every trigger.
     pub order_list_id: Option<String>,
     /// Only the take-profit and stop-loss of the OCO created with this
-    /// `client_list_id` (the contract's `client_list_id` filter), sent as
-    /// given. Use it to learn whether a create whose outcome is unknown made
-    /// the OCO. `None` lists every trigger.
+    /// `client_list_id` (the contract's `client_list_id` filter), sent exactly
+    /// as given, never trimmed: pass the key the create used. Use it to learn
+    /// whether a create whose outcome is unknown made the OCO. 1 to 36 bytes
+    /// of UTF-8; another length is refused with [`crate::Error::Validation`]
+    /// before sending. `None` lists every trigger.
     pub client_list_id: Option<String>,
 }
 
@@ -447,6 +453,10 @@ pub struct CreateOcoResult {
     pub take_profit_trigger_id: String,
     /// Public trigger ID of the stop-loss leg.
     pub stop_loss_trigger_id: String,
+    /// When admission completed, in nanoseconds since the Unix epoch: the
+    /// contract's `accepted_at_ts_ns`, or `accepted_at` when only that is
+    /// sent; 0 when neither is.
+    pub accepted_ts_ns: u64,
 }
 
 /// An OCO's cancellation: both legs end canceled and the OCO's reserved
@@ -457,6 +467,9 @@ pub struct CancelOcoResult {
     pub order_list_id: String,
     /// Both legs' status after the cancel, which is always `canceled`.
     pub status: String,
+    /// When the cancel was answered, in nanoseconds since the Unix epoch:
+    /// `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    pub ts_ns: u64,
 }
 
 /// The outcome of one trigger of a batch cancel.
@@ -488,6 +501,9 @@ pub struct BatchCancelTriggersResult {
     pub results: Vec<BatchCancelTriggersResultItem>,
     pub accepted_count: u32,
     pub rejected_count: u32,
+    /// The server time of the answer, in nanoseconds since the Unix epoch:
+    /// `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    pub ts_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

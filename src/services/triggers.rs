@@ -1,5 +1,5 @@
 use super::ServiceContext;
-use super::correlation_id::require_client_style_id;
+use super::correlation_id::{require_client_list_id, require_client_style_id};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -294,7 +294,9 @@ impl TriggersService {
             }
             req.order_list_id = Some(id);
         }
-        req.client_list_id = opts.client_list_id;
+        if let Some(key) = opts.client_list_id.as_deref() {
+            req.client_list_id = Some(require_client_list_id(key, "client_list_id")?);
+        }
         self.list(req).await
     }
 
@@ -753,7 +755,7 @@ impl TriggersService {
             symbol_id: market.symbol_id,
             side: side.into(),
             qty_scaled: qty,
-            client_list_id: require_client_style_id(&params.client_list_id, "client_list_id")?,
+            client_list_id: require_client_list_id(&params.client_list_id, "client_list_id")?,
             ..Default::default()
         };
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
@@ -2587,7 +2589,9 @@ mod tests {
         assert_eq!(oco.symbol_id, 7);
         assert_eq!(oco.side, Side::Sell);
         assert_eq!(oco.qty_scaled, 10_000_000);
-        assert_eq!(oco.client_list_id, "oco-1");
+        // The contract takes any 1 to 36 bytes of UTF-8 and the server
+        // matches them exactly: the key is sent as given, never trimmed.
+        assert_eq!(oco.client_list_id, " oco-1 ");
         assert_eq!(
             oco.self_trade_prevention_mode,
             SelfTradePreventionMode::ExpireTaker
@@ -2734,6 +2738,29 @@ mod tests {
     }
 
     #[test]
+    fn oco_client_list_id_is_any_1_to_36_bytes_of_utf8_sent_as_given() {
+        let client = client();
+        let keys: Vec<String> = vec![
+            " oco-1 ".into(),
+            " ".into(),
+            "\u{6b62}\u{640d}-\u{00e9}t\u{00e9}".into(),
+            "\u{30b9}".repeat(12),
+            "x".repeat(36),
+            "tab\tand/slash".into(),
+        ];
+        for key in keys {
+            let mut params = sell_oco();
+            params.client_list_id = key.clone();
+            let wire = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_or_else(|err| panic!("{key:?}: {err}"));
+            let oco = wire.oco.as_option().expect("oco intent");
+            assert_eq!(oco.client_list_id, key, "{key:?}");
+        }
+    }
+
+    #[test]
     fn oco_create_refuses_invalid_params_before_sending() {
         let client = client();
         let refused = |params: CreateOcoParams, want: &str| {
@@ -2746,11 +2773,15 @@ mod tests {
         };
 
         let mut p = sell_oco();
-        p.client_list_id = " ".into();
-        refused(p, "client_list_id is required");
+        p.client_list_id = String::new();
+        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
         let mut p = sell_oco();
         p.client_list_id = "x".repeat(37);
-        refused(p, "client_list_id must be 1 to 36 characters");
+        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
+        // 13 three-byte characters are 39 bytes: the limit counts bytes.
+        let mut p = sell_oco();
+        p.client_list_id = "\u{30b9}".repeat(13);
+        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
 
         let mut p = sell_oco();
         p.take_profit.limit_price = None;

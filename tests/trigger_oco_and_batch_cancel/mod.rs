@@ -633,3 +633,65 @@ async fn list_sends_the_oco_filters() {
         );
     }
 }
+
+/// A client OCO ID is any 1 to 36 bytes of UTF-8, matched by the server byte
+/// for byte: the create and the recovery listing send the caller's key
+/// unchanged, untrimmed, non-ASCII included, so the listing finds the OCO the
+/// create made. A key over 36 bytes is refused before anything is sent.
+#[tokio::test]
+async fn create_and_list_send_the_same_client_oco_id_bytes() {
+    let key = " oco-\u{00e9}t\u{00e9} 1 ";
+    for wire in WIRES {
+        let s = server(wire).await;
+        let mut params = sell_oco();
+        params.client_list_id = key.into();
+        let created = s.client.triggers.create_oco(params).await.expect("create");
+        assert_eq!(created.client_list_id, key, "{wire:?}");
+        assert_eq!(
+            created.accepted_ts_ns, 1_700_000_000_000_000_000,
+            "{wire:?}"
+        );
+        let creates = s.creates.lock().unwrap().clone();
+        let sent: CreateOcoRequest = request(wire, &creates[0]);
+        let created_key = sent.oco.as_option().expect("oco").client_list_id.clone();
+        assert_eq!(created_key, key, "{wire:?}");
+
+        s.client
+            .triggers
+            .list_with(ListTriggersOpts {
+                client_list_id: Some(key.into()),
+                ..Default::default()
+            })
+            .await
+            .expect("list");
+        let listed = s.lists.lock().unwrap().last().cloned().unwrap();
+        assert_eq!(
+            listed.client_list_id.as_deref(),
+            Some(created_key.as_str()),
+            "{wire:?}"
+        );
+
+        let sent_before = s.sent();
+        for bad in [String::new(), "x".repeat(37), "\u{30b9}".repeat(13)] {
+            let err = s
+                .client
+                .triggers
+                .list_with(ListTriggersOpts {
+                    client_list_id: Some(bad.clone()),
+                    ..Default::default()
+                })
+                .await
+                .expect_err("invalid client OCO ID");
+            assert!(
+                matches!(err, Error::Validation(_)),
+                "{wire:?} {bad:?}: {err}"
+            );
+            assert!(err.to_string().contains("client_list_id"), "{err}");
+        }
+        assert_eq!(
+            s.sent(),
+            sent_before,
+            "{wire:?}: a refused filter must send nothing"
+        );
+    }
+}
