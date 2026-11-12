@@ -3,7 +3,8 @@ use super::correlation_id::require_client_style_id;
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
-    attach_trigger_scale, get_trigger_from_proto, trigger_events_list_from_proto,
+    attach_trigger_scale, batch_cancel_triggers_from_proto, cancel_oco_from_proto,
+    create_oco_from_proto, get_trigger_from_proto, trigger_events_list_from_proto,
     trigger_mutation_from_cancel, trigger_mutation_from_create, trigger_mutation_from_modify,
     trigger_mutation_from_pause, trigger_mutation_from_resume, triggers_list_from_proto,
 };
@@ -11,25 +12,29 @@ use crate::codecs::scalars::id_to_u64;
 use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
-    CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType,
-    FeeAsset, ListTriggersOpts, ModifyTriggerParams, ResumeTriggerParams, Trigger, TriggerEvent,
-    TriggerEventsList, TriggerMutationResult, TriggersList,
+    BatchCancelTriggersResult, CancelOcoResult, CreateOcoParams, CreateOcoResult, CreateOrderType,
+    CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType, FeeAsset,
+    ListTriggersOpts, ModifyTriggerParams, OcoLegParams, ResumeTriggerParams, Trigger,
+    TriggerEvent, TriggerEventsList, TriggerMutationResult, TriggersList,
 };
 use crate::proto::orders::v1::{
-    FeeAsset as ProtoFeeAsset, SelfTradePreventionMode, Side, TriggerPriceSource,
+    FeeAsset as ProtoFeeAsset, RiskExecution, RiskLimitGtc, SelfTradePreventionMode, Side,
+    TriggerPriceSource, risk_execution,
 };
 use crate::proto::triggers::v1::{
-    CancelTriggerRequest, ConditionalChildExecution, ConditionalTrigger, CreateTriggerRequest,
-    GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
-    ModifyTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger,
-    TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc,
-    TriggerType, TwapLimitGtc, TwapMarketIoc, TwapTrigger, conditional_child_execution,
-    modify_trigger_request, trailing_stop_trigger, trigger_intent, trigger_market_ioc,
-    twap_market_ioc, twap_trigger,
+    BatchCancelTriggersRequest, CancelOcoRequest, CancelTriggerRequest, ConditionalChildExecution,
+    ConditionalTrigger, CreateOcoRequest, CreateTriggerRequest, GetTriggerRequest, LadderTrigger,
+    ListTriggerEventsRequest, ListTriggersRequest, ModifyTriggerRequest, OcoIntent, OcoLeg,
+    PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger, TriggerIntent, TriggerLimitFok,
+    TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc, TriggerType, TwapLimitGtc, TwapMarketIoc,
+    TwapTrigger, conditional_child_execution, modify_trigger_request, trailing_stop_trigger,
+    trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
 use crate::types::{resolve_price_ticks, resolve_qty_scaled};
 
 const MAX_BPS: i32 = 10_000;
+/// Most triggers one batch cancel takes.
+const MAX_BATCH_CANCEL_TRIGGERS: usize = 50;
 /// Slippage cap shared by every trailing stop and every child that sells: a
 /// 100% cap would leave a sell no positive price to sell at. A modify does
 /// not say which trigger it changes, so it takes up to [`MAX_BPS`], as the
@@ -717,6 +722,147 @@ impl TriggersService {
         })
     }
 
+    fn encode_create_oco_params(&self, params: &CreateOcoParams) -> Result<CreateOcoRequest> {
+        // Resolve the market once: the ID sent, the quantity scale and the
+        // legs' price checks use the catalog's market, not the caller's text.
+        let market = self.ctx.catalogs.require_market(&params.symbol)?;
+        let qty = resolve_qty_scaled(
+            &params.qty,
+            market.base_quantity_scale,
+            Some(&market.symbol),
+            Some(market.symbol_id),
+        )?;
+        let take_profit =
+            self.encode_oco_leg(&params.take_profit, "take_profit", &market.symbol)?;
+        let stop_loss = self.encode_oco_leg(&params.stop_loss, "stop_loss", &market.symbol)?;
+        // A SELL OCO takes profit above its stop-loss, a BUY OCO below it.
+        let (side, ordered) = match params.side {
+            CreateSide::Sell => (
+                Side::Sell,
+                take_profit.trigger_price_ticks > stop_loss.trigger_price_ticks,
+            ),
+            CreateSide::Buy => (
+                Side::Buy,
+                take_profit.trigger_price_ticks < stop_loss.trigger_price_ticks,
+            ),
+        };
+        if !ordered {
+            return Err(Error::validation(match params.side {
+                CreateSide::Sell => {
+                    "a sell OCO's take_profit trigger_price must be above its stop_loss trigger_price"
+                }
+                CreateSide::Buy => {
+                    "a buy OCO's take_profit trigger_price must be below its stop_loss trigger_price"
+                }
+            }));
+        }
+        let mut oco = OcoIntent {
+            symbol_id: market.symbol_id,
+            side: side.into(),
+            qty_scaled: qty,
+            client_list_id: require_client_style_id(&params.client_list_id, "client_list_id")?,
+            ..Default::default()
+        };
+        if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
+            oco.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
+        }
+        *oco.take_profit.get_or_insert_default() = take_profit;
+        *oco.stop_loss.get_or_insert_default() = stop_loss;
+        let mut req = CreateOcoRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            ..Default::default()
+        };
+        *req.oco.get_or_insert_default() = oco;
+        Ok(req)
+    }
+
+    /// Map one flat [`OcoLegParams`] onto the leg's trigger price, source and
+    /// child [`RiskExecution`]: a market IOC or a limit GTC order.
+    fn encode_oco_leg(&self, leg: &OcoLegParams, field: &str, symbol: &str) -> Result<OcoLeg> {
+        let trigger_price_ticks = self.resolve_catalog_price(&leg.trigger_price, symbol)?;
+        if trigger_price_ticks <= 0 {
+            return Err(Error::validation(format!(
+                "{field} trigger_price must be positive"
+            )));
+        }
+        let execution = match (leg.order_type, leg.limit_price.as_ref()) {
+            (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
+            (CreateOrderType::Market, Some(_)) => {
+                return Err(Error::validation(format!(
+                    "{field} market leg must not set limit_price"
+                )));
+            }
+            (CreateOrderType::Limit, Some(price)) => {
+                risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
+                    price_ticks: self.resolve_catalog_price(price, symbol)?,
+                    ..Default::default()
+                }))
+            }
+            (CreateOrderType::Limit, None) => {
+                return Err(Error::validation(format!(
+                    "{field} limit leg requires limit_price"
+                )));
+            }
+        };
+        let trigger_price_source = match leg.trigger_price_source.as_deref() {
+            Some(label) => Self::trigger_price_source(label)?,
+            None => TriggerPriceSource::TriggerPriceSourceUnspecified,
+        };
+        let mut out = OcoLeg {
+            trigger_price_ticks,
+            trigger_price_source: trigger_price_source.into(),
+            ..Default::default()
+        };
+        *out.child.get_or_insert_default() = RiskExecution {
+            execution: Some(execution),
+            ..Default::default()
+        };
+        Ok(out)
+    }
+
+    fn encode_batch_cancel(
+        &self,
+        trigger_ids: &[String],
+        subaccount_id: Option<u64>,
+        request_id: Option<String>,
+    ) -> Result<BatchCancelTriggersRequest> {
+        if trigger_ids.is_empty() {
+            return Err(Error::validation(
+                "batch_cancel requires at least one trigger_id",
+            ));
+        }
+        if trigger_ids.len() > MAX_BATCH_CANCEL_TRIGGERS {
+            return Err(Error::validation(format!(
+                "batch_cancel accepts at most {MAX_BATCH_CANCEL_TRIGGERS} trigger_ids; received {}",
+                trigger_ids.len()
+            )));
+        }
+        let mut ids = Vec::with_capacity(trigger_ids.len());
+        for raw in trigger_ids {
+            let id = id_to_u64(raw, "trigger_id")?;
+            if id == 0 {
+                return Err(Error::validation(
+                    "trigger_id must be a non-zero trigger ID",
+                ));
+            }
+            if ids.contains(&id) {
+                return Err(Error::validation(format!(
+                    "duplicate trigger_id {raw:?} in batch_cancel"
+                )));
+            }
+            ids.push(id);
+        }
+        Ok(BatchCancelTriggersRequest {
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            request_id: super::orders::OrdersService::coalesce_request_id(
+                request_id,
+                "batch-cancel-triggers",
+            )?,
+            trigger_ids: ids,
+            ..Default::default()
+        })
+    }
+
     fn encode_modify_params(&self, params: &ModifyTriggerParams) -> Result<ModifyTriggerRequest> {
         if params.trigger_price.is_none()
             && params.activation_price.is_none()
@@ -877,6 +1023,102 @@ impl TriggersService {
             ..Default::default()
         })
         .await
+    }
+
+    /// Create an OCO: a take-profit and a stop-loss over a quantity the
+    /// account already holds, where the first leg to trade cancels the other
+    /// once the whole quantity has traded (see [`CreateOcoParams`]). Prices
+    /// and quantity must be `Price` / `Quantity` wrappers.
+    ///
+    /// Reuse `client_list_id` to retry: the identical params with the same ID
+    /// return the same OCO. A create sent but not confirmed in time fails
+    /// with `TRIGGER_CREATE_OUTCOME_UNKNOWN`
+    /// ([`Error::mutation_outcome_unknown`] is true): the OCO may exist, so
+    /// list the triggers with its `client_list_id`
+    /// (`ListTriggersRequest::client_list_id`) before retrying. An OCO whose
+    /// trigger price the last price has already reached is rejected on both
+    /// legs after the create answers; read the legs for their status.
+    pub async fn create_oco(&self, params: CreateOcoParams) -> Result<CreateOcoResult> {
+        self.ctx.wait_for_catalogs().await?;
+        let req = self.encode_create_oco_params(&params)?;
+        let client = self.client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/CreateOco",
+            req,
+            |req, opts| client.create_oco_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        create_oco_from_proto(&resp)
+    }
+
+    /// Sends `req` as built: the configured default subaccount is not applied.
+    /// Use [`Self::cancel_oco_by_id`] to apply it.
+    pub async fn cancel_oco(&self, req: CancelOcoRequest) -> Result<CancelOcoResult> {
+        super::scope::request_subaccount(req.subaccount_id)?;
+        let client = self.client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/CancelOco",
+            req,
+            |req, opts| client.cancel_oco_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        cancel_oco_from_proto(&resp)
+    }
+
+    /// Cancel both legs of an OCO using the public `order_list_id` returned by
+    /// [`Self::create_oco`]. An ID that is not an OCO of the account, such as
+    /// a leg's trigger ID, is refused with `TRIGGER_NOT_FOUND` and nothing is
+    /// canceled; cancel a single leg with [`Self::cancel_by_id`], which
+    /// cancels both.
+    pub async fn cancel_oco_by_id(
+        &self,
+        order_list_id: &str,
+        subaccount_id: Option<u64>,
+    ) -> Result<CancelOcoResult> {
+        let order_list_id = id_to_u64(order_list_id, "order_list_id")?;
+        if order_list_id == 0 {
+            return Err(Error::validation("order_list_id must be a non-zero OCO ID"));
+        }
+        self.cancel_oco(CancelOcoRequest {
+            order_list_id,
+            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            ..Default::default()
+        })
+        .await
+    }
+
+    /// Batch-cancel up to 50 distinct triggers by their public IDs. Each is
+    /// canceled as [`Self::cancel_by_id`] cancels it and answered on its own,
+    /// in request order; one rejection does not stop the others.
+    ///
+    /// A `request_id` is generated when omitted. Provide a stable non-empty
+    /// value when retrying the same logical batch: within 2 minutes, the same
+    /// `request_id` with the same trigger IDs returns the original results and
+    /// cancels nothing again, so a timed-out batch may be sent again
+    /// unchanged; omitting it on retry mints a new id. The same `request_id`
+    /// with other trigger IDs rejects every item with
+    /// `ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE`.
+    pub async fn batch_cancel(
+        &self,
+        trigger_ids: Vec<String>,
+        subaccount_id: Option<u64>,
+        request_id: Option<String>,
+    ) -> Result<BatchCancelTriggersResult> {
+        let req = self.encode_batch_cancel(&trigger_ids, subaccount_id, request_id)?;
+        let client = self.client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/BatchCancelTriggers",
+            req,
+            |req, opts| client.batch_cancel_triggers_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        batch_cancel_triggers_from_proto(&resp)
     }
 
     /// Sends `req` as built: the configured default subaccount is not applied.
@@ -2216,5 +2458,267 @@ mod tests {
         both.max_slippage_ticks = Some(1);
         both.max_slippage_bps = Some(1);
         assert!(client.triggers.encode_create_params(&both).is_err());
+    }
+
+    fn btc_price(decimal: &str) -> crate::Price {
+        crate::Price::from_decimal_str(decimal, Some("BTC-USDT".into())).unwrap()
+    }
+
+    /// A sell OCO over 0.1 BTC: a limit take-profit at 51000 (limit 50990)
+    /// and a market stop-loss at 49000.
+    fn sell_oco() -> CreateOcoParams {
+        let mut params = CreateOcoParams::new(
+            "BTC-USDT",
+            CreateSide::Sell,
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            OcoLegParams::limit(btc_price("51000"), btc_price("50990")),
+            OcoLegParams::market(btc_price("49000")),
+        );
+        params.client_list_id = "oco-1".into();
+        params
+    }
+
+    fn leg_execution(leg: &OcoLeg) -> Option<&risk_execution::Execution> {
+        leg.child
+            .as_option()
+            .and_then(|child| child.execution.as_ref())
+    }
+
+    #[test]
+    fn oco_create_encodes_the_intent_and_both_legs() {
+        let client = client();
+        let mut params = sell_oco();
+        params.client_list_id = " oco-1 ".into();
+        params.stop_loss.trigger_price_source = Some("index".into());
+        params.self_trade_prevention_mode = Some("expire_taker".into());
+        params.subaccount_id = Some(12);
+        let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+        assert_eq!(wire.subaccount_id, Some(12));
+        let oco = wire.oco.as_option().expect("oco intent");
+        assert_eq!(oco.symbol_id, 7);
+        assert_eq!(oco.side, Side::Sell);
+        assert_eq!(oco.qty_scaled, 10_000_000);
+        assert_eq!(oco.client_list_id, "oco-1");
+        assert_eq!(
+            oco.self_trade_prevention_mode,
+            SelfTradePreventionMode::ExpireTaker
+        );
+
+        let tp = oco.take_profit.as_option().expect("take_profit");
+        assert_eq!(tp.trigger_price_ticks, 51_000_000_000_000);
+        assert_eq!(
+            tp.trigger_price_source,
+            TriggerPriceSource::TriggerPriceSourceUnspecified
+        );
+        match leg_execution(tp) {
+            Some(risk_execution::Execution::LimitGtc(limit)) => {
+                assert_eq!(limit.price_ticks, 50_990_000_000_000);
+            }
+            other => panic!("take_profit: expected a limit GTC child, got {other:?}"),
+        }
+
+        let sl = oco.stop_loss.as_option().expect("stop_loss");
+        assert_eq!(sl.trigger_price_ticks, 49_000_000_000_000);
+        assert_eq!(sl.trigger_price_source, TriggerPriceSource::IndexPrice);
+        assert!(
+            matches!(
+                leg_execution(sl),
+                Some(risk_execution::Execution::MarketIoc(_))
+            ),
+            "stop_loss: expected a market IOC child, got {:?}",
+            leg_execution(sl)
+        );
+
+        // Unset options send nothing: the server defaults apply.
+        let wire = client
+            .triggers
+            .encode_create_oco_params(&sell_oco())
+            .unwrap();
+        let oco = wire.oco.as_option().unwrap();
+        assert_eq!(wire.subaccount_id, None);
+        assert_eq!(
+            oco.self_trade_prevention_mode,
+            SelfTradePreventionMode::default()
+        );
+    }
+
+    #[test]
+    fn decimal_and_scaled_oco_encode_identically() {
+        let client = client();
+        let decimal = sell_oco();
+        let mut scaled = CreateOcoParams::new(
+            "BTC-USDT",
+            CreateSide::Sell,
+            crate::Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            OcoLegParams::limit(
+                crate::Price::from_ticks(51_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+                crate::Price::from_ticks(50_990_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            ),
+            OcoLegParams::market(
+                crate::Price::from_ticks(49_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+            ),
+        );
+        scaled.client_list_id = "oco-1".into();
+        assert_eq!(
+            client
+                .triggers
+                .encode_create_oco_params(&decimal)
+                .unwrap()
+                .encode_to_vec(),
+            client
+                .triggers
+                .encode_create_oco_params(&scaled)
+                .unwrap()
+                .encode_to_vec()
+        );
+    }
+
+    #[test]
+    fn buy_oco_takes_profit_below_its_stop_loss() {
+        let client = client();
+        let mut buy = sell_oco();
+        buy.side = CreateSide::Buy;
+        buy.take_profit = OcoLegParams::market(btc_price("49000"));
+        buy.stop_loss = OcoLegParams::limit(btc_price("51000"), btc_price("51010"));
+        let wire = client.triggers.encode_create_oco_params(&buy).unwrap();
+        let oco = wire.oco.as_option().unwrap();
+        assert_eq!(oco.side, Side::Buy);
+
+        // The sell OCO's legs, kept for a buy, are the wrong way round.
+        let mut swapped = sell_oco();
+        swapped.side = CreateSide::Buy;
+        let err = client
+            .triggers
+            .encode_create_oco_params(&swapped)
+            .unwrap_err();
+        assert!(err.to_string().contains("below its stop_loss"), "{err}");
+    }
+
+    #[test]
+    fn oco_create_refuses_invalid_params_before_sending() {
+        let client = client();
+        let refused = |params: CreateOcoParams, want: &str| {
+            let err = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
+            assert!(err.to_string().contains(want), "{want}: {err}");
+        };
+
+        let mut p = sell_oco();
+        p.stop_loss = OcoLegParams::market(btc_price("51000"));
+        refused(p, "above its stop_loss");
+        let mut p = sell_oco();
+        p.stop_loss = OcoLegParams::market(btc_price("52000"));
+        refused(p, "above its stop_loss");
+
+        let mut p = sell_oco();
+        p.client_list_id = " ".into();
+        refused(p, "client_list_id is required");
+        let mut p = sell_oco();
+        p.client_list_id = "x".repeat(37);
+        refused(p, "client_list_id must be 1 to 36 characters");
+
+        let mut p = sell_oco();
+        p.take_profit.limit_price = None;
+        refused(p, "take_profit limit leg requires limit_price");
+        let mut p = sell_oco();
+        p.stop_loss.limit_price = Some(btc_price("48990"));
+        refused(p, "stop_loss market leg must not set limit_price");
+        let mut p = sell_oco();
+        p.stop_loss.trigger_price = crate::Price::from_ticks(0, None).unwrap();
+        refused(p, "stop_loss trigger_price must be positive");
+
+        let mut p = sell_oco();
+        p.take_profit.trigger_price_source = Some("mark".into());
+        refused(p, "no mark price");
+        let mut p = sell_oco();
+        p.self_trade_prevention_mode = Some("decrement".into());
+        refused(p, "self_trade_prevention_mode");
+
+        let mut p = sell_oco();
+        p.take_profit.trigger_price =
+            crate::Price::from_decimal_str("51000", Some("ETH-USDT".into())).unwrap();
+        let err = client.triggers.encode_create_oco_params(&p).unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+
+        let mut p = sell_oco();
+        p.symbol = "DOGE-USDT".into();
+        assert!(client.triggers.encode_create_oco_params(&p).is_err());
+    }
+
+    #[test]
+    fn batch_cancel_sends_each_trigger_id_once_with_a_request_id() {
+        let client = client();
+        let base58 = bs58::encode(42_u64.to_be_bytes()).into_string();
+        let wire = client
+            .triggers
+            .encode_batch_cancel(
+                &[base58.clone(), "40".into()],
+                Some(5),
+                Some(" retry-1 ".into()),
+            )
+            .unwrap();
+        assert_eq!(wire.trigger_ids, vec![42, 40]);
+        assert_eq!(wire.subaccount_id, Some(5));
+        assert_eq!(wire.request_id, "retry-1");
+
+        let generated = client
+            .triggers
+            .encode_batch_cancel(&["43".into()], None, None)
+            .unwrap();
+        assert!(
+            generated.request_id.starts_with("batch-cancel-triggers-"),
+            "{}",
+            generated.request_id
+        );
+        assert_eq!(generated.subaccount_id, None);
+
+        let fifty: Vec<String> = (1..=50).map(|n| (n * 1000).to_string()).collect();
+        assert_eq!(
+            client
+                .triggers
+                .encode_batch_cancel(&fifty, None, None)
+                .unwrap()
+                .trigger_ids
+                .len(),
+            50
+        );
+    }
+
+    #[test]
+    fn batch_cancel_refuses_invalid_requests_before_sending() {
+        let client = client();
+        let refused = |ids: Vec<String>, request_id: Option<&str>, want: &str| {
+            let err = client
+                .triggers
+                .encode_batch_cancel(&ids, None, request_id.map(str::to_owned))
+                .unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
+            assert!(err.to_string().contains(want), "{want}: {err}");
+        };
+        refused(Vec::new(), None, "at least one trigger_id");
+        let fifty_one: Vec<String> = (1..=51).map(|n| (n * 1000).to_string()).collect();
+        refused(fifty_one, None, "at most 50 trigger_ids; received 51");
+        // The same trigger, once in base58 and once in decimal (a `0` keeps
+        // a decimal ID from reading as base58).
+        let base58 = bs58::encode(40_u64.to_be_bytes()).into_string();
+        refused(vec![base58, "40".into()], None, "duplicate trigger_id");
+        refused(vec!["0".into()], None, "non-zero trigger ID");
+        refused(vec!["not an id".into()], None, "trigger_id");
+        refused(vec!["42".into()], Some("has space"), "request_id");
+        refused(
+            vec!["42".into()],
+            Some("r".repeat(65).as_str()),
+            "request_id",
+        );
     }
 }

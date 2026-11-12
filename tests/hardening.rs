@@ -51,6 +51,8 @@ mod request_size_rate_limit;
 mod signed_redirects;
 #[path = "subaccount_get_expansions/mod.rs"]
 mod subaccount_get_expansions;
+#[path = "trigger_oco_and_batch_cancel/mod.rs"]
+mod trigger_oco_and_batch_cancel;
 #[path = "trigger_reads_and_filters/mod.rs"]
 mod trigger_reads_and_filters;
 #[path = "url_userinfo/mod.rs"]

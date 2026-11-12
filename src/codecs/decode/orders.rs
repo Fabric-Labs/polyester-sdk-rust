@@ -554,7 +554,7 @@ fn timestamp_ms(ts: &buffa_types::google::protobuf::Timestamp) -> i64 {
 
 /// The field violations of an order error detail, in the order sent; empty
 /// when there is no detail.
-fn field_violations_from_proto(msg: Option<&ErrorDetail>) -> Vec<OrderFieldViolation> {
+pub(super) fn field_violations_from_proto(msg: Option<&ErrorDetail>) -> Vec<OrderFieldViolation> {
     msg.map_or_else(Vec::new, |msg| {
         msg.violations
             .iter()

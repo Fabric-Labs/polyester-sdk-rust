@@ -152,6 +152,116 @@ pub struct ResumeTriggerParams {
     pub symbol_id: Option<u32>,
 }
 
+/// One leg of an OCO: the price that triggers it and the order it then places
+/// for the OCO's whole remaining quantity.
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with [`Self::market`] or [`Self::limit`] and sets fields afterwards instead
+/// of a struct literal.
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub struct OcoLegParams {
+    /// Price that triggers the leg.
+    pub trigger_price: Price,
+    /// The order the leg places: [`CreateOrderType::Market`] places a market
+    /// order (IOC), [`CreateOrderType::Limit`] a resting limit order (GTC) at
+    /// [`Self::limit_price`].
+    pub order_type: CreateOrderType,
+    /// Limit price of a limit leg's order. Required for a limit leg; must be
+    /// `None` for a market leg.
+    pub limit_price: Option<Price>,
+    /// Price the leg watches, with the labels trigger reads use: `last` or
+    /// `index`. `None` or empty watches the last trade price. `mark` is
+    /// refused: spot markets have no mark price. On a market without an index
+    /// price, an `index` OCO is rejected on both legs.
+    pub trigger_price_source: Option<String>,
+}
+
+impl OcoLegParams {
+    /// A leg that places a market order (IOC) when `trigger_price` is reached.
+    pub fn market(trigger_price: Price) -> Self {
+        Self {
+            trigger_price,
+            order_type: CreateOrderType::Market,
+            limit_price: None,
+            trigger_price_source: None,
+        }
+    }
+
+    /// A leg that places a resting limit order (GTC) at `limit_price` when
+    /// `trigger_price` is reached.
+    pub fn limit(trigger_price: Price, limit_price: Price) -> Self {
+        Self {
+            trigger_price,
+            order_type: CreateOrderType::Limit,
+            limit_price: Some(limit_price),
+            trigger_price_source: None,
+        }
+    }
+}
+
+/// Typed create-OCO params: a one-cancels-the-other pair of a take-profit and
+/// a stop-loss over a quantity the account already holds.
+///
+/// Both legs trade `side` for `qty`, which is reserved once, when the OCO is
+/// created, and shared by both legs. A SELL OCO protects a held base
+/// position: its take-profit triggers above the last price and its stop-loss
+/// below it. A BUY OCO buys with held quote: its take-profit triggers below
+/// the last price and its stop-loss above it. The first leg to reach its
+/// trigger price places its order for the OCO's remaining quantity; when the
+/// whole quantity has traded, the other leg ends canceled. Cancelling either
+/// leg, or the OCO with `triggers.cancel_oco_by_id`, cancels both.
+///
+/// Fields may be added in minor releases, so code outside this crate builds it
+/// with [`Self::new`] and sets fields afterwards instead of a struct literal.
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub struct CreateOcoParams {
+    pub symbol: String,
+    /// The side both legs trade.
+    pub side: CreateSide,
+    /// Quantity both legs trade; a multiple of the pair's quantity step.
+    pub qty: Quantity,
+    /// Stable identity for this logical OCO, unique per sub-account and pair
+    /// among OCOs. Persist and reuse it on retries: while the OCO is active
+    /// and for 60 seconds after both legs ended, a create with the identical
+    /// params and the same ID returns the same OCO, and different params with
+    /// the same ID are refused with `CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID`.
+    pub client_list_id: String,
+    /// The take-profit leg. Its trigger price must be above the stop-loss's
+    /// for a SELL OCO and below it for a BUY OCO.
+    pub take_profit: OcoLegParams,
+    /// The stop-loss leg.
+    pub stop_loss: OcoLegParams,
+    pub subaccount_id: Option<u64>,
+    /// `expire_taker`, `expire_maker` or `expire_both`; `None` uses the
+    /// server default, `expire_maker`.
+    pub self_trade_prevention_mode: Option<String>,
+}
+
+impl CreateOcoParams {
+    /// Params with only the required fields set; assign `client_list_id` and
+    /// the optional fields afterwards.
+    pub fn new(
+        symbol: impl Into<String>,
+        side: CreateSide,
+        qty: Quantity,
+        take_profit: OcoLegParams,
+        stop_loss: OcoLegParams,
+    ) -> Self {
+        Self {
+            symbol: symbol.into(),
+            side,
+            qty,
+            client_list_id: String::new(),
+            take_profit,
+            stop_loss,
+            subaccount_id: None,
+            self_trade_prevention_mode: None,
+        }
+    }
+}
+
 /// Valid trigger status filter / response labels, spelled as the contract
 /// and trigger events spell them (`canceled`).
 pub const TRIGGER_STATUS_VALUES: &[&str] = &[
@@ -295,6 +405,61 @@ pub struct TriggerMutationResult {
     pub trigger_id: String,
     pub client_trigger_id: String,
     pub status: String,
+}
+
+/// An OCO's creation: its quantity is reserved and both legs are created.
+/// Read the legs' status and orders with the trigger reads and events.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateOcoResult {
+    /// Public ID of the OCO, which both legs carry.
+    pub order_list_id: String,
+    /// Echoed client OCO ID.
+    pub client_list_id: String,
+    /// Public trigger ID of the take-profit leg.
+    pub take_profit_trigger_id: String,
+    /// Public trigger ID of the stop-loss leg.
+    pub stop_loss_trigger_id: String,
+}
+
+/// An OCO's cancellation: both legs end canceled and the OCO's reserved
+/// quantity is released.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancelOcoResult {
+    /// Public ID of the canceled OCO.
+    pub order_list_id: String,
+    /// Both legs' status after the cancel, which is always `canceled`.
+    pub status: String,
+}
+
+/// The outcome of one trigger of a batch cancel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCancelTriggersResultItem {
+    /// `accepted`: the trigger's events report when it is canceled.
+    /// `rejected`: `code` says why.
+    pub status: String,
+    /// The requested trigger's public ID.
+    pub trigger_id: String,
+    /// Rejection code, empty when accepted. `TRIGGER_NOT_FOUND`: no trigger
+    /// of the account has this ID. `TRIGGER_STATUS_INVALID`: the trigger has
+    /// already ended; treat it as done. `RATE_LIMIT_EXCEEDED`,
+    /// `PAIR_BACKLOGGED` and `TRIGGER_CONTROL_IN_PROGRESS`: retry the trigger
+    /// in a new request with a new `request_id`. Other codes are those
+    /// `triggers.cancel` returns.
+    pub code: String,
+    /// Rate-limit guidance, when the item was rate limited.
+    pub rate_limit: Option<super::RateLimitDetail>,
+    /// Field violations a rejection names, in the order the server sent them;
+    /// empty for an accepted item or a rejection that names no field.
+    pub violations: Vec<super::OrderFieldViolation>,
+}
+
+/// Results of a batch trigger cancel, one per requested trigger, in request
+/// order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchCancelTriggersResult {
+    pub results: Vec<BatchCancelTriggersResultItem>,
+    pub accepted_count: u32,
+    pub rejected_count: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

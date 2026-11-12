@@ -958,7 +958,7 @@ impl OrdersService {
     }
 
     /// Prefer a trimmed caller-provided request id; otherwise generate one (TS/Go/Python parity).
-    fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
+    pub(super) fn coalesce_request_id(value: Option<String>, prefix: &str) -> Result<String> {
         if let Some(id) = optional_request_id(value.as_deref())? {
             return Ok(id);
         }

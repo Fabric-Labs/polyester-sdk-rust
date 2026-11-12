@@ -5,6 +5,7 @@ use super::money::{attach_qty_scale, decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
+    BatchCancelTriggersResult, BatchCancelTriggersResultItem, CancelOcoResult, CreateOcoResult,
     MaxSlippage, Trigger, TriggerDetails, TriggerEvent, TriggerEventsList, TriggerLadderDetails,
     TriggerMutationResult, TriggerStopDetails, TriggerTrailingDetails, TriggerTwapDetails,
     TriggersList,
@@ -13,10 +14,11 @@ use crate::proto::orders::v1::{
     FeeAsset, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
-    CancelTriggerResponse, ConditionalTrigger, CreateTriggerResponse, GetTriggerResponse,
-    LadderDistribution, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
-    PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
-    TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
+    BatchCancelTriggersResponse, CancelOcoResponse, CancelTriggerResponse, ConditionalTrigger,
+    CreateOcoResponse, CreateTriggerResponse, GetTriggerResponse, LadderDistribution,
+    ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse, PauseTriggerResponse,
+    ResumeTriggerResponse, Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent,
+    TriggerEventType, TriggerStatus, TriggerType, batch_cancel_triggers_result_item,
     conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
     twap_market_ioc, twap_trigger,
 };
@@ -569,6 +571,108 @@ pub fn trigger_mutation_from_modify(
     msg: &ModifyTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
+}
+
+/// `CreateOcoResponse` acknowledges the OCO and both legs; an answer missing
+/// any of their IDs or the echoed client OCO ID is refused.
+pub fn create_oco_from_proto(msg: &CreateOcoResponse) -> crate::errors::Result<CreateOcoResult> {
+    if msg.order_list_id == 0
+        || msg.take_profit_trigger_id == 0
+        || msg.stop_loss_trigger_id == 0
+        || msg.client_list_id.trim().is_empty()
+    {
+        return Err(crate::Error::transport(
+            "invalid CreateOco response: missing order_list_id, client_list_id or a leg trigger_id",
+        ));
+    }
+    Ok(CreateOcoResult {
+        order_list_id: format_uint64_id(msg.order_list_id),
+        client_list_id: msg.client_list_id.clone(),
+        take_profit_trigger_id: format_uint64_id(msg.take_profit_trigger_id),
+        stop_loss_trigger_id: format_uint64_id(msg.stop_loss_trigger_id),
+    })
+}
+
+pub fn cancel_oco_from_proto(msg: &CancelOcoResponse) -> crate::errors::Result<CancelOcoResult> {
+    let status = enum_value_trigger_status(msg.status);
+    if msg.order_list_id == 0 || status.is_empty() {
+        return Err(crate::Error::transport(
+            "invalid CancelOco response: missing order_list_id or status",
+        ));
+    }
+    Ok(CancelOcoResult {
+        order_list_id: format_uint64_id(msg.order_list_id),
+        status,
+    })
+}
+
+fn batch_cancel_triggers_item_status_name(
+    status: &buffa::EnumValue<batch_cancel_triggers_result_item::Status>,
+) -> Option<&'static str> {
+    match status.as_known()? {
+        batch_cancel_triggers_result_item::Status::Accepted => Some("accepted"),
+        batch_cancel_triggers_result_item::Status::Rejected => Some("rejected"),
+        batch_cancel_triggers_result_item::Status::StatusUnspecified => None,
+    }
+}
+
+/// Per-trigger results of a batch cancel, as `batch_cancel_from_proto` reads
+/// a batch order cancel: an item with an unknown status, or counts that do not
+/// add up to the items, are refused.
+pub fn batch_cancel_triggers_from_proto(
+    msg: &BatchCancelTriggersResponse,
+) -> crate::errors::Result<BatchCancelTriggersResult> {
+    let mut accepted = 0u32;
+    let mut rejected = 0u32;
+    let mut results = Vec::with_capacity(msg.results.len());
+    for item in &msg.results {
+        let status = batch_cancel_triggers_item_status_name(&item.status).ok_or_else(|| {
+            crate::Error::response_contract(
+                "BatchCancelTriggers",
+                format!("unknown item status {}", item.status.to_i32()),
+            )
+        })?;
+        match status {
+            "accepted" => accepted += 1,
+            "rejected" => rejected += 1,
+            _ => unreachable!("known batch cancel status"),
+        }
+        results.push(BatchCancelTriggersResultItem {
+            status: status.to_owned(),
+            // Zero is no trigger: it stays empty instead of reading as an ID.
+            trigger_id: if item.trigger_id == 0 {
+                String::new()
+            } else {
+                format_uint64_id(item.trigger_id)
+            },
+            code: item.code.clone(),
+            rate_limit: item.error.as_option().and_then(|err| {
+                err.rate_limit
+                    .as_option()
+                    .map(super::rate_limit_detail_from_proto)
+            }),
+            violations: super::orders::field_violations_from_proto(item.error.as_option()),
+        });
+    }
+    if accepted != msg.accepted_count
+        || rejected != msg.rejected_count
+        || usize::try_from(accepted + rejected).ok() != Some(results.len())
+    {
+        return Err(crate::Error::response_contract(
+            "BatchCancelTriggers",
+            format!(
+                "response counts mismatch: decoded {accepted} accepted/{rejected} rejected for {} results, server reported {}/{}",
+                results.len(),
+                msg.accepted_count,
+                msg.rejected_count
+            ),
+        ));
+    }
+    Ok(BatchCancelTriggersResult {
+        results,
+        accepted_count: msg.accepted_count,
+        rejected_count: msg.rejected_count,
+    })
 }
 
 fn trigger_event_type_label(value: buffa::EnumValue<TriggerEventType>) -> String {
@@ -1223,6 +1327,127 @@ mod tests {
         })
         .unwrap();
         assert_eq!(created.client_trigger_id, "stable-trigger");
+    }
+
+    #[test]
+    fn oco_answers_name_the_oco_and_its_legs() {
+        let created = create_oco_from_proto(&CreateOcoResponse {
+            order_list_id: 70,
+            client_list_id: "oco-1".into(),
+            take_profit_trigger_id: 71,
+            stop_loss_trigger_id: 72,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            created,
+            CreateOcoResult {
+                order_list_id: format_uint64_id(70),
+                client_list_id: "oco-1".into(),
+                take_profit_trigger_id: format_uint64_id(71),
+                stop_loss_trigger_id: format_uint64_id(72),
+            }
+        );
+        for broken in [
+            CreateOcoResponse::default(),
+            CreateOcoResponse {
+                order_list_id: 0,
+                ..created_oco()
+            },
+            CreateOcoResponse {
+                client_list_id: " ".into(),
+                ..created_oco()
+            },
+            CreateOcoResponse {
+                take_profit_trigger_id: 0,
+                ..created_oco()
+            },
+            CreateOcoResponse {
+                stop_loss_trigger_id: 0,
+                ..created_oco()
+            },
+        ] {
+            let err = create_oco_from_proto(&broken).unwrap_err();
+            assert!(err.mutation_outcome_unknown(), "{err:?}");
+        }
+
+        let canceled = cancel_oco_from_proto(&CancelOcoResponse {
+            order_list_id: 70,
+            status: TriggerStatus::StatusCanceled.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(canceled.order_list_id, format_uint64_id(70));
+        assert_eq!(canceled.status, "canceled");
+        assert!(cancel_oco_from_proto(&CancelOcoResponse::default()).is_err());
+        assert!(
+            cancel_oco_from_proto(&CancelOcoResponse {
+                status: TriggerStatus::StatusCanceled.into(),
+                ..Default::default()
+            })
+            .is_err()
+        );
+    }
+
+    fn created_oco() -> CreateOcoResponse {
+        CreateOcoResponse {
+            order_list_id: 70,
+            client_list_id: "oco-1".into(),
+            take_profit_trigger_id: 71,
+            stop_loss_trigger_id: 72,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn batch_cancel_triggers_fails_closed_on_unknown_status_or_counts() {
+        use crate::proto::triggers::v1::BatchCancelTriggersResultItem as Item;
+        let item = |status: batch_cancel_triggers_result_item::Status, id: u64| Item {
+            status: status.into(),
+            trigger_id: id,
+            ..Default::default()
+        };
+        let ok = batch_cancel_triggers_from_proto(&BatchCancelTriggersResponse {
+            results: vec![
+                item(batch_cancel_triggers_result_item::Status::Accepted, 42),
+                Item {
+                    code: "TRIGGER_NOT_FOUND".into(),
+                    ..item(batch_cancel_triggers_result_item::Status::Rejected, 43)
+                },
+            ],
+            accepted_count: 1,
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(ok.results[0].status, "accepted");
+        assert_eq!(ok.results[0].trigger_id, format_uint64_id(42));
+        assert_eq!(ok.results[0].code, "");
+        assert_eq!(ok.results[1].status, "rejected");
+        assert_eq!(ok.results[1].trigger_id, format_uint64_id(43));
+        assert_eq!(ok.results[1].code, "TRIGGER_NOT_FOUND");
+        assert_eq!((ok.accepted_count, ok.rejected_count), (1, 1));
+
+        let mismatch = BatchCancelTriggersResponse {
+            results: vec![item(
+                batch_cancel_triggers_result_item::Status::Accepted,
+                42,
+            )],
+            accepted_count: 2,
+            ..Default::default()
+        };
+        let err = batch_cancel_triggers_from_proto(&mismatch).unwrap_err();
+        assert!(err.to_string().contains("counts mismatch"), "{err}");
+
+        let unknown = BatchCancelTriggersResponse {
+            results: vec![item(
+                batch_cancel_triggers_result_item::Status::StatusUnspecified,
+                42,
+            )],
+            ..Default::default()
+        };
+        let err = batch_cancel_triggers_from_proto(&unknown).unwrap_err();
+        assert!(err.to_string().contains("unknown item status"), "{err}");
     }
 
     #[test]
