@@ -778,3 +778,56 @@ async fn create_alert_checks_a_bound_price_against_the_catalogued_market() {
     assert_eq!(sent.len(), 3);
     assert!(sent.iter().all(|req| req.symbol_id == 2));
 }
+
+/// The update names the alert, not its market: a bound price can't be checked
+/// without reading the alert, so it is refused before sending, even one bound
+/// to the alert's own market. Unbound prices are sent.
+#[tokio::test]
+async fn update_alert_refuses_a_market_bound_price() {
+    let updates = Arc::new(Mutex::new(Vec::new()));
+    let handler_updates = updates.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        handler_updates
+            .lock()
+            .unwrap()
+            .push(UpdateAlertRequest::decode_from_slice(&request.body).unwrap());
+        connect_proto_ok(&UpdateAlertResponse {
+            alert: proto_alert().into(),
+            outcome: UpdateOutcome::APPLIED.into(),
+            ..Default::default()
+        })
+    })
+    .await;
+    let client = client(&server);
+    for bound in [
+        eth_bound(),
+        Price::from_ticks(90_000_000_000_000, Some("BTC-USDT".into())).unwrap(),
+    ] {
+        let err = client
+            .alerts
+            .update(UpdateAlertParams::new("1234", 1).with_price(bound.clone()))
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(&err, Error::Validation(msg) if msg.contains("unbound price")),
+            "{bound:?}: {err:?}"
+        );
+    }
+    assert!(updates.lock().unwrap().is_empty());
+    for unbound in [
+        Price::from_ticks(91_000_000_000_000, None).unwrap(),
+        price("91000"),
+    ] {
+        client
+            .alerts
+            .update(UpdateAlertParams::new("1234", 1).with_price(unbound))
+            .await
+            .unwrap();
+    }
+    let sent = updates.lock().unwrap();
+    assert_eq!(sent.len(), 2);
+    assert!(
+        sent.iter()
+            .all(|req| req.update.price_ticks == 91_000_000_000_000)
+    );
+}

@@ -913,7 +913,11 @@ stalled feed never fires it. Status values are `"active"`, `"triggered"` and
 `"cancelled"` (the contract's spelling).
 
 `update` sends only the fields set on `UpdateAlertParams` with the
-`expected_revision` you last read; a stale one is refused with code
+`expected_revision` you last read. Its price must be unbound
+(`Price::from_decimal_str(.., None)`, `Price::from_ticks(.., None)`): a price
+bound to a market, including an alert's own `price`, is refused with
+`Error::Validation` before sending, since the update names the alert, not its
+market; a stale one is refused with code
 `REVISION_CONFLICT`, so read the alert again. An update that sets no field
 changes nothing on an active alert and sets a triggered one again as it is.
 `outcome` is `"applied"`, `"unchanged"` or `"replayed"` (the idempotency key
