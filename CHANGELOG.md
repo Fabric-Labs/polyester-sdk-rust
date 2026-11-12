@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** `sub_accounts.get` with `GetSubaccountOpts::include_members`, `include_invites` or `include_policy` returns the sub-account's members, invites and attached policy: `GetSubaccountResult` gains `members` (`Vec<SubAccountMember>`, read as `sub_accounts.list_members` reads them), `invites` (`Vec<SubAccountInvite>`, read as `sub_accounts.list_invites` reads them, filtered by `invites_direction`) and `policy` (`Option<SubaccountPolicy>`, read as `policies.subscribe_subaccount_policies` reads it). The server sends them, as the contract's `GetSubaccountResponse.members`, `invites` and `policy`, and the SDK dropped them, so the three options had no effect. `members` and `invites` are empty and `policy` is `None` when not asked for or not sent; `policy` is also `None` when no policy is attached. Affected: `GetSubaccountResult`, `sub_accounts.get` and `codecs::decode::get_subaccount_from_proto`. Migration: a `GetSubaccountResult` struct literal without `..Default::default()` no longer compiles; set `members`, `invites` and `policy` (empty and `None` when none), or read the view from the SDK instead of constructing it. Code that compares whole results now also compares `members`, `invites` and `policy`.
+
 ## 0.24.0
 
 Package version: `0.24.0`. Git tag: `v0.24.0`. Released 2026-11-12. Built on public contract `e339360`.

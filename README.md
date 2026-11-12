@@ -1197,6 +1197,46 @@ lists them as `api_keys.list` reads them. The server sends them to an owner or
 admin of the sub-account only; `api_keys` is empty when not asked for or none
 were sent.
 
+It can also include the sub-account's members, invitations and attached
+policy: set `GetSubaccountOpts::include_members`, `include_invites` or
+`include_policy`. `GetSubaccountResult.members` lists the current members as
+`sub_accounts.list_members` reads them, `invites` the invitations visible to
+the caller as `sub_accounts.list_invites` reads them, filtered by
+`invites_direction` (`"incoming"`, `"outgoing"` or empty for both), and
+`policy` is the attached sub-account policy as
+`policies.subscribe_subaccount_policies` reads it. Members and the policy go
+to a current member only; `members` and `invites` are empty and `policy` is
+`None` when not asked for, not sent, or, for `policy`, when no policy is
+attached. An API key without `READ_SUBACCOUNT_MEMBERS` or
+`READ_SUBACCOUNT_INVITES` gets the view without them rather than an error.
+
+```rust,no_run
+use polyester::services::GetSubaccountOpts;
+
+let view = client
+    .sub_accounts
+    .get(
+        subaccount_id,
+        GetSubaccountOpts {
+            include_members: true,
+            include_invites: true,
+            include_policy: true,
+            invites_direction: "incoming".into(),
+            ..Default::default()
+        },
+    )
+    .await?;
+for member in &view.members {
+    println!("{} {}", member.grantee_account_id, member.role);
+}
+for invite in &view.invites {
+    println!("{} {} {}", invite.invite_id, invite.role, invite.status);
+}
+if let Some(policy) = &view.policy {
+    println!("{} {:?}", policy.name, policy.actions);
+}
+```
+
 A sub-account read can include the sub-account's balances in the same shape:
 set `GetSubaccountOpts::include_balances`, and `GetSubaccountResult.balances`
 is the balances list (`None` when not asked for). It needs the

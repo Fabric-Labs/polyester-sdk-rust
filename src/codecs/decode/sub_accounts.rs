@@ -3,6 +3,7 @@
 use crate::codecs::decode::admin::api_key_from_proto;
 use crate::codecs::decode::balances::balances_list_from_proto;
 use crate::codecs::decode::enums::enum_proto_name;
+use crate::codecs::decode::policies::subaccount_policy_from_proto;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
     CreateSubaccountResult, GetSubaccountResult, SubAccount, SubAccountActivityEvent,
@@ -78,12 +79,18 @@ pub fn subaccounts_list_from_proto(msg: &ListSubaccountsResponse) -> SubAccounts
     }
 }
 
-/// Decode a `GetSubaccount` answer. `balances` is the balances list when the
-/// answer carries it, `None` otherwise.
+/// Decode a `GetSubaccount` answer. `members`, `invites` and `policy` read as
+/// the members list, the invites list and the sub-account policy stream read
+/// them; `balances` is the balances list when the answer carries it, `None`
+/// otherwise.
 pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> GetSubaccountResult {
     GetSubaccountResult {
         subaccount: msg.subaccount.as_option().map(subaccount_from_proto),
         api_keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
+        members: msg.members.iter().map(member_from_proto).collect(),
+        invites: msg.invites.iter().map(invite_from_proto).collect(),
+        // `None` when no policy is attached: the server leaves it unset.
+        policy: msg.policy.as_option().map(subaccount_policy_from_proto),
         balances: msg.balances.as_option().map(balances_list_from_proto),
     }
 }
