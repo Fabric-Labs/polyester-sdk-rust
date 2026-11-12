@@ -7,7 +7,7 @@
 
 use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
-use crate::models::{DepositWithdrawConfig, PairOrderLimits, ZippedAssetSupplyUpdate};
+use crate::models::{DepositWithdrawConfig, PairOrderLimits, PriceBand, ZippedAssetSupplyUpdate};
 use crate::realtime::{read_unpoisoned, write_unpoisoned};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -96,6 +96,47 @@ fn parse_open_orders_limit(value: Option<&Value>, field: &str) -> Result<u32> {
                 "spot config {field} must be an unsigned 32-bit integer"
             ))
         })
+}
+
+/// A pair's `price_band`: `None` when absent or null. Its JSON form leaves
+/// out a zero field.
+fn parse_price_band(value: Option<&Value>) -> Result<Option<PriceBand>> {
+    let band = match value {
+        None | Some(Value::Null) => return Ok(None),
+        Some(band) => band,
+    };
+    if !band.is_object() {
+        return Err(Error::validation(
+            "spot config price_band must be an object",
+        ));
+    }
+    let number = |snake: &str, camel: &str| {
+        parse_u32_number(field(band, snake, camel), &format!("price_band.{snake}"))
+    };
+    Ok(Some(PriceBand {
+        lower_bps: number("lower_bps", "lowerBps")?,
+        upper_bps: number("upper_bps", "upperBps")?,
+        reference_window_ms: number("reference_window_ms", "referenceWindowMs")?,
+    }))
+}
+
+/// An unsigned 32-bit JSON number, or the decimal string proto-JSON may use;
+/// 0 when absent.
+fn parse_u32_number(value: Option<&Value>, field: &str) -> Result<u32> {
+    let parsed = match value {
+        None => return Ok(0),
+        Some(Value::String(text))
+            if !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()) =>
+        {
+            text.parse::<u32>().ok()
+        }
+        Some(value) => value.as_u64().and_then(|raw| u32::try_from(raw).ok()),
+    };
+    parsed.ok_or_else(|| {
+        Error::validation(format!(
+            "spot config {field} must be an unsigned 32-bit integer"
+        ))
+    })
 }
 
 fn field<'a>(object: &'a Value, snake: &str, camel: &str) -> Option<&'a Value> {
@@ -290,6 +331,7 @@ fn build_spot_snapshot(value: Value) -> Result<SpotSnapshot> {
                     field(m, "max_open_orders_per_pair", "maxOpenOrdersPerPair"),
                     "max_open_orders_per_pair",
                 )?,
+                price_band: parse_price_band(field(m, "price_band", "priceBand"))?,
             },
         );
         // Optional catalog minima/tick/step fields are ignored here. Venue
@@ -929,6 +971,7 @@ mod tests {
         assert_eq!(btc.max_order_notional_quote.as_deref(), Some("5000000"));
         assert_eq!(btc.max_market_notional_quote.as_deref(), Some("250000"));
         assert_eq!(btc.max_open_orders_per_pair, 200);
+        assert_eq!(btc.price_band, None);
         let eth = m.pair_order_limits_for_symbol("ETH-USDT").unwrap();
         assert_eq!(
             eth,
@@ -941,6 +984,42 @@ mod tests {
         assert_eq!(m.pair_order_limits_for_symbol("SOL-USDT"), None);
     }
 
+    /// A pair's price band reads from either spelling; a field the JSON
+    /// leaves out is zero, and a decimal string is read as proto-JSON allows.
+    #[test]
+    fn catalog_exposes_pair_price_band() {
+        let m = Manager::new();
+        m.hydrate_spot_config_json(json!({
+            "pairs": [
+                {"symbol": "BTC-USDT", "symbolId": 1, "baseQuantityScale": 8,
+                 "priceBand": {"lowerBps": 500, "upperBps": 400, "referenceWindowMs": 60000}},
+                {"symbol": "ETH-USDT", "symbol_id": 2, "base_quantity_scale": 8,
+                 "price_band": {"lower_bps": "250", "upper_bps": 250}},
+                {"symbol": "SOL-USDT", "symbol_id": 3, "base_quantity_scale": 8,
+                 "priceBand": null}
+            ]
+        }))
+        .unwrap();
+        let band = |symbol: &str| m.pair_order_limits_for_symbol(symbol).unwrap().price_band;
+        assert_eq!(
+            band("BTC-USDT"),
+            Some(PriceBand {
+                lower_bps: 500,
+                upper_bps: 400,
+                reference_window_ms: 60_000,
+            })
+        );
+        assert_eq!(
+            band("ETH-USDT"),
+            Some(PriceBand {
+                lower_bps: 250,
+                upper_bps: 250,
+                reference_window_ms: 0,
+            })
+        );
+        assert_eq!(band("SOL-USDT"), None);
+    }
+
     #[test]
     fn catalog_rejects_malformed_order_limits_atomically() {
         let m = Manager::new();
@@ -951,6 +1030,12 @@ mod tests {
                    "maxLimitQtyBase": 100}),
             json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
                    "maxOpenOrdersPerPair": -1}),
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "priceBand": 500}),
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "priceBand": {"lowerBps": -1}}),
+            json!({"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8,
+                   "price_band": {"upper_bps": 4294967296_u64}}),
         ] {
             assert!(
                 m.hydrate_spot_config_json(json!({"pairs": [pair]}))

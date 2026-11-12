@@ -39,6 +39,23 @@ pub(crate) fn optional_client_order_id(value: Option<&str>) -> Result<Option<Str
     Ok(Some(trimmed.to_owned()))
 }
 
+/// The contract's limit on a client OCO ID (`OcoIntent.client_list_id` and
+/// the `ListTriggersRequest.client_list_id` filter), in UTF-8 bytes.
+pub(crate) const CLIENT_LIST_ID_MAX_BYTES: usize = 36;
+
+/// Validate a client OCO ID as the contract does: 1 to 36 bytes of UTF-8, any
+/// characters. It is neither trimmed nor normalised: the server matches the
+/// bytes, so the create and the recovery listing must send the same ones.
+pub(crate) fn require_client_list_id(value: &str, field: &str) -> Result<String> {
+    if value.is_empty() || value.len() > CLIENT_LIST_ID_MAX_BYTES {
+        return Err(Error::validation(format!(
+            "{field} must be 1 to {CLIENT_LIST_ID_MAX_BYTES} bytes of UTF-8, got {}",
+            value.len()
+        )));
+    }
+    Ok(value.to_owned())
+}
+
 /// Trim and validate a required client-style id (client order / trigger id).
 pub(crate) fn require_client_style_id(value: &str, field: &str) -> Result<String> {
     let trimmed = value.trim();

@@ -18,6 +18,7 @@ pub mod fees;
 pub mod ledger;
 pub mod marketdata;
 pub mod marketoverview;
+pub mod notifications;
 pub mod orderbook;
 pub mod orders;
 pub mod ratelimit;

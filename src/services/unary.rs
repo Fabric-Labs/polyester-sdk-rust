@@ -67,7 +67,7 @@ where
     let opts = factory.sign_options_async(procedure, &request).await?;
     tolerant_json(call(request, opts))
         .await
-        .map_err(Factory::map_error)
+        .map_err(|err| Factory::map_error(err).for_procedure(procedure))
 }
 
 /// Backoff for a side-effect-free read the server may answer with a
@@ -152,7 +152,7 @@ where
                 tokio::time::sleep(delay).await;
                 delay = policy.next_delay(delay);
             }
-            Err(err) => return Err(Factory::map_error(err)),
+            Err(err) => return Err(Factory::map_error(err).for_procedure(procedure)),
         }
     }
 }

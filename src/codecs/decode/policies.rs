@@ -229,6 +229,32 @@ mod tests {
         }
     }
 
+    /// The price-alert permissions read by name on both policy kinds and
+    /// keep their numbers.
+    #[test]
+    fn price_alert_policy_actions_read_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let actions = vec![
+            PolicyAction::READ_PRICE_ALERTS.into(),
+            PolicyAction::MANAGE_PRICE_ALERTS.into(),
+        ];
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: actions.clone(),
+            ..Default::default()
+        });
+        let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
+            actions,
+            ..Default::default()
+        });
+        for decoded in [&api.actions, &sub.actions] {
+            assert_eq!(decoded, &["READ_PRICE_ALERTS", "MANAGE_PRICE_ALERTS"]);
+        }
+        assert_eq!(PolicyAction::READ_PRICE_ALERTS.to_i32(), 36);
+        assert_eq!(PolicyAction::MANAGE_PRICE_ALERTS.to_i32(), 37);
+    }
+
     /// Every `PolicyAction`, the POLY-9102 account permissions included,
     /// reads as its proto name and parses back to the same value. Unset
     /// entries are skipped and a value newer than this SDK keeps its number.
