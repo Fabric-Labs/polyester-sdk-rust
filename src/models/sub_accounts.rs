@@ -41,6 +41,27 @@ pub struct GetSubaccountResult {
     /// server sent some: it sends them to an owner or admin of the
     /// sub-account only.
     pub api_keys: Vec<crate::models::ApiKeySummary>,
+    /// The sub-account's current members, read as
+    /// [`crate::services::SubAccountsService::list_members`] reads them.
+    /// Empty unless the read asked for them with
+    /// [`crate::services::GetSubaccountOpts::include_members`] and the
+    /// server sent some: it sends them to a current member, and leaves them
+    /// out for an API key without `READ_SUBACCOUNT_MEMBERS`.
+    pub members: Vec<SubAccountMember>,
+    /// The invitations visible to the caller, read as
+    /// [`crate::services::SubAccountsService::list_invites`] reads them and
+    /// filtered by [`crate::services::GetSubaccountOpts::invites_direction`].
+    /// Empty unless the read asked for them with
+    /// [`crate::services::GetSubaccountOpts::include_invites`] and the
+    /// server sent some: it leaves them out for an API key without
+    /// `READ_SUBACCOUNT_INVITES`.
+    pub invites: Vec<SubAccountInvite>,
+    /// The sub-account policy attached to the sub-account, read as
+    /// [`crate::services::PoliciesService::subscribe_subaccount_policies`]
+    /// reads it. `Some` only when the read asked for it with
+    /// [`crate::services::GetSubaccountOpts::include_policy`], the caller is
+    /// a current member and a policy is attached.
+    pub policy: Option<crate::models::SubaccountPolicy>,
     /// The sub-account's current balances, one row per asset as the
     /// balances list returns them. `Some` only when the read asked for them
     /// with [`crate::services::GetSubaccountOpts::include_balances`].
