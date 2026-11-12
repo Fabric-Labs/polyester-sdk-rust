@@ -49,6 +49,8 @@ mod recv_window_replay;
 mod request_size_rate_limit;
 #[path = "signed_redirects/mod.rs"]
 mod signed_redirects;
+#[path = "subaccount_get_expansions/mod.rs"]
+mod subaccount_get_expansions;
 #[path = "trigger_reads_and_filters/mod.rs"]
 mod trigger_reads_and_filters;
 #[path = "url_userinfo/mod.rs"]
