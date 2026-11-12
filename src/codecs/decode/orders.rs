@@ -55,6 +55,13 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         orig_qty: decode_qty_scaled(msg.orig_qty_scaled, None, None, symbol_id_opt),
         cum_qty: decode_qty_scaled_allow_zero(msg.cum_qty_scaled, None, None, symbol_id_opt),
         leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
+        display_qty: decode_qty_scaled_allow_zero(
+            msg.display_qty_scaled,
+            None,
+            None,
+            symbol_id_opt,
+        ),
+        hidden_qty: decode_qty_scaled_allow_zero(msg.hidden_qty_scaled, None, None, symbol_id_opt),
         inherited_cum_qty: decode_qty_scaled_allow_zero(
             msg.inherited_cum_qty_scaled,
             None,
@@ -80,6 +87,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             msg.self_trade_prevention_mode,
         ),
         submitted_max_quote_debit_scaled: msg.submitted_max_quote_debit_scaled,
+        submitted_quote_proceeds_scaled: msg.submitted_quote_proceeds_scaled,
         attached_risk: msg
             .attached_risk
             .as_option()
@@ -104,6 +112,8 @@ pub(crate) fn attach_order_scale(order: &mut Order, base_scale: Option<u32>) {
     attach_qty_scale(&mut order.orig_qty, base_scale);
     attach_qty_scale(&mut order.cum_qty, base_scale);
     attach_qty_scale(&mut order.leaves_qty, base_scale);
+    attach_qty_scale(&mut order.display_qty, base_scale);
+    attach_qty_scale(&mut order.hidden_qty, base_scale);
     attach_qty_scale(&mut order.inherited_cum_qty, base_scale);
     if let Some(fee) = order.fee_total.as_mut() {
         attach_qty_scale(&mut fee.qty, base_scale);
@@ -502,6 +512,7 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
     let mut result = order_mutation("accepted", msg.order_id, &msg.client_order_id);
     result.resolved_base_qty = decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None);
     result.submitted_max_quote_debit_scaled = msg.submitted_max_quote_debit_scaled;
+    result.submitted_quote_proceeds_scaled = msg.submitted_quote_proceeds_scaled;
     result.take_profit_trigger_id = leg_trigger_id(msg.take_profit_trigger_id);
     result.stop_loss_trigger_id = leg_trigger_id(msg.stop_loss_trigger_id);
     result.trailing_stop_trigger_id = leg_trigger_id(msg.trailing_stop_trigger_id);
@@ -536,6 +547,7 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
         client_order_id: client_order_id.to_owned(),
         resolved_base_qty: None,
         submitted_max_quote_debit_scaled: None,
+        submitted_quote_proceeds_scaled: None,
         take_profit_trigger_id: None,
         stop_loss_trigger_id: None,
         trailing_stop_trigger_id: None,
@@ -741,6 +753,8 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 code: String::new(),
                 rate_limit: None,
                 existing_order_id: None,
+                submitted_max_quote_debit_scaled: None,
+                submitted_quote_proceeds_scaled: None,
                 take_profit_trigger_id: None,
                 stop_loss_trigger_id: None,
                 trailing_stop_trigger_id: None,
@@ -751,6 +765,8 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                     accepted += 1;
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
+                    out.submitted_max_quote_debit_scaled = value.submitted_max_quote_debit_scaled;
+                    out.submitted_quote_proceeds_scaled = value.submitted_quote_proceeds_scaled;
                     out.take_profit_trigger_id = leg_trigger_id(value.take_profit_trigger_id);
                     out.stop_loss_trigger_id = leg_trigger_id(value.stop_loss_trigger_id);
                     out.trailing_stop_trigger_id = leg_trigger_id(value.trailing_stop_trigger_id);
@@ -2787,6 +2803,249 @@ mod tests {
         })
         .expect("batch replace");
         assert_eq!(replaced.results[0].violations, want);
+    }
+
+    /// An iceberg order reads its display and hidden quantities at the
+    /// pair's base scale, as `leaves_qty`; both are zero on a plain order. A
+    /// SELL sized by quote proceeds reads its target; others read `None`.
+    #[test]
+    fn order_reads_iceberg_quantities_and_quote_proceeds_target() {
+        let mut order = order_from_proto(&ProtoOrder {
+            order_id: 1,
+            symbol_id: 7,
+            side: Side::Sell.into(),
+            orig_qty_scaled: 100_000_000,
+            leaves_qty_scaled: 90_000_000,
+            display_qty_scaled: 10_000_000,
+            hidden_qty_scaled: 80_000_000,
+            submitted_quote_proceeds_scaled: Some(100_000_000),
+            ..Default::default()
+        })
+        .unwrap();
+        attach_order_scale(&mut order, Some(8));
+        let scaled = |qty: &Option<crate::Quantity>| {
+            let qty = qty.as_ref().expect("quantity");
+            (qty.as_scaled(), qty.scale())
+        };
+        assert_eq!(scaled(&order.display_qty), (10_000_000, Some(8)));
+        assert_eq!(scaled(&order.hidden_qty), (80_000_000, Some(8)));
+        assert_eq!(scaled(&order.leaves_qty), (90_000_000, Some(8)));
+        assert_eq!(
+            order.display_qty.as_ref().unwrap().format(None).unwrap(),
+            "0.1"
+        );
+        assert_eq!(order.submitted_quote_proceeds_scaled, Some(100_000_000));
+        assert_eq!(order.submitted_max_quote_debit_scaled, None);
+
+        let plain = order_from_proto(&ProtoOrder {
+            order_id: 2,
+            symbol_id: 7,
+            leaves_qty_scaled: 5,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(plain.display_qty.as_ref().map(|q| q.as_scaled()), Some(0));
+        assert_eq!(plain.hidden_qty.as_ref().map(|q| q.as_scaled()), Some(0));
+        assert_eq!(plain.submitted_quote_proceeds_scaled, None);
+    }
+
+    /// The create and batch-create answers echo the quote sizing that was
+    /// submitted: a BUY's quote budget or a SELL's quote proceeds target.
+    #[test]
+    fn create_and_batch_create_echo_submitted_quote_sizing() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoItem, CreateOrderResponse,
+            batch_create_result_item,
+        };
+        let created = order_mutation_from_create(&CreateOrderResponse {
+            order_id: 5,
+            resolved_base_qty_scaled: 1_000,
+            submitted_quote_proceeds_scaled: Some(100_000_000),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(created.submitted_quote_proceeds_scaled, Some(100_000_000));
+        assert_eq!(created.submitted_max_quote_debit_scaled, None);
+
+        let accepted = |item: BatchCreateAccepted| ProtoItem {
+            outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(item))),
+            ..Default::default()
+        };
+        let batch = batch_create_from_proto(&BatchCreateOrdersResponse {
+            results: vec![
+                accepted(BatchCreateAccepted {
+                    order_id: 6,
+                    submitted_quote_proceeds_scaled: Some(7_000_000),
+                    ..Default::default()
+                }),
+                accepted(BatchCreateAccepted {
+                    order_id: 7,
+                    submitted_max_quote_debit_scaled: Some(8_000_000),
+                    ..Default::default()
+                }),
+                accepted(BatchCreateAccepted {
+                    order_id: 8,
+                    ..Default::default()
+                }),
+            ],
+            accepted_count: 3,
+            ..Default::default()
+        })
+        .unwrap();
+        let echoes: Vec<_> = batch
+            .results
+            .iter()
+            .map(|item| {
+                (
+                    item.submitted_max_quote_debit_scaled,
+                    item.submitted_quote_proceeds_scaled,
+                )
+            })
+            .collect();
+        assert_eq!(
+            echoes,
+            [
+                (None, Some(7_000_000)),
+                (Some(8_000_000), None),
+                (None, None)
+            ]
+        );
+    }
+
+    /// Cancel reasons of this contract read by name, never as unknown: the
+    /// decrement self-trade prevention cut (19), the price band (20) and
+    /// cancel-on-disconnect (21). The decrement mode reads `decrement`.
+    #[test]
+    fn order_reads_decrement_price_band_and_disconnect_cancels() {
+        use crate::proto::orders::v1::{CancelReason, SelfTradePreventionMode};
+        for (reason, number, want) in [
+            (
+                CancelReason::CANCEL_REASON_STP_DECREMENT,
+                19,
+                "CANCEL_REASON_STP_DECREMENT",
+            ),
+            (
+                CancelReason::CANCEL_REASON_PRICE_BAND,
+                20,
+                "CANCEL_REASON_PRICE_BAND",
+            ),
+            (
+                CancelReason::CANCEL_REASON_CANCEL_ON_DISCONNECT,
+                21,
+                "CANCEL_REASON_CANCEL_ON_DISCONNECT",
+            ),
+        ] {
+            for value in [reason.into(), buffa::EnumValue::from(number)] {
+                let order = order_from_proto(&ProtoOrder {
+                    order_id: 1,
+                    status: OrderStatus::Canceled.into(),
+                    cancel_reason: value,
+                    self_trade_prevention_mode: SelfTradePreventionMode::DECREMENT.into(),
+                    ..Default::default()
+                })
+                .unwrap();
+                assert_eq!(order.cancel_reason.as_deref(), Some(want));
+                assert_eq!(order.self_trade_prevention_mode, "decrement");
+            }
+        }
+    }
+
+    /// An attached leg whose exit could never meet the pair's minimums is
+    /// named by a violation on its attached-risk field, in a batch create
+    /// item, and a batch replace item refused for its value is rejected
+    /// alone, with its code and an indexed violation.
+    #[test]
+    fn leg_and_batch_replace_item_violations_are_kept() {
+        use crate::proto::orders::v1::{
+            BatchCreateRejected, BatchCreateResultItem as CreateItem,
+            BatchReplaceAdmissionItem as ReplaceItem, BatchReplaceAdmissionStatus,
+            BatchReplaceItemAdmissionStatus, ErrorCode, FieldViolation, batch_create_result_item,
+        };
+        let created = batch_create_from_proto(&BatchCreateOrdersResponse {
+            results: vec![CreateItem {
+                outcome: Some(batch_create_result_item::Outcome::Rejected(Box::new(
+                    BatchCreateRejected {
+                        error: ErrorDetail {
+                            code: ErrorCode::ERROR_CODE_MIN_NOTIONAL.into(),
+                            violations: vec![FieldViolation {
+                                field_path: "order.attached_risk.stop_loss".into(),
+                                rule_id: "MIN_NOTIONAL".into(),
+                                message: "Its stop-loss can't be placed".into(),
+                                ..Default::default()
+                            }],
+                            ..Default::default()
+                        }
+                        .into(),
+                        ..Default::default()
+                    },
+                ))),
+                ..Default::default()
+            }],
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(created.results[0].code, "ERROR_CODE_MIN_NOTIONAL");
+        assert_eq!(
+            created.results[0].violations,
+            [OrderFieldViolation {
+                field_path: "order.attached_risk.stop_loss".into(),
+                rule_id: "MIN_NOTIONAL".into(),
+                message: "Its stop-loss can't be placed".into(),
+            }]
+        );
+
+        let item = |index: u32, status: BatchReplaceItemAdmissionStatus| ReplaceItem {
+            item_index: index,
+            status: status.into(),
+            old_order_id: 10 + u64::from(index),
+            ..Default::default()
+        };
+        let mut refused = item(
+            1,
+            BatchReplaceItemAdmissionStatus::BATCH_REPLACE_ITEM_ADMISSION_STATUS_REJECTED,
+        );
+        refused.code = "PRICE_TICK_SIZE".into();
+        refused.error = ErrorDetail {
+            code: ErrorCode::ERROR_CODE_PRICE_TICK_SIZE.into(),
+            violations: vec![FieldViolation {
+                field_path: "items[1].new_attached_risk.take_profit.trigger_price_ticks".into(),
+                rule_id: "PRICE_TICK_SIZE".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .into();
+        let replaced = batch_replace_from_proto(&BatchReplaceOrdersResponse {
+            batch_request_id: 4,
+            status: BatchReplaceAdmissionStatus::BATCH_REPLACE_ADMISSION_STATUS_PARTIALLY_ADMITTED
+                .into(),
+            results: vec![
+                item(
+                    0,
+                    BatchReplaceItemAdmissionStatus::BATCH_REPLACE_ITEM_ADMISSION_STATUS_ADMITTED,
+                ),
+                refused,
+            ],
+            accepted_count: 1,
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(replaced.results[0].status, "admitted");
+        let rejected = &replaced.results[1];
+        assert_eq!(
+            (
+                rejected.item_index,
+                rejected.status.as_str(),
+                rejected.code.as_str()
+            ),
+            (1, "rejected", "PRICE_TICK_SIZE")
+        );
+        assert_eq!(
+            rejected.violations[0].field_path,
+            "items[1].new_attached_risk.take_profit.trigger_price_ticks"
+        );
     }
 
     #[test]

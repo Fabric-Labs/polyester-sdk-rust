@@ -449,11 +449,12 @@ admission acknowledgement and reconcile with `list_open` before releasing local
 state. Within one batch, non-empty client order IDs must be unique; omitted and
 blank IDs remain allowed.
 
-Create sizing is explicit: set exactly one of base `quantity` or
-`max_quote_debit_scaled` (a typed hard all-in quote-debit budget). Construct the
-latter with `Quantity::from_quote_decimal_str` / `from_quote_decimal` /
-`from_quote_scaled`; the SDK validates its `OrderQuote` domain and scale against
-`Catalogs::quote_quantity_scale_for_symbol`.
+Create sizing is explicit: set exactly one of base `quantity`,
+`max_quote_debit_scaled` (a typed hard all-in quote-debit budget of a BUY) or
+`quote_proceeds_scaled` (a SELL's quote proceeds target: "sell 100 USDT
+worth"). Construct the quote amounts with `Quantity::from_quote_decimal_str` /
+`from_quote_decimal` / `from_quote_scaled`; the SDK validates their `OrderQuote`
+domain and scale against `Catalogs::quote_quantity_scale_for_symbol`.
 
 ```rust,no_run
 let quote_scale = client
@@ -482,6 +483,57 @@ API host, so handle an unimplemented/not-found response and do not make Preview
 a prerequisite for order submission. Fee selection is `FeeAsset::Quote` or, for
 BUYs only, `FeeAsset::Base`; the former `received` fee mode no longer exists.
 
+A SELL market order or SELL limit IOC can be sized by `quote_proceeds_scaled`:
+it sells whole quantity steps until its proceeds before fees reach the target
+and never receives more; the fee is charged in quote on those proceeds. Any
+other side or time in force is refused with `Error::Validation` before
+sending. The order holds the base its target sells at its limit price, or a
+market order's maximum slippage price (`INSUFFICIENT_FUNDS` when that base is
+not free); a target too small for one step is refused `QUOTE_SIZE_TOO_SMALL`,
+and attached risk `VALIDATION_ERROR` (rule `no_attached_risk`). The create
+result and accepted batch items echo it as `submitted_quote_proceeds_scaled`
+(and a BUY's budget as `submitted_max_quote_debit_scaled`); order reads carry
+`Order.submitted_quote_proceeds_scaled`, and `Order::cum_quote` is then the
+proceeds received before fees.
+
+```rust,no_run
+let quote_scale = client
+    .catalogs
+    .quote_quantity_scale_for_symbol("BTC-USDT")
+    .expect("catalog hydrated with quote scale");
+let mut sell = CreateOrderParams::new("BTC-USDT", CreateSide::Sell, CreateOrderType::Market);
+sell.quote_proceeds_scaled = Some(Quantity::from_quote_decimal_str(
+    "100",
+    quote_scale,
+    Some("BTC-USDT".into()),
+    client.catalogs.symbol_id_for_symbol("BTC-USDT"),
+)?);
+client.orders.create(sell).await?;
+```
+
+A limit GTC or GTD order can be an iceberg order: `display_quantity` (base
+quantity, as `quantity`) is the most of it the order book shows at once; once
+that part is fully executed, the next part is shown at the same price, behind
+the orders already resting there. A display on a market, limit IOC or limit FOK
+order, or one that is not positive, is refused with `Error::Validation` before
+sending. The API checks the rest: below `quantity`, a multiple of the
+quantity step, at least the pair's minimum quantity and at least `quantity` /
+100 rounded up (`ICEBERG_DISPLAY_INVALID`, `ICEBERG_DISPLAY_TOO_SMALL`), and
+no attached risk (`ICEBERG_NOT_ALLOWED`). Order reads carry
+`Order.display_qty` and `Order.hidden_qty`; the book shows `leaves_qty` minus
+`hidden_qty`. Both are zero for a plain order.
+
+A limit order can take its price from the book once, at entry: `peg` is an
+`OrderPeg::new(PegReference::BestBid | PegReference::BestAsk, offset_ticks)`,
+where `offset_ticks` is a signed number of the pair's price increments (its
+tick size, not 1e-9 price ticks) added to the reference; `-2` is two
+increments below it. `price` stays required, as the BUY's highest or the SELL's
+lowest acceptable price (`PEG_LIMIT_VIOLATION` beyond it); an empty reference
+side is refused `PEG_REFERENCE_UNAVAILABLE`, other unsupported terms
+`INVALID_PEG`. A peg on a market order, with quote sizing or with
+`attached_risk` is refused with `Error::Validation` before sending. The price
+never follows the book afterwards; read the order for the price it took.
+
 A buy sized by a quote amount (`max_quote_debit_scaled`, market or limit IOC)
 can carry `attached_risk` like any other order: the server checks each leg
 against the pair's minimums at the quantity the amount buys at the order's
@@ -491,8 +543,15 @@ price limit, and the legs then protect what the fills buy.
 default `ExpireMaker`) also applies to the order's attached take-profit,
 stop-loss and trailing-stop exits, which have no mode of their own. Order
 reads report it as `Order.self_trade_prevention_mode` (`expire_taker`,
-`expire_maker`, `expire_both`), and each leg's trigger as
-`Trigger.self_trade_prevention_mode`. An attached exit never trades with the
+`expire_maker`, `expire_both`, `decrement`), and each leg's trigger as
+`Trigger.self_trade_prevention_mode`. `Decrement` reduces both orders by the
+quantity that would have traded, with no trade: the order left with no
+quantity ends `canceled` with `CANCEL_REASON_STP_DECREMENT`, a resting order
+that keeps a quantity keeps its place in the queue, and an incoming one goes on
+matching. A fill-or-kill order that would meet such an order is rejected
+`FOK_INSUFFICIENT_LIQUIDITY`. The incoming order's mode decides, so a resting
+order of any mode can be reduced or canceled this way. Trigger creates take
+`decrement` too (`CreateTriggerParams.self_trade_prevention_mode`). An attached exit never trades with the
 order it protects: when it fires while that order still rests, the order's
 unfilled rest is canceled first (fills before stand) and the order ends
 `canceled` with `CANCEL_REASON_ATTACHED_EXIT_FIRED`.
@@ -695,8 +754,11 @@ the order error code the Orders API returns for the same refusal and in the
 same form as `Error::Api`'s `code` (for example `ERROR_CODE_POST_ONLY_CROSS`).
 A `canceled` order carries `Order.cancel_reason`, a `CancelReason` proto name
 such as `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_IOC_REMAINDER`,
-`CANCEL_REASON_STP_EXPIRE_MAKER`, `CANCEL_REASON_REPLACED` or
-`CANCEL_REASON_GTD_EXPIRED`. Both are `None` for every other status. A value
+`CANCEL_REASON_STP_EXPIRE_MAKER`, `CANCEL_REASON_REPLACED`,
+`CANCEL_REASON_GTD_EXPIRED`, `CANCEL_REASON_STP_DECREMENT`,
+`CANCEL_REASON_PRICE_BAND` (the rest of a market order the price band stopped)
+or `CANCEL_REASON_CANCEL_ON_DISCONNECT`. Both are `None` for every other
+status. A value
 this SDK does not know yet keeps its number: `UNKNOWN_ERROR_CODE(<n>)` and
 `UNKNOWN(<n>)`. Match on these codes, not on message text.
 
@@ -711,6 +773,16 @@ maximum (not zero); an order above one is rejected with `MAX_QTY` or
 `MAX_NOTIONAL`. `max_open_orders_per_pair` and `max_open_orders_total` are
 the default resting-order limits for a typical account (0 when unpublished);
 an account may have a lower limit of its own.
+
+`price_band` (`Option<PriceBand>`, `None` when the pair has none) limits how
+far from the market an order may be priced or trade: `lower_bps`, `upper_bps`
+and `reference_window_ms`. With the band's reference price R and tick size T,
+the limits are `ceil(R * (1 - lower_bps / 10000) / T) * T` and
+`floor(R * (1 + upper_bps / 10000) / T) * T`. A limit buy above the upper
+limit or a limit sell below the lower one is refused `PRICE_BAND_VIOLATION`; a
+market order trades only to the limit and the rest is canceled with
+`CANCEL_REASON_PRICE_BAND`. R is not published; the last trade price is a
+close estimate.
 
 ```rust,no_run
 client.wait_for_catalogs().await?;
@@ -839,7 +911,8 @@ Category, audience and surface are lowercase labels (`breaking_change`, `api`,
 `CHANGELOG_*` constants in `polyester::models`). A value newer than this SDK
 reads as `unknown(<n>)`. `ChangelogSection::surface` is the product area a
 section covers, empty for a section not tied to one area (such as the changes
-that need your attention); `list_changes` takes at most 10 `surfaces`. With
+that need your attention); `list_changes` takes at most 11 `surfaces`, one per
+product area (`assistant` included). With
 `WireFormat::Json`, an enum name this SDK does not know reads as unset (and is
 dropped from a list) instead of failing the call. `ChangelogChange::id` is
 the change's public base58 id. The service returns `Unavailable`
@@ -873,8 +946,11 @@ let api_changes = client
 
 ## Price alerts
 
-Price alerts are available on devnet; they are not yet routed on testnet,
-where these calls fail. `client.alerts` creates durable alerts ("tell me when
+Price alerts are devnet only; they are not yet available on testnet, where
+these calls fail. An API key needs `READ_PRICE_ALERTS` on its policy to list
+alerts and `MANAGE_PRICE_ALERTS` to create, update or cancel them (devnet-only
+policy actions); without it the call is refused with `permission_denied` and
+`Error::auth_error_code()` `AUTH_API_KEY_ACCESS_DENIED`. `client.alerts` creates durable alerts ("tell me when
 BTC-USDT falls to 90,000") that the exchange evaluates and delivers in-app
 and/or to your linked Telegram account. Alerts belong to the main account:
 use an API key scoped to the main account. A key scoped to a sub-account is
@@ -1027,6 +1103,17 @@ let distance = TrailingDistance::Ticks(ticks);
 Trigger reads decode the distance back to quote units
 (`TriggerTrailingDetails::trailing_distance`, a `Price`).
 
+A cancel, pause, resume or modify of a trigger that has already ended
+(completed, canceled or failed), a repeat of a cancel that succeeded included,
+is refused with `ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at least 60
+seconds after it ended: `Error::is_trigger_already_ended()` is true. Treat it
+as "already done" and read the trigger for how it ended. After those 60
+seconds the same call may answer `ERROR_CODE_TRIGGER_NOT_FOUND`, which also
+means an ID that is none of the account's triggers: treat it as done only for
+a trigger you know you created. Trigger IDs are opaque per-account values: use
+them only as the API gave them, and compare them only with other trigger IDs
+of the same account.
+
 `triggers.modify` and `triggers.resume_with` / `resume_by_id` take an optional
 symbol: leave it out to target the trigger's own market. An API key limited to
 some markets must name the market. A trailing stop's runtime details expose
@@ -1046,7 +1133,11 @@ resting orders; the leg stays armed and fires again at the next trade through
 its trigger price, or once the blocking order is gone). `fire_price` is the
 price it fired at. For `self_trade_prevented`, `child_seq` names the child
 order that was placed and expired (`CANCEL_REASON_STP_EXPIRE_TAKER` or
-`CANCEL_REASON_STP_EXPIRE_BOTH`); for every other reason `child_seq` is an
+`CANCEL_REASON_STP_EXPIRE_BOTH`). A ladder level the order book rejected when
+it arrived (for example `post_only_cross`) is reported the same way while the
+ladder keeps working its other levels: it follows that level's `fired` event,
+with the same `child_seq` and the level's price as `fire_price`, and that level
+was not placed, so do not count it. For every other reason `child_seq` is an
 attempt that placed no order and `child_order_id` is empty. A refusal
 that ends the trigger is still `failed` with `failure_reason`. A ladder whose
 levels were all canceled before any filled ends `canceled` with
@@ -1377,6 +1468,16 @@ A REST HTTP 403 problem that refuses the operation rather than the key, such as
 `SUBACCOUNT_READ_FORBIDDEN` or `QUICKSWAP_NOT_PERMITTED`, is
 `Error::PermissionDenied { code, message, endpoint, .. }`: the key works, but its
 account, sub-account role or policy does not allow this call. It is not retryable.
+A ConnectRPC `permission_denied` with an `orders.v1.ErrorDetail` is the same
+`Error::PermissionDenied`, with `code` spelled as REST spells it, without the
+`ERROR_CODE_` prefix (`POLICY_SPOT_TRADE_DENY`, not
+`ERROR_CODE_POLICY_SPOT_TRADE_DENY`), and `endpoint` the called procedure.
+Order permission refusals name which policy to change: `API_KEY_SPOT_TRADE_DENY`
+(enable Spot Trading Write, `TRADE_SPOT`, on the API key's policy; also when
+neither policy grants it), `API_KEY_POLICY_REQUIRED` (the key has no policy, so
+no permissions: attach one), `POLICY_SPOT_TRADE_DENY` (enable it on the
+sub-account's policy), `API_KEY_MARKET_DENY` (a main-account key whose own
+market list excludes the pair) and `POLICY_MARKET_DENY`.
 
 Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
 `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,

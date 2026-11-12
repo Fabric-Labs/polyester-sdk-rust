@@ -186,7 +186,8 @@ impl Quantity {
         )
     }
 
-    /// Construct a quote-debit budget from scaled integer units.
+    /// Construct an order quote amount (a BUY's quote-debit budget or a SELL's
+    /// quote proceeds target) from scaled integer units.
     ///
     /// `scale` is required so a bare integer can never silently inherit the
     /// catalog scale. Use [`crate::catalogs::Manager::quote_quantity_scale_for_symbol`].
@@ -428,7 +429,8 @@ pub fn resolve_qty_scaled(
     Ok(scaled)
 }
 
-/// Resolve a quote-debit budget. The value must carry the catalog quote scale.
+/// Resolve an order quote amount (a quote-debit budget or a quote proceeds
+/// target). The value must carry the catalog quote scale.
 pub fn resolve_quote_qty_scaled(
     value: &Quantity,
     scale: u32,

@@ -975,13 +975,16 @@ impl TriggersService {
         }
     }
 
+    /// A trigger create's self-trade prevention mode label, as order reads
+    /// spell it, in any case.
     fn stp_mode(label: &str) -> Result<SelfTradePreventionMode> {
         match label.to_ascii_lowercase().as_str() {
             "expire_taker" => Ok(SelfTradePreventionMode::ExpireTaker),
             "expire_maker" => Ok(SelfTradePreventionMode::ExpireMaker),
             "expire_both" => Ok(SelfTradePreventionMode::ExpireBoth),
+            "decrement" => Ok(SelfTradePreventionMode::Decrement),
             _ => Err(Error::validation(
-                "self_trade_prevention_mode must be expire_taker, expire_maker, or expire_both",
+                "self_trade_prevention_mode must be expire_taker, expire_maker, expire_both, or decrement",
             )),
         }
     }
@@ -1004,6 +1007,7 @@ impl TriggersService {
 
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::cancel_by_id`] to apply it.
+    /// A trigger that has already ended is refused as for [`Self::cancel_by_id`].
     pub async fn cancel(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
         super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
@@ -1019,6 +1023,15 @@ impl TriggersService {
     }
 
     /// Cancel a trigger using the public string ID returned by create and list calls.
+    ///
+    /// A trigger that has already ended (completed, canceled or failed) is
+    /// refused with `ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at
+    /// least 60 seconds after it ended, a repeat of a cancel that succeeded
+    /// included ([`Error::is_trigger_already_ended`] is true); after that it
+    /// may be refused with `ERROR_CODE_TRIGGER_NOT_FOUND`. Both mean "already
+    /// ended, nothing to do" for a trigger you know you created; read it with
+    /// [`Self::get_by_id`] for how it ended. `TRIGGER_NOT_FOUND` also names an
+    /// ID that is none of the account's triggers.
     pub async fn cancel_by_id(
         &self,
         trigger_id: &str,
@@ -1130,6 +1143,7 @@ impl TriggersService {
 
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::pause_by_id`] to apply it.
+    /// A trigger that has already ended is refused as for [`Self::pause_by_id`].
     pub async fn pause(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
         super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
@@ -1145,6 +1159,15 @@ impl TriggersService {
     }
 
     /// Pause a trigger using the public string ID returned by create and list calls.
+    ///
+    /// A trigger that has already ended (completed, canceled or failed) is
+    /// refused with `ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at
+    /// least 60 seconds after it ended, a repeat of a cancel that succeeded
+    /// included ([`Error::is_trigger_already_ended`] is true); after that it
+    /// may be refused with `ERROR_CODE_TRIGGER_NOT_FOUND`. Both mean "already
+    /// ended, nothing to do" for a trigger you know you created; read it with
+    /// [`Self::get_by_id`] for how it ended. `TRIGGER_NOT_FOUND` also names an
+    /// ID that is none of the account's triggers.
     pub async fn pause_by_id(
         &self,
         trigger_id: &str,
@@ -1160,6 +1183,7 @@ impl TriggersService {
 
     /// Sends `req` as built: the configured default subaccount is not applied.
     /// Use [`Self::resume_with`] to apply it.
+    /// A trigger that has already ended is refused as for [`Self::resume_by_id`].
     pub async fn resume(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
         super::scope::request_subaccount(req.subaccount_id)?;
         let client = self.client();
@@ -1175,6 +1199,15 @@ impl TriggersService {
     }
 
     /// Resume a trigger using the public string ID returned by create and list calls.
+    ///
+    /// A trigger that has already ended (completed, canceled or failed) is
+    /// refused with `ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at
+    /// least 60 seconds after it ended, a repeat of a cancel that succeeded
+    /// included ([`Error::is_trigger_already_ended`] is true); after that it
+    /// may be refused with `ERROR_CODE_TRIGGER_NOT_FOUND`. Both mean "already
+    /// ended, nothing to do" for a trigger you know you created; read it with
+    /// [`Self::get_by_id`] for how it ended. `TRIGGER_NOT_FOUND` also names an
+    /// ID that is none of the account's triggers.
     pub async fn resume_by_id(
         &self,
         trigger_id: &str,
@@ -1193,6 +1226,8 @@ impl TriggersService {
     /// Resume a trigger. `symbol` / `symbol_id` are optional: leave both out
     /// to target the trigger's own market. An API key restricted to some
     /// markets must name the market.
+    /// A trigger that has already ended is refused as for
+    /// [`Self::resume_by_id`].
     pub async fn resume_with(&self, params: ResumeTriggerParams) -> Result<TriggerMutationResult> {
         if params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
@@ -1211,6 +1246,17 @@ impl TriggersService {
 
     /// Modify a trigger. Price fields must be `Price` wrappers. When `symbol`
     /// or `symbol_id` is given, a price bound to another market is refused.
+    /// A running ladder or TWAP is refused with
+    /// `ERROR_CODE_TRIGGER_NOT_MODIFIABLE`; it supports only cancel.
+    ///
+    /// A trigger that has already ended (completed, canceled or failed) is
+    /// refused with `ERROR_CODE_TRIGGER_STATUS_INVALID` (HTTP 400) for at
+    /// least 60 seconds after it ended, a repeat of a cancel that succeeded
+    /// included ([`Error::is_trigger_already_ended`] is true); after that it
+    /// may be refused with `ERROR_CODE_TRIGGER_NOT_FOUND`. Both mean "already
+    /// ended, nothing to do" for a trigger you know you created; read it with
+    /// [`Self::get_by_id`] for how it ended. `TRIGGER_NOT_FOUND` also names an
+    /// ID that is none of the account's triggers.
     pub async fn modify(&self, params: ModifyTriggerParams) -> Result<TriggerMutationResult> {
         // A symbol is resolved through the catalogs; a symbol ID needs them to
         // check a price bound to a market.
@@ -1350,6 +1396,42 @@ mod tests {
             fee_asset: None,
             self_trade_prevention_mode: None,
         }
+    }
+
+    /// `decrement` self-trade prevention is valid on trigger creates and is
+    /// sent on an OCO too, in any case; another label is refused before
+    /// sending with a message that lists the modes.
+    #[test]
+    fn trigger_and_oco_creates_send_decrement_self_trade_prevention() {
+        let client = client();
+        let mut params = create_params(
+            crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
+            crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap(),
+            crate::Price::from_decimal_str("48950", Some("BTC-USDT".into())).unwrap(),
+        );
+        for label in ["decrement", "DECREMENT"] {
+            params.self_trade_prevention_mode = Some(label.into());
+            let wire = client.triggers.encode_create_params(&params).unwrap();
+            assert_eq!(
+                wire.trigger.as_option().unwrap().self_trade_prevention_mode,
+                SelfTradePreventionMode::Decrement,
+                "{label}"
+            );
+        }
+        params.self_trade_prevention_mode = Some("decrease".into());
+        let err = client.triggers.encode_create_params(&params).unwrap_err();
+        assert!(
+            matches!(&err, Error::Validation(message) if message.contains("expire_both, or decrement")),
+            "{err:?}"
+        );
+
+        let mut oco = sell_oco();
+        oco.self_trade_prevention_mode = Some("decrement".into());
+        let wire = client.triggers.encode_create_oco_params(&oco).unwrap();
+        assert_eq!(
+            wire.oco.as_option().unwrap().self_trade_prevention_mode,
+            SelfTradePreventionMode::Decrement
+        );
     }
 
     #[test]
@@ -2687,7 +2769,7 @@ mod tests {
             "take_profit trigger_price_source must be last, index or mark",
         );
         let mut p = sell_oco();
-        p.self_trade_prevention_mode = Some("decrement".into());
+        p.self_trade_prevention_mode = Some("decrease".into());
         refused(p, "self_trade_prevention_mode");
 
         let mut p = sell_oco();

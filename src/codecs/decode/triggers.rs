@@ -1618,7 +1618,27 @@ mod tests {
                 TriggerFailureReason::TRIGGER_FAILURE_REASON_MARKET_HALTED,
                 "market_halted",
             ),
+            // A standalone trigger whose order the price band refuses (14),
+            // and a quote amount, a BUY's budget or a SELL's proceeds
+            // target, too small for one step (24, renamed from
+            // MAX_QUOTE_DEBIT_TOO_SMALL).
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION,
+                "price_band_violation",
+            ),
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL,
+                "quote_size_too_small",
+            ),
         ];
+        assert_eq!(
+            TriggerFailureReason::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION.to_i32(),
+            14
+        );
+        assert_eq!(
+            TriggerFailureReason::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL.to_i32(),
+            24
+        );
         for (reason, want) in failures {
             let trigger = trigger_from_proto(&ProtoTrigger {
                 trigger_id: 1,
@@ -1813,6 +1833,46 @@ mod tests {
         })
         .unwrap();
         assert!(fired.fire_refusal_reason.is_empty());
+    }
+
+    /// A ladder level the order book rejects when it arrives is reported
+    /// after its `fired` event as `fire_refused` with the same `child_seq`,
+    /// its reason and the level's price, while the ladder keeps working: that
+    /// level was not placed.
+    #[test]
+    fn ladder_level_the_book_rejects_is_a_refused_fire_of_its_child_seq() {
+        let fired = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 8,
+            trigger_type: TriggerType::Ladder.into(),
+            event_type: TriggerEventType::EventFired.into(),
+            child_seq: 3,
+            child_order_id: 91,
+            fire_price_ticks: Some(61_000_000_000_000),
+            ..Default::default()
+        })
+        .unwrap();
+        let refused = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 8,
+            trigger_type: TriggerType::Ladder.into(),
+            event_type: TriggerEventType::EventFireRefused.into(),
+            child_seq: 3,
+            fire_price_ticks: Some(61_000_000_000_000),
+            fire_refusal_reason: Some(
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS.into(),
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(fired.trigger_type, "ladder");
+        assert_eq!(
+            (fired.event_type.as_str(), refused.event_type.as_str()),
+            ("fired", "fire_refused")
+        );
+        assert_eq!(fired.child_seq, refused.child_seq);
+        assert_eq!(fired.child_order_id, format_uint64_id(91));
+        assert_eq!(refused.fire_refusal_reason, "post_only_cross");
+        assert_eq!(refused.fire_price, fired.fire_price);
+        assert!(refused.failure_reason.is_empty() && refused.cancel_reason.is_empty());
     }
 
     #[test]

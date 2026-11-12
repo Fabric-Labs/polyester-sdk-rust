@@ -64,6 +64,10 @@ pub struct CreateTriggerParams {
     pub ladder_distribution: Option<String>,
     /// Fee asset. `base` is valid only for BUY child orders.
     pub fee_asset: Option<FeeAsset>,
+    /// Self-trade prevention mode of the trigger's orders: `expire_taker`,
+    /// `expire_maker`, `expire_both` or `decrement`, in any case; `None`
+    /// uses the server default, `expire_maker`. Another label is refused
+    /// with [`crate::Error::Validation`] before sending.
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -235,8 +239,10 @@ pub struct CreateOcoParams {
     /// The stop-loss leg.
     pub stop_loss: OcoLegParams,
     pub subaccount_id: Option<u64>,
-    /// `expire_taker`, `expire_maker` or `expire_both`; `None` uses the
-    /// server default, `expire_maker`.
+    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, in any
+    /// case; `None` uses the server default, `expire_maker`. Another label is
+    /// refused with [`crate::Error::Validation`] before sending. The server
+    /// judges whether an OCO takes `decrement`.
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -386,6 +392,8 @@ pub struct Trigger {
     /// Child limit price; for a BUY trailing stop, its maximum price.
     pub limit_price: Option<Price>,
     pub fee_asset: String,
+    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, empty
+    /// when unset, or `UNKNOWN(<number>)` for a mode this SDK does not know.
     pub self_trade_prevention_mode: String,
     pub post_only: bool,
     /// Convenience: stop-trigger price when details are `Stop`.
@@ -496,10 +504,18 @@ pub struct TriggerEvent {
     pub event_type: String,
     pub ts_ns: String,
     /// The fire attempt the event names. A `fire_refused` event uses a
-    /// `child_seq` of its own; the next attempt takes the next one.
+    /// `child_seq` of its own; the next attempt takes the next one. Two
+    /// exceptions name an earlier attempt instead: with the
+    /// `self_trade_prevented` reason, the child order self-trade prevention
+    /// expired; on a ladder, a level the order book rejected when it arrived
+    /// (for example `post_only_cross`), which follows that level's `fired`
+    /// event with the same `child_seq` while the ladder keeps working its
+    /// other levels. A ladder level whose `fired` is followed by a
+    /// `fire_refused` of the same `child_seq` was not placed: do not count
+    /// it.
     pub child_seq: i32,
-    /// Child order the fire placed. Empty on `fire_refused`: no order was
-    /// placed.
+    /// Child order the fire placed. Empty on a `fire_refused` event that
+    /// placed no order.
     pub child_order_id: String,
     pub fire_price: Option<Price>,
     /// Proto `terminal_reason.cancel_reason`. Empty when unset or unspecified.

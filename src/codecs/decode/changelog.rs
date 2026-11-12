@@ -171,6 +171,26 @@ mod tests {
         assert_eq!(change.surfaces, vec!["market_data", "rewards"]);
     }
 
+    /// Changes to the AI assistant, and a post section covering it, read
+    /// `assistant`.
+    #[test]
+    fn assistant_surface_reads_its_label() {
+        let change = change_from_proto(&Change {
+            surfaces: vec![Surface::ASSISTANT.into(), Surface::API.into()],
+            ..Default::default()
+        });
+        assert_eq!(
+            change.surfaces,
+            vec![crate::models::CHANGELOG_SURFACE_ASSISTANT, "api"]
+        );
+        let section = section_from_proto(&Section {
+            heading: "AI assistant".into(),
+            surface: Surface::ASSISTANT.into(),
+            ..Default::default()
+        });
+        assert_eq!(section.surface, "assistant");
+    }
+
     /// A republished post keeps its slug and first publication time, and
     /// reports its current revision and when that revision was published.
     #[test]
