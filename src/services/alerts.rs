@@ -57,6 +57,10 @@ impl AlertsService {
     /// unarmed. Refused before sending: no or repeated channels, more than
     /// two, a price that is not positive or is bound to another market, a
     /// malformed idempotency key, or a market the catalogs don't know by name.
+    /// A price bound to a market is checked against the catalogs' name for
+    /// the ID sent, and refused when they don't know it. An answer without
+    /// the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`].
     pub async fn create(&self, params: CreateAlertParams) -> Result<PriceAlert> {
         let channels = channels(&params.channels)?;
         let price_ticks = positive_price(&params.price)?;
@@ -121,7 +125,9 @@ impl AlertsService {
     /// Change an alert's direction, price or channels: the fields set on
     /// `params` are sent with an update mask naming them. With none set the
     /// mask is empty, which sets a fired alert again (and leaves an active
-    /// one `"unchanged"`). Updating a fired alert sets it again.
+    /// one `"unchanged"`). Updating a fired alert sets it again. An answer
+    /// without the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`] whatever its outcome.
     pub async fn update(&self, params: UpdateAlertParams) -> Result<UpdateAlertResult> {
         let alert_id = alert_id(&params.alert_id)?;
         if params.expected_revision == 0 {
@@ -168,7 +174,9 @@ impl AlertsService {
     }
 
     /// Cancel an active alert. Cancelling a cancelled alert returns it
-    /// unchanged; a fired one is refused with `ALERT_TRIGGERED`.
+    /// unchanged; a fired one is refused with `ALERT_TRIGGERED`. An answer
+    /// without the alert, or with an alert whose ID is 0, is
+    /// [`Error::ResponseContract`].
     pub async fn cancel(&self, alert_id: &str) -> Result<PriceAlert> {
         let req = CancelAlertRequest {
             alert_id: self::alert_id(alert_id)?,

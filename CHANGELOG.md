@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A create, update or cancel of a price alert whose answer carries an alert with `alert_id` 0 returns `Error::ResponseContract` (`CreateAlert: response alert has no alert_id`, likewise `UpdateAlert` and `CancelAlert`), as an answer with no alert already did. It was returned as a made-up alert with `alert_id` `"0"`, `symbol_id` 0, `revision` 0 and status `"unspecified"`, and an update also returned the answer's `outcome`, so a broken answer read as success. The alert is checked before the outcome is read, for every outcome. `mutation_outcome_unknown()` is true for the error: the change may have applied. Tests now also pin that a bound price is never sent for a market the catalogs can't name, whether they were never loaded or failed to load. Affected: `alerts.create`, `alerts.update`, `alerts.cancel`, `codecs::decode::required_price_alert` and `codecs::decode::update_alert_result_from_proto`. Migration: handle `Error::ResponseContract` from these calls and read the alerts back with `alerts.list` before retrying; code that checked for `alert_id == "0"` can drop that check.
+
 ## 0.24.0
 
 Package version: `0.24.0`. Git tag: `v0.24.0`. Released 2026-11-12. Built on public contract `e339360`.

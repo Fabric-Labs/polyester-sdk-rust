@@ -925,6 +925,15 @@ nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
 cancel outcome unknown, so send it again with the same idempotency key
 (`cancel` is idempotent) or read the alerts back.
 
+A price bound to a market (`Price::from_ticks(t, Some("ETH-USDT".into()))`)
+is checked against the catalogs' name for the market's ID; when the catalogs
+don't know that ID (never loaded, failed to load, or not listed) `create`
+refuses it with `Error::Validation` before sending. An unbound price works with
+any `symbol_id`. A `create`, `update` or `cancel` answer without the alert, or
+with an alert whose `alert_id` is 0, returns `Error::ResponseContract`
+(`mutation_outcome_unknown()` is true): read the alerts back rather than
+trusting it.
+
 ## Server build version
 
 `client.get_version().await?` returns the exact build the API host serves

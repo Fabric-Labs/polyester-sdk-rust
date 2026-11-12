@@ -96,14 +96,20 @@ pub fn price_alert_from_proto(msg: &ProtoPriceAlert, symbol: String) -> Result<P
     })
 }
 
-/// The alert of a create, cancel or update response; a response without one
-/// breaks the response contract.
+/// The alert of a create, cancel or update response; a response without one,
+/// or with an alert that has no `alert_id`, breaks the response contract.
 pub fn required_price_alert(
     alert: Option<&ProtoPriceAlert>,
     context: &str,
     symbol_of: impl Fn(u32) -> String,
 ) -> Result<PriceAlert> {
     let alert = alert.ok_or_else(|| Error::response_contract(context, "response has no alert"))?;
+    if alert.alert_id == 0 {
+        return Err(Error::response_contract(
+            context,
+            "response alert has no alert_id",
+        ));
+    }
     price_alert_from_proto(alert, symbol_of(alert.symbol_id))
 }
 
