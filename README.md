@@ -69,13 +69,15 @@ result is those ids plus the new tags; otherwise currently attached tags are
 preserved and `new_tags` are appended. `AddressBookViewInvalidation` includes
 `view_revision`. `get_view` is a proto pass-through (`ApiData.raw`); set
 `minimum_view_revision` on the request. Regenerated raw views include
-`view_revision`. Twitter social-verification `start` forwards the handle as-is,
+`view_revision`, and each entry in them keeps its own `revision`, the
+`expected_revision` for updating that entry. Twitter social-verification `start` forwards the handle as-is,
 including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. Each account read an API key makes needs its own permission on
 the key's API-key policy: `READ_API_KEYS` for `api_keys.list` and
-`api_keys.get`, `READ_VIP_STATUS` for `vip.get_vip_status`,
+`api_keys.get` (each `ApiKeySummary` gives the key's `policy_id`,
+`subaccount_id`, `ip_whitelist` and `expires_at`), `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_SOCIAL_VERIFICATION` for `social_verification.get` (link status only),
 `READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`,
 `READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
@@ -1456,8 +1458,11 @@ for `unavailable` (send the same read again within the window), and
 replacement. The helper polls through `unavailable`, and through `not_found`
 because an older API could answer it for a few seconds after admission. After
 the window, reconcile the individual orders with `orders.get` and never send
-an accepted batch again. An item's `updated_ts_ns` is an observation time, not
-the refusal's identity. A
+an accepted batch again. An order the batch admitted reads back from
+`orders.get`, `orders.list_open`, `orders.list_history` and `orders.subscribe`
+with `Order::batch_request_id` set to the admission's `batch_request_id`; it is
+empty for an order of any other origin. An item's `updated_ts_ns` is an
+observation time, not the refusal's identity. A
 refused item reads `rejected` with `code`, the refusal without its
 `ERROR_CODE_` prefix (`POST_ONLY_CROSS`); `item.error_code()` gives the full
 code an `Error::Api` from a single modify carries (`ERROR_CODE_POST_ONLY_CROSS`),

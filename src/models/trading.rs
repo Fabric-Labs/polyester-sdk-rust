@@ -83,6 +83,10 @@ pub struct Order {
     pub market_max_slippage_bps: i32,
     /// RFC3339 UTC expiry for GTD orders. `None` for every other TIF.
     pub expire_at: Option<String>,
+    /// Public ID of the batch replace that admitted the order, as
+    /// [`BatchReplaceOrdersResult::batch_request_id`]; empty for every other
+    /// origin.
+    pub batch_request_id: String,
     /// Why a `rejected` order was refused: the order error code the Orders
     /// API returns for the same refusal, formatted like
     /// [`crate::Error::Api`]'s `code` (for example
@@ -1287,9 +1291,22 @@ pub struct ApiKeySummary {
     pub label: String,
     pub status: String,
     pub public_key_ed25519: String,
+    /// Public ID of the sub-account the key is scoped to; empty for a key of
+    /// the main account.
+    pub subaccount_id: String,
+    /// Public ID of the API policy attached to the key, as
+    /// [`crate::models::ApiPolicy::policy_id`]; empty when none is attached,
+    /// and then the key has no permissions.
+    pub policy_id: String,
+    /// CIDR allowlist of the addresses the key may be used from, as sent;
+    /// empty means no IP restriction.
+    pub ip_whitelist: Vec<String>,
     pub created_at: Option<Timestamp>,
     pub last_used_at: Option<Timestamp>,
     pub updated_at: Option<Timestamp>,
+    /// Exact UTC time after which the key cannot authenticate, whatever its
+    /// status; `None` when it does not expire.
+    pub expires_at: Option<Timestamp>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
     /// What the key is for: `"STANDARD"` for a key the user created and
