@@ -34,6 +34,13 @@ pub struct SubAccountsList {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct GetSubaccountResult {
     pub subaccount: Option<SubAccount>,
+    /// The API keys scoped to the sub-account, read as
+    /// [`crate::services::ApiKeysService::list`] reads them. Empty unless the
+    /// read asked for them with
+    /// [`crate::services::GetSubaccountOpts::include_api_keys`] and the
+    /// server sent some: it sends them to an owner or admin of the
+    /// sub-account only.
+    pub api_keys: Vec<crate::models::ApiKeySummary>,
     /// The sub-account's current balances, one row per asset as the
     /// balances list returns them. `Some` only when the read asked for them
     /// with [`crate::services::GetSubaccountOpts::include_balances`].

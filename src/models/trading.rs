@@ -1289,6 +1289,15 @@ pub struct WithdrawDestinationValidation {
 pub struct ApiKeySummary {
     pub key_id: String,
     pub label: String,
+    /// User-chosen icon or emoji for display, as sent (at most 32
+    /// characters); empty when unset.
+    pub icon: String,
+    /// User-chosen color token for display, as sent (at most 32
+    /// characters); empty when unset.
+    pub color: String,
+    /// Read-only label of who created the key, such as a username or
+    /// account label; empty when the server sends none.
+    pub created_by_actor: String,
     pub status: String,
     pub public_key_ed25519: String,
     /// Public ID of the sub-account the key is scoped to; empty for a key of

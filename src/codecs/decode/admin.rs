@@ -13,6 +13,9 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
     ApiKeySummary {
         key_id: msg.key_id.clone(),
         label: msg.label.clone(),
+        icon: msg.icon.clone(),
+        color: msg.color.clone(),
+        created_by_actor: msg.created_by_actor.clone(),
         status,
         public_key_ed25519: hex::encode(&msg.public_key_ed25519),
         subaccount_id: format_optional_uint64_id(msg.subaccount_id.unwrap_or_default()),
