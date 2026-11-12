@@ -7,7 +7,7 @@ on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Conne
 
 **Status:** `0.23.0` (git tag `v0.23.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.23.0 is the release of Go 0.25.0 and Python 0.23.1.
+change breaks only one SDK's API: Rust 0.23.0 is the release of Go 0.25.0 and Python 0.24.0.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
