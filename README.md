@@ -77,7 +77,9 @@ Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
 still applies. Each account read an API key makes needs its own permission on
 the key's API-key policy: `READ_API_KEYS` for `api_keys.list` and
 `api_keys.get` (each `ApiKeySummary` gives the key's `policy_id`,
-`subaccount_id`, `ip_whitelist` and `expires_at`), `READ_VIP_STATUS` for `vip.get_vip_status`,
+`subaccount_id` (empty for a main-account key), `ip_whitelist` and
+`expires_at`, and its `icon`, `color` and `created_by_actor`, as sent and
+empty when unset), `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_SOCIAL_VERIFICATION` for `social_verification.get` (link status only),
 `READ_WITHDRAW_VALIDATION` for `withdraw.validate_destination`,
 `READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
@@ -1188,6 +1190,12 @@ for bal in balances.balances {
     println!("{} funding={} trading={}", bal.asset_id, bal.funding, bal.trading);
 }
 ```
+
+A sub-account read can include the API keys scoped to the sub-account: set
+`GetSubaccountOpts::include_api_keys`, and `GetSubaccountResult.api_keys`
+lists them as `api_keys.list` reads them. The server sends them to an owner or
+admin of the sub-account only; `api_keys` is empty when not asked for or none
+were sent.
 
 A sub-account read can include the sub-account's balances in the same shape:
 set `GetSubaccountOpts::include_balances`, and `GetSubaccountResult.balances`

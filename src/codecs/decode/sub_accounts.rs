@@ -1,5 +1,6 @@
 //! Sub-account decoders.
 
+use crate::codecs::decode::admin::api_key_from_proto;
 use crate::codecs::decode::balances::balances_list_from_proto;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
@@ -82,6 +83,7 @@ pub fn subaccounts_list_from_proto(msg: &ListSubaccountsResponse) -> SubAccounts
 pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> GetSubaccountResult {
     GetSubaccountResult {
         subaccount: msg.subaccount.as_option().map(subaccount_from_proto),
+        api_keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
         balances: msg.balances.as_option().map(balances_list_from_proto),
     }
 }

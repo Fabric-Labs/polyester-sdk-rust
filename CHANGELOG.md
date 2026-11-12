@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** API keys read back how they are shown and who created them: `ApiKeySummary` gains `icon`, the user-chosen icon or emoji, `color`, the user-chosen color token, both as sent (at most 32 characters each), and `created_by_actor`, the read-only label of who created the key, such as a username or account label. Each is empty when the server sends none. They were dropped although the server sends them. A main-account key's `subaccount_id` stays empty whether the server leaves `subaccount_id` unset or sends an explicit 0; a test now pins it. Affected: `ApiKeySummary`, `api_keys.list`, `api_keys.get`, `api_keys.subscribe`, `sub_accounts.subscribe_api_keys`, `sub_accounts.get` (its new `api_keys`), `codecs::decode::api_key_from_proto`, `api_keys_list_from_proto`, `api_key_from_get_proto`, `api_key_from_create_proto`, `api_key_from_update_proto`, `api_key_from_bytes` and `get_subaccount_from_proto`. Migration: an `ApiKeySummary` struct literal no longer compiles; set the new fields (empty strings when unset), or read keys from the SDK instead of constructing them. Code that compares whole keys now also compares `icon`, `color` and `created_by_actor`.
+- **Breaking:** `sub_accounts.get` with `GetSubaccountOpts::include_api_keys` returns the sub-account's API keys: `GetSubaccountResult` gains `api_keys`, read as `api_keys.list` reads them, with every `ApiKeySummary` field. The server sends them, as the contract's `GetSubaccountResponse.api_keys`, only to an owner or admin of the sub-account, and the SDK dropped them, so `include_api_keys` had no effect. `api_keys` is empty when they were not asked for or none were sent. Affected: `GetSubaccountResult`, `sub_accounts.get` and `codecs::decode::get_subaccount_from_proto`. Migration: a `GetSubaccountResult` struct literal without `..Default::default()` no longer compiles; set `api_keys` (empty when none), or read the view from the SDK instead of constructing it. Code that compares whole results now also compares `api_keys`.
+
 ## 0.23.0
 
 Package version: `0.23.0`. Git tag: `v0.23.0`. Released 2026-11-12. Built on public contract `e339360`.

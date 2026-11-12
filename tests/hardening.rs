@@ -3,6 +3,8 @@
 //! These exercise production paths (subscribe_raw, JsonRpcClient, wait_for_catalogs,
 //! Quantity::format, SnapshotThenStream) against in-process servers — not private helpers.
 
+#[path = "api_key_display/mod.rs"]
+mod api_key_display;
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
 #[path = "catalog_hydration_wait/mod.rs"]
