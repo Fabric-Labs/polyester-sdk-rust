@@ -105,6 +105,39 @@ pub struct PairOrderLimits {
     /// this pair; 0 when unpublished. An account may have a lower limit of
     /// its own.
     pub max_open_orders_per_pair: u32,
+    /// The pair's price band; `None` when the pair has none.
+    pub price_band: Option<PriceBand>,
+}
+
+/// How far from the market an order on a pair may be priced or trade.
+///
+/// With the band's reference price R and the pair's tick size T, the lower
+/// limit is `ceil(R * (1 - lower_bps / 10000) / T) * T` and the upper limit
+/// `floor(R * (1 + upper_bps / 10000) / T) * T`. A limit buy priced above the
+/// upper limit, or a limit sell priced below the lower limit, is refused with
+/// `ERROR_CODE_PRICE_BAND_VIOLATION`, as is a replace that would add exposure
+/// beyond the band. A market order, or another order whose price the exchange
+/// sets, trades only up to the limit, and its unfilled remainder is canceled
+/// with `CANCEL_REASON_PRICE_BAND`. The band never cancels a resting order,
+/// and a limit order priced away from the market on the passive side is
+/// accepted.
+///
+/// R itself is not published: it follows the pair's last trade, moving at
+/// most once per `reference_window_ms`, and moves to the pair's index price
+/// when the two diverge by more than the band. The last trade price is a
+/// close estimate, so checking a limit price against
+/// `last * (1 ± bps / 10000)` before sending avoids most refusals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PriceBand {
+    /// How far below the reference price a sell may be priced or trade, in
+    /// basis points (1 bp = 0.01%).
+    pub lower_bps: u32,
+    /// How far above the reference price a buy may be priced or trade, in
+    /// basis points.
+    pub upper_bps: u32,
+    /// How long the reference price stays fixed before it can move to a
+    /// newer trade, in milliseconds; 0 moves it with every order.
+    pub reference_window_ms: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

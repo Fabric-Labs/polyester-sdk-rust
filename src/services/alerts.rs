@@ -1,8 +1,18 @@
 //! Price alerts (`alerts.v1.PriceAlertService`).
 //!
-//! Available on devnet; not yet routed on testnet. Alerts belong to the root
+//! Devnet only: the price-alert service, and its two policy actions, are not
+//! available on testnet yet, where these calls fail. Alerts belong to the root
 //! account: an API key scoped to a sub-account is refused with
 //! [`Error::PermissionDenied`] and code `SUBACCOUNT_KEY_REFUSED`.
+//!
+//! An API key needs `READ_PRICE_ALERTS` on its API-key policy to list alerts
+//! ([`AlertsService::list`], [`AlertsService::all`]) and `MANAGE_PRICE_ALERTS`
+//! to create, update or cancel them; neither implies the other. A key whose
+//! policy lacks the call's permission is refused with ConnectRPC
+//! `permission_denied` and the auth code `AUTH_API_KEY_ACCESS_DENIED`, before
+//! any alert is read or changed: an [`Error::Api`] whose
+//! [`Error::auth_error_code`] is `AUTH_API_KEY_ACCESS_DENIED`, with a message
+//! naming the missing permission. Session tokens need neither.
 
 use super::{ServiceContext, changelog::paginate, unary};
 use crate::codecs::decode::{

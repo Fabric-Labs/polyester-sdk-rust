@@ -90,9 +90,9 @@ pub fn enum_value_fee_asset(value: buffa::EnumValue<FeeAsset>) -> String {
         .unwrap_or_else(|| format!("UNKNOWN({})", value.to_i32()))
 }
 
-/// Self-trade prevention mode label: `expire_taker`, `expire_maker` or
-/// `expire_both`, empty when unset, or `UNKNOWN(<number>)` for a mode this SDK
-/// does not know.
+/// Self-trade prevention mode label: `expire_taker`, `expire_maker`,
+/// `expire_both` or `decrement`, empty when unset, or `UNKNOWN(<number>)` for a
+/// mode this SDK does not know.
 pub fn enum_value_self_trade_prevention_mode(
     value: buffa::EnumValue<SelfTradePreventionMode>,
 ) -> String {
@@ -100,6 +100,7 @@ pub fn enum_value_self_trade_prevention_mode(
         Some(SelfTradePreventionMode::ExpireTaker) => "expire_taker".to_owned(),
         Some(SelfTradePreventionMode::ExpireMaker) => "expire_maker".to_owned(),
         Some(SelfTradePreventionMode::ExpireBoth) => "expire_both".to_owned(),
+        Some(SelfTradePreventionMode::Decrement) => "decrement".to_owned(),
         Some(_) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
     }

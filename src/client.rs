@@ -157,8 +157,9 @@ pub struct Client {
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
     pub withdraw: WithdrawService,
-    /// Price alerts of the root account. Available on devnet; not yet routed
-    /// on testnet.
+    /// Price alerts of the root account. Devnet only: not yet available on
+    /// testnet. An API key needs `READ_PRICE_ALERTS` to list and
+    /// `MANAGE_PRICE_ALERTS` to create, update or cancel.
     pub alerts: AlertsService,
     /// Outcome of the spot config's load.
     catalog_ready: Arc<OnceCell<Result<()>>>,

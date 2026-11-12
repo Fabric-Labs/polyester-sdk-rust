@@ -64,6 +64,10 @@ pub struct CreateTriggerParams {
     pub ladder_distribution: Option<String>,
     /// Fee asset. `base` is valid only for BUY child orders.
     pub fee_asset: Option<FeeAsset>,
+    /// Self-trade prevention mode of the trigger's orders: `expire_taker`,
+    /// `expire_maker`, `expire_both` or `decrement`, in any case; `None`
+    /// uses the server default, `expire_maker`. Another label is refused
+    /// with [`crate::Error::Validation`] before sending.
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -228,6 +232,10 @@ pub struct CreateOcoParams {
     /// and for 60 seconds after both legs ended, a create with the identical
     /// params and the same ID returns the same OCO, and different params with
     /// the same ID are refused with `CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID`.
+    /// Any 1 to 36 bytes of UTF-8, sent exactly as given (never trimmed), so
+    /// [`ListTriggersOpts::client_list_id`] finds the OCO with the same
+    /// string; another length is refused with [`crate::Error::Validation`]
+    /// before sending.
     pub client_list_id: String,
     /// The take-profit leg. The server requires its trigger price to be above
     /// the stop-loss's for a SELL OCO and below it for a BUY OCO.
@@ -235,8 +243,10 @@ pub struct CreateOcoParams {
     /// The stop-loss leg.
     pub stop_loss: OcoLegParams,
     pub subaccount_id: Option<u64>,
-    /// `expire_taker`, `expire_maker` or `expire_both`; `None` uses the
-    /// server default, `expire_maker`.
+    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, in any
+    /// case; `None` uses the server default, `expire_maker`. Another label is
+    /// refused with [`crate::Error::Validation`] before sending. The server
+    /// judges whether an OCO takes `decrement`.
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -302,9 +312,11 @@ pub struct ListTriggersOpts {
     /// every trigger.
     pub order_list_id: Option<String>,
     /// Only the take-profit and stop-loss of the OCO created with this
-    /// `client_list_id` (the contract's `client_list_id` filter), sent as
-    /// given. Use it to learn whether a create whose outcome is unknown made
-    /// the OCO. `None` lists every trigger.
+    /// `client_list_id` (the contract's `client_list_id` filter), sent exactly
+    /// as given, never trimmed: pass the key the create used. Use it to learn
+    /// whether a create whose outcome is unknown made the OCO. 1 to 36 bytes
+    /// of UTF-8; another length is refused with [`crate::Error::Validation`]
+    /// before sending. `None` lists every trigger.
     pub client_list_id: Option<String>,
 }
 
@@ -386,6 +398,8 @@ pub struct Trigger {
     /// Child limit price; for a BUY trailing stop, its maximum price.
     pub limit_price: Option<Price>,
     pub fee_asset: String,
+    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, empty
+    /// when unset, or `UNKNOWN(<number>)` for a mode this SDK does not know.
     pub self_trade_prevention_mode: String,
     pub post_only: bool,
     /// Convenience: stop-trigger price when details are `Stop`.
@@ -439,6 +453,10 @@ pub struct CreateOcoResult {
     pub take_profit_trigger_id: String,
     /// Public trigger ID of the stop-loss leg.
     pub stop_loss_trigger_id: String,
+    /// When admission completed, in nanoseconds since the Unix epoch: the
+    /// contract's `accepted_at_ts_ns`, or `accepted_at` when only that is
+    /// sent; 0 when neither is.
+    pub accepted_ts_ns: u64,
 }
 
 /// An OCO's cancellation: both legs end canceled and the OCO's reserved
@@ -449,6 +467,9 @@ pub struct CancelOcoResult {
     pub order_list_id: String,
     /// Both legs' status after the cancel, which is always `canceled`.
     pub status: String,
+    /// When the cancel was answered, in nanoseconds since the Unix epoch:
+    /// `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    pub ts_ns: u64,
 }
 
 /// The outcome of one trigger of a batch cancel.
@@ -480,6 +501,9 @@ pub struct BatchCancelTriggersResult {
     pub results: Vec<BatchCancelTriggersResultItem>,
     pub accepted_count: u32,
     pub rejected_count: u32,
+    /// The server time of the answer, in nanoseconds since the Unix epoch:
+    /// `ts_ns`, or `ts` when only that is sent; 0 when neither is.
+    pub ts_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -496,10 +520,18 @@ pub struct TriggerEvent {
     pub event_type: String,
     pub ts_ns: String,
     /// The fire attempt the event names. A `fire_refused` event uses a
-    /// `child_seq` of its own; the next attempt takes the next one.
+    /// `child_seq` of its own; the next attempt takes the next one. Two
+    /// exceptions name an earlier attempt instead: with the
+    /// `self_trade_prevented` reason, the child order self-trade prevention
+    /// expired; on a ladder, a level the order book rejected when it arrived
+    /// (for example `post_only_cross`), which follows that level's `fired`
+    /// event with the same `child_seq` while the ladder keeps working its
+    /// other levels. A ladder level whose `fired` is followed by a
+    /// `fire_refused` of the same `child_seq` was not placed: do not count
+    /// it.
     pub child_seq: i32,
-    /// Child order the fire placed. Empty on `fire_refused`: no order was
-    /// placed.
+    /// Child order the fire placed. Empty on a `fire_refused` event that
+    /// placed no order.
     pub child_order_id: String,
     pub fire_price: Option<Price>,
     /// Proto `terminal_reason.cancel_reason`. Empty when unset or unspecified.

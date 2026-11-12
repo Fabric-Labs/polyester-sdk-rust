@@ -579,13 +579,29 @@ pub fn trigger_mutation_from_modify(
     trigger_mutation(msg.trigger_id, msg.status)
 }
 
+/// A response time in nanoseconds since the Unix epoch: the exact `*_ts_ns`
+/// field, or its paired `Timestamp` when the nanosecond field is unset; 0
+/// when neither is set or the time is before the epoch.
+fn paired_ts_ns(ts_ns: u64, ts: Option<&Timestamp>) -> u64 {
+    if ts_ns != 0 {
+        return ts_ns;
+    }
+    ts.map_or(0, |ts| {
+        u64::try_from(ts.seconds)
+            .ok()
+            .and_then(|secs| secs.checked_mul(1_000_000_000))
+            .and_then(|ns| ns.checked_add(u64::try_from(ts.nanos).ok()?))
+            .unwrap_or(0)
+    })
+}
+
 /// `CreateOcoResponse` acknowledges the OCO and both legs; an answer missing
 /// any of their IDs or the echoed client OCO ID is refused.
 pub fn create_oco_from_proto(msg: &CreateOcoResponse) -> crate::errors::Result<CreateOcoResult> {
     if msg.order_list_id == 0
         || msg.take_profit_trigger_id == 0
         || msg.stop_loss_trigger_id == 0
-        || msg.client_list_id.trim().is_empty()
+        || msg.client_list_id.is_empty()
     {
         return Err(crate::Error::transport(
             "invalid CreateOco response: missing order_list_id, client_list_id or a leg trigger_id",
@@ -596,6 +612,7 @@ pub fn create_oco_from_proto(msg: &CreateOcoResponse) -> crate::errors::Result<C
         client_list_id: msg.client_list_id.clone(),
         take_profit_trigger_id: format_uint64_id(msg.take_profit_trigger_id),
         stop_loss_trigger_id: format_uint64_id(msg.stop_loss_trigger_id),
+        accepted_ts_ns: paired_ts_ns(msg.accepted_at_ts_ns, msg.accepted_at.as_option()),
     })
 }
 
@@ -609,6 +626,7 @@ pub fn cancel_oco_from_proto(msg: &CancelOcoResponse) -> crate::errors::Result<C
     Ok(CancelOcoResult {
         order_list_id: format_uint64_id(msg.order_list_id),
         status,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -678,6 +696,7 @@ pub fn batch_cancel_triggers_from_proto(
         results,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -1381,6 +1400,7 @@ mod tests {
                 client_list_id: "oco-1".into(),
                 take_profit_trigger_id: format_uint64_id(71),
                 stop_loss_trigger_id: format_uint64_id(72),
+                accepted_ts_ns: 0,
             }
         );
         for broken in [
@@ -1390,7 +1410,7 @@ mod tests {
                 ..created_oco()
             },
             CreateOcoResponse {
-                client_list_id: " ".into(),
+                client_list_id: String::new(),
                 ..created_oco()
             },
             CreateOcoResponse {
@@ -1405,6 +1425,14 @@ mod tests {
             let err = create_oco_from_proto(&broken).unwrap_err();
             assert!(err.mutation_outcome_unknown(), "{err:?}");
         }
+
+        // A client OCO ID of only whitespace is legal and echoed as sent.
+        let spaced = create_oco_from_proto(&CreateOcoResponse {
+            client_list_id: " ".into(),
+            ..created_oco()
+        })
+        .expect("a single-space client_list_id is a legal echo");
+        assert_eq!(spaced.client_list_id, " ");
 
         let canceled = cancel_oco_from_proto(&CancelOcoResponse {
             order_list_id: 70,
@@ -1422,6 +1450,65 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    /// The OCO create and cancel and the batch trigger cancel keep the
+    /// server's time to the nanosecond: the `*_ts_ns` field when sent, else
+    /// its paired `Timestamp`, else 0.
+    #[test]
+    fn oco_and_batch_cancel_answers_keep_server_times() {
+        use buffa_types::google::protobuf::Timestamp;
+        const EXACT: u64 = 1_762_560_000_123_456_789;
+        const FROM_STAMP: u64 = 1_762_560_000_987_654_321;
+        let stamp = || Timestamp {
+            seconds: 1_762_560_000,
+            nanos: 987_654_321,
+            ..Default::default()
+        };
+
+        let created = |ts_ns: u64, ts: Option<Timestamp>| {
+            let mut msg = CreateOcoResponse {
+                accepted_at_ts_ns: ts_ns,
+                ..created_oco()
+            };
+            if let Some(ts) = ts {
+                *msg.accepted_at.get_or_insert_default() = ts;
+            }
+            create_oco_from_proto(&msg).unwrap().accepted_ts_ns
+        };
+        assert_eq!(created(EXACT, Some(stamp())), EXACT);
+        assert_eq!(created(0, Some(stamp())), FROM_STAMP);
+        assert_eq!(created(0, None), 0);
+
+        let canceled = |ts_ns: u64, ts: Option<Timestamp>| {
+            let mut msg = CancelOcoResponse {
+                order_list_id: 70,
+                status: TriggerStatus::StatusCanceled.into(),
+                ts_ns,
+                ..Default::default()
+            };
+            if let Some(ts) = ts {
+                *msg.ts.get_or_insert_default() = ts;
+            }
+            cancel_oco_from_proto(&msg).unwrap().ts_ns
+        };
+        assert_eq!(canceled(EXACT, Some(stamp())), EXACT);
+        assert_eq!(canceled(0, Some(stamp())), FROM_STAMP);
+        assert_eq!(canceled(0, None), 0);
+
+        let batch = |ts_ns: u64, ts: Option<Timestamp>| {
+            let mut msg = BatchCancelTriggersResponse {
+                ts_ns,
+                ..Default::default()
+            };
+            if let Some(ts) = ts {
+                *msg.ts.get_or_insert_default() = ts;
+            }
+            batch_cancel_triggers_from_proto(&msg).unwrap().ts_ns
+        };
+        assert_eq!(batch(EXACT, Some(stamp())), EXACT);
+        assert_eq!(batch(0, Some(stamp())), FROM_STAMP);
+        assert_eq!(batch(0, None), 0);
     }
 
     fn created_oco() -> CreateOcoResponse {
@@ -1618,7 +1705,27 @@ mod tests {
                 TriggerFailureReason::TRIGGER_FAILURE_REASON_MARKET_HALTED,
                 "market_halted",
             ),
+            // A standalone trigger whose order the price band refuses (14),
+            // and a quote amount, a BUY's budget or a SELL's proceeds
+            // target, too small for one step (24, renamed from
+            // MAX_QUOTE_DEBIT_TOO_SMALL).
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION,
+                "price_band_violation",
+            ),
+            (
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL,
+                "quote_size_too_small",
+            ),
         ];
+        assert_eq!(
+            TriggerFailureReason::TRIGGER_FAILURE_REASON_PRICE_BAND_VIOLATION.to_i32(),
+            14
+        );
+        assert_eq!(
+            TriggerFailureReason::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL.to_i32(),
+            24
+        );
         for (reason, want) in failures {
             let trigger = trigger_from_proto(&ProtoTrigger {
                 trigger_id: 1,
@@ -1813,6 +1920,46 @@ mod tests {
         })
         .unwrap();
         assert!(fired.fire_refusal_reason.is_empty());
+    }
+
+    /// A ladder level the order book rejects when it arrives is reported
+    /// after its `fired` event as `fire_refused` with the same `child_seq`,
+    /// its reason and the level's price, while the ladder keeps working: that
+    /// level was not placed.
+    #[test]
+    fn ladder_level_the_book_rejects_is_a_refused_fire_of_its_child_seq() {
+        let fired = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 8,
+            trigger_type: TriggerType::Ladder.into(),
+            event_type: TriggerEventType::EventFired.into(),
+            child_seq: 3,
+            child_order_id: 91,
+            fire_price_ticks: Some(61_000_000_000_000),
+            ..Default::default()
+        })
+        .unwrap();
+        let refused = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 8,
+            trigger_type: TriggerType::Ladder.into(),
+            event_type: TriggerEventType::EventFireRefused.into(),
+            child_seq: 3,
+            fire_price_ticks: Some(61_000_000_000_000),
+            fire_refusal_reason: Some(
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_POST_ONLY_CROSS.into(),
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(fired.trigger_type, "ladder");
+        assert_eq!(
+            (fired.event_type.as_str(), refused.event_type.as_str()),
+            ("fired", "fire_refused")
+        );
+        assert_eq!(fired.child_seq, refused.child_seq);
+        assert_eq!(fired.child_order_id, format_uint64_id(91));
+        assert_eq!(refused.fire_refusal_reason, "post_only_cross");
+        assert_eq!(refused.fire_price, fired.fire_price);
+        assert!(refused.failure_reason.is_empty() && refused.cancel_reason.is_empty());
     }
 
     #[test]

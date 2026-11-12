@@ -861,3 +861,123 @@ async fn poly_8756_missing_headers_keeps_its_auth_reason_at_400() {
     let err = err.expect("skew error");
     assert_eq!(err.auth_code(), Some(AuthErrorCode::AUTH_TIMESTAMP_SKEW));
 }
+
+/// An order permission refusal is the same `Error::PermissionDenied`, with
+/// the same code spelling, status, message and endpoint, whether the API
+/// answers it as a REST problem or as a ConnectRPC `permission_denied` with
+/// an `orders.v1.ErrorDetail`: the API key's own refusals (78, 27, 29)
+/// exactly as the sub-account policy's (23, 20) and the other order
+/// permission codes. None is retryable or leaves an outcome unknown.
+#[tokio::test(flavor = "multi_thread")]
+async fn order_permission_refusals_match_across_transports() {
+    let message = "The API key's policy does not allow spot trading.";
+    for (name, number) in [
+        ("POLICY_MARKET_DENY", 20),
+        ("POLICY_SPOT_TRADE_DENY", 23),
+        ("API_KEY_POLICY_REQUIRED", 27),
+        ("API_KEY_MARKET_DENY", 29),
+        ("API_KEY_SPOT_TRADE_DENY", 78),
+        ("POLICY_SPOT_READ_DENY", 71),
+        ("SUBACCOUNT_READ_FORBIDDEN", 70),
+        ("QUICKSWAP_NOT_PERMITTED", 203),
+    ] {
+        let code =
+            <OrderErrorCode as buffa::Enumeration>::from_proto_name(&format!("ERROR_CODE_{name}"))
+                .unwrap_or_else(|| panic!("{name}"));
+        assert_eq!(buffa::Enumeration::to_i32(&code), number, "{name}");
+        let raw = ErrorDetail {
+            code: code.into(),
+            ..Default::default()
+        }
+        .encode_to_bytes();
+        let connect = json!({
+            "code": "permission_denied",
+            "message": message,
+            "details": [{
+                "type": "orders.v1.ErrorDetail",
+                "value": base64::engine::general_purpose::STANDARD.encode(&raw),
+            }],
+        })
+        .to_string();
+        let rest = json!({"code": name, "detail": message}).to_string();
+        for op in OPS {
+            let mut seen = Vec::new();
+            for (transport, content_type, body) in
+                [("connect", JSON, &connect), ("rest", PROBLEM, &rest)]
+            {
+                let case = format!("{name}/{op}/{transport}");
+                let (err, calls) = call(op, 403, content_type, body, None).await;
+                let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+                assert_eq!(calls, 1, "{case}");
+                assert_flags(&err, false, false, &case);
+                match err {
+                    Error::PermissionDenied {
+                        message,
+                        status,
+                        code,
+                        context,
+                        endpoint,
+                        ..
+                    } => seen.push((code, status, message, context, endpoint)),
+                    other => panic!("{case}: expected PermissionDenied, got {other:?}"),
+                }
+            }
+            let path = if op == "read" { READ_PATH } else { WRITE_PATH };
+            assert_eq!(
+                seen[0],
+                (
+                    name.to_owned(),
+                    403,
+                    message.to_owned(),
+                    path.trim_start_matches('/').to_owned(),
+                    path.to_owned()
+                ),
+                "{name}/{op}"
+            );
+            assert_eq!(seen[0], seen[1], "{name}/{op}: transports differ");
+        }
+    }
+}
+
+/// A trigger change refused because the trigger has already ended is
+/// reported as ended over either transport; a trigger that is not found is
+/// not, since that code also means a wrong ID.
+#[tokio::test(flavor = "multi_thread")]
+async fn trigger_already_ended_over_both_transports() {
+    for (name, status, connect_code, ended) in [
+        ("TRIGGER_STATUS_INVALID", 400, "failed_precondition", true),
+        ("TRIGGER_NOT_FOUND", 404, "not_found", false),
+    ] {
+        let code =
+            <OrderErrorCode as buffa::Enumeration>::from_proto_name(&format!("ERROR_CODE_{name}"))
+                .unwrap();
+        let raw = ErrorDetail {
+            code: code.into(),
+            ..Default::default()
+        }
+        .encode_to_bytes();
+        let mut connect: Value = serde_json::from_str(&detail_body(
+            "orders.v1.ErrorDetail",
+            &raw,
+            Some(connect_code),
+        ))
+        .unwrap();
+        connect["message"] = json!("Trigger has already ended");
+        let rest = json!({"code": name, "detail": "Trigger has already ended"}).to_string();
+        for (transport, content_type, body) in [
+            ("connect", JSON, connect.to_string()),
+            ("rest", PROBLEM, rest),
+        ] {
+            let case = format!("{name}/{transport}");
+            let (err, calls) = call("write", status, content_type, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert_eq!(calls, 1, "{case}");
+            assert_eq!(err.is_trigger_already_ended(), ended, "{case}: {err:?}");
+            assert!(
+                matches!(&err, Error::Api { code: found, .. } if *found == format!("ERROR_CODE_{name}")),
+                "{case}: {err:?}"
+            );
+            assert_flags(&err, false, false, &case);
+        }
+    }
+}
