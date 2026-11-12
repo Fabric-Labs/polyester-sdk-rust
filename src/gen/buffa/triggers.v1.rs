@@ -431,7 +431,20 @@ pub enum TriggerEventType {
     /// says why; the next fire takes the next child_seq.
     /// With TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED, child_seq names the
     /// expired child order instead, which was placed and canceled by self-trade
-    /// prevention. A refusal that ends the trigger is EVENT_FAILED instead.
+    /// prevention. A ladder level the order book rejected when it arrived (for
+    /// example TRIGGER_FAILURE_REASON_POST_ONLY_CROSS) is reported the same way
+    /// while the ladder keeps working its other levels: child_seq names that
+    /// level, whose EVENT_FIRED came first with its child order, now rejected
+    /// for that reason, and fire_price_ticks is the level's price. A rejected
+    /// level that was the ladder's last open level ends the ladder instead and
+    /// has no EVENT_FIRE_REFUSED, whatever the end: EVENT_FAILED, naming the
+    /// first rejected level, when every level was rejected; EVENT_CANCELED with
+    /// TRIGGER_CANCEL_REASON_USER_REQUEST when no level filled and the user
+    /// canceled a level (directly, by canceling all orders, or by the dead-man
+    /// switch); otherwise STATUS_COMPLETED with no event, whether a level filled
+    /// or the other levels ended unfilled for another reason, such as expiry or
+    /// self-trade prevention. Read each level's own child order for its
+    /// rejection.
     EVENT_FIRE_REFUSED = 7i32,
 }
 impl TriggerEventType {
@@ -1014,7 +1027,7 @@ pub enum TriggerFailureReason {
     /// The child order sizing fields did not form a valid sizing request.
     TRIGGER_FAILURE_REASON_INVALID_SIZING = 23i32,
     /// The maximum quote debit could not fund the minimum valid child order.
-    TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL = 24i32,
+    TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL = 24i32,
     /// The applicable fee rate exceeded the maximum accepted by the trigger.
     TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED = 25i32,
     /// The child order's time in force was not accepted.
@@ -1255,9 +1268,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_INVALID_SIZING`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const InvalidSizing: Self = Self::TRIGGER_FAILURE_REASON_INVALID_SIZING;
-    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const MaxQuoteDebitTooSmall: Self = Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL;
+    pub const QuoteSizeTooSmall: Self = Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const FeeCeilingExceeded: Self = Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED;
@@ -1660,7 +1673,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             24i32 => {
                 ::core::option::Option::Some(
-                    Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+                    Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL,
                 )
             }
             25i32 => {
@@ -2085,8 +2098,8 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_INVALID_SIZING => {
                 "TRIGGER_FAILURE_REASON_INVALID_SIZING"
             }
-            Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL => {
-                "TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL"
+            Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL => {
+                "TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL"
             }
             Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED => {
                 "TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED"
@@ -2400,9 +2413,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             "TRIGGER_FAILURE_REASON_INVALID_SIZING" => {
                 ::core::option::Option::Some(Self::TRIGGER_FAILURE_REASON_INVALID_SIZING)
             }
-            "TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL" => {
+            "TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL" => {
                 ::core::option::Option::Some(
-                    Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+                    Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL,
                 )
             }
             "TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED" => {
@@ -2780,7 +2793,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_MIN_QUANTITY,
             Self::TRIGGER_FAILURE_REASON_STEP_SIZE,
             Self::TRIGGER_FAILURE_REASON_INVALID_SIZING,
-            Self::TRIGGER_FAILURE_REASON_MAX_QUOTE_DEBIT_TOO_SMALL,
+            Self::TRIGGER_FAILURE_REASON_QUOTE_SIZE_TOO_SMALL,
             Self::TRIGGER_FAILURE_REASON_FEE_CEILING_EXCEEDED,
             Self::TRIGGER_FAILURE_REASON_INVALID_TIME_IN_FORCE,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_PRICE_INVALID,
@@ -7111,6 +7124,1385 @@ pub const __CREATE_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     is_wkt: false,
 };
 /// =============================================================================
+/// OCO (one-cancels-the-other)
+/// =============================================================================
+///
+/// OcoLeg configures one leg of an OCO: the price that triggers it and the
+/// order it then places for the OCO's whole remaining quantity.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OcoLeg {
+    /// Trigger price in quote units scaled by 1e9.
+    ///
+    /// Field 1: `trigger_price_ticks`
+    #[serde(
+        rename = "triggerPriceTicks",
+        alias = "trigger_price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub trigger_price_ticks: i64,
+    /// The order the leg places when its trigger price is reached: a market
+    /// order (IOC) or a resting limit order (GTC).
+    ///
+    /// Field 2: `child`
+    #[serde(
+        rename = "child",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub child: ::buffa::MessageField<super::super::orders::v1::RiskExecution>,
+    /// Price the leg watches. Unspecified or LAST_PRICE watches the last traded
+    /// price. INDEX_PRICE watches the market's index price; on a market without
+    /// an index price the OCO is rejected with
+    /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE on both legs. MARK_PRICE
+    /// is not supported.
+    ///
+    /// Field 3: `trigger_price_source`
+    #[serde(
+        rename = "triggerPriceSource",
+        alias = "trigger_price_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub trigger_price_source: ::buffa::EnumValue<
+        super::super::orders::v1::TriggerPriceSource,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OcoLeg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OcoLeg")
+            .field("trigger_price_ticks", &self.trigger_price_ticks)
+            .field("child", &self.child)
+            .field("trigger_price_source", &self.trigger_price_source)
+            .finish()
+    }
+}
+impl OcoLeg {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoLeg";
+}
+::buffa::impl_default_instance!(OcoLeg);
+impl ::buffa::MessageName for OcoLeg {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "OcoLeg";
+    const FULL_NAME: &'static str = "triggers.v1.OcoLeg";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoLeg";
+}
+impl ::buffa::Message for OcoLeg {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.trigger_price_ticks != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.trigger_price_ticks) as u32;
+        }
+        if self.child.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.child.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.trigger_price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
+        }
+        if self.child.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.child.write_to(__cache, buf);
+        }
+        {
+            let val = self.trigger_price_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.child.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.trigger_price_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.trigger_price_ticks = 0i64;
+        self.child = ::buffa::MessageField::none();
+        self.trigger_price_source = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OcoLeg {
+    const PROTO_FQN: &'static str = "triggers.v1.OcoLeg";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OcoLeg {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __OCO_LEG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.OcoLeg",
+    to_json: ::buffa::type_registry::any_to_json::<OcoLeg>,
+    from_json: ::buffa::type_registry::any_from_json::<OcoLeg>,
+    is_wkt: false,
+};
+/// OcoIntent configures an OCO over a quantity the account already holds: a
+/// take-profit and a stop-loss that both trade `side` for `qty_scaled`. The
+/// quantity is reserved once, when the OCO is created, and both legs share it,
+/// so it can be sold or bought only once. A SELL OCO protects a held base
+/// position: its take-profit is above the last price and its stop-loss below
+/// it. A BUY OCO buys with held quote: its take-profit is below the last price
+/// and its stop-loss above it.
+///
+/// The first leg to reach its trigger price places its order for the OCO's
+/// remaining quantity. If that order fills only partly, the other leg keeps
+/// protecting the rest: when its own trigger price is reached it cancels the
+/// working order and places its own for what is left. When the whole quantity
+/// has been traded, the leg whose order traded last ends COMPLETED and the
+/// other ends CANCELED with reason OCO. Cancelling either leg, or the OCO with
+/// CancelOco, cancels both.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct OcoIntent {
+    /// Stable numeric pair ID from GetSpotConfig.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// The side both legs trade: SELL protects a held base position, BUY spends
+    /// held quote.
+    ///
+    /// Field 2: `side`
+    #[serde(
+        rename = "side",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
+    /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
+    /// multiple of the pair's quantity step.
+    ///
+    /// Field 3: `qty_scaled`
+    #[serde(
+        rename = "qtyScaled",
+        alias = "qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub qty_scaled: i64,
+    /// Self-trade prevention mode of the legs' orders against orders of the same
+    /// root account, including all its subaccounts. Defaults to EXPIRE_MAKER;
+    /// DECREMENT is not supported.
+    ///
+    /// Field 4: `self_trade_prevention_mode`
+    #[serde(
+        rename = "selfTradePreventionMode",
+        alias = "self_trade_prevention_mode",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub self_trade_prevention_mode: ::buffa::EnumValue<
+        super::super::orders::v1::SelfTradePreventionMode,
+    >,
+    /// Client-provided OCO ID for idempotency, unique per sub-account and pair
+    /// among OCOs. While the OCO is active and for 60 seconds after both legs
+    /// ended, retrying the create with the identical intent returns the same
+    /// OCO, and a different intent with the same ID returns
+    /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. At most 36 bytes in UTF-8.
+    ///
+    /// Field 5: `client_list_id`
+    #[serde(
+        rename = "clientListId",
+        alias = "client_list_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_list_id: ::buffa::alloc::string::String,
+    /// The take-profit leg. Its trigger price must be above the stop-loss's for
+    /// a SELL OCO and below it for a BUY OCO.
+    ///
+    /// Field 6: `take_profit`
+    #[serde(
+        rename = "takeProfit",
+        alias = "take_profit",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub take_profit: ::buffa::MessageField<OcoLeg>,
+    /// The stop-loss leg.
+    ///
+    /// Field 7: `stop_loss`
+    #[serde(
+        rename = "stopLoss",
+        alias = "stop_loss",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub stop_loss: ::buffa::MessageField<OcoLeg>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for OcoIntent {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("OcoIntent")
+            .field("symbol_id", &self.symbol_id)
+            .field("side", &self.side)
+            .field("qty_scaled", &self.qty_scaled)
+            .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
+            .field("client_list_id", &self.client_list_id)
+            .field("take_profit", &self.take_profit)
+            .field("stop_loss", &self.stop_loss)
+            .finish()
+    }
+}
+impl OcoIntent {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoIntent";
+}
+::buffa::impl_default_instance!(OcoIntent);
+impl ::buffa::MessageName for OcoIntent {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "OcoIntent";
+    const FULL_NAME: &'static str = "triggers.v1.OcoIntent";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoIntent";
+}
+impl ::buffa::Message for OcoIntent {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.qty_scaled != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+        }
+        {
+            let val = self.self_trade_prevention_mode.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.client_list_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.client_list_id) as u32;
+        }
+        if self.take_profit.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.take_profit.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.stop_loss.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.stop_loss.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        {
+            let val = self.side.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+        }
+        {
+            let val = self.self_trade_prevention_mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if !self.client_list_id.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.client_list_id, buf);
+        }
+        if self.take_profit.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.take_profit.write_to(__cache, buf);
+        }
+        if self.stop_loss.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.stop_loss.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.side = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.self_trade_prevention_mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_list_id, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.take_profit.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.stop_loss.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.side = ::buffa::EnumValue::from(0);
+        self.qty_scaled = 0i64;
+        self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
+        self.client_list_id.clear();
+        self.take_profit = ::buffa::MessageField::none();
+        self.stop_loss = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for OcoIntent {
+    const PROTO_FQN: &'static str = "triggers.v1.OcoIntent";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for OcoIntent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __OCO_INTENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.OcoIntent",
+    to_json: ::buffa::type_registry::any_to_json::<OcoIntent>,
+    from_json: ::buffa::type_registry::any_from_json::<OcoIntent>,
+    is_wkt: false,
+};
+/// CreateOcoRequest submits one OCO for admission. An OCO whose trigger price
+/// the last price has already reached is rejected with
+/// TRIGGER_WOULD_TRIGGER_IMMEDIATELY on both legs, after the create is
+/// acknowledged: read the legs for their status. A create sent but not
+/// confirmed in time fails with TRIGGER_CREATE_OUTCOME_UNKNOWN: the OCO may
+/// have been created, so list the triggers with its client_list_id
+/// (ListTriggers client_list_id) before retrying.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOcoRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// OCO to admit.
+    ///
+    /// Field 2: `oco`
+    #[serde(
+        rename = "oco",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub oco: ::buffa::MessageField<OcoIntent>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOcoRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOcoRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("oco", &self.oco)
+            .finish()
+    }
+}
+impl CreateOcoRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoRequest";
+}
+impl CreateOcoRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(CreateOcoRequest);
+impl ::buffa::MessageName for CreateOcoRequest {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "CreateOcoRequest";
+    const FULL_NAME: &'static str = "triggers.v1.CreateOcoRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoRequest";
+}
+impl ::buffa::Message for CreateOcoRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.oco.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.oco.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.oco.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.oco.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.oco.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.oco = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOcoRequest {
+    const PROTO_FQN: &'static str = "triggers.v1.CreateOcoRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOcoRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_OCO_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.CreateOcoRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOcoRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateOcoRequest>,
+    is_wkt: false,
+};
+/// CreateOcoResponse acknowledges the OCO's creation: its quantity is reserved
+/// and both legs are created. Their status and orders are visible through the
+/// trigger reads and events.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateOcoResponse {
+    /// Assigned OCO ID, which both legs carry as order_list_id.
+    ///
+    /// Field 1: `order_list_id`
+    #[serde(
+        rename = "orderListId",
+        alias = "order_list_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub order_list_id: u64,
+    /// Echoed client OCO ID.
+    ///
+    /// Field 2: `client_list_id`
+    #[serde(
+        rename = "clientListId",
+        alias = "client_list_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_list_id: ::buffa::alloc::string::String,
+    /// The take-profit leg's trigger ID.
+    ///
+    /// Field 3: `take_profit_trigger_id`
+    #[serde(
+        rename = "takeProfitTriggerId",
+        alias = "take_profit_trigger_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub take_profit_trigger_id: u64,
+    /// The stop-loss leg's trigger ID.
+    ///
+    /// Field 4: `stop_loss_trigger_id`
+    #[serde(
+        rename = "stopLossTriggerId",
+        alias = "stop_loss_trigger_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub stop_loss_trigger_id: u64,
+    /// Time creation admission completed.
+    ///
+    /// Field 5: `accepted_at`
+    #[serde(
+        rename = "acceptedAt",
+        alias = "accepted_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub accepted_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Admission completion time in nanoseconds since epoch (UTC).
+    ///
+    /// Field 6: `accepted_at_ts_ns`
+    #[serde(
+        rename = "acceptedAtTsNs",
+        alias = "accepted_at_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub accepted_at_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateOcoResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateOcoResponse")
+            .field("order_list_id", &self.order_list_id)
+            .field("client_list_id", &self.client_list_id)
+            .field("take_profit_trigger_id", &self.take_profit_trigger_id)
+            .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
+            .field("accepted_at", &self.accepted_at)
+            .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
+            .finish()
+    }
+}
+impl CreateOcoResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoResponse";
+}
+::buffa::impl_default_instance!(CreateOcoResponse);
+impl ::buffa::MessageName for CreateOcoResponse {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "CreateOcoResponse";
+    const FULL_NAME: &'static str = "triggers.v1.CreateOcoResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoResponse";
+}
+impl ::buffa::Message for CreateOcoResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.order_list_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.client_list_id.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.client_list_id) as u32;
+        }
+        if self.take_profit_trigger_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.stop_loss_trigger_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.accepted_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.accepted_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.order_list_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+        }
+        if !self.client_list_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.client_list_id, buf);
+        }
+        if self.take_profit_trigger_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.take_profit_trigger_id, buf);
+        }
+        if self.stop_loss_trigger_id != 0u64 {
+            ::buffa::types::put_fixed64_field(4u32, self.stop_loss_trigger_id, buf);
+        }
+        if self.accepted_at.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.accepted_at.write_to(__cache, buf);
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.accepted_at_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_list_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_list_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.take_profit_trigger_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.stop_loss_trigger_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.accepted_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.order_list_id = 0u64;
+        self.client_list_id.clear();
+        self.take_profit_trigger_id = 0u64;
+        self.stop_loss_trigger_id = 0u64;
+        self.accepted_at = ::buffa::MessageField::none();
+        self.accepted_at_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateOcoResponse {
+    const PROTO_FQN: &'static str = "triggers.v1.CreateOcoResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateOcoResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_OCO_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.CreateOcoResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateOcoResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateOcoResponse>,
+    is_wkt: false,
+};
+/// CancelOcoRequest cancels both legs of an OCO.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelOcoRequest {
+    /// OCO ID from CreateOco. An ID that is not an OCO of the account, such as
+    /// a trigger ID or a leg's ID, is refused TRIGGER_NOT_FOUND and nothing is
+    /// canceled.
+    ///
+    /// Field 1: `order_list_id`
+    #[serde(
+        rename = "orderListId",
+        alias = "order_list_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub order_list_id: u64,
+    /// Optional public subaccount ID for authorization. When omitted,
+    /// subaccount-scoped API keys use their bound subaccount; other callers use
+    /// their authenticated root account.
+    ///
+    /// Field 2: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelOcoRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelOcoRequest")
+            .field("order_list_id", &self.order_list_id)
+            .field("subaccount_id", &self.subaccount_id)
+            .finish()
+    }
+}
+impl CancelOcoRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoRequest";
+}
+impl CancelOcoRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(CancelOcoRequest);
+impl ::buffa::MessageName for CancelOcoRequest {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "CancelOcoRequest";
+    const FULL_NAME: &'static str = "triggers.v1.CancelOcoRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoRequest";
+}
+impl ::buffa::Message for CancelOcoRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.order_list_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.order_list_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+        }
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_list_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.order_list_id = 0u64;
+        self.subaccount_id = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelOcoRequest {
+    const PROTO_FQN: &'static str = "triggers.v1.CancelOcoRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelOcoRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_OCO_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.CancelOcoRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CancelOcoRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelOcoRequest>,
+    is_wkt: false,
+};
+/// CancelOcoResponse confirms the cancellation: both legs end CANCELED, and
+/// the OCO's reserved quantity is released.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelOcoResponse {
+    /// OCO ID that was canceled.
+    ///
+    /// Field 1: `order_list_id`
+    #[serde(
+        rename = "orderListId",
+        alias = "order_list_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub order_list_id: u64,
+    /// Both legs' status after the cancel, which is always canceled.
+    ///
+    /// Field 2: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<TriggerStatus>,
+    /// Server timestamp.
+    ///
+    /// Field 3: `ts`
+    #[serde(
+        rename = "ts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Server timestamp in nanoseconds since epoch (UTC).
+    ///
+    /// Field 4: `ts_ns`
+    #[serde(
+        rename = "tsNs",
+        alias = "ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelOcoResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelOcoResponse")
+            .field("order_list_id", &self.order_list_id)
+            .field("status", &self.status)
+            .field("ts", &self.ts)
+            .field("ts_ns", &self.ts_ns)
+            .finish()
+    }
+}
+impl CancelOcoResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoResponse";
+}
+::buffa::impl_default_instance!(CancelOcoResponse);
+impl ::buffa::MessageName for CancelOcoResponse {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "CancelOcoResponse";
+    const FULL_NAME: &'static str = "triggers.v1.CancelOcoResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoResponse";
+}
+impl ::buffa::Message for CancelOcoResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.order_list_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.ts.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.ts.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.order_list_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.ts.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.ts.write_to(__cache, buf);
+        }
+        if self.ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_list_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.ts.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.order_list_id = 0u64;
+        self.status = ::buffa::EnumValue::from(0);
+        self.ts = ::buffa::MessageField::none();
+        self.ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelOcoResponse {
+    const PROTO_FQN: &'static str = "triggers.v1.CancelOcoResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelOcoResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_OCO_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.CancelOcoResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CancelOcoResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelOcoResponse>,
+    is_wkt: false,
+};
+/// =============================================================================
 /// Get Trigger
 /// =============================================================================
 ///
@@ -7474,6 +8866,28 @@ pub struct ListTriggersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub parent_order_id: ::core::option::Option<u64>,
+    /// Optional filter by OCO: the take-profit and the stop-loss of the OCO with
+    /// this order_list_id.
+    ///
+    /// Field 6: `order_list_id`
+    #[serde(
+        rename = "orderListId",
+        alias = "order_list_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub order_list_id: ::core::option::Option<u64>,
+    /// Optional filter by OCO client ID: the take-profit and the stop-loss of
+    /// the OCO created with this client_list_id, 1 to 36 bytes in UTF-8. Use it
+    /// to find an OCO whose create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
+    ///
+    /// Field 7: `client_list_id`
+    #[serde(
+        rename = "clientListId",
+        alias = "client_list_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub client_list_id: ::core::option::Option<::buffa::alloc::string::String>,
     /// Maximum number of triggers to return. Defaults to 100 when omitted;
     /// maximum is 1000.
     ///
@@ -7508,6 +8922,8 @@ impl ::core::fmt::Debug for ListTriggersRequest {
             .field("status", &self.status)
             .field("trigger_type", &self.trigger_type)
             .field("parent_order_id", &self.parent_order_id)
+            .field("order_list_id", &self.order_list_id)
+            .field("client_list_id", &self.client_list_id)
             .field("limit", &self.limit)
             .field("page_token", &self.page_token)
             .finish()
@@ -7533,6 +8949,23 @@ impl ListTriggersRequest {
     ///Sets [`Self::parent_order_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_parent_order_id(mut self, value: u64) -> Self {
         self.parent_order_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::order_list_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_order_list_id(mut self, value: u64) -> Self {
+        self.order_list_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::client_list_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_client_list_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.client_list_id = Some(value.into());
         self
     }
 }
@@ -7578,6 +9011,12 @@ impl ::buffa::Message for ListTriggersRequest {
         if self.parent_order_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        if self.order_list_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if let Some(ref v) = self.client_list_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         if self.limit != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
         }
@@ -7619,6 +9058,12 @@ impl ::buffa::Message for ListTriggersRequest {
         }
         if let Some(v) = self.parent_order_id {
             ::buffa::types::put_fixed64_field(5u32, v, buf);
+        }
+        if let Some(v) = self.order_list_id {
+            ::buffa::types::put_fixed64_field(6u32, v, buf);
+        }
+        if let Some(ref v) = self.client_list_id {
+            ::buffa::types::put_string_field(7u32, v, buf);
         }
         if self.limit != 0u32 {
             ::buffa::types::put_uint32_field(10u32, self.limit, buf);
@@ -7711,6 +9156,27 @@ impl ::buffa::Message for ListTriggersRequest {
                     ::buffa::types::decode_fixed64(buf)?,
                 );
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_list_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .client_list_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             10u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -7738,6 +9204,8 @@ impl ::buffa::Message for ListTriggersRequest {
         self.status.clear();
         self.trigger_type = ::buffa::EnumValue::from(0);
         self.parent_order_id = ::core::option::Option::None;
+        self.order_list_id = ::core::option::Option::None;
+        self.client_list_id = ::core::option::Option::None;
         self.limit = 0u32;
         self.page_token.clear();
         self.__buffa_unknown_fields.clear();
@@ -9639,12 +11107,867 @@ pub const __CANCEL_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     is_wkt: false,
 };
 /// =============================================================================
+/// Batch Cancel Triggers
+/// =============================================================================
+///
+/// BatchCancelTriggersRequest cancels up to 50 of the account's triggers in one
+/// request. Each trigger is canceled as CancelTrigger cancels it and answered
+/// on its own, in request order; one item's rejection does not stop the others.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCancelTriggersRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account. An explicit zero is rejected with ERROR_CODE_INVALID_ARGUMENT
+    /// and cancels nothing.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Idempotency key (required). Retrying with the same request_id and the same
+    /// trigger_ids within 2 minutes returns the original results and cancels
+    /// nothing again. The same request_id with other trigger_ids rejects every
+    /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+    ///
+    /// Field 2: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Triggers to cancel: 1 to 50 distinct trigger IDs. Results follow this
+    /// order. Cancel more by sending further requests of up to 50.
+    ///
+    /// Field 3: `trigger_ids`
+    #[serde(
+        rename = "triggerIds",
+        alias = "trigger_ids",
+        with = "::buffa::json_helpers::proto_seq",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub trigger_ids: ::buffa::alloc::vec::Vec<u64>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCancelTriggersRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCancelTriggersRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("request_id", &self.request_id)
+            .field("trigger_ids", &self.trigger_ids)
+            .finish()
+    }
+}
+impl BatchCancelTriggersRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersRequest";
+}
+impl BatchCancelTriggersRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(BatchCancelTriggersRequest);
+impl ::buffa::MessageName for BatchCancelTriggersRequest {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "BatchCancelTriggersRequest";
+    const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersRequest";
+}
+impl ::buffa::Message for BatchCancelTriggersRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        if !self.trigger_ids.is_empty() {
+            let payload: u32 = self.trigger_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+        }
+        if !self.trigger_ids.is_empty() {
+            let payload: u32 = self.trigger_ids.len() as u32
+                * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+            ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+            for &v in &self.trigger_ids {
+                ::buffa::types::encode_fixed64(v, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            3u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.trigger_ids.reserve(len / 8usize);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.trigger_ids
+                            .push(::buffa::types::decode_fixed64(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64 {
+                    self.trigger_ids.push(::buffa::types::decode_fixed64(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.request_id.clear();
+        self.trigger_ids.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCancelTriggersRequest {
+    const PROTO_FQN: &'static str = "triggers.v1.BatchCancelTriggersRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCancelTriggersRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CANCEL_TRIGGERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.BatchCancelTriggersRequest",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCancelTriggersRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchCancelTriggersRequest>,
+    is_wkt: false,
+};
+/// BatchCancelTriggersResultItem is the outcome of one requested trigger cancel.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCancelTriggersResultItem {
+    /// Per-item cancellation outcome.
+    ///
+    /// Field 1: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<batch_cancel_triggers_result_item::Status>,
+    /// The requested trigger ID, echoed.
+    ///
+    /// Field 2: `trigger_id`
+    #[serde(
+        rename = "triggerId",
+        alias = "trigger_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub trigger_id: u64,
+    /// Error code when rejected, empty when accepted. TRIGGER_NOT_FOUND: no
+    /// trigger of the account has this ID. TRIGGER_STATUS_INVALID: the trigger
+    /// has already ended; treat it as done. RATE_LIMIT_EXCEEDED,
+    /// PAIR_BACKLOGGED and TRIGGER_CONTROL_IN_PROGRESS: retry the item in a new
+    /// request with a new request_id. Other codes are those CancelTrigger
+    /// returns.
+    ///
+    /// Field 3: `code`
+    #[serde(
+        rename = "code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub code: ::buffa::alloc::string::String,
+    /// Structured rejection details, with rate-limit guidance when the item was
+    /// rate limited.
+    ///
+    /// Field 4: `error`
+    #[serde(
+        rename = "error",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub error: ::buffa::MessageField<super::super::orders::v1::ErrorDetail>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCancelTriggersResultItem {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCancelTriggersResultItem")
+            .field("status", &self.status)
+            .field("trigger_id", &self.trigger_id)
+            .field("code", &self.code)
+            .field("error", &self.error)
+            .finish()
+    }
+}
+impl BatchCancelTriggersResultItem {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResultItem";
+}
+::buffa::impl_default_instance!(BatchCancelTriggersResultItem);
+impl ::buffa::MessageName for BatchCancelTriggersResultItem {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "BatchCancelTriggersResultItem";
+    const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersResultItem";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResultItem";
+}
+impl ::buffa::Message for BatchCancelTriggersResultItem {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.trigger_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+        }
+        if self.error.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.error.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.trigger_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.trigger_id, buf);
+        }
+        if !self.code.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.code, buf);
+        }
+        if self.error.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.error.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.trigger_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.code, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.error.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.status = ::buffa::EnumValue::from(0);
+        self.trigger_id = 0u64;
+        self.code.clear();
+        self.error = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCancelTriggersResultItem {
+    const PROTO_FQN: &'static str = "triggers.v1.BatchCancelTriggersResultItem";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCancelTriggersResultItem {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CANCEL_TRIGGERS_RESULT_ITEM_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.BatchCancelTriggersResultItem",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCancelTriggersResultItem>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchCancelTriggersResultItem>,
+    is_wkt: false,
+};
+pub mod batch_cancel_triggers_result_item {
+    #[allow(unused_imports)]
+    use super::*;
+    /// Per-item cancellation outcome.
+    #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+    #[repr(i32)]
+    pub enum Status {
+        /// Batch trigger cancellation outcome was not provided.
+        STATUS_UNSPECIFIED = 0i32,
+        /// The cancellation was accepted; the trigger's events report when it is
+        /// canceled.
+        ACCEPTED = 1i32,
+        /// The cancellation was rejected; code says why.
+        REJECTED = 2i32,
+    }
+    impl Status {
+        ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+        ///Idiomatic alias for [`Self::ACCEPTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Accepted: Self = Self::ACCEPTED;
+        ///Idiomatic alias for [`Self::REJECTED`]; `Debug` prints the variant name.
+        #[allow(non_upper_case_globals)]
+        pub const Rejected: Self = Self::REJECTED;
+    }
+    impl ::core::default::Default for Status {
+        fn default() -> Self {
+            Self::STATUS_UNSPECIFIED
+        }
+    }
+    impl ::serde::Serialize for Status {
+        fn serialize<S: ::serde::Serializer>(
+            &self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            s.serialize_str(::buffa::Enumeration::proto_name(self))
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Status {
+        fn deserialize<D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            struct _V;
+            impl ::serde::de::Visitor<'_> for _V {
+                type Value = Status;
+                fn expecting(
+                    &self,
+                    f: &mut ::core::fmt::Formatter<'_>,
+                ) -> ::core::fmt::Result {
+                    f.write_str(
+                        concat!("a string, integer, or null for ", stringify!(Status)),
+                    )
+                }
+                fn visit_str<E: ::serde::de::Error>(
+                    self,
+                    v: &str,
+                ) -> ::core::result::Result<Status, E> {
+                    <Status as ::buffa::Enumeration>::from_proto_name(v)
+                        .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+                }
+                fn visit_i64<E: ::serde::de::Error>(
+                    self,
+                    v: i64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_u64<E: ::serde::de::Error>(
+                    self,
+                    v: u64,
+                ) -> ::core::result::Result<Status, E> {
+                    let v32 = i32::try_from(v)
+                        .map_err(|_| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                            )
+                        })?;
+                    <Status as ::buffa::Enumeration>::from_i32(v32)
+                        .ok_or_else(|| {
+                            ::serde::de::Error::custom(
+                                ::buffa::alloc::format!("unknown enum value {v32}"),
+                            )
+                        })
+                }
+                fn visit_unit<E: ::serde::de::Error>(
+                    self,
+                ) -> ::core::result::Result<Status, E> {
+                    ::core::result::Result::Ok(::core::default::Default::default())
+                }
+            }
+            d.deserialize_any(_V)
+        }
+    }
+    impl ::buffa::json_helpers::ProtoElemJson for Status {
+        fn serialize_proto_json<S: ::serde::Serializer>(
+            v: &Self,
+            s: S,
+        ) -> ::core::result::Result<S::Ok, S::Error> {
+            ::serde::Serialize::serialize(v, s)
+        }
+        fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+            d: D,
+        ) -> ::core::result::Result<Self, D::Error> {
+            <Self as ::serde::Deserialize>::deserialize(d)
+        }
+    }
+    impl ::buffa::Enumeration for Status {
+        fn from_i32(value: i32) -> ::core::option::Option<Self> {
+            match value {
+                0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+                1i32 => ::core::option::Option::Some(Self::ACCEPTED),
+                2i32 => ::core::option::Option::Some(Self::REJECTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn to_i32(&self) -> i32 {
+            *self as i32
+        }
+        fn proto_name(&self) -> &'static str {
+            match self {
+                Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+                Self::ACCEPTED => "ACCEPTED",
+                Self::REJECTED => "REJECTED",
+            }
+        }
+        fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+            match name {
+                "STATUS_UNSPECIFIED" => {
+                    ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+                }
+                "ACCEPTED" => ::core::option::Option::Some(Self::ACCEPTED),
+                "REJECTED" => ::core::option::Option::Some(Self::REJECTED),
+                _ => ::core::option::Option::None,
+            }
+        }
+        fn values() -> &'static [Self] {
+            &[Self::STATUS_UNSPECIFIED, Self::ACCEPTED, Self::REJECTED]
+        }
+    }
+}
+/// BatchCancelTriggersResponse returns one result per requested trigger.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCancelTriggersResponse {
+    /// Per-item results, in the same order as trigger_ids.
+    ///
+    /// Field 1: `results`
+    #[serde(
+        rename = "results",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub results: ::buffa::alloc::vec::Vec<BatchCancelTriggersResultItem>,
+    /// Number of accepted cancellations.
+    ///
+    /// Field 2: `accepted_count`
+    #[serde(
+        rename = "acceptedCount",
+        alias = "accepted_count",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub accepted_count: u32,
+    /// Number of rejected cancellations.
+    ///
+    /// Field 3: `rejected_count`
+    #[serde(
+        rename = "rejectedCount",
+        alias = "rejected_count",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub rejected_count: u32,
+    /// Server timestamp.
+    ///
+    /// Field 4: `ts`
+    #[serde(
+        rename = "ts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub ts: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Server timestamp in nanoseconds since epoch (UTC).
+    ///
+    /// Field 5: `ts_ns`
+    #[serde(
+        rename = "tsNs",
+        alias = "ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCancelTriggersResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCancelTriggersResponse")
+            .field("results", &self.results)
+            .field("accepted_count", &self.accepted_count)
+            .field("rejected_count", &self.rejected_count)
+            .field("ts", &self.ts)
+            .field("ts_ns", &self.ts_ns)
+            .finish()
+    }
+}
+impl BatchCancelTriggersResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResponse";
+}
+::buffa::impl_default_instance!(BatchCancelTriggersResponse);
+impl ::buffa::MessageName for BatchCancelTriggersResponse {
+    const PACKAGE: &'static str = "triggers.v1";
+    const NAME: &'static str = "BatchCancelTriggersResponse";
+    const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResponse";
+}
+impl ::buffa::Message for BatchCancelTriggersResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.results {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.accepted_count != 0u32 {
+            size
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.accepted_count) as u32;
+        }
+        if self.rejected_count != 0u32 {
+            size
+                += 1u32 + ::buffa::types::uint32_encoded_len(self.rejected_count) as u32;
+        }
+        if self.ts.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.ts.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.results {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.accepted_count != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.accepted_count, buf);
+        }
+        if self.rejected_count != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.rejected_count, buf);
+        }
+        if self.ts.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.ts.write_to(__cache, buf);
+        }
+        if self.ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.results.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_count = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.rejected_count = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.ts.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.results.clear();
+        self.accepted_count = 0u32;
+        self.rejected_count = 0u32;
+        self.ts = ::buffa::MessageField::none();
+        self.ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCancelTriggersResponse {
+    const PROTO_FQN: &'static str = "triggers.v1.BatchCancelTriggersResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCancelTriggersResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CANCEL_TRIGGERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/triggers.v1.BatchCancelTriggersResponse",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCancelTriggersResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<BatchCancelTriggersResponse>,
+    is_wkt: false,
+};
+/// =============================================================================
 /// Modify / Pause / Resume Trigger
 /// =============================================================================
 ///
 /// ModifyTriggerRequest applies a limited patch to an existing trigger.
-/// Supported for stop-loss, take-profit and trailing-stop triggers; ladder and
-/// TWAP triggers support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+/// Supported for stop-loss, take-profit and trailing-stop triggers; a running
+/// ladder or TWAP supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A
+/// trigger of any type that has ended answers TRIGGER_STATUS_INVALID for at
+/// least 60 s after it ends; after that it may answer TRIGGER_NOT_FOUND.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -10583,8 +12906,10 @@ pub const __MODIFY_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     is_wkt: false,
 };
 /// PauseTriggerRequest pauses an active trigger by ID. Supported for
-/// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
-/// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+/// stop-loss, take-profit and trailing-stop triggers; a running ladder or TWAP
+/// supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A trigger of any
+/// type that has ended answers TRIGGER_STATUS_INVALID for at least 60 s after
+/// it ends; after that it may answer TRIGGER_NOT_FOUND.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10969,8 +13294,10 @@ pub const __PAUSE_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     is_wkt: false,
 };
 /// ResumeTriggerRequest resumes a paused trigger by ID. Supported for
-/// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
-/// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+/// stop-loss, take-profit and trailing-stop triggers; a running ladder or TWAP
+/// supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A trigger of any
+/// type that has ended answers TRIGGER_STATUS_INVALID for at least 60 s after
+/// it ends; after that it may answer TRIGGER_NOT_FOUND.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -12563,6 +14890,18 @@ pub struct Trigger {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub parent_order_id: ::core::option::Option<u64>,
+    /// The OCO this take-profit or stop-loss belongs to: both triggers of an OCO
+    /// created with CreateOco carry its order_list_id, and neither has a parent
+    /// order. Empty for any other trigger.
+    ///
+    /// Field 9: `order_list_id`
+    #[serde(
+        rename = "orderListId",
+        alias = "order_list_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub order_list_id: ::core::option::Option<u64>,
     /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
     ///
     /// Field 20: `qty_scaled`
@@ -12595,7 +14934,8 @@ pub struct Trigger {
     pub self_trade_prevention_mode: ::buffa::EnumValue<
         super::super::orders::v1::SelfTradePreventionMode,
     >,
-    /// Client-provided trigger ID for idempotency and correlation.
+    /// Client-provided trigger ID for idempotency and correlation. Empty for an
+    /// OCO's take-profit and stop-loss, which carry client_list_id instead.
     ///
     /// Field 60: `client_trigger_id`
     #[serde(
@@ -12605,6 +14945,18 @@ pub struct Trigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub client_trigger_id: ::buffa::alloc::string::String,
+    /// The client_list_id of the OCO this take-profit or stop-loss belongs to,
+    /// as given to CreateOco; both triggers of the OCO carry it. Empty for any
+    /// other trigger.
+    ///
+    /// Field 66: `client_list_id`
+    #[serde(
+        rename = "clientListId",
+        alias = "client_list_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_list_id: ::buffa::alloc::string::String,
     /// Creation timestamp.
     ///
     /// Field 61: `created_at`
@@ -12678,10 +15030,12 @@ impl ::core::fmt::Debug for Trigger {
             .field("symbol_id", &self.symbol_id)
             .field("status", &self.status)
             .field("parent_order_id", &self.parent_order_id)
+            .field("order_list_id", &self.order_list_id)
             .field("qty_scaled", &self.qty_scaled)
             .field("fee_asset", &self.fee_asset)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("client_trigger_id", &self.client_trigger_id)
+            .field("client_list_id", &self.client_list_id)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("armed_at", &self.armed_at)
@@ -12706,6 +15060,13 @@ impl Trigger {
     ///Sets [`Self::parent_order_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_parent_order_id(mut self, value: u64) -> Self {
         self.parent_order_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::order_list_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_order_list_id(mut self, value: u64) -> Self {
+        self.order_list_id = Some(value);
         self
     }
 }
@@ -12754,6 +15115,9 @@ impl ::buffa::Message for Trigger {
                     size += 1u32 + ::buffa::types::int32_encoded_len(x.to_i32()) as u32;
                 }
             }
+        }
+        if self.order_list_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
         if self.qty_scaled != 0i64 {
             size += 2u32 + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
@@ -12854,6 +15218,11 @@ impl ::buffa::Message for Trigger {
         if self.version != 0u32 {
             size += 2u32 + ::buffa::types::uint32_encoded_len(self.version) as u32;
         }
+        if !self.client_list_id.is_empty() {
+            size
+                += 2u32
+                    + ::buffa::types::string_encoded_len(&self.client_list_id) as u32;
+        }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
                 __buffa::oneof::trigger::RuntimeDetails::Stop(x) => {
@@ -12927,6 +15296,9 @@ impl ::buffa::Message for Trigger {
                     ::buffa::types::put_int32_field(8u32, x.to_i32(), buf);
                 }
             }
+        }
+        if let Some(v) = self.order_list_id {
+            ::buffa::types::put_fixed64_field(9u32, v, buf);
         }
         if self.qty_scaled != 0i64 {
             ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
@@ -13008,6 +15380,9 @@ impl ::buffa::Message for Trigger {
         }
         if self.version != 0u32 {
             ::buffa::types::put_uint32_field(65u32, self.version, buf);
+        }
+        if !self.client_list_id.is_empty() {
+            ::buffa::types::put_string_field(66u32, &self.client_list_id, buf);
         }
         if let ::core::option::Option::Some(ref v) = self.runtime_details {
             match v {
@@ -13117,6 +15492,15 @@ impl ::buffa::Message for Trigger {
                     __buffa::oneof::trigger::TerminalReason::FailureReason(
                         ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
                     ),
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.order_list_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
                 );
             }
             20u32 => {
@@ -13304,6 +15688,13 @@ impl ::buffa::Message for Trigger {
                 )?;
                 self.version = ::buffa::types::decode_uint32(buf)?;
             }
+            66u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_list_id, buf)?;
+            }
             100u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -13400,6 +15791,7 @@ impl ::buffa::Message for Trigger {
         self.status = ::buffa::EnumValue::from(0);
         self.parent_order_id = ::core::option::Option::None;
         self.terminal_reason = ::core::option::Option::None;
+        self.order_list_id = ::core::option::Option::None;
         self.qty_scaled = 0i64;
         self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
@@ -13410,6 +15802,7 @@ impl ::buffa::Message for Trigger {
         self.armed_at = ::buffa::MessageField::none();
         self.completed_at = ::buffa::MessageField::none();
         self.version = 0u32;
+        self.client_list_id.clear();
         self.runtime_details = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -13447,6 +15840,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 let mut __f_parent_order_id: ::core::option::Option<
                     ::core::option::Option<u64>,
                 > = None;
+                let mut __f_order_list_id: ::core::option::Option<
+                    ::core::option::Option<u64>,
+                > = None;
                 let mut __f_qty_scaled: ::core::option::Option<i64> = None;
                 let mut __f_fee_asset: ::core::option::Option<
                     ::buffa::EnumValue<super::super::orders::v1::FeeAsset>,
@@ -13455,6 +15851,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                     ::buffa::EnumValue<super::super::orders::v1::SelfTradePreventionMode>,
                 > = None;
                 let mut __f_client_trigger_id: ::core::option::Option<
+                    ::buffa::alloc::string::String,
+                > = None;
+                let mut __f_client_list_id: ::core::option::Option<
                     ::buffa::alloc::string::String,
                 > = None;
                 let mut __f_created_at: ::core::option::Option<
@@ -13562,6 +15961,24 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                                 map.next_value_seed(_S)?
                             });
                         }
+                        "orderListId" | "order_list_id" => {
+                            __f_order_list_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::core::option::Option<u64>;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::core::option::Option<u64>,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::opt_uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
                         "qtyScaled" | "qty_scaled" => {
                             __f_qty_scaled = Some({
                                 struct _S;
@@ -13621,6 +16038,24 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                         }
                         "clientTriggerId" | "client_trigger_id" => {
                             __f_client_trigger_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = ::buffa::alloc::string::String;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<
+                                        ::buffa::alloc::string::String,
+                                        D::Error,
+                                    > {
+                                        ::buffa::json_helpers::proto_string::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "clientListId" | "client_list_id" => {
+                            __f_client_list_id = Some({
                                 struct _S;
                                 impl<'de> serde::de::DeserializeSeed<'de> for _S {
                                     type Value = ::buffa::alloc::string::String;
@@ -13977,6 +16412,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 if let ::core::option::Option::Some(v) = __f_parent_order_id {
                     __r.parent_order_id = v;
                 }
+                if let ::core::option::Option::Some(v) = __f_order_list_id {
+                    __r.order_list_id = v;
+                }
                 if let ::core::option::Option::Some(v) = __f_qty_scaled {
                     __r.qty_scaled = v;
                 }
@@ -13988,6 +16426,9 @@ impl<'de> serde::Deserialize<'de> for Trigger {
                 }
                 if let ::core::option::Option::Some(v) = __f_client_trigger_id {
                     __r.client_trigger_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_client_list_id {
+                    __r.client_list_id = v;
                 }
                 if let ::core::option::Option::Some(v) = __f_created_at {
                     __r.created_at = v;
@@ -20013,6 +22454,2573 @@ pub mod __buffa {
             }
         }
         /// =============================================================================
+        /// OCO (one-cancels-the-other)
+        /// =============================================================================
+        ///
+        /// OcoLeg configures one leg of an OCO: the price that triggers it and the
+        /// order it then places for the OCO's whole remaining quantity.
+        #[derive(Clone, Debug, Default)]
+        pub struct OcoLegView<'a> {
+            /// Trigger price in quote units scaled by 1e9.
+            ///
+            /// Field 1: `trigger_price_ticks`
+            pub trigger_price_ticks: i64,
+            /// The order the leg places when its trigger price is reached: a market
+            /// order (IOC) or a resting limit order (GTC).
+            ///
+            /// Field 2: `child`
+            pub child: ::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::RiskExecutionView<
+                    'a,
+                >,
+            >,
+            /// Price the leg watches. Unspecified or LAST_PRICE watches the last traded
+            /// price. INDEX_PRICE watches the market's index price; on a market without
+            /// an index price the OCO is rejected with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE on both legs. MARK_PRICE
+            /// is not supported.
+            ///
+            /// Field 3: `trigger_price_source`
+            pub trigger_price_source: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OcoLegView<'a> {
+            type Owned = super::super::OcoLeg;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_ticks = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.child.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.child = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::orders::v1::__buffa::view::RiskExecutionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.trigger_price_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoLeg, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::OcoLeg, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OcoLeg {
+                    trigger_price_ticks: self.trigger_price_ticks,
+                    child: match self.child.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::orders::v1::RiskExecution,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    trigger_price_source: self.trigger_price_source,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OcoLegView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.trigger_price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.trigger_price_ticks)
+                                as u32;
+                }
+                if self.child.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.child.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.trigger_price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(1u32, self.trigger_price_ticks, buf);
+                }
+                if self.child.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.child.write_to(__cache, buf);
+                }
+                {
+                    let val = self.trigger_price_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OcoLegView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.trigger_price_ticks,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.trigger_price_ticks),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.child.as_option() {
+                        __map.serialize_entry("child", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.trigger_price_source,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "triggerPriceSource",
+                            &self.trigger_price_source,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OcoLegView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "OcoLeg";
+            const FULL_NAME: &'static str = "triggers.v1.OcoLeg";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoLeg";
+        }
+        ::buffa::impl_default_view_instance!(OcoLegView);
+        ::buffa::impl_view_reborrow!(OcoLegView);
+        /** Self-contained, `'static` owned view of a `OcoLeg` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OcoLegView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OcoLegView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OcoLegOwnedView(::buffa::OwnedView<OcoLegView<'static>>);
+        impl OcoLegOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OcoLeg,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoLegOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OcoLegView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OcoLegView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoLeg, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Trigger price in quote units scaled by 1e9.
+            ///
+            /// Field 1: `trigger_price_ticks`
+            #[must_use]
+            pub fn trigger_price_ticks(&self) -> i64 {
+                self.0.reborrow().trigger_price_ticks
+            }
+            /// The order the leg places when its trigger price is reached: a market
+            /// order (IOC) or a resting limit order (GTC).
+            ///
+            /// Field 2: `child`
+            #[must_use]
+            pub fn child(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::RiskExecutionView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().child
+            }
+            /// Price the leg watches. Unspecified or LAST_PRICE watches the last traded
+            /// price. INDEX_PRICE watches the market's index price; on a market without
+            /// an index price the OCO is rejected with
+            /// TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE on both legs. MARK_PRICE
+            /// is not supported.
+            ///
+            /// Field 3: `trigger_price_source`
+            #[must_use]
+            pub fn trigger_price_source(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::TriggerPriceSource,
+            > {
+                self.0.reborrow().trigger_price_source
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OcoLegView<'static>>>
+        for OcoLegOwnedView {
+            fn from(inner: ::buffa::OwnedView<OcoLegView<'static>>) -> Self {
+                OcoLegOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OcoLegOwnedView>
+        for ::buffa::OwnedView<OcoLegView<'static>> {
+            fn from(wrapper: OcoLegOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OcoLegView<'static>>>
+        for OcoLegOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OcoLegView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OcoLeg {
+            type View<'a> = OcoLegView<'a>;
+            type ViewHandle = OcoLegOwnedView;
+        }
+        impl ::serde::Serialize for OcoLegOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// OcoIntent configures an OCO over a quantity the account already holds: a
+        /// take-profit and a stop-loss that both trade `side` for `qty_scaled`. The
+        /// quantity is reserved once, when the OCO is created, and both legs share it,
+        /// so it can be sold or bought only once. A SELL OCO protects a held base
+        /// position: its take-profit is above the last price and its stop-loss below
+        /// it. A BUY OCO buys with held quote: its take-profit is below the last price
+        /// and its stop-loss above it.
+        ///
+        /// The first leg to reach its trigger price places its order for the OCO's
+        /// remaining quantity. If that order fills only partly, the other leg keeps
+        /// protecting the rest: when its own trigger price is reached it cancels the
+        /// working order and places its own for what is left. When the whole quantity
+        /// has been traded, the leg whose order traded last ends COMPLETED and the
+        /// other ends CANCELED with reason OCO. Cancelling either leg, or the OCO with
+        /// CancelOco, cancels both.
+        #[derive(Clone, Debug, Default)]
+        pub struct OcoIntentView<'a> {
+            /// Stable numeric pair ID from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            /// The side both legs trade: SELL protects a held base position, BUY spends
+            /// held quote.
+            ///
+            /// Field 2: `side`
+            pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
+            /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
+            /// multiple of the pair's quantity step.
+            ///
+            /// Field 3: `qty_scaled`
+            pub qty_scaled: i64,
+            /// Self-trade prevention mode of the legs' orders against orders of the same
+            /// root account, including all its subaccounts. Defaults to EXPIRE_MAKER;
+            /// DECREMENT is not supported.
+            ///
+            /// Field 4: `self_trade_prevention_mode`
+            pub self_trade_prevention_mode: ::buffa::EnumValue<
+                super::super::super::super::orders::v1::SelfTradePreventionMode,
+            >,
+            /// Client-provided OCO ID for idempotency, unique per sub-account and pair
+            /// among OCOs. While the OCO is active and for 60 seconds after both legs
+            /// ended, retrying the create with the identical intent returns the same
+            /// OCO, and a different intent with the same ID returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. At most 36 bytes in UTF-8.
+            ///
+            /// Field 5: `client_list_id`
+            pub client_list_id: &'a str,
+            /// The take-profit leg. Its trigger price must be above the stop-loss's for
+            /// a SELL OCO and below it for a BUY OCO.
+            ///
+            /// Field 6: `take_profit`
+            pub take_profit: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegView<'a>,
+            >,
+            /// The stop-loss leg.
+            ///
+            /// Field 7: `stop_loss`
+            pub stop_loss: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for OcoIntentView<'a> {
+            type Owned = super::super::OcoIntent;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.side = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.self_trade_prevention_mode = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_list_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.take_profit.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.take_profit = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OcoLegView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.stop_loss.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.stop_loss = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OcoLegView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoIntent, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::OcoIntent, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::OcoIntent {
+                    symbol_id: self.symbol_id,
+                    side: self.side,
+                    qty_scaled: self.qty_scaled,
+                    self_trade_prevention_mode: self.self_trade_prevention_mode,
+                    client_list_id: self.client_list_id.to_string(),
+                    take_profit: match self.take_profit.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OcoLeg,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    stop_loss: match self.stop_loss.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OcoLeg,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for OcoIntentView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.qty_scaled) as u32;
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.client_list_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.client_list_id)
+                                as u32;
+                }
+                if self.take_profit.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.take_profit.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.stop_loss.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.stop_loss.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                {
+                    let val = self.side.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.qty_scaled, buf);
+                }
+                {
+                    let val = self.self_trade_prevention_mode.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if !self.client_list_id.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.client_list_id, buf);
+                }
+                if self.take_profit.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.take_profit.write_to(__cache, buf);
+                }
+                if self.stop_loss.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.stop_loss.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for OcoIntentView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.side) {
+                    __map.serialize_entry("side", &self.side)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
+                    __map
+                        .serialize_entry(
+                            "qtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.self_trade_prevention_mode,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "selfTradePreventionMode",
+                            &self.self_trade_prevention_mode,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_list_id) {
+                    __map.serialize_entry("clientListId", self.client_list_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .take_profit
+                        .as_option()
+                    {
+                        __map.serialize_entry("takeProfit", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.stop_loss.as_option()
+                    {
+                        __map.serialize_entry("stopLoss", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for OcoIntentView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "OcoIntent";
+            const FULL_NAME: &'static str = "triggers.v1.OcoIntent";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.OcoIntent";
+        }
+        ::buffa::impl_default_view_instance!(OcoIntentView);
+        ::buffa::impl_view_reborrow!(OcoIntentView);
+        /** Self-contained, `'static` owned view of a `OcoIntent` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`OcoIntentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`OcoIntentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct OcoIntentOwnedView(::buffa::OwnedView<OcoIntentView<'static>>);
+        impl OcoIntentOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoIntentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoIntentOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::OcoIntent,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    OcoIntentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`OcoIntentView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &OcoIntentView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::OcoIntent, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable numeric pair ID from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// The side both legs trade: SELL protects a held base position, BUY spends
+            /// held quote.
+            ///
+            /// Field 2: `side`
+            #[must_use]
+            pub fn side(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
+                self.0.reborrow().side
+            }
+            /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
+            /// multiple of the pair's quantity step.
+            ///
+            /// Field 3: `qty_scaled`
+            #[must_use]
+            pub fn qty_scaled(&self) -> i64 {
+                self.0.reborrow().qty_scaled
+            }
+            /// Self-trade prevention mode of the legs' orders against orders of the same
+            /// root account, including all its subaccounts. Defaults to EXPIRE_MAKER;
+            /// DECREMENT is not supported.
+            ///
+            /// Field 4: `self_trade_prevention_mode`
+            #[must_use]
+            pub fn self_trade_prevention_mode(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::orders::v1::SelfTradePreventionMode,
+            > {
+                self.0.reborrow().self_trade_prevention_mode
+            }
+            /// Client-provided OCO ID for idempotency, unique per sub-account and pair
+            /// among OCOs. While the OCO is active and for 60 seconds after both legs
+            /// ended, retrying the create with the identical intent returns the same
+            /// OCO, and a different intent with the same ID returns
+            /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. At most 36 bytes in UTF-8.
+            ///
+            /// Field 5: `client_list_id`
+            #[must_use]
+            pub fn client_list_id(&self) -> &'_ str {
+                self.0.reborrow().client_list_id
+            }
+            /// The take-profit leg. Its trigger price must be above the stop-loss's for
+            /// a SELL OCO and below it for a BUY OCO.
+            ///
+            /// Field 6: `take_profit`
+            #[must_use]
+            pub fn take_profit(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegView<'_>,
+            > {
+                &self.0.reborrow().take_profit
+            }
+            /// The stop-loss leg.
+            ///
+            /// Field 7: `stop_loss`
+            #[must_use]
+            pub fn stop_loss(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoLegView<'_>,
+            > {
+                &self.0.reborrow().stop_loss
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<OcoIntentView<'static>>>
+        for OcoIntentOwnedView {
+            fn from(inner: ::buffa::OwnedView<OcoIntentView<'static>>) -> Self {
+                OcoIntentOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<OcoIntentOwnedView>
+        for ::buffa::OwnedView<OcoIntentView<'static>> {
+            fn from(wrapper: OcoIntentOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<OcoIntentView<'static>>>
+        for OcoIntentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<OcoIntentView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::OcoIntent {
+            type View<'a> = OcoIntentView<'a>;
+            type ViewHandle = OcoIntentOwnedView;
+        }
+        impl ::serde::Serialize for OcoIntentOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateOcoRequest submits one OCO for admission. An OCO whose trigger price
+        /// the last price has already reached is rejected with
+        /// TRIGGER_WOULD_TRIGGER_IMMEDIATELY on both legs, after the create is
+        /// acknowledged: read the legs for their status. A create sent but not
+        /// confirmed in time fails with TRIGGER_CREATE_OUTCOME_UNKNOWN: the OCO may
+        /// have been created, so list the triggers with its client_list_id
+        /// (ListTriggers client_list_id) before retrying.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOcoRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// OCO to admit.
+            ///
+            /// Field 2: `oco`
+            pub oco: ::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoIntentView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateOcoRequestView<'a> {
+            type Owned = super::super::CreateOcoRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.oco.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.oco = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::OcoIntentView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOcoRequest {
+                    subaccount_id: self.subaccount_id,
+                    oco: match self.oco.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::OcoIntent,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateOcoRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.oco.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.oco.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if self.oco.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.oco.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateOcoRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.oco.as_option() {
+                        __map.serialize_entry("oco", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOcoRequestView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "CreateOcoRequest";
+            const FULL_NAME: &'static str = "triggers.v1.CreateOcoRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateOcoRequestView);
+        ::buffa::impl_view_reborrow!(CreateOcoRequestView);
+        /** Self-contained, `'static` owned view of a `CreateOcoRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOcoRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOcoRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOcoRequestOwnedView(
+            ::buffa::OwnedView<CreateOcoRequestView<'static>>,
+        );
+        impl CreateOcoRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOcoRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CreateOcoRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOcoRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// OCO to admit.
+            ///
+            /// Field 2: `oco`
+            #[must_use]
+            pub fn oco(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::OcoIntentView<'_>,
+            > {
+                &self.0.reborrow().oco
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CreateOcoRequestView<'static>>>
+        for CreateOcoRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<CreateOcoRequestView<'static>>) -> Self {
+                CreateOcoRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOcoRequestOwnedView>
+        for ::buffa::OwnedView<CreateOcoRequestView<'static>> {
+            fn from(wrapper: CreateOcoRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CreateOcoRequestView<'static>>>
+        for CreateOcoRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CreateOcoRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateOcoRequest {
+            type View<'a> = CreateOcoRequestView<'a>;
+            type ViewHandle = CreateOcoRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateOcoRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateOcoResponse acknowledges the OCO's creation: its quantity is reserved
+        /// and both legs are created. Their status and orders are visible through the
+        /// trigger reads and events.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateOcoResponseView<'a> {
+            /// Assigned OCO ID, which both legs carry as order_list_id.
+            ///
+            /// Field 1: `order_list_id`
+            pub order_list_id: u64,
+            /// Echoed client OCO ID.
+            ///
+            /// Field 2: `client_list_id`
+            pub client_list_id: &'a str,
+            /// The take-profit leg's trigger ID.
+            ///
+            /// Field 3: `take_profit_trigger_id`
+            pub take_profit_trigger_id: u64,
+            /// The stop-loss leg's trigger ID.
+            ///
+            /// Field 4: `stop_loss_trigger_id`
+            pub stop_loss_trigger_id: u64,
+            /// Time creation admission completed.
+            ///
+            /// Field 5: `accepted_at`
+            pub accepted_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Admission completion time in nanoseconds since epoch (UTC).
+            ///
+            /// Field 6: `accepted_at_ts_ns`
+            pub accepted_at_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateOcoResponseView<'a> {
+            type Owned = super::super::CreateOcoResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_list_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_list_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.take_profit_trigger_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.stop_loss_trigger_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.accepted_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.accepted_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_at_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateOcoResponse {
+                    order_list_id: self.order_list_id,
+                    client_list_id: self.client_list_id.to_string(),
+                    take_profit_trigger_id: self.take_profit_trigger_id,
+                    stop_loss_trigger_id: self.stop_loss_trigger_id,
+                    accepted_at: match self.accepted_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    accepted_at_ts_ns: self.accepted_at_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateOcoResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.order_list_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.client_list_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.client_list_id)
+                                as u32;
+                }
+                if self.take_profit_trigger_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.stop_loss_trigger_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.accepted_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.accepted_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.order_list_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+                }
+                if !self.client_list_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.client_list_id, buf);
+                }
+                if self.take_profit_trigger_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        3u32,
+                        self.take_profit_trigger_id,
+                        buf,
+                    );
+                }
+                if self.stop_loss_trigger_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        4u32,
+                        self.stop_loss_trigger_id,
+                        buf,
+                    );
+                }
+                if self.accepted_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.accepted_at.write_to(__cache, buf);
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.accepted_at_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateOcoResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_list_id) {
+                    __map
+                        .serialize_entry(
+                            "orderListId",
+                            &::buffa::json_helpers::ProtoJson(&self.order_list_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_list_id) {
+                    __map.serialize_entry("clientListId", self.client_list_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.take_profit_trigger_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "takeProfitTriggerId",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.take_profit_trigger_id,
+                            ),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.stop_loss_trigger_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "stopLossTriggerId",
+                            &::buffa::json_helpers::ProtoJson(&self.stop_loss_trigger_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .accepted_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("acceptedAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.accepted_at_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "acceptedAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateOcoResponseView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "CreateOcoResponse";
+            const FULL_NAME: &'static str = "triggers.v1.CreateOcoResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CreateOcoResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateOcoResponseView);
+        ::buffa::impl_view_reborrow!(CreateOcoResponseView);
+        /** Self-contained, `'static` owned view of a `CreateOcoResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateOcoResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateOcoResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateOcoResponseOwnedView(
+            ::buffa::OwnedView<CreateOcoResponseView<'static>>,
+        );
+        impl CreateOcoResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateOcoResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateOcoResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CreateOcoResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateOcoResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Assigned OCO ID, which both legs carry as order_list_id.
+            ///
+            /// Field 1: `order_list_id`
+            #[must_use]
+            pub fn order_list_id(&self) -> u64 {
+                self.0.reborrow().order_list_id
+            }
+            /// Echoed client OCO ID.
+            ///
+            /// Field 2: `client_list_id`
+            #[must_use]
+            pub fn client_list_id(&self) -> &'_ str {
+                self.0.reborrow().client_list_id
+            }
+            /// The take-profit leg's trigger ID.
+            ///
+            /// Field 3: `take_profit_trigger_id`
+            #[must_use]
+            pub fn take_profit_trigger_id(&self) -> u64 {
+                self.0.reborrow().take_profit_trigger_id
+            }
+            /// The stop-loss leg's trigger ID.
+            ///
+            /// Field 4: `stop_loss_trigger_id`
+            #[must_use]
+            pub fn stop_loss_trigger_id(&self) -> u64 {
+                self.0.reborrow().stop_loss_trigger_id
+            }
+            /// Time creation admission completed.
+            ///
+            /// Field 5: `accepted_at`
+            #[must_use]
+            pub fn accepted_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().accepted_at
+            }
+            /// Admission completion time in nanoseconds since epoch (UTC).
+            ///
+            /// Field 6: `accepted_at_ts_ns`
+            #[must_use]
+            pub fn accepted_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_at_ts_ns
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CreateOcoResponseView<'static>>>
+        for CreateOcoResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<CreateOcoResponseView<'static>>) -> Self {
+                CreateOcoResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateOcoResponseOwnedView>
+        for ::buffa::OwnedView<CreateOcoResponseView<'static>> {
+            fn from(wrapper: CreateOcoResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CreateOcoResponseView<'static>>>
+        for CreateOcoResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CreateOcoResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateOcoResponse {
+            type View<'a> = CreateOcoResponseView<'a>;
+            type ViewHandle = CreateOcoResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateOcoResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CancelOcoRequest cancels both legs of an OCO.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelOcoRequestView<'a> {
+            /// OCO ID from CreateOco. An ID that is not an OCO of the account, such as
+            /// a trigger ID or a leg's ID, is refused TRIGGER_NOT_FOUND and nothing is
+            /// canceled.
+            ///
+            /// Field 1: `order_list_id`
+            pub order_list_id: u64,
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
+            ///
+            /// Field 2: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelOcoRequestView<'a> {
+            type Owned = super::super::CancelOcoRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_list_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelOcoRequest {
+                    order_list_id: self.order_list_id,
+                    subaccount_id: self.subaccount_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelOcoRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.order_list_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.order_list_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+                }
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelOcoRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_list_id) {
+                    __map
+                        .serialize_entry(
+                            "orderListId",
+                            &::buffa::json_helpers::ProtoJson(&self.order_list_id),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelOcoRequestView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "CancelOcoRequest";
+            const FULL_NAME: &'static str = "triggers.v1.CancelOcoRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoRequest";
+        }
+        ::buffa::impl_default_view_instance!(CancelOcoRequestView);
+        ::buffa::impl_view_reborrow!(CancelOcoRequestView);
+        /** Self-contained, `'static` owned view of a `CancelOcoRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelOcoRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelOcoRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelOcoRequestOwnedView(
+            ::buffa::OwnedView<CancelOcoRequestView<'static>>,
+        );
+        impl CancelOcoRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelOcoRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CancelOcoRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelOcoRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// OCO ID from CreateOco. An ID that is not an OCO of the account, such as
+            /// a trigger ID or a leg's ID, is refused TRIGGER_NOT_FOUND and nothing is
+            /// canceled.
+            ///
+            /// Field 1: `order_list_id`
+            #[must_use]
+            pub fn order_list_id(&self) -> u64 {
+                self.0.reborrow().order_list_id
+            }
+            /// Optional public subaccount ID for authorization. When omitted,
+            /// subaccount-scoped API keys use their bound subaccount; other callers use
+            /// their authenticated root account.
+            ///
+            /// Field 2: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CancelOcoRequestView<'static>>>
+        for CancelOcoRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<CancelOcoRequestView<'static>>) -> Self {
+                CancelOcoRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelOcoRequestOwnedView>
+        for ::buffa::OwnedView<CancelOcoRequestView<'static>> {
+            fn from(wrapper: CancelOcoRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CancelOcoRequestView<'static>>>
+        for CancelOcoRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CancelOcoRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelOcoRequest {
+            type View<'a> = CancelOcoRequestView<'a>;
+            type ViewHandle = CancelOcoRequestOwnedView;
+        }
+        impl ::serde::Serialize for CancelOcoRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CancelOcoResponse confirms the cancellation: both legs end CANCELED, and
+        /// the OCO's reserved quantity is released.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelOcoResponseView<'a> {
+            /// OCO ID that was canceled.
+            ///
+            /// Field 1: `order_list_id`
+            pub order_list_id: u64,
+            /// Both legs' status after the cancel, which is always canceled.
+            ///
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<super::super::TriggerStatus>,
+            /// Server timestamp.
+            ///
+            /// Field 3: `ts`
+            pub ts: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Server timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `ts_ns`
+            pub ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelOcoResponseView<'a> {
+            type Owned = super::super::CancelOcoResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_list_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.ts.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.ts = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelOcoResponse {
+                    order_list_id: self.order_list_id,
+                    status: self.status,
+                    ts: match self.ts.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    ts_ns: self.ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelOcoResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.order_list_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.ts.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.ts.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.ts_ns != 0u64 {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.order_list_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.order_list_id, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.ts.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.ts.write_to(__cache, buf);
+                }
+                if self.ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelOcoResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.order_list_id) {
+                    __map
+                        .serialize_entry(
+                            "orderListId",
+                            &::buffa::json_helpers::ProtoJson(&self.order_list_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.ts.as_option() {
+                        __map.serialize_entry("ts", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "tsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelOcoResponseView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "CancelOcoResponse";
+            const FULL_NAME: &'static str = "triggers.v1.CancelOcoResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.CancelOcoResponse";
+        }
+        ::buffa::impl_default_view_instance!(CancelOcoResponseView);
+        ::buffa::impl_view_reborrow!(CancelOcoResponseView);
+        /** Self-contained, `'static` owned view of a `CancelOcoResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelOcoResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelOcoResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelOcoResponseOwnedView(
+            ::buffa::OwnedView<CancelOcoResponseView<'static>>,
+        );
+        impl CancelOcoResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelOcoResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelOcoResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CancelOcoResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelOcoResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelOcoResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// OCO ID that was canceled.
+            ///
+            /// Field 1: `order_list_id`
+            #[must_use]
+            pub fn order_list_id(&self) -> u64 {
+                self.0.reborrow().order_list_id
+            }
+            /// Both legs' status after the cancel, which is always canceled.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::TriggerStatus> {
+                self.0.reborrow().status
+            }
+            /// Server timestamp.
+            ///
+            /// Field 3: `ts`
+            #[must_use]
+            pub fn ts(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().ts
+            }
+            /// Server timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 4: `ts_ns`
+            #[must_use]
+            pub fn ts_ns(&self) -> u64 {
+                self.0.reborrow().ts_ns
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CancelOcoResponseView<'static>>>
+        for CancelOcoResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<CancelOcoResponseView<'static>>) -> Self {
+                CancelOcoResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelOcoResponseOwnedView>
+        for ::buffa::OwnedView<CancelOcoResponseView<'static>> {
+            fn from(wrapper: CancelOcoResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CancelOcoResponseView<'static>>>
+        for CancelOcoResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CancelOcoResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelOcoResponse {
+            type View<'a> = CancelOcoResponseView<'a>;
+            type ViewHandle = CancelOcoResponseOwnedView;
+        }
+        impl ::serde::Serialize for CancelOcoResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// =============================================================================
         /// Get Trigger
         /// =============================================================================
         ///
@@ -20665,6 +25673,17 @@ pub mod __buffa {
             ///
             /// Field 5: `parent_order_id`
             pub parent_order_id: ::core::option::Option<u64>,
+            /// Optional filter by OCO: the take-profit and the stop-loss of the OCO with
+            /// this order_list_id.
+            ///
+            /// Field 6: `order_list_id`
+            pub order_list_id: ::core::option::Option<u64>,
+            /// Optional filter by OCO client ID: the take-profit and the stop-loss of
+            /// the OCO created with this client_list_id, 1 to 36 bytes in UTF-8. Use it
+            /// to find an OCO whose create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
+            ///
+            /// Field 7: `client_list_id`
+            pub client_list_id: ::core::option::Option<&'a str>,
             /// Maximum number of triggers to return. Defaults to 100 when omitted;
             /// maximum is 1000.
             ///
@@ -20741,6 +25760,24 @@ pub mod __buffa {
                         )?;
                         view.parent_order_id = Some(
                             ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_list_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_list_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
                         );
                     }
                     10u32 => {
@@ -20824,6 +25861,8 @@ pub mod __buffa {
                     status: self.status.to_vec(),
                     trigger_type: self.trigger_type,
                     parent_order_id: self.parent_order_id,
+                    order_list_id: self.order_list_id,
+                    client_list_id: self.client_list_id.map(|s| s.to_string()),
                     limit: self.limit,
                     page_token: self.page_token.to_string(),
                     __buffa_unknown_fields: self
@@ -20866,6 +25905,12 @@ pub mod __buffa {
                 }
                 if self.parent_order_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.order_list_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if let Some(ref v) = self.client_list_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
                 if self.limit != 0u32 {
                     size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
@@ -20912,6 +25957,12 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.parent_order_id {
                     ::buffa::types::put_fixed64_field(5u32, v, buf);
+                }
+                if let Some(v) = self.order_list_id {
+                    ::buffa::types::put_fixed64_field(6u32, v, buf);
+                }
+                if let Some(ref v) = self.client_list_id {
+                    ::buffa::types::put_string_field(7u32, v, buf);
                 }
                 if self.limit != 0u32 {
                     ::buffa::types::put_uint32_field(10u32, self.limit, buf);
@@ -20972,6 +26023,16 @@ pub mod __buffa {
                             "parentOrderId",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.order_list_id {
+                    __map
+                        .serialize_entry(
+                            "orderListId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.client_list_id {
+                    __map.serialize_entry("clientListId", __v)?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
                     __map
@@ -21120,6 +26181,23 @@ pub mod __buffa {
             #[must_use]
             pub fn parent_order_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().parent_order_id
+            }
+            /// Optional filter by OCO: the take-profit and the stop-loss of the OCO with
+            /// this order_list_id.
+            ///
+            /// Field 6: `order_list_id`
+            #[must_use]
+            pub fn order_list_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().order_list_id
+            }
+            /// Optional filter by OCO client ID: the take-profit and the stop-loss of
+            /// the OCO created with this client_list_id, 1 to 36 bytes in UTF-8. Use it
+            /// to find an OCO whose create failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
+            ///
+            /// Field 7: `client_list_id`
+            #[must_use]
+            pub fn client_list_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().client_list_id
             }
             /// Maximum number of triggers to return. Defaults to 100 when omitted;
             /// maximum is 1000.
@@ -24001,12 +29079,1321 @@ pub mod __buffa {
             }
         }
         /// =============================================================================
+        /// Batch Cancel Triggers
+        /// =============================================================================
+        ///
+        /// BatchCancelTriggersRequest cancels up to 50 of the account's triggers in one
+        /// request. Each trigger is canceled as CancelTrigger cancels it and answered
+        /// on its own, in request order; one item's rejection does not stop the others.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCancelTriggersRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account. An explicit zero is rejected with ERROR_CODE_INVALID_ARGUMENT
+            /// and cancels nothing.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Idempotency key (required). Retrying with the same request_id and the same
+            /// trigger_ids within 2 minutes returns the original results and cancels
+            /// nothing again. The same request_id with other trigger_ids rejects every
+            /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            ///
+            /// Field 2: `request_id`
+            pub request_id: &'a str,
+            /// Triggers to cancel: 1 to 50 distinct trigger IDs. Results follow this
+            /// order. Cancel more by sending further requests of up to 50.
+            ///
+            /// Field 3: `trigger_ids`
+            pub trigger_ids: ::buffa::RepeatedView<'a, u64>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchCancelTriggersRequestView<'a> {
+            type Owned = super::super::BatchCancelTriggersRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.trigger_ids.reserve(payload.len() / 8usize);
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.trigger_ids
+                                    .push(::buffa::types::decode_fixed64(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Fixed64
+                        {
+                            view.trigger_ids
+                                .push(::buffa::types::decode_fixed64(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCancelTriggersRequest {
+                    subaccount_id: self.subaccount_id,
+                    request_id: self.request_id.to_string(),
+                    trigger_ids: self.trigger_ids.to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchCancelTriggersRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                if !self.trigger_ids.is_empty() {
+                    let payload: u32 = self.trigger_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.request_id, buf);
+                }
+                if !self.trigger_ids.is_empty() {
+                    let payload: u32 = self.trigger_ids.len() as u32
+                        * ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                    ::buffa::types::put_len_delimited_header(3u32, payload, buf);
+                    for &v in &self.trigger_ids {
+                        ::buffa::types::encode_fixed64(v, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCancelTriggersRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !self.trigger_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "triggerIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.trigger_ids),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCancelTriggersRequestView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "BatchCancelTriggersRequest";
+            const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersRequest";
+        }
+        ::buffa::impl_default_view_instance!(BatchCancelTriggersRequestView);
+        ::buffa::impl_view_reborrow!(BatchCancelTriggersRequestView);
+        /** Self-contained, `'static` owned view of a `BatchCancelTriggersRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCancelTriggersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCancelTriggersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCancelTriggersRequestOwnedView(
+            ::buffa::OwnedView<BatchCancelTriggersRequestView<'static>>,
+        );
+        impl BatchCancelTriggersRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCancelTriggersRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`BatchCancelTriggersRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCancelTriggersRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account. An explicit zero is rejected with ERROR_CODE_INVALID_ARGUMENT
+            /// and cancels nothing.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Idempotency key (required). Retrying with the same request_id and the same
+            /// trigger_ids within 2 minutes returns the original results and cancels
+            /// nothing again. The same request_id with other trigger_ids rejects every
+            /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            ///
+            /// Field 2: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Triggers to cancel: 1 to 50 distinct trigger IDs. Results follow this
+            /// order. Cancel more by sending further requests of up to 50.
+            ///
+            /// Field 3: `trigger_ids`
+            #[must_use]
+            pub fn trigger_ids(&self) -> &::buffa::RepeatedView<'_, u64> {
+                &self.0.reborrow().trigger_ids
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchCancelTriggersRequestView<'static>>,
+        > for BatchCancelTriggersRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchCancelTriggersRequestView<'static>>,
+            ) -> Self {
+                BatchCancelTriggersRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCancelTriggersRequestOwnedView>
+        for ::buffa::OwnedView<BatchCancelTriggersRequestView<'static>> {
+            fn from(wrapper: BatchCancelTriggersRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchCancelTriggersRequestView<'static>>,
+        > for BatchCancelTriggersRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchCancelTriggersRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchCancelTriggersRequest {
+            type View<'a> = BatchCancelTriggersRequestView<'a>;
+            type ViewHandle = BatchCancelTriggersRequestOwnedView;
+        }
+        impl ::serde::Serialize for BatchCancelTriggersRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCancelTriggersResultItem is the outcome of one requested trigger cancel.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCancelTriggersResultItemView<'a> {
+            /// Per-item cancellation outcome.
+            ///
+            /// Field 1: `status`
+            pub status: ::buffa::EnumValue<
+                super::super::batch_cancel_triggers_result_item::Status,
+            >,
+            /// The requested trigger ID, echoed.
+            ///
+            /// Field 2: `trigger_id`
+            pub trigger_id: u64,
+            /// Error code when rejected, empty when accepted. TRIGGER_NOT_FOUND: no
+            /// trigger of the account has this ID. TRIGGER_STATUS_INVALID: the trigger
+            /// has already ended; treat it as done. RATE_LIMIT_EXCEEDED,
+            /// PAIR_BACKLOGGED and TRIGGER_CONTROL_IN_PROGRESS: retry the item in a new
+            /// request with a new request_id. Other codes are those CancelTrigger
+            /// returns.
+            ///
+            /// Field 3: `code`
+            pub code: &'a str,
+            /// Structured rejection details, with rate-limit guidance when the item was
+            /// rate limited.
+            ///
+            /// Field 4: `error`
+            pub error: ::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::ErrorDetailView<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchCancelTriggersResultItemView<'a> {
+            type Owned = super::super::BatchCancelTriggersResultItem;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.trigger_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.error.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.error = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::orders::v1::__buffa::view::ErrorDetailView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResultItem,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResultItem,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCancelTriggersResultItem {
+                    status: self.status,
+                    trigger_id: self.trigger_id,
+                    code: self.code.to_string(),
+                    error: match self.error.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::orders::v1::ErrorDetail,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchCancelTriggersResultItemView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.trigger_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.code.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.code) as u32;
+                }
+                if self.error.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.error.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.trigger_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(2u32, self.trigger_id, buf);
+                }
+                if !self.code.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.code, buf);
+                }
+                if self.error.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.error.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCancelTriggersResultItemView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.trigger_id) {
+                    __map
+                        .serialize_entry(
+                            "triggerId",
+                            &::buffa::json_helpers::ProtoJson(&self.trigger_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.code) {
+                    __map.serialize_entry("code", self.code)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.error.as_option() {
+                        __map.serialize_entry("error", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCancelTriggersResultItemView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "BatchCancelTriggersResultItem";
+            const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersResultItem";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResultItem";
+        }
+        ::buffa::impl_default_view_instance!(BatchCancelTriggersResultItemView);
+        ::buffa::impl_view_reborrow!(BatchCancelTriggersResultItemView);
+        /** Self-contained, `'static` owned view of a `BatchCancelTriggersResultItem` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCancelTriggersResultItemView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCancelTriggersResultItemView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCancelTriggersResultItemOwnedView(
+            ::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>>,
+        );
+        impl BatchCancelTriggersResultItemOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResultItemOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResultItemOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCancelTriggersResultItem,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResultItemOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`BatchCancelTriggersResultItemView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCancelTriggersResultItemView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResultItem,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Per-item cancellation outcome.
+            ///
+            /// Field 1: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::batch_cancel_triggers_result_item::Status,
+            > {
+                self.0.reborrow().status
+            }
+            /// The requested trigger ID, echoed.
+            ///
+            /// Field 2: `trigger_id`
+            #[must_use]
+            pub fn trigger_id(&self) -> u64 {
+                self.0.reborrow().trigger_id
+            }
+            /// Error code when rejected, empty when accepted. TRIGGER_NOT_FOUND: no
+            /// trigger of the account has this ID. TRIGGER_STATUS_INVALID: the trigger
+            /// has already ended; treat it as done. RATE_LIMIT_EXCEEDED,
+            /// PAIR_BACKLOGGED and TRIGGER_CONTROL_IN_PROGRESS: retry the item in a new
+            /// request with a new request_id. Other codes are those CancelTrigger
+            /// returns.
+            ///
+            /// Field 3: `code`
+            #[must_use]
+            pub fn code(&self) -> &'_ str {
+                self.0.reborrow().code
+            }
+            /// Structured rejection details, with rate-limit guidance when the item was
+            /// rate limited.
+            ///
+            /// Field 4: `error`
+            #[must_use]
+            pub fn error(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::orders::v1::__buffa::view::ErrorDetailView<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().error
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>>,
+        > for BatchCancelTriggersResultItemOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>>,
+            ) -> Self {
+                BatchCancelTriggersResultItemOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCancelTriggersResultItemOwnedView>
+        for ::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>> {
+            fn from(wrapper: BatchCancelTriggersResultItemOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>>,
+        > for BatchCancelTriggersResultItemOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchCancelTriggersResultItemView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchCancelTriggersResultItem {
+            type View<'a> = BatchCancelTriggersResultItemView<'a>;
+            type ViewHandle = BatchCancelTriggersResultItemOwnedView;
+        }
+        impl ::serde::Serialize for BatchCancelTriggersResultItemOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCancelTriggersResponse returns one result per requested trigger.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCancelTriggersResponseView<'a> {
+            /// Per-item results, in the same order as trigger_ids.
+            ///
+            /// Field 1: `results`
+            pub results: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::BatchCancelTriggersResultItemView<'a>,
+            >,
+            /// Number of accepted cancellations.
+            ///
+            /// Field 2: `accepted_count`
+            pub accepted_count: u32,
+            /// Number of rejected cancellations.
+            ///
+            /// Field 3: `rejected_count`
+            pub rejected_count: u32,
+            /// Server timestamp.
+            ///
+            /// Field 4: `ts`
+            pub ts: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Server timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 5: `ts_ns`
+            pub ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BatchCancelTriggersResponseView<'a> {
+            type Owned = super::super::BatchCancelTriggersResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.rejected_count = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.ts.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.ts = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.results
+                            .push(
+                                <super::super::__buffa::view::BatchCancelTriggersResultItemView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCancelTriggersResponse {
+                    results: self
+                        .results
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    accepted_count: self.accepted_count,
+                    rejected_count: self.rejected_count,
+                    ts: match self.ts.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    ts_ns: self.ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BatchCancelTriggersResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.results {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.accepted_count != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.accepted_count)
+                                as u32;
+                }
+                if self.rejected_count != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.rejected_count)
+                                as u32;
+                }
+                if self.ts.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.ts.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.ts_ns != 0u64 {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_ns) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.results {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.accepted_count != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.accepted_count, buf);
+                }
+                if self.rejected_count != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.rejected_count, buf);
+                }
+                if self.ts.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.ts.write_to(__cache, buf);
+                }
+                if self.ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(5u32, self.ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCancelTriggersResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.results.is_empty() {
+                    __map.serialize_entry("results", &*self.results)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.accepted_count) {
+                    __map
+                        .serialize_entry(
+                            "acceptedCount",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_count),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.rejected_count) {
+                    __map
+                        .serialize_entry(
+                            "rejectedCount",
+                            &::buffa::json_helpers::ProtoJson(&self.rejected_count),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.ts.as_option() {
+                        __map.serialize_entry("ts", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "tsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCancelTriggersResponseView<'a> {
+            const PACKAGE: &'static str = "triggers.v1";
+            const NAME: &'static str = "BatchCancelTriggersResponse";
+            const FULL_NAME: &'static str = "triggers.v1.BatchCancelTriggersResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/triggers.v1.BatchCancelTriggersResponse";
+        }
+        ::buffa::impl_default_view_instance!(BatchCancelTriggersResponseView);
+        ::buffa::impl_view_reborrow!(BatchCancelTriggersResponseView);
+        /** Self-contained, `'static` owned view of a `BatchCancelTriggersResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCancelTriggersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCancelTriggersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCancelTriggersResponseOwnedView(
+            ::buffa::OwnedView<BatchCancelTriggersResponseView<'static>>,
+        );
+        impl BatchCancelTriggersResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCancelTriggersResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCancelTriggersResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`BatchCancelTriggersResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCancelTriggersResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCancelTriggersResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Per-item results, in the same order as trigger_ids.
+            ///
+            /// Field 1: `results`
+            #[must_use]
+            pub fn results(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::BatchCancelTriggersResultItemView<'_>,
+            > {
+                &self.0.reborrow().results
+            }
+            /// Number of accepted cancellations.
+            ///
+            /// Field 2: `accepted_count`
+            #[must_use]
+            pub fn accepted_count(&self) -> u32 {
+                self.0.reborrow().accepted_count
+            }
+            /// Number of rejected cancellations.
+            ///
+            /// Field 3: `rejected_count`
+            #[must_use]
+            pub fn rejected_count(&self) -> u32 {
+                self.0.reborrow().rejected_count
+            }
+            /// Server timestamp.
+            ///
+            /// Field 4: `ts`
+            #[must_use]
+            pub fn ts(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().ts
+            }
+            /// Server timestamp in nanoseconds since epoch (UTC).
+            ///
+            /// Field 5: `ts_ns`
+            #[must_use]
+            pub fn ts_ns(&self) -> u64 {
+                self.0.reborrow().ts_ns
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchCancelTriggersResponseView<'static>>,
+        > for BatchCancelTriggersResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BatchCancelTriggersResponseView<'static>>,
+            ) -> Self {
+                BatchCancelTriggersResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCancelTriggersResponseOwnedView>
+        for ::buffa::OwnedView<BatchCancelTriggersResponseView<'static>> {
+            fn from(wrapper: BatchCancelTriggersResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchCancelTriggersResponseView<'static>>,
+        > for BatchCancelTriggersResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchCancelTriggersResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BatchCancelTriggersResponse {
+            type View<'a> = BatchCancelTriggersResponseView<'a>;
+            type ViewHandle = BatchCancelTriggersResponseOwnedView;
+        }
+        impl ::serde::Serialize for BatchCancelTriggersResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// =============================================================================
         /// Modify / Pause / Resume Trigger
         /// =============================================================================
         ///
         /// ModifyTriggerRequest applies a limited patch to an existing trigger.
-        /// Supported for stop-loss, take-profit and trailing-stop triggers; ladder and
-        /// TWAP triggers support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+        /// Supported for stop-loss, take-profit and trailing-stop triggers; a running
+        /// ladder or TWAP supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A
+        /// trigger of any type that has ended answers TRIGGER_STATUS_INVALID for at
+        /// least 60 s after it ends; after that it may answer TRIGGER_NOT_FOUND.
         #[derive(Clone, Debug, Default)]
         pub struct ModifyTriggerRequestView<'a> {
             /// Trigger ID to modify.
@@ -25097,8 +31484,10 @@ pub mod __buffa {
             }
         }
         /// PauseTriggerRequest pauses an active trigger by ID. Supported for
-        /// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
-        /// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+        /// stop-loss, take-profit and trailing-stop triggers; a running ladder or TWAP
+        /// supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A trigger of any
+        /// type that has ended answers TRIGGER_STATUS_INVALID for at least 60 s after
+        /// it ends; after that it may answer TRIGGER_NOT_FOUND.
         #[derive(Clone, Debug, Default)]
         pub struct PauseTriggerRequestView<'a> {
             /// Trigger ID to pause.
@@ -25821,8 +32210,10 @@ pub mod __buffa {
             }
         }
         /// ResumeTriggerRequest resumes a paused trigger by ID. Supported for
-        /// stop-loss, take-profit and trailing-stop triggers; ladder and TWAP triggers
-        /// support only cancel and answer TRIGGER_NOT_MODIFIABLE.
+        /// stop-loss, take-profit and trailing-stop triggers; a running ladder or TWAP
+        /// supports only cancel and answers TRIGGER_NOT_MODIFIABLE. A trigger of any
+        /// type that has ended answers TRIGGER_STATUS_INVALID for at least 60 s after
+        /// it ends; after that it may answer TRIGGER_NOT_FOUND.
         #[derive(Clone, Debug, Default)]
         pub struct ResumeTriggerRequestView<'a> {
             /// Trigger ID to resume.
@@ -28570,6 +34961,12 @@ pub mod __buffa {
             ///
             /// Field 6: `parent_order_id`
             pub parent_order_id: ::core::option::Option<u64>,
+            /// The OCO this take-profit or stop-loss belongs to: both triggers of an OCO
+            /// created with CreateOco carry its order_list_id, and neither has a parent
+            /// order. Empty for any other trigger.
+            ///
+            /// Field 9: `order_list_id`
+            pub order_list_id: ::core::option::Option<u64>,
             /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 20: `qty_scaled`
@@ -28586,10 +34983,17 @@ pub mod __buffa {
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::SelfTradePreventionMode,
             >,
-            /// Client-provided trigger ID for idempotency and correlation.
+            /// Client-provided trigger ID for idempotency and correlation. Empty for an
+            /// OCO's take-profit and stop-loss, which carry client_list_id instead.
             ///
             /// Field 60: `client_trigger_id`
             pub client_trigger_id: &'a str,
+            /// The client_list_id of the OCO this take-profit or stop-loss belongs to,
+            /// as given to CreateOco; both triggers of the OCO carry it. Empty for any
+            /// other trigger.
+            ///
+            /// Field 66: `client_list_id`
+            pub client_list_id: &'a str,
             /// Creation timestamp.
             ///
             /// Field 61: `created_at`
@@ -28709,6 +35113,15 @@ pub mod __buffa {
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.order_list_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -28740,6 +35153,13 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.client_trigger_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    66u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_list_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
                     61u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -29181,10 +35601,12 @@ pub mod __buffa {
                     symbol_id: self.symbol_id,
                     status: self.status,
                     parent_order_id: self.parent_order_id,
+                    order_list_id: self.order_list_id,
                     qty_scaled: self.qty_scaled,
                     fee_asset: self.fee_asset,
                     self_trade_prevention_mode: self.self_trade_prevention_mode,
                     client_trigger_id: self.client_trigger_id.to_string(),
+                    client_list_id: self.client_list_id.to_string(),
                     created_at: match self.created_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -29388,6 +35810,9 @@ pub mod __buffa {
                         }
                     }
                 }
+                if self.order_list_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 if self.qty_scaled != 0i64 {
                     size
                         += 2u32
@@ -29502,6 +35927,12 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::uint32_encoded_len(self.version) as u32;
                 }
+                if !self.client_list_id.is_empty() {
+                    size
+                        += 2u32
+                            + ::buffa::types::string_encoded_len(&self.client_list_id)
+                                as u32;
+                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -29588,6 +36019,9 @@ pub mod __buffa {
                             ::buffa::types::put_int32_field(8u32, x.to_i32(), buf);
                         }
                     }
+                }
+                if let Some(v) = self.order_list_id {
+                    ::buffa::types::put_fixed64_field(9u32, v, buf);
                 }
                 if self.qty_scaled != 0i64 {
                     ::buffa::types::put_int64_field(20u32, self.qty_scaled, buf);
@@ -29700,6 +36134,9 @@ pub mod __buffa {
                 if self.version != 0u32 {
                     ::buffa::types::put_uint32_field(65u32, self.version, buf);
                 }
+                if !self.client_list_id.is_empty() {
+                    ::buffa::types::put_string_field(66u32, &self.client_list_id, buf);
+                }
                 if let ::core::option::Option::Some(ref v) = self.runtime_details {
                     match v {
                         super::super::__buffa::view::oneof::trigger::RuntimeDetails::Stop(
@@ -29796,6 +36233,13 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
+                if let ::core::option::Option::Some(__v) = self.order_list_id {
+                    __map
+                        .serialize_entry(
+                            "orderListId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(&self.qty_scaled) {
                     __map
                         .serialize_entry(
@@ -29821,6 +36265,9 @@ pub mod __buffa {
                     self.client_trigger_id,
                 ) {
                     __map.serialize_entry("clientTriggerId", self.client_trigger_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_list_id) {
+                    __map.serialize_entry("clientListId", self.client_list_id)?;
                 }
                 {
                     if let ::core::option::Option::Some(__v) = self
@@ -30052,6 +36499,15 @@ pub mod __buffa {
             pub fn parent_order_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().parent_order_id
             }
+            /// The OCO this take-profit or stop-loss belongs to: both triggers of an OCO
+            /// created with CreateOco carry its order_list_id, and neither has a parent
+            /// order. Empty for any other trigger.
+            ///
+            /// Field 9: `order_list_id`
+            #[must_use]
+            pub fn order_list_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().order_list_id
+            }
             /// Child quantity scaled by the pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 20: `qty_scaled`
@@ -30079,12 +36535,22 @@ pub mod __buffa {
             > {
                 self.0.reborrow().self_trade_prevention_mode
             }
-            /// Client-provided trigger ID for idempotency and correlation.
+            /// Client-provided trigger ID for idempotency and correlation. Empty for an
+            /// OCO's take-profit and stop-loss, which carry client_list_id instead.
             ///
             /// Field 60: `client_trigger_id`
             #[must_use]
             pub fn client_trigger_id(&self) -> &'_ str {
                 self.0.reborrow().client_trigger_id
+            }
+            /// The client_list_id of the OCO this take-profit or stop-loss belongs to,
+            /// as given to CreateOco; both triggers of the OCO carry it. Empty for any
+            /// other trigger.
+            ///
+            /// Field 66: `client_list_id`
+            #[must_use]
+            pub fn client_list_id(&self) -> &'_ str {
+                self.0.reborrow().client_list_id
             }
             /// Creation timestamp.
             ///
@@ -31138,6 +37604,12 @@ pub mod __buffa {
         reg.register_json_any(super::__TRIGGER_INTENT_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRIGGER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__OCO_LEG_JSON_ANY);
+        reg.register_json_any(super::__OCO_INTENT_JSON_ANY);
+        reg.register_json_any(super::__CREATE_OCO_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_OCO_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CANCEL_OCO_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CANCEL_OCO_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_TRIGGER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_TRIGGERS_REQUEST_JSON_ANY);
@@ -31148,6 +37620,9 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_TRIGGER_EVENTS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CANCEL_TRIGGER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CANCEL_TRIGGERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CANCEL_TRIGGERS_RESULT_ITEM_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CANCEL_TRIGGERS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MODIFY_TRIGGER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MODIFY_TRIGGER_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__PAUSE_TRIGGER_REQUEST_JSON_ANY);
@@ -31218,6 +37693,30 @@ pub use self::__buffa::view::CreateTriggerResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateTriggerResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::OcoLegView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoLegOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoIntentView;
+#[doc(inline)]
+pub use self::__buffa::view::OcoIntentOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOcoRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOcoRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOcoResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateOcoResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelOcoRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelOcoRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelOcoResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelOcoResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::GetTriggerRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::GetTriggerRequestOwnedView;
@@ -31257,6 +37756,18 @@ pub use self::__buffa::view::CancelTriggerRequestOwnedView;
 pub use self::__buffa::view::CancelTriggerResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CancelTriggerResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersResultItemView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersResultItemOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCancelTriggersResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ModifyTriggerRequestView;
 #[doc(inline)]

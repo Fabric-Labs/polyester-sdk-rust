@@ -23152,6 +23152,744 @@ pub const __LIST_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
     from_json: ::buffa::type_registry::any_from_json::<ListAssistantKeysResponse>,
     is_wkt: false,
 };
+/// TelegramApprovalLimits are the caller's optional limits on what they may
+/// approve from Telegram, in US dollars of notional value. Each is off unless
+/// set. They apply to placing orders, swapping, modifying orders or triggers
+/// and resuming a trigger; cancelling, pausing a trigger and rejecting are
+/// never limited. Stablecoin amounts count one US dollar per unit; other
+/// amounts are valued at the current market price, and an approval that
+/// cannot be valued is refused while a limit is set.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TelegramApprovalLimits {
+    /// Largest notional value one approval from Telegram may have, in US
+    /// dollars: a decimal string with at most 2 decimal places, for example
+    /// "5000" or "250.50". "0" allows none. Unset: no limit.
+    ///
+    /// Field 1: `per_approval_usd`
+    #[serde(
+        rename = "perApprovalUsd",
+        alias = "per_approval_usd",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub per_approval_usd: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Largest total notional value of approvals from Telegram in any rolling
+    /// 24 hours, in US dollars, in the same format. Unset: no limit.
+    ///
+    /// Field 2: `daily_usd`
+    #[serde(
+        rename = "dailyUsd",
+        alias = "daily_usd",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub daily_usd: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TelegramApprovalLimits {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TelegramApprovalLimits")
+            .field("per_approval_usd", &self.per_approval_usd)
+            .field("daily_usd", &self.daily_usd)
+            .finish()
+    }
+}
+impl TelegramApprovalLimits {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TelegramApprovalLimits";
+}
+impl TelegramApprovalLimits {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::per_approval_usd`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_per_approval_usd(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.per_approval_usd = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::daily_usd`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_daily_usd(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.daily_usd = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(TelegramApprovalLimits);
+impl ::buffa::MessageName for TelegramApprovalLimits {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "TelegramApprovalLimits";
+    const FULL_NAME: &'static str = "ai.v1.TelegramApprovalLimits";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TelegramApprovalLimits";
+}
+impl ::buffa::Message for TelegramApprovalLimits {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let Some(ref v) = self.per_approval_usd {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if let Some(ref v) = self.daily_usd {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.per_approval_usd {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if let Some(ref v) = self.daily_usd {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .per_approval_usd
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .daily_usd
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.per_approval_usd = ::core::option::Option::None;
+        self.daily_usd = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TelegramApprovalLimits {
+    const PROTO_FQN: &'static str = "ai.v1.TelegramApprovalLimits";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TelegramApprovalLimits {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TELEGRAM_APPROVAL_LIMITS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.TelegramApprovalLimits",
+    to_json: ::buffa::type_registry::any_to_json::<TelegramApprovalLimits>,
+    from_json: ::buffa::type_registry::any_from_json::<TelegramApprovalLimits>,
+    is_wkt: false,
+};
+/// GetTelegramApprovalLimitsRequest reads the caller's Telegram approval
+/// limits.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetTelegramApprovalLimitsRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetTelegramApprovalLimitsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetTelegramApprovalLimitsRequest").finish()
+    }
+}
+impl GetTelegramApprovalLimitsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsRequest";
+}
+::buffa::impl_default_instance!(GetTelegramApprovalLimitsRequest);
+impl ::buffa::MessageName for GetTelegramApprovalLimitsRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetTelegramApprovalLimitsRequest";
+    const FULL_NAME: &'static str = "ai.v1.GetTelegramApprovalLimitsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsRequest";
+}
+impl ::buffa::Message for GetTelegramApprovalLimitsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetTelegramApprovalLimitsRequest {
+    const PROTO_FQN: &'static str = "ai.v1.GetTelegramApprovalLimitsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetTelegramApprovalLimitsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_TELEGRAM_APPROVAL_LIMITS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetTelegramApprovalLimitsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetTelegramApprovalLimitsRequest>,
+    is_wkt: false,
+};
+/// GetTelegramApprovalLimitsResponse returns the caller's Telegram approval
+/// limits and what counts against the daily one.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetTelegramApprovalLimitsResponse {
+    /// The limits; both unset when the caller set none.
+    ///
+    /// Field 1: `limits`
+    #[serde(
+        rename = "limits",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub limits: ::buffa::MessageField<TelegramApprovalLimits>,
+    /// Notional value approved from Telegram in the last 24 hours while a limit
+    /// was set, in US dollars: a decimal string with 2 decimal places.
+    ///
+    /// Field 2: `approved_last_24h_usd`
+    #[serde(
+        rename = "approvedLast24hUsd",
+        alias = "approved_last_24h_usd",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub approved_last_24h_usd: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetTelegramApprovalLimitsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetTelegramApprovalLimitsResponse")
+            .field("limits", &self.limits)
+            .field("approved_last_24h_usd", &self.approved_last_24h_usd)
+            .finish()
+    }
+}
+impl GetTelegramApprovalLimitsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsResponse";
+}
+::buffa::impl_default_instance!(GetTelegramApprovalLimitsResponse);
+impl ::buffa::MessageName for GetTelegramApprovalLimitsResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetTelegramApprovalLimitsResponse";
+    const FULL_NAME: &'static str = "ai.v1.GetTelegramApprovalLimitsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsResponse";
+}
+impl ::buffa::Message for GetTelegramApprovalLimitsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.limits.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.limits.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.approved_last_24h_usd.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.approved_last_24h_usd)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.limits.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.limits.write_to(__cache, buf);
+        }
+        if !self.approved_last_24h_usd.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.approved_last_24h_usd, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.limits.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.approved_last_24h_usd, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.limits = ::buffa::MessageField::none();
+        self.approved_last_24h_usd.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetTelegramApprovalLimitsResponse {
+    const PROTO_FQN: &'static str = "ai.v1.GetTelegramApprovalLimitsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetTelegramApprovalLimitsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetTelegramApprovalLimitsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetTelegramApprovalLimitsResponse,
+    >,
+    is_wkt: false,
+};
+/// SetTelegramApprovalLimitsRequest replaces the caller's Telegram approval
+/// limits.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetTelegramApprovalLimitsRequest {
+    /// The limits as they are from now on: an unset limit is turned off.
+    ///
+    /// Field 1: `limits`
+    #[serde(
+        rename = "limits",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub limits: ::buffa::MessageField<TelegramApprovalLimits>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetTelegramApprovalLimitsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetTelegramApprovalLimitsRequest")
+            .field("limits", &self.limits)
+            .finish()
+    }
+}
+impl SetTelegramApprovalLimitsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsRequest";
+}
+::buffa::impl_default_instance!(SetTelegramApprovalLimitsRequest);
+impl ::buffa::MessageName for SetTelegramApprovalLimitsRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "SetTelegramApprovalLimitsRequest";
+    const FULL_NAME: &'static str = "ai.v1.SetTelegramApprovalLimitsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsRequest";
+}
+impl ::buffa::Message for SetTelegramApprovalLimitsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.limits.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.limits.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.limits.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.limits.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.limits.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.limits = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetTelegramApprovalLimitsRequest {
+    const PROTO_FQN: &'static str = "ai.v1.SetTelegramApprovalLimitsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetTelegramApprovalLimitsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_TELEGRAM_APPROVAL_LIMITS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetTelegramApprovalLimitsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetTelegramApprovalLimitsRequest>,
+    is_wkt: false,
+};
+/// SetTelegramApprovalLimitsResponse returns the limits as recorded.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetTelegramApprovalLimitsResponse {
+    /// The limits now.
+    ///
+    /// Field 1: `limits`
+    #[serde(
+        rename = "limits",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub limits: ::buffa::MessageField<TelegramApprovalLimits>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetTelegramApprovalLimitsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetTelegramApprovalLimitsResponse")
+            .field("limits", &self.limits)
+            .finish()
+    }
+}
+impl SetTelegramApprovalLimitsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsResponse";
+}
+::buffa::impl_default_instance!(SetTelegramApprovalLimitsResponse);
+impl ::buffa::MessageName for SetTelegramApprovalLimitsResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "SetTelegramApprovalLimitsResponse";
+    const FULL_NAME: &'static str = "ai.v1.SetTelegramApprovalLimitsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsResponse";
+}
+impl ::buffa::Message for SetTelegramApprovalLimitsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.limits.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.limits.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.limits.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.limits.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.limits.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.limits = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetTelegramApprovalLimitsResponse {
+    const PROTO_FQN: &'static str = "ai.v1.SetTelegramApprovalLimitsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetTelegramApprovalLimitsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetTelegramApprovalLimitsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        SetTelegramApprovalLimitsResponse,
+    >,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -56737,6 +57475,1576 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// TelegramApprovalLimits are the caller's optional limits on what they may
+        /// approve from Telegram, in US dollars of notional value. Each is off unless
+        /// set. They apply to placing orders, swapping, modifying orders or triggers
+        /// and resuming a trigger; cancelling, pausing a trigger and rejecting are
+        /// never limited. Stablecoin amounts count one US dollar per unit; other
+        /// amounts are valued at the current market price, and an approval that
+        /// cannot be valued is refused while a limit is set.
+        #[derive(Clone, Debug, Default)]
+        pub struct TelegramApprovalLimitsView<'a> {
+            /// Largest notional value one approval from Telegram may have, in US
+            /// dollars: a decimal string with at most 2 decimal places, for example
+            /// "5000" or "250.50". "0" allows none. Unset: no limit.
+            ///
+            /// Field 1: `per_approval_usd`
+            pub per_approval_usd: ::core::option::Option<&'a str>,
+            /// Largest total notional value of approvals from Telegram in any rolling
+            /// 24 hours, in US dollars, in the same format. Unset: no limit.
+            ///
+            /// Field 2: `daily_usd`
+            pub daily_usd: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TelegramApprovalLimitsView<'a> {
+            type Owned = super::super::TelegramApprovalLimits;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.per_approval_usd = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.daily_usd = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TelegramApprovalLimits,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TelegramApprovalLimits,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TelegramApprovalLimits {
+                    per_approval_usd: self.per_approval_usd.map(|s| s.to_string()),
+                    daily_usd: self.daily_usd.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TelegramApprovalLimitsView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let Some(ref v) = self.per_approval_usd {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if let Some(ref v) = self.daily_usd {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.per_approval_usd {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if let Some(ref v) = self.daily_usd {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TelegramApprovalLimitsView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.per_approval_usd {
+                    __map.serialize_entry("perApprovalUsd", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.daily_usd {
+                    __map.serialize_entry("dailyUsd", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TelegramApprovalLimitsView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "TelegramApprovalLimits";
+            const FULL_NAME: &'static str = "ai.v1.TelegramApprovalLimits";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TelegramApprovalLimits";
+        }
+        ::buffa::impl_default_view_instance!(TelegramApprovalLimitsView);
+        ::buffa::impl_view_reborrow!(TelegramApprovalLimitsView);
+        /** Self-contained, `'static` owned view of a `TelegramApprovalLimits` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TelegramApprovalLimitsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TelegramApprovalLimitsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TelegramApprovalLimitsOwnedView(
+            ::buffa::OwnedView<TelegramApprovalLimitsView<'static>>,
+        );
+        impl TelegramApprovalLimitsOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramApprovalLimitsOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramApprovalLimitsOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TelegramApprovalLimits,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramApprovalLimitsOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TelegramApprovalLimitsView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TelegramApprovalLimitsView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TelegramApprovalLimits,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Largest notional value one approval from Telegram may have, in US
+            /// dollars: a decimal string with at most 2 decimal places, for example
+            /// "5000" or "250.50". "0" allows none. Unset: no limit.
+            ///
+            /// Field 1: `per_approval_usd`
+            #[must_use]
+            pub fn per_approval_usd(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().per_approval_usd
+            }
+            /// Largest total notional value of approvals from Telegram in any rolling
+            /// 24 hours, in US dollars, in the same format. Unset: no limit.
+            ///
+            /// Field 2: `daily_usd`
+            #[must_use]
+            pub fn daily_usd(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().daily_usd
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<TelegramApprovalLimitsView<'static>>,
+        > for TelegramApprovalLimitsOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TelegramApprovalLimitsView<'static>>,
+            ) -> Self {
+                TelegramApprovalLimitsOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TelegramApprovalLimitsOwnedView>
+        for ::buffa::OwnedView<TelegramApprovalLimitsView<'static>> {
+            fn from(wrapper: TelegramApprovalLimitsOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<TelegramApprovalLimitsView<'static>>,
+        > for TelegramApprovalLimitsOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<TelegramApprovalLimitsView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TelegramApprovalLimits {
+            type View<'a> = TelegramApprovalLimitsView<'a>;
+            type ViewHandle = TelegramApprovalLimitsOwnedView;
+        }
+        impl ::serde::Serialize for TelegramApprovalLimitsOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetTelegramApprovalLimitsRequest reads the caller's Telegram approval
+        /// limits.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetTelegramApprovalLimitsRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetTelegramApprovalLimitsRequestView<'a> {
+            type Owned = super::super::GetTelegramApprovalLimitsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetTelegramApprovalLimitsRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetTelegramApprovalLimitsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetTelegramApprovalLimitsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetTelegramApprovalLimitsRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetTelegramApprovalLimitsRequest";
+            const FULL_NAME: &'static str = "ai.v1.GetTelegramApprovalLimitsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetTelegramApprovalLimitsRequestView);
+        ::buffa::impl_view_reborrow!(GetTelegramApprovalLimitsRequestView);
+        /** Self-contained, `'static` owned view of a `GetTelegramApprovalLimitsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetTelegramApprovalLimitsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetTelegramApprovalLimitsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetTelegramApprovalLimitsRequestOwnedView(
+            ::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>>,
+        );
+        impl GetTelegramApprovalLimitsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetTelegramApprovalLimitsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetTelegramApprovalLimitsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetTelegramApprovalLimitsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>>,
+        > for GetTelegramApprovalLimitsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>>,
+            ) -> Self {
+                GetTelegramApprovalLimitsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetTelegramApprovalLimitsRequestOwnedView>
+        for ::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>> {
+            fn from(wrapper: GetTelegramApprovalLimitsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>>,
+        > for GetTelegramApprovalLimitsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetTelegramApprovalLimitsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetTelegramApprovalLimitsRequest {
+            type View<'a> = GetTelegramApprovalLimitsRequestView<'a>;
+            type ViewHandle = GetTelegramApprovalLimitsRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetTelegramApprovalLimitsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetTelegramApprovalLimitsResponse returns the caller's Telegram approval
+        /// limits and what counts against the daily one.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetTelegramApprovalLimitsResponseView<'a> {
+            /// The limits; both unset when the caller set none.
+            ///
+            /// Field 1: `limits`
+            pub limits: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'a>,
+            >,
+            /// Notional value approved from Telegram in the last 24 hours while a limit
+            /// was set, in US dollars: a decimal string with 2 decimal places.
+            ///
+            /// Field 2: `approved_last_24h_usd`
+            pub approved_last_24h_usd: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetTelegramApprovalLimitsResponseView<'a> {
+            type Owned = super::super::GetTelegramApprovalLimitsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.limits.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.limits = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TelegramApprovalLimitsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.approved_last_24h_usd = ::buffa::types::borrow_str(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetTelegramApprovalLimitsResponse {
+                    limits: match self.limits.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::TelegramApprovalLimits,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    approved_last_24h_usd: self.approved_last_24h_usd.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetTelegramApprovalLimitsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.limits.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.limits.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.approved_last_24h_usd.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.approved_last_24h_usd,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.limits.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.limits.write_to(__cache, buf);
+                }
+                if !self.approved_last_24h_usd.is_empty() {
+                    ::buffa::types::put_string_field(
+                        2u32,
+                        &self.approved_last_24h_usd,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetTelegramApprovalLimitsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.limits.as_option() {
+                        __map.serialize_entry("limits", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.approved_last_24h_usd,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "approvedLast24hUsd",
+                            self.approved_last_24h_usd,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetTelegramApprovalLimitsResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetTelegramApprovalLimitsResponse";
+            const FULL_NAME: &'static str = "ai.v1.GetTelegramApprovalLimitsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetTelegramApprovalLimitsResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetTelegramApprovalLimitsResponseView);
+        ::buffa::impl_view_reborrow!(GetTelegramApprovalLimitsResponseView);
+        /** Self-contained, `'static` owned view of a `GetTelegramApprovalLimitsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetTelegramApprovalLimitsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetTelegramApprovalLimitsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetTelegramApprovalLimitsResponseOwnedView(
+            ::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>>,
+        );
+        impl GetTelegramApprovalLimitsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetTelegramApprovalLimitsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetTelegramApprovalLimitsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetTelegramApprovalLimitsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The limits; both unset when the caller set none.
+            ///
+            /// Field 1: `limits`
+            #[must_use]
+            pub fn limits(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'_>,
+            > {
+                &self.0.reborrow().limits
+            }
+            /// Notional value approved from Telegram in the last 24 hours while a limit
+            /// was set, in US dollars: a decimal string with 2 decimal places.
+            ///
+            /// Field 2: `approved_last_24h_usd`
+            #[must_use]
+            pub fn approved_last_24h_usd(&self) -> &'_ str {
+                self.0.reborrow().approved_last_24h_usd
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>>,
+        > for GetTelegramApprovalLimitsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>>,
+            ) -> Self {
+                GetTelegramApprovalLimitsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetTelegramApprovalLimitsResponseOwnedView>
+        for ::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>> {
+            fn from(wrapper: GetTelegramApprovalLimitsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>>,
+        > for GetTelegramApprovalLimitsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetTelegramApprovalLimitsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetTelegramApprovalLimitsResponse {
+            type View<'a> = GetTelegramApprovalLimitsResponseView<'a>;
+            type ViewHandle = GetTelegramApprovalLimitsResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetTelegramApprovalLimitsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetTelegramApprovalLimitsRequest replaces the caller's Telegram approval
+        /// limits.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetTelegramApprovalLimitsRequestView<'a> {
+            /// The limits as they are from now on: an unset limit is turned off.
+            ///
+            /// Field 1: `limits`
+            pub limits: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetTelegramApprovalLimitsRequestView<'a> {
+            type Owned = super::super::SetTelegramApprovalLimitsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.limits.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.limits = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TelegramApprovalLimitsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetTelegramApprovalLimitsRequest {
+                    limits: match self.limits.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::TelegramApprovalLimits,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetTelegramApprovalLimitsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.limits.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.limits.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.limits.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.limits.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetTelegramApprovalLimitsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.limits.as_option() {
+                        __map.serialize_entry("limits", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetTelegramApprovalLimitsRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "SetTelegramApprovalLimitsRequest";
+            const FULL_NAME: &'static str = "ai.v1.SetTelegramApprovalLimitsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsRequest";
+        }
+        ::buffa::impl_default_view_instance!(SetTelegramApprovalLimitsRequestView);
+        ::buffa::impl_view_reborrow!(SetTelegramApprovalLimitsRequestView);
+        /** Self-contained, `'static` owned view of a `SetTelegramApprovalLimitsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetTelegramApprovalLimitsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetTelegramApprovalLimitsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetTelegramApprovalLimitsRequestOwnedView(
+            ::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>>,
+        );
+        impl SetTelegramApprovalLimitsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetTelegramApprovalLimitsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetTelegramApprovalLimitsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetTelegramApprovalLimitsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The limits as they are from now on: an unset limit is turned off.
+            ///
+            /// Field 1: `limits`
+            #[must_use]
+            pub fn limits(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'_>,
+            > {
+                &self.0.reborrow().limits
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>>,
+        > for SetTelegramApprovalLimitsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>>,
+            ) -> Self {
+                SetTelegramApprovalLimitsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetTelegramApprovalLimitsRequestOwnedView>
+        for ::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>> {
+            fn from(wrapper: SetTelegramApprovalLimitsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>>,
+        > for SetTelegramApprovalLimitsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetTelegramApprovalLimitsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetTelegramApprovalLimitsRequest {
+            type View<'a> = SetTelegramApprovalLimitsRequestView<'a>;
+            type ViewHandle = SetTelegramApprovalLimitsRequestOwnedView;
+        }
+        impl ::serde::Serialize for SetTelegramApprovalLimitsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetTelegramApprovalLimitsResponse returns the limits as recorded.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetTelegramApprovalLimitsResponseView<'a> {
+            /// The limits now.
+            ///
+            /// Field 1: `limits`
+            pub limits: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetTelegramApprovalLimitsResponseView<'a> {
+            type Owned = super::super::SetTelegramApprovalLimitsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.limits.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.limits = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TelegramApprovalLimitsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetTelegramApprovalLimitsResponse {
+                    limits: match self.limits.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::TelegramApprovalLimits,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetTelegramApprovalLimitsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.limits.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.limits.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.limits.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.limits.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetTelegramApprovalLimitsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.limits.as_option() {
+                        __map.serialize_entry("limits", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetTelegramApprovalLimitsResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "SetTelegramApprovalLimitsResponse";
+            const FULL_NAME: &'static str = "ai.v1.SetTelegramApprovalLimitsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetTelegramApprovalLimitsResponse";
+        }
+        ::buffa::impl_default_view_instance!(SetTelegramApprovalLimitsResponseView);
+        ::buffa::impl_view_reborrow!(SetTelegramApprovalLimitsResponseView);
+        /** Self-contained, `'static` owned view of a `SetTelegramApprovalLimitsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetTelegramApprovalLimitsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetTelegramApprovalLimitsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetTelegramApprovalLimitsResponseOwnedView(
+            ::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>>,
+        );
+        impl SetTelegramApprovalLimitsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetTelegramApprovalLimitsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetTelegramApprovalLimitsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`SetTelegramApprovalLimitsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetTelegramApprovalLimitsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetTelegramApprovalLimitsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The limits now.
+            ///
+            /// Field 1: `limits`
+            #[must_use]
+            pub fn limits(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::TelegramApprovalLimitsView<'_>,
+            > {
+                &self.0.reborrow().limits
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>>,
+        > for SetTelegramApprovalLimitsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>>,
+            ) -> Self {
+                SetTelegramApprovalLimitsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetTelegramApprovalLimitsResponseOwnedView>
+        for ::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>> {
+            fn from(wrapper: SetTelegramApprovalLimitsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>>,
+        > for SetTelegramApprovalLimitsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<SetTelegramApprovalLimitsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::SetTelegramApprovalLimitsResponse {
+            type View<'a> = SetTelegramApprovalLimitsResponseView<'a>;
+            type ViewHandle = SetTelegramApprovalLimitsResponseOwnedView;
+        }
+        impl ::serde::Serialize for SetTelegramApprovalLimitsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -58076,6 +60384,11 @@ pub mod __buffa {
         reg.register_json_any(super::__COMPLETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_ASSISTANT_KEYS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_ASSISTANT_KEYS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TELEGRAM_APPROVAL_LIMITS_JSON_ANY);
+        reg.register_json_any(super::__GET_TELEGRAM_APPROVAL_LIMITS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_TELEGRAM_APPROVAL_LIMITS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -58406,5 +60719,25 @@ pub use self::__buffa::view::ListAssistantKeysRequestOwnedView;
 pub use self::__buffa::view::ListAssistantKeysResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListAssistantKeysResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TelegramApprovalLimitsView;
+#[doc(inline)]
+pub use self::__buffa::view::TelegramApprovalLimitsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTelegramApprovalLimitsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTelegramApprovalLimitsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTelegramApprovalLimitsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetTelegramApprovalLimitsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetTelegramApprovalLimitsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetTelegramApprovalLimitsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetTelegramApprovalLimitsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetTelegramApprovalLimitsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

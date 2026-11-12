@@ -88,6 +88,22 @@ pub type OwnedListAssistantKeysRequestView = ::buffa::view::OwnedView<
 pub type OwnedListAssistantKeysResponseView = ::buffa::view::OwnedView<
     crate::proto::ai::v1::__buffa::view::ListAssistantKeysResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetTelegramApprovalLimitsRequestView<'static>>`.
+pub type OwnedGetTelegramApprovalLimitsRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetTelegramApprovalLimitsResponseView<'static>>`.
+pub type OwnedGetTelegramApprovalLimitsResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SetTelegramApprovalLimitsRequestView<'static>>`.
+pub type OwnedSetTelegramApprovalLimitsRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetTelegramApprovalLimitsResponseView<'static>>`.
+pub type OwnedSetTelegramApprovalLimitsResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::ai::v1::SendMessageResponse>
 for crate::proto::ai::v1::__buffa::view::SendMessageResponseView<'_> {
     fn encode(
@@ -308,6 +324,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetTelegramApprovalLimitsResponse>
+for crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetTelegramApprovalLimitsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::SetTelegramApprovalLimitsResponse>
+for crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::SetTelegramApprovalLimitsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const ASSISTANT_SERVICE_SERVICE_NAME: &str = "ai.v1.AssistantService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `SendMessage` RPC.
@@ -409,6 +465,24 @@ pub const ASSISTANT_SERVICE_LIST_ASSISTANT_KEYS_SPEC: ::connectrpc::Spec = ::con
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetTelegramApprovalLimits` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_GET_TELEGRAM_APPROVAL_LIMITS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/GetTelegramApprovalLimits",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetTelegramApprovalLimits` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/SetTelegramApprovalLimits",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// AssistantService is the Polyester trading assistant. A user sends a
 /// message, which starts a run: the assistant's answer, with the tools,
 /// skills and subagents it uses. The run continues on the server when no
@@ -808,6 +882,64 @@ pub trait AssistantService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// GetTelegramApprovalLimits reads the caller's optional limits on what
+    /// they may approve from Telegram, and the notional value approved from
+    /// Telegram in the last 24 hours.
+    /// Errors:
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_telegram_approval_limits<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::GetTelegramApprovalLimitsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// SetTelegramApprovalLimits replaces the caller's optional limits on what
+    /// they may approve from Telegram. A limit left unset is turned off. Only a
+    /// signed-in session sets them, never Telegram; they apply to the next
+    /// approval from Telegram.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_telegram_approval_limits<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::SetTelegramApprovalLimitsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -1154,6 +1286,64 @@ impl<S: AssistantService> AssistantServiceExt for S {
                 },
             )
             .with_spec(ASSISTANT_SERVICE_LIST_ASSISTANT_KEYS_SPEC)
+            .route_view_idempotent(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetTelegramApprovalLimits",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_telegram_approval_limits(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ai::v1::GetTelegramApprovalLimitsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_GET_TELEGRAM_APPROVAL_LIMITS_SPEC)
+            .route_view(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "SetTelegramApprovalLimits",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_telegram_approval_limits(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ai::v1::SetTelegramApprovalLimitsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1272,6 +1462,18 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(ASSISTANT_SERVICE_LIST_ASSISTANT_KEYS_SPEC),
+                )
+            }
+            "GetTelegramApprovalLimits" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(ASSISTANT_SERVICE_GET_TELEGRAM_APPROVAL_LIMITS_SPEC),
+                )
+            }
+            "SetTelegramApprovalLimits" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC),
                 )
             }
             _ => None,
@@ -1484,6 +1686,48 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                         .await?
                         .encode::<
                             crate::proto::ai::v1::ListAssistantKeysResponse,
+                        >(format)
+                })
+            }
+            "GetTelegramApprovalLimits" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_telegram_approval_limits(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ai::v1::GetTelegramApprovalLimitsResponse,
+                        >(format)
+                })
+            }
+            "SetTelegramApprovalLimits" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_telegram_approval_limits(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ai::v1::SetTelegramApprovalLimitsResponse,
                         >(format)
                 })
             }
@@ -2074,6 +2318,96 @@ where
                 &self.config,
                 ASSISTANT_SERVICE_SERVICE_NAME,
                 "ListAssistantKeys",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetTelegramApprovalLimits RPC. Sends a request to /ai.v1.AssistantService/GetTelegramApprovalLimits.
+    pub async fn get_telegram_approval_limits(
+        &self,
+        request: crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_telegram_approval_limits_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetTelegramApprovalLimits RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_telegram_approval_limits_with_options(
+        &self,
+        request: crate::proto::ai::v1::GetTelegramApprovalLimitsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetTelegramApprovalLimitsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetTelegramApprovalLimits",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetTelegramApprovalLimits RPC. Sends a request to /ai.v1.AssistantService/SetTelegramApprovalLimits.
+    pub async fn set_telegram_approval_limits(
+        &self,
+        request: crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_telegram_approval_limits_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetTelegramApprovalLimits RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_telegram_approval_limits_with_options(
+        &self,
+        request: crate::proto::ai::v1::SetTelegramApprovalLimitsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "SetTelegramApprovalLimits",
                 request,
                 options,
             )

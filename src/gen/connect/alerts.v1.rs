@@ -153,7 +153,9 @@ pub const PRICE_ALERT_SERVICE_CANCEL_ALERT_SPEC: ::connectrpc::Spec = ::connectr
 /// PriceAlertService manages the caller's price alerts. An alert belongs to
 /// the caller's root account, the person, not to a trading account: a session
 /// and the root account's API keys see the same alerts, and an API key scoped
-/// to a subaccount is refused (PERMISSION_DENIED, SUBACCOUNT_KEY_REFUSED). No
+/// to a subaccount is refused (PERMISSION_DENIED, SUBACCOUNT_KEY_REFUSED). An
+/// API key also needs its policy to grant the call's permission: READ_PRICE_ALERTS
+/// to list alerts, MANAGE_PRICE_ALERTS to create, update or cancel them. No
 /// call changes balances, orders or account settings.
 ///
 /// # Implementing handlers
@@ -215,7 +217,8 @@ pub trait PriceAlertService: Send + Sync + 'static {
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original alert stands.
     /// - UNAVAILABLE: PRICE_UNAVAILABLE or SERVICE_UNAVAILABLE; retry the same
     /// request.
-    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED.
+    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED, or AUTH_API_KEY_ACCESS_DENIED
+    /// when the API key's policy does not grant MANAGE_PRICE_ALERTS.
     /// - UNAUTHENTICATED: missing or invalid credentials.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -243,7 +246,8 @@ pub trait PriceAlertService: Send + Sync + 'static {
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request or page token.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
-    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED.
+    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED, or AUTH_API_KEY_ACCESS_DENIED
+    /// when the API key's policy does not grant READ_PRICE_ALERTS.
     /// - UNAUTHENTICATED: missing or invalid credentials.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -283,7 +287,8 @@ pub trait PriceAlertService: Send + Sync + 'static {
     /// - FAILED_PRECONDITION: ALERT_CANCELLED, PRICE_SOURCE_UNSUPPORTED,
     /// ALERT_LIMIT_REACHED or ALERT_UPDATE_LIMIT_REACHED.
     /// - UNAVAILABLE: PRICE_UNAVAILABLE or SERVICE_UNAVAILABLE; retry.
-    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED.
+    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED, or AUTH_API_KEY_ACCESS_DENIED
+    /// when the API key's policy does not grant MANAGE_PRICE_ALERTS.
     /// - UNAUTHENTICATED: missing or invalid credentials.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -314,7 +319,8 @@ pub trait PriceAlertService: Send + Sync + 'static {
     /// - NOT_FOUND: ALERT_NOT_FOUND.
     /// - FAILED_PRECONDITION: ALERT_TRIGGERED; the alert already fired.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry.
-    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED.
+    /// - PERMISSION_DENIED: SUBACCOUNT_KEY_REFUSED, or AUTH_API_KEY_ACCESS_DENIED
+    /// when the API key's policy does not grant MANAGE_PRICE_ALERTS.
     /// - UNAUTHENTICATED: missing or invalid credentials.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).

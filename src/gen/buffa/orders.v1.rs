@@ -602,10 +602,10 @@ impl ::buffa::Enumeration for FeeAsset {
         &[Self::FEE_ASSET_UNSPECIFIED, Self::QUOTE, Self::BASE]
     }
 }
-/// SelfTradePreventionMode controls which orders expire when an order would
-/// trade against another order of the same root account, including all its
+/// SelfTradePreventionMode controls what happens when an order would trade
+/// against another order of the same root account, including all its
 /// subaccounts: two subaccounts of one root never trade with each other. The
-/// incoming order's mode decides which orders expire.
+/// incoming order's mode decides which orders expire or are reduced.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum SelfTradePreventionMode {
@@ -617,6 +617,20 @@ pub enum SelfTradePreventionMode {
     EXPIRE_TAKER = 2i32,
     /// Cancel both maker and taker orders on self-trade.
     EXPIRE_BOTH = 3i32,
+    /// Reduce both orders by the quantity that would have traded, with no
+    /// trade. The order left with no quantity is canceled with
+    /// CANCEL_REASON_STP_DECREMENT, both when their quantities are equal; a
+    /// resting order that keeps a quantity keeps its place in the queue, and an
+    /// incoming order that keeps one goes on matching and may rest. A reduced
+    /// order's quantity is its original quantity less what self-trade
+    /// prevention removed. A fill-or-kill order that would meet such an order
+    /// before it is completely filled is rejected instead of reduced. Applies
+    /// to attached protective exits and trigger children too. Prevention does
+    /// not count as a fill of the parent position. A fully prevented attached
+    /// exit re-arms its unexecuted exposure and waits while the surviving self
+    /// maker heads the opposite book; it can fire again once that maker stops
+    /// leading.
+    DECREMENT = 4i32,
 }
 impl SelfTradePreventionMode {
     ///Idiomatic alias for [`Self::SELF_TRADE_PREVENTION_MODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -631,6 +645,9 @@ impl SelfTradePreventionMode {
     ///Idiomatic alias for [`Self::EXPIRE_BOTH`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ExpireBoth: Self = Self::EXPIRE_BOTH;
+    ///Idiomatic alias for [`Self::DECREMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Decrement: Self = Self::DECREMENT;
 }
 impl ::core::default::Default for SelfTradePreventionMode {
     fn default() -> Self {
@@ -737,6 +754,7 @@ impl ::buffa::Enumeration for SelfTradePreventionMode {
             1i32 => ::core::option::Option::Some(Self::EXPIRE_MAKER),
             2i32 => ::core::option::Option::Some(Self::EXPIRE_TAKER),
             3i32 => ::core::option::Option::Some(Self::EXPIRE_BOTH),
+            4i32 => ::core::option::Option::Some(Self::DECREMENT),
             _ => ::core::option::Option::None,
         }
     }
@@ -751,6 +769,7 @@ impl ::buffa::Enumeration for SelfTradePreventionMode {
             Self::EXPIRE_MAKER => "EXPIRE_MAKER",
             Self::EXPIRE_TAKER => "EXPIRE_TAKER",
             Self::EXPIRE_BOTH => "EXPIRE_BOTH",
+            Self::DECREMENT => "DECREMENT",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -763,6 +782,7 @@ impl ::buffa::Enumeration for SelfTradePreventionMode {
             "EXPIRE_MAKER" => ::core::option::Option::Some(Self::EXPIRE_MAKER),
             "EXPIRE_TAKER" => ::core::option::Option::Some(Self::EXPIRE_TAKER),
             "EXPIRE_BOTH" => ::core::option::Option::Some(Self::EXPIRE_BOTH),
+            "DECREMENT" => ::core::option::Option::Some(Self::DECREMENT),
             _ => ::core::option::Option::None,
         }
     }
@@ -772,7 +792,154 @@ impl ::buffa::Enumeration for SelfTradePreventionMode {
             Self::EXPIRE_MAKER,
             Self::EXPIRE_TAKER,
             Self::EXPIRE_BOTH,
+            Self::DECREMENT,
         ]
+    }
+}
+/// The displayed book side used for a static entry peg.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum PegReference {
+    /// No reference selected.
+    PEG_REFERENCE_UNSPECIFIED = 0i32,
+    /// Highest live bid at entry.
+    BEST_BID = 1i32,
+    /// Lowest live ask at entry.
+    BEST_ASK = 2i32,
+}
+impl PegReference {
+    ///Idiomatic alias for [`Self::PEG_REFERENCE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PegReferenceUnspecified: Self = Self::PEG_REFERENCE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BEST_BID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BestBid: Self = Self::BEST_BID;
+    ///Idiomatic alias for [`Self::BEST_ASK`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BestAsk: Self = Self::BEST_ASK;
+}
+impl ::core::default::Default for PegReference {
+    fn default() -> Self {
+        Self::PEG_REFERENCE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for PegReference {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for PegReference {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = PegReference;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(PegReference)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<PegReference, E> {
+                <PegReference as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<PegReference, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PegReference as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<PegReference, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PegReference as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<PegReference, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PegReference {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for PegReference {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PEG_REFERENCE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::BEST_BID),
+            2i32 => ::core::option::Option::Some(Self::BEST_ASK),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PEG_REFERENCE_UNSPECIFIED => "PEG_REFERENCE_UNSPECIFIED",
+            Self::BEST_BID => "BEST_BID",
+            Self::BEST_ASK => "BEST_ASK",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PEG_REFERENCE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PEG_REFERENCE_UNSPECIFIED)
+            }
+            "BEST_BID" => ::core::option::Option::Some(Self::BEST_BID),
+            "BEST_ASK" => ::core::option::Option::Some(Self::BEST_ASK),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::PEG_REFERENCE_UNSPECIFIED, Self::BEST_BID, Self::BEST_ASK]
     }
 }
 /// ErrorCode enumerates stable machine-readable error codes for the Orders API.
@@ -832,7 +999,10 @@ pub enum ErrorCode {
     ERROR_CODE_POLICY_MAX_NOTIONAL = 21i32,
     /// Trading has been globally halted for this sub-account.
     ERROR_CODE_POLICY_TRADING_HALTED = 22i32,
-    /// Sub-account policy does not allow spot trading (action mask).
+    /// The sub-account's policy does not allow spot trading: enable TRADE_SPOT
+    /// (Spot Trading Write) on the sub-account's policy. A sub-account without a
+    /// policy is read-only. When the API key's policy lacks it instead, the
+    /// refusal is ERROR_CODE_API_KEY_SPOT_TRADE_DENY.
     ERROR_CODE_POLICY_SPOT_TRADE_DENY = 23i32,
     /// API key is scoped to the master/root account and cannot trade on
     /// sub-accounts.
@@ -842,7 +1012,8 @@ pub enum ErrorCode {
     ERROR_CODE_API_KEY_SUB_SCOPE_ONLY = 25i32,
     /// API key is scoped to a different sub-account than the one requested.
     ERROR_CODE_API_KEY_SUBACCOUNT_MISMATCH = 26i32,
-    /// API key must have an attached policy before it can be used for trading.
+    /// The API key has no policy, so it has no permissions: attach a policy to
+    /// the API key that grants what it needs.
     ERROR_CODE_API_KEY_POLICY_REQUIRED = 27i32,
     /// API key referenced in the request could not be resolved by the Orders
     /// service.
@@ -850,6 +1021,10 @@ pub enum ErrorCode {
     /// API key policy does not allow trading this market, even though the
     /// sub-account policy does.
     ERROR_CODE_API_KEY_MARKET_DENY = 29i32,
+    /// The API key's policy does not allow spot trading: enable TRADE_SPOT
+    /// (Spot Trading Write) on the API key's policy. When both the key's and the
+    /// sub-account's policies lack it, the key is named first.
+    ERROR_CODE_API_KEY_SPOT_TRADE_DENY = 78i32,
     /// Price must align with the pair tick size, including trigger and activation prices.
     ERROR_CODE_PRICE_TICK_SIZE = 30i32,
     /// Quantity is below the pair minimum quantity (base units).
@@ -929,8 +1104,10 @@ pub enum ErrorCode {
     /// HTTP 503. No Retry-After or RateLimit-* headers are supplied. Retry after
     /// one of the outstanding requests completes.
     ERROR_CODE_OVERLOADED = 67i32,
-    /// The all-in quote budget cannot resolve one valid step-aligned base quantity.
-    ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL = 68i32,
+    /// The quote amount cannot resolve one valid step-aligned base quantity: an
+    /// all-in quote budget at the order's highest price, or a quote proceeds
+    /// target at its lowest price.
+    ERROR_CODE_QUOTE_SIZE_TOO_SMALL = 68i32,
     /// The account exhausted its current order-admission quota.
     ERROR_CODE_RATE_LIMIT_EXCEEDED = 69i32,
     /// Caller has a sub-account role that does not allow reading spot data.
@@ -960,9 +1137,11 @@ pub enum ErrorCode {
     /// above its planned quantity. Nothing changed.
     ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED = 81i32,
     /// Attached take-profit, stop-loss or trailing legs can't be applied here:
-    /// this market takes none, an attached trailing stop isn't offered yet, or
-    /// the modify changes them together with the order's price, quantity, client
-    /// order ID or a replace. Nothing changed.
+    /// this market takes none, an attached trailing stop isn't offered yet, the
+    /// modify changes them together with the order's price, quantity, client
+    /// order ID or a replace, or the order was placed by a triggered take-profit,
+    /// stop-loss or trailing-stop leg, which can't carry legs of its own. Nothing
+    /// changed.
     ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED = 82i32,
     /// The account has too many filled or ended orders whose settlement has not
     /// completed yet. Nothing changed; the request is accepted again once settlement
@@ -1269,8 +1448,16 @@ pub enum ErrorCode {
     /// activated is already reached by that price, so it would activate at once.
     /// Nothing changed; the trigger keeps its previous settings. Returned by
     /// ModifyTrigger, and by an order modify that moves an attached take-profit,
-    /// stop-loss or trailing stop of an order with a fill. Choose a price the
-    /// market has not reached.
+    /// stop-loss or trailing stop of an order with a fill. Also returned when a
+    /// market order is created or previewed with an attached take-profit or
+    /// stop-loss on the last price that its own fill would trigger, at or past
+    /// the best price the order takes (the best ask for a buy, the best bid for
+    /// a sell); the order is not placed. A market order with an attached
+    /// take-profit or stop-loss on the index price that the index has already
+    /// reached is accepted, then rejected with this reason before it trades,
+    /// and so is one whose last-price leg the market reaches before the order
+    /// reaches the book; nothing is placed. Choose a price the market has not
+    /// reached.
     ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY = 302i32,
     /// The order was sent but not confirmed in time. Its outcome is unknown and
     /// it may have been accepted; read the order by its client order ID, or read
@@ -1280,8 +1467,8 @@ pub enum ErrorCode {
     /// and retries the rest without admitting any item twice.
     ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN = 303i32,
     /// The trigger was sent but not confirmed in time. Its outcome is unknown and
-    /// it may have been created; read the triggers for its client trigger ID
-    /// before retrying.
+    /// it may have been created; read the triggers for its client trigger ID,
+    /// or an OCO's for its client list ID, before retrying.
     ERROR_CODE_TRIGGER_CREATE_OUTCOME_UNKNOWN = 304i32,
     /// The request names a listed trading pair other than the trigger's own, so
     /// it was refused. Nothing changed; name the trigger's own pair, or omit the
@@ -1331,6 +1518,24 @@ pub enum ErrorCode {
     /// of a signed request, or recv_window_ms of a WebSocket command. Send a new
     /// request with a fresh timestamp.
     ERROR_CODE_REQUEST_DEADLINE_EXCEEDED = 308i32,
+    /// A display quantity was set on an order that cannot be an iceberg order.
+    /// Only good-till-cancelled and good-till-date limit orders without attached
+    /// take-profit, stop-loss or trailing stop orders can be iceberg orders.
+    /// Nothing changed.
+    ERROR_CODE_ICEBERG_NOT_ALLOWED = 309i32,
+    /// The iceberg display quantity is below the pair's minimum order quantity,
+    /// or splits the order's quantity into more than 100 parts: it must be at
+    /// least the order's quantity divided by 100, rounded up. Nothing changed.
+    ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL = 310i32,
+    /// The iceberg display quantity is not below the order's quantity, or is not
+    /// a multiple of the pair's quantity step. Nothing changed.
+    ERROR_CODE_ICEBERG_DISPLAY_INVALID = 311i32,
+    /// Resolved peg exceeds its buy cap or falls below its sell floor.
+    ERROR_CODE_PEG_LIMIT_VIOLATION = 312i32,
+    /// Selected entry-peg book side has no live quote.
+    ERROR_CODE_PEG_REFERENCE_UNAVAILABLE = 313i32,
+    /// Entry peg has an invalid reference or unsupported combination.
+    ERROR_CODE_INVALID_PEG = 314i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1423,6 +1628,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_API_KEY_MARKET_DENY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ApiKeyMarketDeny: Self = Self::ERROR_CODE_API_KEY_MARKET_DENY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ApiKeySpotTradeDeny: Self = Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY;
     ///Idiomatic alias for [`Self::ERROR_CODE_PRICE_TICK_SIZE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const PriceTickSize: Self = Self::ERROR_CODE_PRICE_TICK_SIZE;
@@ -1525,9 +1733,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_OVERLOADED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Overloaded: Self = Self::ERROR_CODE_OVERLOADED;
-    ///Idiomatic alias for [`Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const MaxQuoteDebitTooSmall: Self = Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL;
+    pub const QuoteSizeTooSmall: Self = Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL;
     ///Idiomatic alias for [`Self::ERROR_CODE_RATE_LIMIT_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RateLimitExceeded: Self = Self::ERROR_CODE_RATE_LIMIT_EXCEEDED;
@@ -1927,6 +2135,24 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const RequestDeadlineExceeded: Self = Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ICEBERG_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IcebergNotAllowed: Self = Self::ERROR_CODE_ICEBERG_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IcebergDisplayTooSmall: Self = Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IcebergDisplayInvalid: Self = Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PEG_LIMIT_VIOLATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PegLimitViolation: Self = Self::ERROR_CODE_PEG_LIMIT_VIOLATION;
+    ///Idiomatic alias for [`Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PegReferenceUnavailable: Self = Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_PEG`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidPeg: Self = Self::ERROR_CODE_INVALID_PEG;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2068,6 +2294,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             28i32 => ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_UNKNOWN),
             29i32 => ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_MARKET_DENY),
+            78i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY)
+            }
             30i32 => ::core::option::Option::Some(Self::ERROR_CODE_PRICE_TICK_SIZE),
             31i32 => ::core::option::Option::Some(Self::ERROR_CODE_MIN_QTY),
             32i32 => ::core::option::Option::Some(Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY),
@@ -2132,9 +2361,7 @@ impl ::buffa::Enumeration for ErrorCode {
             65i32 => ::core::option::Option::Some(Self::ERROR_CODE_STALE_QUOTE),
             66i32 => ::core::option::Option::Some(Self::ERROR_CODE_VALIDATION_ERROR),
             67i32 => ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED),
-            68i32 => {
-                ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
-            }
+            68i32 => ::core::option::Option::Some(Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL),
             69i32 => ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED),
             70i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN)
@@ -2554,6 +2781,18 @@ impl ::buffa::Enumeration for ErrorCode {
             308i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
             }
+            309i32 => ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_NOT_ALLOWED),
+            310i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL)
+            }
+            311i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID)
+            }
+            312i32 => ::core::option::Option::Some(Self::ERROR_CODE_PEG_LIMIT_VIOLATION),
+            313i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE)
+            }
+            314i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_PEG),
             _ => ::core::option::Option::None,
         }
     }
@@ -2604,6 +2843,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_API_KEY_UNKNOWN => "ERROR_CODE_API_KEY_UNKNOWN",
             Self::ERROR_CODE_API_KEY_MARKET_DENY => "ERROR_CODE_API_KEY_MARKET_DENY",
+            Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY => {
+                "ERROR_CODE_API_KEY_SPOT_TRADE_DENY"
+            }
             Self::ERROR_CODE_PRICE_TICK_SIZE => "ERROR_CODE_PRICE_TICK_SIZE",
             Self::ERROR_CODE_MIN_QTY => "ERROR_CODE_MIN_QTY",
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY => "ERROR_CODE_POST_ONLY_LIMIT_ONLY",
@@ -2660,9 +2902,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STALE_QUOTE => "ERROR_CODE_STALE_QUOTE",
             Self::ERROR_CODE_VALIDATION_ERROR => "ERROR_CODE_VALIDATION_ERROR",
             Self::ERROR_CODE_OVERLOADED => "ERROR_CODE_OVERLOADED",
-            Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL => {
-                "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL"
-            }
+            Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL => "ERROR_CODE_QUOTE_SIZE_TOO_SMALL",
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED => "ERROR_CODE_RATE_LIMIT_EXCEEDED",
             Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN => {
                 "ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN"
@@ -2976,6 +3216,18 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED => {
                 "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED"
             }
+            Self::ERROR_CODE_ICEBERG_NOT_ALLOWED => "ERROR_CODE_ICEBERG_NOT_ALLOWED",
+            Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL => {
+                "ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL"
+            }
+            Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID => {
+                "ERROR_CODE_ICEBERG_DISPLAY_INVALID"
+            }
+            Self::ERROR_CODE_PEG_LIMIT_VIOLATION => "ERROR_CODE_PEG_LIMIT_VIOLATION",
+            Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE => {
+                "ERROR_CODE_PEG_REFERENCE_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_INVALID_PEG => "ERROR_CODE_INVALID_PEG",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -3073,6 +3325,9 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             "ERROR_CODE_API_KEY_MARKET_DENY" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_MARKET_DENY)
+            }
+            "ERROR_CODE_API_KEY_SPOT_TRADE_DENY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY)
             }
             "ERROR_CODE_PRICE_TICK_SIZE" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_PRICE_TICK_SIZE)
@@ -3184,8 +3439,8 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_OVERLOADED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_OVERLOADED)
             }
-            "ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL" => {
-                ::core::option::Option::Some(Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL)
+            "ERROR_CODE_QUOTE_SIZE_TOO_SMALL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL)
             }
             "ERROR_CODE_RATE_LIMIT_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_RATE_LIMIT_EXCEEDED)
@@ -3674,6 +3929,24 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_REQUEST_DEADLINE_EXCEEDED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED)
             }
+            "ERROR_CODE_ICEBERG_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_NOT_ALLOWED)
+            }
+            "ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL)
+            }
+            "ERROR_CODE_ICEBERG_DISPLAY_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID)
+            }
+            "ERROR_CODE_PEG_LIMIT_VIOLATION" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PEG_LIMIT_VIOLATION)
+            }
+            "ERROR_CODE_PEG_REFERENCE_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE)
+            }
+            "ERROR_CODE_INVALID_PEG" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_INVALID_PEG)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3709,6 +3982,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_API_KEY_POLICY_REQUIRED,
             Self::ERROR_CODE_API_KEY_UNKNOWN,
             Self::ERROR_CODE_API_KEY_MARKET_DENY,
+            Self::ERROR_CODE_API_KEY_SPOT_TRADE_DENY,
             Self::ERROR_CODE_PRICE_TICK_SIZE,
             Self::ERROR_CODE_MIN_QTY,
             Self::ERROR_CODE_POST_ONLY_LIMIT_ONLY,
@@ -3743,7 +4017,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STALE_QUOTE,
             Self::ERROR_CODE_VALIDATION_ERROR,
             Self::ERROR_CODE_OVERLOADED,
-            Self::ERROR_CODE_MAX_QUOTE_DEBIT_TOO_SMALL,
+            Self::ERROR_CODE_QUOTE_SIZE_TOO_SMALL,
             Self::ERROR_CODE_RATE_LIMIT_EXCEEDED,
             Self::ERROR_CODE_SUBACCOUNT_READ_FORBIDDEN,
             Self::ERROR_CODE_POLICY_SPOT_READ_DENY,
@@ -3877,6 +4151,12 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CHILD_ORDER_INCONSISTENT,
             Self::ERROR_CODE_PATH_BODY_ID_MISMATCH,
             Self::ERROR_CODE_REQUEST_DEADLINE_EXCEEDED,
+            Self::ERROR_CODE_ICEBERG_NOT_ALLOWED,
+            Self::ERROR_CODE_ICEBERG_DISPLAY_TOO_SMALL,
+            Self::ERROR_CODE_ICEBERG_DISPLAY_INVALID,
+            Self::ERROR_CODE_PEG_LIMIT_VIOLATION,
+            Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE,
+            Self::ERROR_CODE_INVALID_PEG,
         ]
     }
 }
@@ -5220,6 +5500,27 @@ pub struct LimitGtc {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub post_only: bool,
+    /// Optional iceberg display quantity, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+    /// positive, the order book shows at most this quantity of the order; once
+    /// that shown part is fully executed, the next part is shown at the same
+    /// price, behind the orders already resting there. It must be below
+    /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+    /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+    /// rounded up, so the order splits into at most 100 parts: otherwise the
+    /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+    /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+    /// it.
+    ///
+    /// Field 3: `display_qty_scaled`
+    #[serde(
+        rename = "displayQtyScaled",
+        alias = "display_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub display_qty_scaled: i64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5229,6 +5530,7 @@ impl ::core::fmt::Debug for LimitGtc {
         f.debug_struct("LimitGtc")
             .field("price_ticks", &self.price_ticks)
             .field("post_only", &self.post_only)
+            .field("display_qty_scaled", &self.display_qty_scaled)
             .finish()
     }
 }
@@ -5263,6 +5565,11 @@ impl ::buffa::Message for LimitGtc {
         if self.post_only {
             size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
         }
+        if self.display_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.display_qty_scaled) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5278,6 +5585,9 @@ impl ::buffa::Message for LimitGtc {
         }
         if self.post_only {
             ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+        }
+        if self.display_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(3u32, self.display_qty_scaled, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5306,6 +5616,13 @@ impl ::buffa::Message for LimitGtc {
                 )?;
                 self.post_only = ::buffa::types::decode_bool(buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.display_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5316,6 +5633,7 @@ impl ::buffa::Message for LimitGtc {
     fn clear(&mut self) {
         self.price_ticks = 0i64;
         self.post_only = false;
+        self.display_qty_scaled = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5385,6 +5703,27 @@ pub struct LimitGtd {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub expire_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Optional iceberg display quantity, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+    /// positive, the order book shows at most this quantity of the order; once
+    /// that shown part is fully executed, the next part is shown at the same
+    /// price, behind the orders already resting there. It must be below
+    /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+    /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+    /// rounded up, so the order splits into at most 100 parts: otherwise the
+    /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+    /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+    /// it.
+    ///
+    /// Field 4: `display_qty_scaled`
+    #[serde(
+        rename = "displayQtyScaled",
+        alias = "display_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub display_qty_scaled: i64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5395,6 +5734,7 @@ impl ::core::fmt::Debug for LimitGtd {
             .field("price_ticks", &self.price_ticks)
             .field("post_only", &self.post_only)
             .field("expire_at", &self.expire_at)
+            .field("display_qty_scaled", &self.display_qty_scaled)
             .finish()
     }
 }
@@ -5437,6 +5777,11 @@ impl ::buffa::Message for LimitGtd {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.display_qty_scaled != 0i64 {
+            size
+                += 1u32
+                    + ::buffa::types::int64_encoded_len(self.display_qty_scaled) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5456,6 +5801,9 @@ impl ::buffa::Message for LimitGtd {
         if self.expire_at.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.expire_at.write_to(__cache, buf);
+        }
+        if self.display_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(4u32, self.display_qty_scaled, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5495,6 +5843,13 @@ impl ::buffa::Message for LimitGtd {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.display_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5506,6 +5861,7 @@ impl ::buffa::Message for LimitGtd {
         self.price_ticks = 0i64;
         self.post_only = false;
         self.expire_at = ::buffa::MessageField::none();
+        self.display_qty_scaled = 0i64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5790,6 +6146,171 @@ pub const __LIMIT_FOK_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
     from_json: ::buffa::type_registry::any_from_json::<LimitFok>,
     is_wkt: false,
 };
+/// Derives a limit price once at entry. Available only with base quantity and
+/// limit execution, without attached risk. The limit execution's price_ticks is
+/// required: a BUY maximum price or SELL minimum price. A derived price beyond
+/// that bound is rejected. The order never follows later book changes.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct StaticPeg {
+    /// Required public book side. An empty selected side rejects the order.
+    ///
+    /// Field 1: `reference`
+    #[serde(
+        rename = "reference",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reference: ::buffa::EnumValue<PegReference>,
+    /// Signed number of configured price increments added to the reference.
+    /// One increment is the pair’s configured price increment in quote units; this count
+    /// is not Q9 and does not select occupied price levels. Defaults to zero.
+    ///
+    /// Field 2: `offset_ticks`
+    #[serde(
+        rename = "offsetTicks",
+        alias = "offset_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub offset_ticks: i64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for StaticPeg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("StaticPeg")
+            .field("reference", &self.reference)
+            .field("offset_ticks", &self.offset_ticks)
+            .finish()
+    }
+}
+impl StaticPeg {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.StaticPeg";
+}
+::buffa::impl_default_instance!(StaticPeg);
+impl ::buffa::MessageName for StaticPeg {
+    const PACKAGE: &'static str = "orders.v1";
+    const NAME: &'static str = "StaticPeg";
+    const FULL_NAME: &'static str = "orders.v1.StaticPeg";
+    const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.StaticPeg";
+}
+impl ::buffa::Message for StaticPeg {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.reference.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.offset_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.offset_ticks) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.reference.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.offset_ticks != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.offset_ticks, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.offset_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.reference = ::buffa::EnumValue::from(0);
+        self.offset_ticks = 0i64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for StaticPeg {
+    const PROTO_FQN: &'static str = "orders.v1.StaticPeg";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for StaticPeg {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __STATIC_PEG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/orders.v1.StaticPeg",
+    to_json: ::buffa::type_registry::any_to_json::<StaticPeg>,
+    from_json: ::buffa::type_registry::any_from_json::<StaticPeg>,
+    is_wkt: false,
+};
 /// OrderIntent contains one order's complete, transport-independent placement
 /// intent. Single and batch create use this same message.
 #[derive(Clone, PartialEq, Default)]
@@ -5860,6 +6381,15 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub attached_risk: ::buffa::MessageField<RiskPolicy>,
+    /// Optional static peg. The selected limit execution still requires its price
+    /// bound. Quote sizing, market execution and attached risk are invalid.
+    ///
+    /// Field 31: `peg`
+    #[serde(
+        rename = "peg",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub peg: ::buffa::MessageField<StaticPeg>,
     #[serde(flatten)]
     pub sizing: ::core::option::Option<__buffa::oneof::order_intent::Sizing>,
     #[serde(flatten)]
@@ -5877,6 +6407,7 @@ impl ::core::fmt::Debug for OrderIntent {
             .field("fee_asset", &self.fee_asset)
             .field("self_trade_prevention_mode", &self.self_trade_prevention_mode)
             .field("attached_risk", &self.attached_risk)
+            .field("peg", &self.peg)
             .field("sizing", &self.sizing)
             .field("execution", &self.execution)
             .finish()
@@ -5922,6 +6453,9 @@ impl ::buffa::Message for OrderIntent {
                     size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
                 __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(v) => {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                }
+                __buffa::oneof::order_intent::Sizing::QuoteProceedsScaled(v) => {
                     size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                 }
             }
@@ -5995,6 +6529,14 @@ impl ::buffa::Message for OrderIntent {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.peg.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.peg.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -6021,6 +6563,9 @@ impl ::buffa::Message for OrderIntent {
                 }
                 __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(x) => {
                     ::buffa::types::put_int64_field(4u32, *x, buf);
+                }
+                __buffa::oneof::order_intent::Sizing::QuoteProceedsScaled(x) => {
+                    ::buffa::types::put_int64_field(5u32, *x, buf);
                 }
             }
         }
@@ -6087,6 +6632,10 @@ impl ::buffa::Message for OrderIntent {
             ::buffa::types::put_len_delimited_header(30u32, __cache.consume_next(), buf);
             self.attached_risk.write_to(__cache, buf);
         }
+        if self.peg.is_set() {
+            ::buffa::types::put_len_delimited_header(31u32, __cache.consume_next(), buf);
+            self.peg.write_to(__cache, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -6132,6 +6681,17 @@ impl ::buffa::Message for OrderIntent {
                 )?;
                 self.sizing = ::core::option::Option::Some(
                     __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                        ::buffa::types::decode_int64(buf)?,
+                    ),
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sizing = ::core::option::Option::Some(
+                    __buffa::oneof::order_intent::Sizing::QuoteProceedsScaled(
                         ::buffa::types::decode_int64(buf)?,
                     ),
                 );
@@ -6272,6 +6832,17 @@ impl ::buffa::Message for OrderIntent {
                     ctx,
                 )?;
             }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.peg.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6288,6 +6859,7 @@ impl ::buffa::Message for OrderIntent {
         self.fee_asset = ::buffa::EnumValue::from(0);
         self.self_trade_prevention_mode = ::buffa::EnumValue::from(0);
         self.attached_risk = ::buffa::MessageField::none();
+        self.peg = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6328,6 +6900,9 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 > = None;
                 let mut __f_attached_risk: ::core::option::Option<
                     ::buffa::MessageField<RiskPolicy>,
+                > = None;
+                let mut __f_peg: ::core::option::Option<
+                    ::buffa::MessageField<StaticPeg>,
                 > = None;
                 let mut __oneof_sizing: ::core::option::Option<
                     __buffa::oneof::order_intent::Sizing,
@@ -6429,6 +7004,11 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                                 map.next_value::<::buffa::MessageField<RiskPolicy>>()?,
                             );
                         }
+                        "peg" => {
+                            __f_peg = Some(
+                                map.next_value::<::buffa::MessageField<StaticPeg>>()?,
+                            );
+                        }
                         "baseQtyScaled" | "base_qty_scaled" => {
                             struct _DeserSeed;
                             impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
@@ -6482,6 +7062,34 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                                 }
                                 __oneof_sizing = Some(
                                     __buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(v),
+                                );
+                            }
+                        }
+                        "quoteProceedsScaled" | "quote_proceeds_scaled" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = i64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<i64, D::Error> {
+                                    ::buffa::json_helpers::int64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<i64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_sizing.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'sizing'",
+                                        ),
+                                    );
+                                }
+                                __oneof_sizing = Some(
+                                    __buffa::oneof::order_intent::Sizing::QuoteProceedsScaled(v),
                                 );
                             }
                         }
@@ -6628,6 +7236,9 @@ impl<'de> serde::Deserialize<'de> for OrderIntent {
                 }
                 if let ::core::option::Option::Some(v) = __f_attached_risk {
                     __r.attached_risk = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_peg {
+                    __r.peg = v;
                 }
                 __r.sizing = __oneof_sizing;
                 __r.execution = __oneof_execution;
@@ -6919,6 +7530,18 @@ pub struct CreateOrderResponse {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+    /// Submitted quote proceeds target, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+    /// method was submitted.
+    ///
+    /// Field 7: `submitted_quote_proceeds_scaled`
+    #[serde(
+        rename = "submittedQuoteProceedsScaled",
+        alias = "submitted_quote_proceeds_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
     /// Trigger ID for attached take-profit.
     ///
     /// Field 20: `take_profit_trigger_id`
@@ -6965,6 +7588,10 @@ impl ::core::fmt::Debug for CreateOrderResponse {
                 "submitted_max_quote_debit_scaled",
                 &self.submitted_max_quote_debit_scaled,
             )
+            .field(
+                "submitted_quote_proceeds_scaled",
+                &self.submitted_quote_proceeds_scaled,
+            )
             .field("take_profit_trigger_id", &self.take_profit_trigger_id)
             .field("stop_loss_trigger_id", &self.stop_loss_trigger_id)
             .field("trailing_stop_trigger_id", &self.trailing_stop_trigger_id)
@@ -6984,6 +7611,13 @@ impl CreateOrderResponse {
     ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
     pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
         self.submitted_max_quote_debit_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_quote_proceeds_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_quote_proceeds_scaled(mut self, value: i64) -> Self {
+        self.submitted_quote_proceeds_scaled = Some(value);
         self
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
@@ -7056,6 +7690,9 @@ impl ::buffa::Message for CreateOrderResponse {
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         if let Some(v) = self.take_profit_trigger_id {
             size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
@@ -7093,6 +7730,9 @@ impl ::buffa::Message for CreateOrderResponse {
         }
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             ::buffa::types::put_int64_field(6u32, v, buf);
+        }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            ::buffa::types::put_int64_field(7u32, v, buf);
         }
         if let Some(v) = self.take_profit_trigger_id {
             ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -7164,6 +7804,15 @@ impl ::buffa::Message for CreateOrderResponse {
                     ::buffa::types::decode_int64(buf)?,
                 );
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_quote_proceeds_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -7205,6 +7854,7 @@ impl ::buffa::Message for CreateOrderResponse {
         self.accepted_at_ts_ns = 0u64;
         self.resolved_base_qty_scaled = 0i64;
         self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
+        self.submitted_quote_proceeds_scaled = ::core::option::Option::None;
         self.take_profit_trigger_id = ::core::option::Option::None;
         self.stop_loss_trigger_id = ::core::option::Option::None;
         self.trailing_stop_trigger_id = ::core::option::Option::None;
@@ -10299,6 +10949,19 @@ pub mod trailing_stop_policy {
 /// at the order's limit price, or a market order's maximum slippage price:
 /// the least it buys if it spends the amount.
 ///
+/// Each leg's exit must be able to meet the pair's minimum quantity, step size
+/// and minimum notional for the parent's whole quantity, valued where it would
+/// execute: a buy-back at its maximum price (a market exit's slippage bound
+/// above its trigger price, a limit exit's limit price, a trailing stop's limit
+/// price), a market sell exit at its slippage bound below its trigger price, a
+/// limit sell exit at its limit price, and a trailing sell exit by its quantity
+/// alone. An order, or a ModifyOrder, whose leg could never meet them is
+/// rejected with that check's code (ERROR_CODE_MIN_QTY,
+/// ERROR_CODE_QTY_STEP_SIZE or ERROR_CODE_MIN_NOTIONAL), as for the order
+/// itself, and its ErrorDetail names the leg with a field violation on its
+/// attached-risk field (take_profit, stop_loss or trailing_stop) whose rule is
+/// that code. Nothing is placed or changed.
+///
 /// The legs of one parent share that position, whether or not oco is set, and
 /// only one exit works at a time. The first leg whose condition is met submits
 /// an exit for the whole remaining position, rounded down to the pair's step
@@ -12818,6 +13481,17 @@ pub struct BatchCreateAccepted {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+    /// Submitted quote proceeds target, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+    ///
+    /// Field 7: `submitted_quote_proceeds_scaled`
+    #[serde(
+        rename = "submittedQuoteProceedsScaled",
+        alias = "submitted_quote_proceeds_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12833,6 +13507,10 @@ impl ::core::fmt::Debug for BatchCreateAccepted {
             .field(
                 "submitted_max_quote_debit_scaled",
                 &self.submitted_max_quote_debit_scaled,
+            )
+            .field(
+                "submitted_quote_proceeds_scaled",
+                &self.submitted_quote_proceeds_scaled,
             )
             .finish()
     }
@@ -12871,6 +13549,13 @@ impl BatchCreateAccepted {
     ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
     pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
         self.submitted_max_quote_debit_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_quote_proceeds_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_quote_proceeds_scaled(mut self, value: i64) -> Self {
+        self.submitted_quote_proceeds_scaled = Some(value);
         self
     }
 }
@@ -12913,6 +13598,9 @@ impl ::buffa::Message for BatchCreateAccepted {
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
         }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -12940,6 +13628,9 @@ impl ::buffa::Message for BatchCreateAccepted {
         }
         if let Some(v) = self.submitted_max_quote_debit_scaled {
             ::buffa::types::put_int64_field(6u32, v, buf);
+        }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            ::buffa::types::put_int64_field(7u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -13004,6 +13695,15 @@ impl ::buffa::Message for BatchCreateAccepted {
                     ::buffa::types::decode_int64(buf)?,
                 );
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_quote_proceeds_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -13018,6 +13718,7 @@ impl ::buffa::Message for BatchCreateAccepted {
         self.trailing_stop_trigger_id = ::core::option::Option::None;
         self.resolved_base_qty_scaled = 0i64;
         self.submitted_max_quote_debit_scaled = ::core::option::Option::None;
+        self.submitted_quote_proceeds_scaled = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -17403,7 +18104,10 @@ pub enum OrderStatus {
     /// Fully filled (no remaining quantity). A buy sized by a quote amount
     /// (max_quote_debit_scaled) is fully filled once it has spent that amount:
     /// what is left of it buys no further quantity step at the next price the
-    /// order could fill at. Its quantity is then what it bought.
+    /// order could fill at. Its quantity is then what it bought. A sell sized by
+    /// a quote proceeds target (quote_proceeds_scaled) is fully filled once
+    /// what is left of that target sells no further quantity step at the next
+    /// price the order could fill at. Its quantity is then what it sold.
     FILLED = 4i32,
     /// Canceled and no longer working.
     CANCELED = 5i32,
@@ -17589,14 +18293,17 @@ pub enum CancelReason {
     /// A cancel the account sent: a cancel, a batch cancel or a cancel-all.
     CANCEL_REASON_USER_REQUEST = 1i32,
     /// The unfilled remainder of an immediate-or-cancel order. A buy sized by a
-    /// quote amount (max_quote_debit_scaled) that spends that amount ends
-    /// FILLED instead.
+    /// quote amount (max_quote_debit_scaled) that spends that amount, or a sell
+    /// sized by a quote proceeds target (quote_proceeds_scaled) that receives
+    /// it, ends FILLED instead.
     CANCEL_REASON_IOC_REMAINDER = 2i32,
     /// The unfilled remainder of a market order: the book ran out, the next
     /// price was past the order's protection price, or the order reached the
     /// market's maximum order quantity. A market buy sized by a quote amount
     /// (max_quote_debit_scaled) that spends that amount, so that what is left
-    /// buys no further quantity step, ends FILLED instead.
+    /// buys no further quantity step, ends FILLED instead, as does a market sell
+    /// sized by a quote proceeds target (quote_proceeds_scaled) once what is
+    /// left of the target sells no further quantity step.
     CANCEL_REASON_MARKET_REMAINDER = 3i32,
     /// Self-trade prevention canceled this resting order when an incoming order
     /// belonging to the same root account, including another subaccount of that
@@ -17647,6 +18354,23 @@ pub enum CancelReason {
     /// remainder before placing the attached order, so the two never trade with
     /// each other. Fills before the cancel stand.
     CANCEL_REASON_ATTACHED_EXIT_FIRED = 18i32,
+    /// Self-trade prevention mode DECREMENT reduced this order to its filled
+    /// quantity: an incoming order met a resting order belonging to the same
+    /// root account, including another subaccount of that root, both were
+    /// reduced by the quantity that would have traded, with no trade, and this
+    /// order had no quantity left. Fills before the cancel stand.
+    CANCEL_REASON_STP_DECREMENT = 19i32,
+    /// The market's price band stopped the order: it filled up to the band's
+    /// limit price, and its unfilled remainder was canceled rather than trade
+    /// beyond the band. Fills before the cancel stand.
+    CANCEL_REASON_PRICE_BAND = 20i32,
+    /// Cancel-on-disconnect canceled the order: the trading WebSocket
+    /// connections of the account that opted in to cancel-on-disconnect all
+    /// closed, and no session of the account opted in again before each one's
+    /// grace period passed. An order the account's own cancel-all-after timer
+    /// canceled reads CANCEL_REASON_CANCEL_ALL_AFTER instead. Fills before the
+    /// cancel stand.
+    CANCEL_REASON_CANCEL_ON_DISCONNECT = 21i32,
 }
 impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -17706,6 +18430,15 @@ impl CancelReason {
     ///Idiomatic alias for [`Self::CANCEL_REASON_ATTACHED_EXIT_FIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AttachedExitFired: Self = Self::CANCEL_REASON_ATTACHED_EXIT_FIRED;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_STP_DECREMENT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StpDecrement: Self = Self::CANCEL_REASON_STP_DECREMENT;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_PRICE_BAND`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PriceBand: Self = Self::CANCEL_REASON_PRICE_BAND;
+    ///Idiomatic alias for [`Self::CANCEL_REASON_CANCEL_ON_DISCONNECT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelOnDisconnect: Self = Self::CANCEL_REASON_CANCEL_ON_DISCONNECT;
 }
 impl ::core::default::Default for CancelReason {
     fn default() -> Self {
@@ -17826,6 +18559,11 @@ impl ::buffa::Enumeration for CancelReason {
             18i32 => {
                 ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_EXIT_FIRED)
             }
+            19i32 => ::core::option::Option::Some(Self::CANCEL_REASON_STP_DECREMENT),
+            20i32 => ::core::option::Option::Some(Self::CANCEL_REASON_PRICE_BAND),
+            21i32 => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_CANCEL_ON_DISCONNECT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -17858,6 +18596,11 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_MARKET_HALTED => "CANCEL_REASON_MARKET_HALTED",
             Self::CANCEL_REASON_ATTACHED_EXIT_FIRED => {
                 "CANCEL_REASON_ATTACHED_EXIT_FIRED"
+            }
+            Self::CANCEL_REASON_STP_DECREMENT => "CANCEL_REASON_STP_DECREMENT",
+            Self::CANCEL_REASON_PRICE_BAND => "CANCEL_REASON_PRICE_BAND",
+            Self::CANCEL_REASON_CANCEL_ON_DISCONNECT => {
+                "CANCEL_REASON_CANCEL_ON_DISCONNECT"
             }
         }
     }
@@ -17920,6 +18663,15 @@ impl ::buffa::Enumeration for CancelReason {
             "CANCEL_REASON_ATTACHED_EXIT_FIRED" => {
                 ::core::option::Option::Some(Self::CANCEL_REASON_ATTACHED_EXIT_FIRED)
             }
+            "CANCEL_REASON_STP_DECREMENT" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_STP_DECREMENT)
+            }
+            "CANCEL_REASON_PRICE_BAND" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_PRICE_BAND)
+            }
+            "CANCEL_REASON_CANCEL_ON_DISCONNECT" => {
+                ::core::option::Option::Some(Self::CANCEL_REASON_CANCEL_ON_DISCONNECT)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -17944,6 +18696,9 @@ impl ::buffa::Enumeration for CancelReason {
             Self::CANCEL_REASON_SYSTEM,
             Self::CANCEL_REASON_MARKET_HALTED,
             Self::CANCEL_REASON_ATTACHED_EXIT_FIRED,
+            Self::CANCEL_REASON_STP_DECREMENT,
+            Self::CANCEL_REASON_PRICE_BAND,
+            Self::CANCEL_REASON_CANCEL_ON_DISCONNECT,
         ]
     }
 }
@@ -20454,6 +21209,32 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub leaves_qty_scaled: i64,
+    /// Iceberg display quantity the order was placed with, scaled by the pair's
+    /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
+    /// order the order book shows at once. Zero for a plain order. A replace
+    /// keeps it.
+    ///
+    /// Field 39: `display_qty_scaled`
+    #[serde(
+        rename = "displayQtyScaled",
+        alias = "display_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub display_qty_scaled: i64,
+    /// Part of leaves_qty_scaled an iceberg order keeps hidden from the order
+    /// book, scaled by the pair's base_quantity_scale from GetSpotConfig for
+    /// symbol_id. The order book shows leaves_qty_scaled minus this quantity.
+    /// Zero for a plain order and for terminal orders.
+    ///
+    /// Field 40: `hidden_qty_scaled`
+    #[serde(
+        rename = "hiddenQtyScaled",
+        alias = "hidden_qty_scaled",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub hidden_qty_scaled: i64,
     /// Average execution price across the lineage through this generation,
     /// in quote units scaled by 1e9, rounded down. Zero if no fills.
     /// avg_price_e18 carries the exact average.
@@ -20494,6 +21275,13 @@ pub struct Order {
     /// since a rebate is credited; it is this amount alone when fee_asset is
     /// BASE, whose fee is taken from the base received. What it left unspent is
     /// submitted_max_quote_debit_scaled less the quote it used.
+    ///
+    /// For a SELL sized by a quote proceeds target
+    /// (submitted_quote_proceeds_scaled), this amount is the proceeds it
+    /// received before fees, never above the target; the quote it was credited
+    /// is this amount less fee_total's amount_e18, or plus it when fee_total's
+    /// is_rebate is true. What it did not receive is
+    /// submitted_quote_proceeds_scaled less this amount.
     ///
     /// Field 37: `cum_notional`
     #[serde(
@@ -20657,6 +21445,18 @@ pub struct Order {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+    /// Submitted quote proceeds target, scaled by the pair's
+    /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+    /// method was submitted.
+    ///
+    /// Field 41: `submitted_quote_proceeds_scaled`
+    #[serde(
+        rename = "submittedQuoteProceedsScaled",
+        alias = "submitted_quote_proceeds_scaled",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
     /// Logical-order identity and requested generation. Always populated by order reads.
     ///
     /// Field 31: `lineage`
@@ -20698,6 +21498,8 @@ impl ::core::fmt::Debug for Order {
             .field("cum_qty_scaled", &self.cum_qty_scaled)
             .field("inherited_cum_qty_scaled", &self.inherited_cum_qty_scaled)
             .field("leaves_qty_scaled", &self.leaves_qty_scaled)
+            .field("display_qty_scaled", &self.display_qty_scaled)
+            .field("hidden_qty_scaled", &self.hidden_qty_scaled)
             .field("avg_price_ticks", &self.avg_price_ticks)
             .field("avg_price_e18", &self.avg_price_e18)
             .field("cum_notional", &self.cum_notional)
@@ -20718,6 +21520,10 @@ impl ::core::fmt::Debug for Order {
                 "submitted_max_quote_debit_scaled",
                 &self.submitted_max_quote_debit_scaled,
             )
+            .field(
+                "submitted_quote_proceeds_scaled",
+                &self.submitted_quote_proceeds_scaled,
+            )
             .field("lineage", &self.lineage)
             .field("expire_at", &self.expire_at)
             .finish()
@@ -20736,6 +21542,13 @@ impl Order {
     ///Sets [`Self::submitted_max_quote_debit_scaled`] to `Some(value)`, consuming and returning `self`.
     pub fn with_submitted_max_quote_debit_scaled(mut self, value: i64) -> Self {
         self.submitted_max_quote_debit_scaled = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::submitted_quote_proceeds_scaled`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_submitted_quote_proceeds_scaled(mut self, value: i64) -> Self {
+        self.submitted_quote_proceeds_scaled = Some(value);
         self
     }
 }
@@ -20935,6 +21748,19 @@ impl ::buffa::Message for Order {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.display_qty_scaled != 0i64 {
+            size
+                += 2u32
+                    + ::buffa::types::int64_encoded_len(self.display_qty_scaled) as u32;
+        }
+        if self.hidden_qty_scaled != 0i64 {
+            size
+                += 2u32
+                    + ::buffa::types::int64_encoded_len(self.hidden_qty_scaled) as u32;
+        }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -21078,6 +21904,15 @@ impl ::buffa::Message for Order {
         if self.fee_total.is_set() {
             ::buffa::types::put_len_delimited_header(38u32, __cache.consume_next(), buf);
             self.fee_total.write_to(__cache, buf);
+        }
+        if self.display_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(39u32, self.display_qty_scaled, buf);
+        }
+        if self.hidden_qty_scaled != 0i64 {
+            ::buffa::types::put_int64_field(40u32, self.hidden_qty_scaled, buf);
+        }
+        if let Some(v) = self.submitted_quote_proceeds_scaled {
+            ::buffa::types::put_int64_field(41u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -21367,6 +22202,29 @@ impl ::buffa::Message for Order {
                     ctx,
                 )?;
             }
+            39u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.display_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            40u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.hidden_qty_scaled = ::buffa::types::decode_int64(buf)?;
+            }
+            41u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.submitted_quote_proceeds_scaled = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -21408,6 +22266,9 @@ impl ::buffa::Message for Order {
         self.avg_price_e18 = ::buffa::MessageField::none();
         self.cum_notional = ::buffa::MessageField::none();
         self.fee_total = ::buffa::MessageField::none();
+        self.display_qty_scaled = 0i64;
+        self.hidden_qty_scaled = 0i64;
+        self.submitted_quote_proceeds_scaled = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -26638,6 +27499,21 @@ pub mod __buffa {
             ///
             /// Field 2: `post_only`
             pub post_only: bool,
+            /// Optional iceberg display quantity, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+            /// positive, the order book shows at most this quantity of the order; once
+            /// that shown part is fully executed, the next part is shown at the same
+            /// price, behind the orders already resting there. It must be below
+            /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+            /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+            /// rounded up, so the order splits into at most 100 parts: otherwise the
+            /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+            /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+            /// it.
+            ///
+            /// Field 3: `display_qty_scaled`
+            pub display_qty_scaled: i64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LimitGtcView<'a> {
@@ -26685,6 +27561,15 @@ pub mod __buffa {
                         )?;
                         view.post_only = ::buffa::types::decode_bool(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.display_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -26710,6 +27595,7 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::LimitGtc {
                     price_ticks: self.price_ticks,
                     post_only: self.post_only,
+                    display_qty_scaled: self.display_qty_scaled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -26732,6 +27618,12 @@ pub mod __buffa {
                 if self.post_only {
                     size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
                 }
+                if self.display_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.display_qty_scaled)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -26748,6 +27640,9 @@ pub mod __buffa {
                 }
                 if self.post_only {
                     ::buffa::types::put_bool_field(2u32, self.post_only, buf);
+                }
+                if self.display_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(3u32, self.display_qty_scaled, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -26779,6 +27674,15 @@ pub mod __buffa {
                 }
                 if self.post_only {
                     __map.serialize_entry("postOnly", &self.post_only)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.display_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "displayQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.display_qty_scaled),
+                        )?;
                 }
                 __map.end()
             }
@@ -26886,6 +27790,24 @@ pub mod __buffa {
             pub fn post_only(&self) -> bool {
                 self.0.reborrow().post_only
             }
+            /// Optional iceberg display quantity, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+            /// positive, the order book shows at most this quantity of the order; once
+            /// that shown part is fully executed, the next part is shown at the same
+            /// price, behind the orders already resting there. It must be below
+            /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+            /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+            /// rounded up, so the order splits into at most 100 parts: otherwise the
+            /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+            /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+            /// it.
+            ///
+            /// Field 3: `display_qty_scaled`
+            #[must_use]
+            pub fn display_qty_scaled(&self) -> i64 {
+                self.0.reborrow().display_qty_scaled
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<LimitGtcView<'static>>>
         for LimitGtcOwnedView {
@@ -26937,6 +27859,21 @@ pub mod __buffa {
             pub expire_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Optional iceberg display quantity, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+            /// positive, the order book shows at most this quantity of the order; once
+            /// that shown part is fully executed, the next part is shown at the same
+            /// price, behind the orders already resting there. It must be below
+            /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+            /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+            /// rounded up, so the order splits into at most 100 parts: otherwise the
+            /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+            /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+            /// it.
+            ///
+            /// Field 4: `display_qty_scaled`
+            pub display_qty_scaled: i64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LimitGtdView<'a> {
@@ -27009,6 +27946,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.display_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -27042,6 +27988,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    display_qty_scaled: self.display_qty_scaled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -27072,6 +28019,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.display_qty_scaled != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.display_qty_scaled)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -27096,6 +28049,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.expire_at.write_to(__cache, buf);
+                }
+                if self.display_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(4u32, self.display_qty_scaled, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -27133,6 +28089,15 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("expireAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.display_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "displayQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.display_qty_scaled),
+                        )?;
                 }
                 __map.end()
             }
@@ -27251,6 +28216,24 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().expire_at
+            }
+            /// Optional iceberg display quantity, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig. Zero places a plain order. When
+            /// positive, the order book shows at most this quantity of the order; once
+            /// that shown part is fully executed, the next part is shown at the same
+            /// price, behind the orders already resting there. It must be below
+            /// base_qty_scaled, a multiple of the pair's quantity step, at least the
+            /// pair's minimum quantity, and at least base_qty_scaled divided by 100,
+            /// rounded up, so the order splits into at most 100 parts: otherwise the
+            /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
+            /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
+            /// it.
+            ///
+            /// Field 4: `display_qty_scaled`
+            #[must_use]
+            pub fn display_qty_scaled(&self) -> i64 {
+                self.0.reborrow().display_qty_scaled
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<LimitGtdView<'static>>>
@@ -27805,6 +28788,313 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// Derives a limit price once at entry. Available only with base quantity and
+        /// limit execution, without attached risk. The limit execution's price_ticks is
+        /// required: a BUY maximum price or SELL minimum price. A derived price beyond
+        /// that bound is rejected. The order never follows later book changes.
+        #[derive(Clone, Debug, Default)]
+        pub struct StaticPegView<'a> {
+            /// Required public book side. An empty selected side rejects the order.
+            ///
+            /// Field 1: `reference`
+            pub reference: ::buffa::EnumValue<super::super::PegReference>,
+            /// Signed number of configured price increments added to the reference.
+            /// One increment is the pair’s configured price increment in quote units; this count
+            /// is not Q9 and does not select occupied price levels. Defaults to zero.
+            ///
+            /// Field 2: `offset_ticks`
+            pub offset_ticks: i64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for StaticPegView<'a> {
+            type Owned = super::super::StaticPeg;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.offset_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::StaticPeg, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::StaticPeg, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::StaticPeg {
+                    reference: self.reference,
+                    offset_ticks: self.offset_ticks,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for StaticPegView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.reference.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.offset_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.offset_ticks)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.reference.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.offset_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.offset_ticks, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for StaticPegView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.reference,
+                ) {
+                    __map.serialize_entry("reference", &self.reference)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.offset_ticks) {
+                    __map
+                        .serialize_entry(
+                            "offsetTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.offset_ticks),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for StaticPegView<'a> {
+            const PACKAGE: &'static str = "orders.v1";
+            const NAME: &'static str = "StaticPeg";
+            const FULL_NAME: &'static str = "orders.v1.StaticPeg";
+            const TYPE_URL: &'static str = "type.googleapis.com/orders.v1.StaticPeg";
+        }
+        ::buffa::impl_default_view_instance!(StaticPegView);
+        ::buffa::impl_view_reborrow!(StaticPegView);
+        /** Self-contained, `'static` owned view of a `StaticPeg` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`StaticPegView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`StaticPegView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct StaticPegOwnedView(::buffa::OwnedView<StaticPegView<'static>>);
+        impl StaticPegOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StaticPegOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StaticPegOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::StaticPeg,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    StaticPegOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`StaticPegView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &StaticPegView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::StaticPeg, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Required public book side. An empty selected side rejects the order.
+            ///
+            /// Field 1: `reference`
+            #[must_use]
+            pub fn reference(&self) -> ::buffa::EnumValue<super::super::PegReference> {
+                self.0.reborrow().reference
+            }
+            /// Signed number of configured price increments added to the reference.
+            /// One increment is the pair’s configured price increment in quote units; this count
+            /// is not Q9 and does not select occupied price levels. Defaults to zero.
+            ///
+            /// Field 2: `offset_ticks`
+            #[must_use]
+            pub fn offset_ticks(&self) -> i64 {
+                self.0.reborrow().offset_ticks
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<StaticPegView<'static>>>
+        for StaticPegOwnedView {
+            fn from(inner: ::buffa::OwnedView<StaticPegView<'static>>) -> Self {
+                StaticPegOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<StaticPegOwnedView>
+        for ::buffa::OwnedView<StaticPegView<'static>> {
+            fn from(wrapper: StaticPegOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<StaticPegView<'static>>>
+        for StaticPegOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<StaticPegView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::StaticPeg {
+            type View<'a> = StaticPegView<'a>;
+            type ViewHandle = StaticPegOwnedView;
+        }
+        impl ::serde::Serialize for StaticPegOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// OrderIntent contains one order's complete, transport-independent placement
         /// intent. Single and batch create use this same message.
         #[derive(Clone, Debug, Default)]
@@ -27842,6 +29132,13 @@ pub mod __buffa {
             /// Field 30: `attached_risk`
             pub attached_risk: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RiskPolicyView<'a>,
+            >,
+            /// Optional static peg. The selected limit execution still requires its price
+            /// bound. Quote sizing, market execution and attached risk are invalid.
+            ///
+            /// Field 31: `peg`
+            pub peg: ::buffa::MessageFieldView<
+                super::super::__buffa::view::StaticPegView<'a>,
             >,
             pub sizing: ::core::option::Option<
                 super::super::__buffa::view::oneof::order_intent::Sizing,
@@ -27948,6 +29245,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.peg.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.peg = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::StaticPegView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -27966,6 +29288,17 @@ pub mod __buffa {
                         )?;
                         view.sizing = Some(
                             super::super::__buffa::view::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                                ::buffa::types::decode_int64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sizing = Some(
+                            super::super::__buffa::view::oneof::order_intent::Sizing::QuoteProceedsScaled(
                                 ::buffa::types::decode_int64(&mut cur)?,
                             ),
                         );
@@ -28167,6 +29500,14 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    peg: match self.peg.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::StaticPeg,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     sizing: self
                         .sizing
                         .as_ref()
@@ -28182,6 +29523,13 @@ pub mod __buffa {
                                 v,
                             ) => {
                                 super::super::__buffa::oneof::order_intent::Sizing::MaxQuoteDebitScaled(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::order_intent::Sizing::QuoteProceedsScaled(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::order_intent::Sizing::QuoteProceedsScaled(
                                     *v,
                                 )
                             }
@@ -28277,6 +29625,11 @@ pub mod __buffa {
                         ) => {
                             size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
                         }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::QuoteProceedsScaled(
+                            v,
+                        ) => {
+                            size += 1u32 + ::buffa::types::int64_encoded_len(*v) as u32;
+                        }
                     }
                 }
                 if let ::core::option::Option::Some(ref v) = self.execution {
@@ -28359,6 +29712,14 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.peg.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.peg.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -28390,6 +29751,11 @@ pub mod __buffa {
                             x,
                         ) => {
                             ::buffa::types::put_int64_field(4u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::QuoteProceedsScaled(
+                            x,
+                        ) => {
+                            ::buffa::types::put_int64_field(5u32, *x, buf);
                         }
                     }
                 }
@@ -28470,6 +29836,14 @@ pub mod __buffa {
                     );
                     self.attached_risk.write_to(__cache, buf);
                 }
+                if self.peg.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        31u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.peg.write_to(__cache, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -28526,6 +29900,11 @@ pub mod __buffa {
                         __map.serialize_entry("attachedRisk", __v)?;
                     }
                 }
+                {
+                    if let ::core::option::Option::Some(__v) = self.peg.as_option() {
+                        __map.serialize_entry("peg", __v)?;
+                    }
+                }
                 if let ::core::option::Option::Some(ref __ov) = self.sizing {
                     match __ov {
                         super::super::__buffa::view::oneof::order_intent::Sizing::BaseQtyScaled(
@@ -28543,6 +29922,15 @@ pub mod __buffa {
                             __map
                                 .serialize_entry(
                                     "maxQuoteDebitScaled",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::order_intent::Sizing::QuoteProceedsScaled(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "quoteProceedsScaled",
                                     &::buffa::json_helpers::ProtoJson(v),
                                 )?;
                         }
@@ -28724,6 +30112,18 @@ pub mod __buffa {
                 super::super::__buffa::view::RiskPolicyView<'_>,
             > {
                 &self.0.reborrow().attached_risk
+            }
+            /// Optional static peg. The selected limit execution still requires its price
+            /// bound. Quote sizing, market execution and attached risk are invalid.
+            ///
+            /// Field 31: `peg`
+            #[must_use]
+            pub fn peg(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::StaticPegView<'_>,
+            > {
+                &self.0.reborrow().peg
             }
             /// Oneof `sizing`.
             #[must_use]
@@ -29162,6 +30562,12 @@ pub mod __buffa {
             ///
             /// Field 6: `submitted_max_quote_debit_scaled`
             pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 7: `submitted_quote_proceeds_scaled`
+            pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
             /// Trigger ID for attached take-profit.
             ///
             /// Field 20: `take_profit_trigger_id`
@@ -29273,6 +30679,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_quote_proceeds_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -29343,6 +30758,8 @@ pub mod __buffa {
                     resolved_base_qty_scaled: self.resolved_base_qty_scaled,
                     submitted_max_quote_debit_scaled: self
                         .submitted_max_quote_debit_scaled,
+                    submitted_quote_proceeds_scaled: self
+                        .submitted_quote_proceeds_scaled,
                     take_profit_trigger_id: self.take_profit_trigger_id,
                     stop_loss_trigger_id: self.stop_loss_trigger_id,
                     trailing_stop_trigger_id: self.trailing_stop_trigger_id,
@@ -29393,6 +30810,9 @@ pub mod __buffa {
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 if let Some(v) = self.take_profit_trigger_id {
                     size += 2u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
@@ -29439,6 +30859,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     ::buffa::types::put_int64_field(6u32, v, buf);
+                }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    ::buffa::types::put_int64_field(7u32, v, buf);
                 }
                 if let Some(v) = self.take_profit_trigger_id {
                     ::buffa::types::put_uint64_field(20u32, v, buf);
@@ -29514,6 +30937,15 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "submittedMaxQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_quote_proceeds_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedQuoteProceedsScaled",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -29685,6 +31117,17 @@ pub mod __buffa {
                 &self,
             ) -> ::core::option::Option<i64> {
                 self.0.reborrow().submitted_max_quote_debit_scaled
+            }
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 7: `submitted_quote_proceeds_scaled`
+            #[must_use]
+            pub fn submitted_quote_proceeds_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_quote_proceeds_scaled
             }
             /// Trigger ID for attached take-profit.
             ///
@@ -34543,6 +35986,19 @@ pub mod __buffa {
         /// at the order's limit price, or a market order's maximum slippage price:
         /// the least it buys if it spends the amount.
         ///
+        /// Each leg's exit must be able to meet the pair's minimum quantity, step size
+        /// and minimum notional for the parent's whole quantity, valued where it would
+        /// execute: a buy-back at its maximum price (a market exit's slippage bound
+        /// above its trigger price, a limit exit's limit price, a trailing stop's limit
+        /// price), a market sell exit at its slippage bound below its trigger price, a
+        /// limit sell exit at its limit price, and a trailing sell exit by its quantity
+        /// alone. An order, or a ModifyOrder, whose leg could never meet them is
+        /// rejected with that check's code (ERROR_CODE_MIN_QTY,
+        /// ERROR_CODE_QTY_STEP_SIZE or ERROR_CODE_MIN_NOTIONAL), as for the order
+        /// itself, and its ErrorDetail names the leg with a field violation on its
+        /// attached-risk field (take_profit, stop_loss or trailing_stop) whose rule is
+        /// that code. Nothing is placed or changed.
+        ///
         /// The legs of one parent share that position, whether or not oco is set, and
         /// only one exit works at a time. The first leg whose condition is met submits
         /// an exit for the whole remaining position, rounded down to the pair's step
@@ -37901,6 +39357,11 @@ pub mod __buffa {
             ///
             /// Field 6: `submitted_max_quote_debit_scaled`
             pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+            ///
+            /// Field 7: `submitted_quote_proceeds_scaled`
+            pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for BatchCreateAcceptedView<'a> {
@@ -37986,6 +39447,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_quote_proceeds_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -38022,6 +39492,8 @@ pub mod __buffa {
                     resolved_base_qty_scaled: self.resolved_base_qty_scaled,
                     submitted_max_quote_debit_scaled: self
                         .submitted_max_quote_debit_scaled,
+                    submitted_quote_proceeds_scaled: self
+                        .submitted_quote_proceeds_scaled,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -38058,6 +39530,9 @@ pub mod __buffa {
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
                 }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -38090,6 +39565,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.submitted_max_quote_debit_scaled {
                     ::buffa::types::put_int64_field(6u32, v, buf);
+                }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    ::buffa::types::put_int64_field(7u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -38158,6 +39636,15 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "submittedMaxQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_quote_proceeds_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedQuoteProceedsScaled",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -38302,6 +39789,16 @@ pub mod __buffa {
                 &self,
             ) -> ::core::option::Option<i64> {
                 self.0.reborrow().submitted_max_quote_debit_scaled
+            }
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when submitted.
+            ///
+            /// Field 7: `submitted_quote_proceeds_scaled`
+            #[must_use]
+            pub fn submitted_quote_proceeds_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_quote_proceeds_scaled
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<BatchCreateAcceptedView<'static>>>
@@ -48200,6 +49697,20 @@ pub mod __buffa {
             ///
             /// Field 20: `leaves_qty_scaled`
             pub leaves_qty_scaled: i64,
+            /// Iceberg display quantity the order was placed with, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
+            /// order the order book shows at once. Zero for a plain order. A replace
+            /// keeps it.
+            ///
+            /// Field 39: `display_qty_scaled`
+            pub display_qty_scaled: i64,
+            /// Part of leaves_qty_scaled an iceberg order keeps hidden from the order
+            /// book, scaled by the pair's base_quantity_scale from GetSpotConfig for
+            /// symbol_id. The order book shows leaves_qty_scaled minus this quantity.
+            /// Zero for a plain order and for terminal orders.
+            ///
+            /// Field 40: `hidden_qty_scaled`
+            pub hidden_qty_scaled: i64,
             /// Average execution price across the lineage through this generation,
             /// in quote units scaled by 1e9, rounded down. Zero if no fills.
             /// avg_price_e18 carries the exact average.
@@ -48233,6 +49744,13 @@ pub mod __buffa {
             /// since a rebate is credited; it is this amount alone when fee_asset is
             /// BASE, whose fee is taken from the base received. What it left unspent is
             /// submitted_max_quote_debit_scaled less the quote it used.
+            ///
+            /// For a SELL sized by a quote proceeds target
+            /// (submitted_quote_proceeds_scaled), this amount is the proceeds it
+            /// received before fees, never above the target; the quote it was credited
+            /// is this amount less fee_total's amount_e18, or plus it when fee_total's
+            /// is_rebate is true. What it did not receive is
+            /// submitted_quote_proceeds_scaled less this amount.
             ///
             /// Field 37: `cum_notional`
             pub cum_notional: ::buffa::MessageFieldView<
@@ -48322,6 +49840,12 @@ pub mod __buffa {
             ///
             /// Field 28: `submitted_max_quote_debit_scaled`
             pub submitted_max_quote_debit_scaled: ::core::option::Option<i64>,
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 41: `submitted_quote_proceeds_scaled`
+            pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
             /// Logical-order identity and requested generation. Always populated by order reads.
             ///
             /// Field 31: `lineage`
@@ -48481,6 +50005,22 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Varint,
                         )?;
                         view.leaves_qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    39u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.display_qty_scaled = ::buffa::types::decode_int64(
+                            &mut cur,
+                        )?;
+                    }
+                    40u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.hidden_qty_scaled = ::buffa::types::decode_int64(&mut cur)?;
                     }
                     14u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -48705,6 +50245,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int64(&mut cur)?,
                         );
                     }
+                    41u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.submitted_quote_proceeds_scaled = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     31u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -48792,6 +50341,8 @@ pub mod __buffa {
                     cum_qty_scaled: self.cum_qty_scaled,
                     inherited_cum_qty_scaled: self.inherited_cum_qty_scaled,
                     leaves_qty_scaled: self.leaves_qty_scaled,
+                    display_qty_scaled: self.display_qty_scaled,
+                    hidden_qty_scaled: self.hidden_qty_scaled,
                     avg_price_ticks: self.avg_price_ticks,
                     avg_price_e18: match self.avg_price_e18.as_option() {
                         Some(v) => {
@@ -48845,6 +50396,8 @@ pub mod __buffa {
                     batch_request_id: self.batch_request_id,
                     submitted_max_quote_debit_scaled: self
                         .submitted_max_quote_debit_scaled,
+                    submitted_quote_proceeds_scaled: self
+                        .submitted_quote_proceeds_scaled,
                     lineage: match self.lineage.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -49076,6 +50629,21 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.display_qty_scaled != 0i64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::int64_encoded_len(self.display_qty_scaled)
+                                as u32;
+                }
+                if self.hidden_qty_scaled != 0i64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::int64_encoded_len(self.hidden_qty_scaled)
+                                as u32;
+                }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    size += 2u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -49261,6 +50829,15 @@ pub mod __buffa {
                     );
                     self.fee_total.write_to(__cache, buf);
                 }
+                if self.display_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(39u32, self.display_qty_scaled, buf);
+                }
+                if self.hidden_qty_scaled != 0i64 {
+                    ::buffa::types::put_int64_field(40u32, self.hidden_qty_scaled, buf);
+                }
+                if let Some(v) = self.submitted_quote_proceeds_scaled {
+                    ::buffa::types::put_int64_field(41u32, v, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -49364,6 +50941,24 @@ pub mod __buffa {
                         .serialize_entry(
                             "leavesQtyScaled",
                             &::buffa::json_helpers::ProtoJson(&self.leaves_qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.display_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "displayQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.display_qty_scaled),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(
+                    &self.hidden_qty_scaled,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "hiddenQtyScaled",
+                            &::buffa::json_helpers::ProtoJson(&self.hidden_qty_scaled),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_i64(&self.avg_price_ticks) {
@@ -49492,6 +51087,15 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "submittedMaxQuoteDebitScaled",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self
+                    .submitted_quote_proceeds_scaled
+                {
+                    __map
+                        .serialize_entry(
+                            "submittedQuoteProceedsScaled",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -49705,6 +51309,26 @@ pub mod __buffa {
             pub fn leaves_qty_scaled(&self) -> i64 {
                 self.0.reborrow().leaves_qty_scaled
             }
+            /// Iceberg display quantity the order was placed with, scaled by the pair's
+            /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
+            /// order the order book shows at once. Zero for a plain order. A replace
+            /// keeps it.
+            ///
+            /// Field 39: `display_qty_scaled`
+            #[must_use]
+            pub fn display_qty_scaled(&self) -> i64 {
+                self.0.reborrow().display_qty_scaled
+            }
+            /// Part of leaves_qty_scaled an iceberg order keeps hidden from the order
+            /// book, scaled by the pair's base_quantity_scale from GetSpotConfig for
+            /// symbol_id. The order book shows leaves_qty_scaled minus this quantity.
+            /// Zero for a plain order and for terminal orders.
+            ///
+            /// Field 40: `hidden_qty_scaled`
+            #[must_use]
+            pub fn hidden_qty_scaled(&self) -> i64 {
+                self.0.reborrow().hidden_qty_scaled
+            }
             /// Average execution price across the lineage through this generation,
             /// in quote units scaled by 1e9, rounded down. Zero if no fills.
             /// avg_price_e18 carries the exact average.
@@ -49746,6 +51370,13 @@ pub mod __buffa {
             /// since a rebate is credited; it is this amount alone when fee_asset is
             /// BASE, whose fee is taken from the base received. What it left unspent is
             /// submitted_max_quote_debit_scaled less the quote it used.
+            ///
+            /// For a SELL sized by a quote proceeds target
+            /// (submitted_quote_proceeds_scaled), this amount is the proceeds it
+            /// received before fees, never above the target; the quote it was credited
+            /// is this amount less fee_total's amount_e18, or plus it when fee_total's
+            /// is_rebate is true. What it did not receive is
+            /// submitted_quote_proceeds_scaled less this amount.
             ///
             /// Field 37: `cum_notional`
             #[must_use]
@@ -49891,6 +51522,17 @@ pub mod __buffa {
                 &self,
             ) -> ::core::option::Option<i64> {
                 self.0.reborrow().submitted_max_quote_debit_scaled
+            }
+            /// Submitted quote proceeds target, scaled by the pair's
+            /// quote_quantity_scale from GetSpotConfig. Present only when that sizing
+            /// method was submitted.
+            ///
+            /// Field 41: `submitted_quote_proceeds_scaled`
+            #[must_use]
+            pub fn submitted_quote_proceeds_scaled(
+                &self,
+            ) -> ::core::option::Option<i64> {
+                self.0.reborrow().submitted_quote_proceeds_scaled
             }
             /// Logical-order identity and requested generation. Always populated by order reads.
             ///
@@ -57033,6 +58675,7 @@ pub mod __buffa {
                 pub enum Sizing {
                     BaseQtyScaled(i64),
                     MaxQuoteDebitScaled(i64),
+                    QuoteProceedsScaled(i64),
                 }
                 #[derive(Clone, Debug)]
                 pub enum Execution<'a> {
@@ -57233,6 +58876,7 @@ pub mod __buffa {
             pub enum Sizing {
                 BaseQtyScaled(i64),
                 MaxQuoteDebitScaled(i64),
+                QuoteProceedsScaled(i64),
             }
             impl ::buffa::Oneof for Sizing {}
             impl serde::Serialize for Sizing {
@@ -57252,6 +58896,12 @@ pub mod __buffa {
                         Self::MaxQuoteDebitScaled(v) => {
                             map.serialize_entry(
                                 "maxQuoteDebitScaled",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::QuoteProceedsScaled(v) => {
+                            map.serialize_entry(
+                                "quoteProceedsScaled",
                                 &::buffa::json_helpers::ProtoJson(v),
                             )?;
                         }
@@ -57756,6 +59406,7 @@ pub mod __buffa {
         reg.register_json_any(super::__LIMIT_GTD_JSON_ANY);
         reg.register_json_any(super::__LIMIT_IOC_JSON_ANY);
         reg.register_json_any(super::__LIMIT_FOK_JSON_ANY);
+        reg.register_json_any(super::__STATIC_PEG_JSON_ANY);
         reg.register_json_any(super::__ORDER_INTENT_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_ORDER_RESPONSE_JSON_ANY);
@@ -57838,6 +59489,10 @@ pub use self::__buffa::view::LimitIocOwnedView;
 pub use self::__buffa::view::LimitFokView;
 #[doc(inline)]
 pub use self::__buffa::view::LimitFokOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::StaticPegView;
+#[doc(inline)]
+pub use self::__buffa::view::StaticPegOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::OrderIntentView;
 #[doc(inline)]
