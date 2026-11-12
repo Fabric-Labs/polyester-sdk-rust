@@ -9,7 +9,7 @@ use super::money::{
     attach_qty_scale, decode_price_ticks, decode_price_ticks_allow_zero, decode_qty_scaled,
     decode_qty_scaled_allow_zero,
 };
-use crate::codecs::scalars::{TsNs, format_uint64_id, u128_to_str};
+use crate::codecs::scalars::{TsNs, format_optional_uint64_id, format_uint64_id, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
     AttachedRisk, AttachedRiskLegState, BatchCancelOrdersResult, BatchCancelResultItem,
@@ -92,6 +92,7 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         market_max_slippage: positive_price_ticks(msg.market_max_slippage_ticks),
         market_max_slippage_bps: msg.market_max_slippage_bps,
         expire_at: expire_at_rfc3339(msg.expire_at.as_option()),
+        batch_request_id: format_optional_uint64_id(msg.batch_request_id),
         reject_reason: order_reject_reason(msg.reject_reason),
         cancel_reason: order_cancel_reason(msg.cancel_reason),
     })

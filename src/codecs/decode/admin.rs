@@ -1,7 +1,7 @@
 //! API key and resolve-account decoders.
 
 use crate::codecs::decode::enums::enum_proto_name;
-use crate::codecs::scalars::format_uint64_id;
+use crate::codecs::scalars::{format_optional_uint64_id, format_uint64_id};
 use crate::models::{ApiKeySummary, ApiKeysList, ResolvedAccount, ResolvedAccountsList};
 use crate::proto::auth::v1::{
     ApiKey as ProtoApiKey, CreateApiKeyResponse, GetApiKeyResponse, ListApiKeysResponse,
@@ -15,9 +15,13 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
         label: msg.label.clone(),
         status,
         public_key_ed25519: hex::encode(&msg.public_key_ed25519),
+        subaccount_id: format_optional_uint64_id(msg.subaccount_id.unwrap_or_default()),
+        policy_id: format_optional_uint64_id(msg.policy_id.unwrap_or_default()),
+        ip_whitelist: msg.ip_whitelist.clone(),
         created_at: msg.created_at.as_option().cloned(),
         last_used_at: msg.last_used_at.as_option().cloned(),
         updated_at: msg.updated_at.as_option().cloned(),
+        expires_at: msg.expires_at.as_option().cloned(),
         revision: msg.revision,
         purpose: if msg.purpose.to_i32() == 0 {
             String::new()

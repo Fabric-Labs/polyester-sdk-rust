@@ -384,6 +384,16 @@ pub fn format_uint64_id(id: u64) -> String {
     }
 }
 
+/// Format a uint64 id the server may leave out as base58: zero is none, so it
+/// stays empty instead of becoming `"0"`.
+pub(crate) fn format_optional_uint64_id(id: u64) -> String {
+    if id == 0 {
+        String::new()
+    } else {
+        format_id(id)
+    }
+}
+
 /// Format protobuf U128 hi/lo as a decimal string.
 pub fn u128_to_str(hi: u64, lo: u64) -> String {
     let value = (u128::from(hi) << 64) | u128::from(lo);
