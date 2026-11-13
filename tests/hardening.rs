@@ -8898,6 +8898,16 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
                     .unwrap()
                     .subaccount_id,
             ),
+            "ListSubaccountMembers" => plain(
+                book::ListSubaccountMembersRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListSubaccountActivity" => plain(
+                book::ListSubaccountEventsRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
             "GetGuardSignerStatus" => plain(
                 guard::GetGuardSignerStatusRequest::decode_from_slice(body)
                     .unwrap()
@@ -9212,7 +9222,8 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
     use polyester::proto::auth::v1::{
         CopyAddressBookEntryRequest, CreateAddressBookEntryRequest, CreateAddressBookTagRequest,
         GetAddressBookViewRequest, GetWithdrawWhitelistViewRequest, ListAddressBookEntriesRequest,
-        ListInternalTransferWhitelistEntriesRequest, ListTransferCounterpartiesRequest,
+        ListInternalTransferWhitelistEntriesRequest, ListSubaccountEventsRequest,
+        ListSubaccountMembersRequest, ListTransferCounterpartiesRequest,
         ListTransferDestinationsRequest,
     };
     use polyester::proto::chain::deposit::v1::CreateDepositAddressRequest;
@@ -9443,6 +9454,20 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
                 ..Default::default()
             })
             .await;
+        let _ = client
+            .sub_accounts
+            .list_members(ListSubaccountMembersRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .sub_accounts
+            .list_activity(ListSubaccountEventsRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
         let got = std::mem::take(&mut *seen.lock().unwrap());
         let expected: Vec<(String, Option<u64>)> = [
             "GetBalances",
@@ -9473,6 +9498,8 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
             "BatchSignProtectedActions",
             "RotateGuardSignerWallet",
             "ExportGuardSignerWallet",
+            "ListSubaccountMembers",
+            "ListSubaccountActivity",
         ]
         .map(|rpc| (rpc.to_owned(), want))
         .to_vec();

@@ -499,12 +499,14 @@ impl SubAccountsService {
     }
 
     /// List a sub-account's members. API keys can call it with
-    /// `READ_SUBACCOUNT_MEMBERS` on their API-key policy.
+    /// `READ_SUBACCOUNT_MEMBERS` on their API-key policy. A request that
+    /// leaves `subaccount_id` 0 lists the configured default sub-account's.
     pub async fn list_members(
         &self,
-        req: crate::proto::auth::v1::ListSubaccountMembersRequest,
+        mut req: crate::proto::auth::v1::ListSubaccountMembersRequest,
     ) -> crate::errors::Result<crate::models::SubAccountMembersList> {
         use crate::codecs::decode::subaccount_members_list_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -543,12 +545,14 @@ impl SubAccountsService {
     }
 
     /// List a sub-account's activity. An API key needs
-    /// `READ_SUBACCOUNT_ACTIVITY`.
+    /// `READ_SUBACCOUNT_ACTIVITY`. A request that leaves `subaccount_id` 0
+    /// lists the configured default sub-account's.
     pub async fn list_activity(
         &self,
-        req: crate::proto::auth::v1::ListSubaccountEventsRequest,
+        mut req: crate::proto::auth::v1::ListSubaccountEventsRequest,
     ) -> crate::errors::Result<crate::models::SubAccountActivityList> {
         use crate::codecs::decode::subaccount_activity_list_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = crate::connect::auth::v1::SubaccountViewServiceClient::new(
             self.ctx.factory.transport(),
             self.ctx.factory.connect_config(),
