@@ -981,3 +981,118 @@ async fn trigger_already_ended_over_both_transports() {
         }
     }
 }
+
+/// A credential refusal reads the same whichever REST endpoint answers it:
+/// the bare documented code at its documented status, never an `AUTH_`
+/// prefixed alias or a reason hidden in `detail`. Authentication that is
+/// temporarily unavailable (503) and a full replay record (429) refused the
+/// request before it was processed, so both are retryable and certain.
+#[tokio::test(flavor = "multi_thread")]
+async fn credential_refusals_read_the_same_on_every_rest_endpoint() {
+    use polyester::proto::auth::v1::AuthErrorCode as Auth;
+    let cases: [(u16, &str, Auth, bool); 10] = [
+        (
+            401,
+            "UNAUTHENTICATED",
+            Auth::AUTH_AUTHENTICATION_REQUIRED,
+            false,
+        ),
+        (401, "MISSING_HEADERS", Auth::AUTH_MISSING_HEADERS, false),
+        (
+            401,
+            "SIGNATURE_INVALID",
+            Auth::AUTH_SIGNATURE_INVALID,
+            false,
+        ),
+        (401, "TIMESTAMP_SKEW", Auth::AUTH_TIMESTAMP_SKEW, true),
+        (
+            401,
+            "RECV_WINDOW_INVALID",
+            Auth::AUTH_RECV_WINDOW_INVALID,
+            false,
+        ),
+        (401, "KEY_EXPIRED", Auth::AUTH_KEY_EXPIRED, false),
+        (401, "KEY_DISABLED", Auth::AUTH_KEY_DISABLED, false),
+        (401, "IP_NOT_ALLOWED", Auth::AUTH_IP_NOT_ALLOWED, false),
+        (
+            503,
+            "AUTH_TEMPORARILY_UNAVAILABLE",
+            Auth::AUTH_TEMPORARILY_UNAVAILABLE,
+            true,
+        ),
+        (
+            429,
+            "REPLAY_CAPACITY_EXHAUSTED",
+            Auth::AUTH_REPLAY_CAPACITY_EXHAUSTED,
+            true,
+        ),
+    ];
+    for (status, code, auth, retryable) in cases {
+        for op in OPS {
+            let case = format!("{op} {status}/{code}");
+            let body =
+                json!({"code": code, "title": "t", "detail": "d", "status": status}).to_string();
+            let (err, calls) = call(op, status, PROBLEM, &body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert_eq!(calls, 1, "{case}");
+            assert_eq!(err.auth_code(), Some(auth), "{case}: {err:?}");
+            assert_flags(&err, retryable, false, &case);
+        }
+    }
+}
+
+/// A REST path the API does not serve answers a `NOT_FOUND` problem: the
+/// request was refused, not lost.
+#[tokio::test(flavor = "multi_thread")]
+async fn not_found_problem_keeps_its_code() {
+    for op in OPS {
+        let body = json!({"code": "NOT_FOUND", "title": "Not Found", "detail": "No API operation matches this method and path.", "status": 404}).to_string();
+        let (err, calls) = call(op, 404, PROBLEM, &body, None).await;
+        let err = err.expect("error");
+        assert_eq!(calls, 1, "{op}");
+        assert!(
+            matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_NOT_FOUND"),
+            "{op}: {err:?}"
+        );
+        assert_flags(&err, false, false, op);
+    }
+}
+
+/// A trailing stop that already tracks refuses a new activation price with
+/// `ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE` (315) on both
+/// transports: a final refusal that changed nothing.
+#[tokio::test(flavor = "multi_thread")]
+async fn trigger_activation_price_not_modifiable_is_final_on_both_transports() {
+    const CODE: &str = "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE";
+    let detail = ErrorDetail {
+        code: OrderErrorCode::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE.into(),
+        ..Default::default()
+    };
+    let connect = detail_body(
+        "orders.v1.ErrorDetail",
+        &detail.encode_to_bytes(),
+        Some("failed_precondition"),
+    );
+    let rest =
+        json!({"code": "TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE", "detail": "d", "status": 400})
+            .to_string();
+    for op in OPS {
+        for (transport, content_type, body) in
+            [("connect", JSON, &connect), ("rest", PROBLEM, &rest)]
+        {
+            let case = format!("{op} {transport}");
+            let (err, calls) = call(op, 400, content_type, body, None).await;
+            let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+            assert_eq!(calls, 1, "{case}");
+            assert!(
+                matches!(&err, Error::Api { code, .. } if code == CODE),
+                "{case}: {err:?}"
+            );
+            assert_flags(&err, false, false, &case);
+        }
+    }
+    assert_eq!(
+        OrderErrorCode::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE as i32,
+        315
+    );
+}
