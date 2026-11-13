@@ -1,5 +1,5 @@
 //! Public changelog without credentials: newest posts, the newest post in
-//! full, and breaking changes since a date.
+//! full, breaking changes since a date, and deployment groups.
 //!
 //!   cargo run --example changelog
 //!   POLYESTER_API_URL=https://api.testnet.polyester.com cargo run --example changelog
@@ -54,6 +54,25 @@ async fn main() -> polyester::Result<()> {
         println!(
             "  {} [{}] {} action_required={} surfaces={:?}",
             e.change.id, e.post_slug, e.change.title, e.change.action_required, e.change.surfaces
+        );
+    }
+
+    // Empty until the environment publishes release posts.
+    let groups = client
+        .changelog
+        .list_deployment_groups(Default::default())
+        .await?;
+    println!("deployment groups: {}", groups.groups.len());
+    for g in &groups.groups {
+        println!("  {} {} {:?}", g.slug, g.environment, g.versions);
+    }
+    if let Some(first) = groups.groups.first() {
+        let group = client.changelog.get_deployment_group(&first.slug).await?;
+        println!(
+            "group {}: {} attention, {} highlights",
+            group.summary.slug,
+            group.attention.len(),
+            group.highlights.len()
         );
     }
     Ok(())

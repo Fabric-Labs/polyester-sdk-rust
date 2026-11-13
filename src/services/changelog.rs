@@ -5,17 +5,20 @@
 
 use super::{ServiceContext, unary};
 use crate::codecs::decode::{
-    changelog_changes_page_from_proto, changelog_post_from_proto, changelog_posts_page_from_proto,
+    changelog_changes_page_from_proto, changelog_deployment_group_from_proto,
+    changelog_deployment_groups_page_from_proto, changelog_post_from_proto,
+    changelog_posts_page_from_proto,
 };
 use crate::connect::changelog::v1::ChangelogServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
-    CHANGELOG_CATEGORY_BREAKING_CHANGE, ChangelogChangeEntry, ChangelogChangesPage, ChangelogPost,
-    ChangelogPostSummary, ChangelogPostsPage,
+    CHANGELOG_CATEGORY_BREAKING_CHANGE, ChangelogChangeEntry, ChangelogChangesPage,
+    ChangelogDeploymentGroup, ChangelogDeploymentGroupSummary, ChangelogDeploymentGroupsPage,
+    ChangelogPost, ChangelogPostSummary, ChangelogPostsPage,
 };
 use crate::proto::changelog::v1::{
-    Audience, ChangeCategory, GetPostRequest, ListChangesRequest, ListPostsRequest, SortDirection,
-    Surface,
+    Audience, ChangeCategory, GetDeploymentGroupRequest, GetPostRequest, ListChangesRequest,
+    ListDeploymentGroupsRequest, ListPostsRequest, SortDirection, Surface,
 };
 use crate::transport::SharedTransport;
 use buffa::Enumeration;
@@ -35,6 +38,17 @@ pub struct ListChangelogPostsOptions {
     /// Page size; `None` uses the server default of 20 (maximum 100).
     pub limit: Option<u32>,
     /// Continue from a previous page's `next_page_token`.
+    pub page_token: Option<String>,
+}
+
+/// Options for [`ChangelogService::list_deployment_groups`] and
+/// [`ChangelogService::deployment_groups`].
+#[derive(Debug, Clone, Default)]
+pub struct ListChangelogDeploymentGroupsOptions {
+    /// Page size; `None` uses the server default of 20 (maximum 100).
+    pub limit: Option<u32>,
+    /// Continue from a previous page's `next_page_token`: an opaque cursor
+    /// bound to deployment time and slug.
     pub page_token: Option<String>,
 }
 
@@ -114,6 +128,42 @@ impl ChangelogService {
         changelog_post_from_proto(&resp)
     }
 
+    /// One page of this environment's deployment groups, newest deployment
+    /// first: each deployment that brought new releases, with the release
+    /// posts it brought. The list is empty until the environment publishes
+    /// release posts.
+    pub async fn list_deployment_groups(
+        &self,
+        opts: ListChangelogDeploymentGroupsOptions,
+    ) -> Result<ChangelogDeploymentGroupsPage> {
+        let req = ListDeploymentGroupsRequest {
+            limit: opts.limit.unwrap_or(0),
+            page_token: opts.page_token.unwrap_or_default(),
+            ..Default::default()
+        };
+        // "/changelog.v1.ChangelogService/ListDeploymentGroups"
+        let resp = unary::await_public(self.client().list_deployment_groups(req))
+            .await?
+            .into_owned();
+        Ok(changelog_deployment_groups_page_from_proto(&resp))
+    }
+
+    /// One deployment group by slug, such as `testnet-v0.92.9`, with the
+    /// changes that need attention and the highlights of its release posts.
+    /// An unknown slug is an [`Error::Api`] with code `NotFound`; every slug
+    /// is unknown until the environment publishes release posts.
+    pub async fn get_deployment_group(&self, slug: &str) -> Result<ChangelogDeploymentGroup> {
+        let req = GetDeploymentGroupRequest {
+            slug: slug.to_owned(),
+            ..Default::default()
+        };
+        // "/changelog.v1.ChangelogService/GetDeploymentGroup"
+        let resp = unary::await_public(self.client().get_deployment_group(req))
+            .await?
+            .into_owned();
+        changelog_deployment_group_from_proto(&resp)
+    }
+
     /// One page of individual changes across posts.
     pub async fn list_changes(
         &self,
@@ -146,6 +196,30 @@ impl ChangelogService {
                 async move {
                     let page = svc.list_posts(opts).await?;
                     Ok((page.posts, page.next_page_token))
+                }
+            },
+        )
+    }
+
+    /// Every deployment group summary from `opts.page_token` on, newest
+    /// deployment first, fetching pages as the stream is polled.
+    pub fn deployment_groups(
+        &self,
+        opts: ListChangelogDeploymentGroupsOptions,
+    ) -> impl Stream<Item = Result<ChangelogDeploymentGroupSummary>> + Send + 'static {
+        let svc = self.clone();
+        paginate(
+            "changelog pagination",
+            opts.page_token.clone(),
+            move |page_token| {
+                let svc = svc.clone();
+                let opts = ListChangelogDeploymentGroupsOptions {
+                    limit: opts.limit,
+                    page_token: Some(page_token),
+                };
+                async move {
+                    let page = svc.list_deployment_groups(opts).await?;
+                    Ok((page.groups, page.next_page_token))
                 }
             },
         )

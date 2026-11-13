@@ -20,7 +20,10 @@ pub use alerts::AlertsService;
 pub use api_keys::ApiKeysService;
 pub use auth::AuthService;
 pub use balances::BalancesService;
-pub use changelog::{ChangelogService, ListChangelogChangesOptions, ListChangelogPostsOptions};
+pub use changelog::{
+    ChangelogService, ListChangelogChangesOptions, ListChangelogDeploymentGroupsOptions,
+    ListChangelogPostsOptions,
+};
 pub use deposit_withdraw::{
     DepositService, PreparedTradingWithdraw, WithdrawService, ZipperService,
     new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,

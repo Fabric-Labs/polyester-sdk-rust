@@ -34,6 +34,48 @@ pub const CHANGELOG_SURFACE_REWARDS: &str = "rewards";
 /// The AI assistant: chats, approvals, memories and preferences.
 pub const CHANGELOG_SURFACE_ASSISTANT: &str = "assistant";
 
+/// Environment labels.
+pub const CHANGELOG_ENVIRONMENT_DEVNET: &str = "devnet";
+pub const CHANGELOG_ENVIRONMENT_TESTNET: &str = "testnet";
+pub const CHANGELOG_ENVIRONMENT_MAINNET: &str = "mainnet";
+
+/// Change availability labels: how one change of a release differs from its
+/// release in one environment.
+///
+/// Available in the environment while its release is still pending there.
+pub const CHANGELOG_AVAILABILITY_AHEAD: &str = "ahead";
+/// Not yet available in the environment although its release is live there.
+pub const CHANGELOG_AVAILABILITY_PENDING: &str = "pending";
+/// Not available in the environment for now, whatever its release's status.
+pub const CHANGELOG_AVAILABILITY_UNAVAILABLE: &str = "unavailable";
+
+/// Whether a release is live in one environment.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogEnvironmentStatus {
+    /// A `CHANGELOG_ENVIRONMENT_*` label.
+    pub environment: String,
+    /// When the release went live in the environment; `None` while it is
+    /// pending there.
+    pub live_at: Option<Timestamp>,
+}
+
+/// The status of one change in one environment where it differs from its
+/// release's status.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogChangeException {
+    /// A `CHANGELOG_ENVIRONMENT_*` label.
+    pub environment: String,
+    /// A `CHANGELOG_AVAILABILITY_*` label.
+    pub availability: String,
+    /// When the change became available in the environment; set for
+    /// [`CHANGELOG_AVAILABILITY_AHEAD`] only, `None` otherwise.
+    pub live_at: Option<Timestamp>,
+}
+
+// Every field compares reflexively (a `Timestamp` is two integers), so the
+// equality is total and `ChangelogChange` keeps `Eq`.
+impl Eq for ChangelogChangeException {}
+
 /// One product change in a changelog post.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ChangelogChange {
@@ -50,6 +92,12 @@ pub struct ChangelogChange {
     pub audiences: Vec<String>,
     /// `CHANGELOG_SURFACE_*` labels.
     pub surfaces: Vec<String>,
+    /// The environments, any of them and not only the one the client points
+    /// at, where this change differs from its release's status, for example
+    /// a change already available on testnet before its release reaches
+    /// testnet. Empty outside release posts and when the change follows its
+    /// release everywhere.
+    pub environment_exceptions: Vec<ChangelogChangeException>,
 }
 
 /// A post's changes grouped under one heading.
@@ -96,6 +144,21 @@ pub struct ChangelogPostSummary {
     pub new_feature_count: u32,
     pub improvement_count: u32,
     pub bug_fix_count: u32,
+    /// The release the post announces, for example `0.92.9`; `None` for a
+    /// post that does not announce one release. A release post has the same
+    /// slug (`v0.92.9`) and content in every environment, and is listed even
+    /// where its release is still pending.
+    pub release_version: Option<String>,
+    /// The status of the post's release in each environment, devnet, testnet
+    /// and mainnet in that order; empty for a post without
+    /// `release_version`. It changes when the release goes live somewhere,
+    /// without a new `revision`: compare the whole summary to notice it.
+    pub environments: Vec<ChangelogEnvironmentStatus>,
+    /// The slug of the deployment group that brought the release to this
+    /// environment, for `ChangelogService::get_deployment_group`; `None`
+    /// while the release is pending here and for a post without
+    /// `release_version`.
+    pub deployment_group_slug: Option<String>,
 }
 
 /// One full changelog post at its current revision.
@@ -126,5 +189,92 @@ pub struct ChangelogPostsPage {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangelogChangesPage {
     pub changes: Vec<ChangelogChangeEntry>,
+    pub next_page_token: String,
+}
+
+/// One published release post a deployment group brought.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogDeploymentGroupPost {
+    /// The post's slug, for example `v0.92.9`, for `ChangelogService::get_post`.
+    pub slug: String,
+    /// The release the post announces, for example `0.92.9`.
+    pub release_version: String,
+    pub title: String,
+    /// Time of first publication of the post.
+    pub published_at: Option<Timestamp>,
+    /// The post's published revision, starting at 1.
+    pub revision: u32,
+    /// When the post's current revision was published.
+    pub updated_at: Option<Timestamp>,
+}
+
+/// One deployment group without its details: one deployment to the
+/// environment that raised its release version, bringing every release
+/// above the previous group's version up to and including its own.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogDeploymentGroupSummary {
+    /// Stable, shareable identifier: the environment and the group's own
+    /// release, for example `testnet-v0.92.9`.
+    pub slug: String,
+    /// The `CHANGELOG_ENVIRONMENT_*` label the group was deployed to.
+    pub environment: String,
+    /// When the deployment ran.
+    pub occurred_at: Option<Timestamp>,
+    /// The group's own, highest release, for example `0.92.9`.
+    pub release_version: String,
+    /// The tag of the group's own release, for example `v0.92.9`; `None`
+    /// when unknown.
+    pub release_tag: Option<String>,
+    /// The release of the previous deployment group; `None` for the first
+    /// group.
+    pub previous_release_version: Option<String>,
+    /// Every release the group brought, ascending, for example
+    /// `["0.92.8", "0.92.9"]`.
+    pub versions: Vec<String>,
+    /// The published release posts of those releases, ascending by release.
+    /// A release without a published post has none.
+    pub posts: Vec<ChangelogDeploymentGroupPost>,
+}
+
+/// One change of a deployment group that needs attention: breaking, or with
+/// `action_required`.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogDeploymentGroupAttention {
+    /// The slug of the release post that announces the change.
+    pub post_slug: String,
+    /// The release of that post.
+    pub release_version: String,
+    /// The change as in its post.
+    pub change: ChangelogChange,
+}
+
+/// One highlight of a release post in a deployment group.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ChangelogDeploymentGroupHighlight {
+    /// The slug of the release post.
+    pub post_slug: String,
+    /// The release of that post.
+    pub release_version: String,
+    /// Highlight text, inline Markdown.
+    pub text: String,
+}
+
+/// One complete deployment group.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogDeploymentGroup {
+    pub summary: ChangelogDeploymentGroupSummary,
+    /// The breaking changes and the changes that require action across the
+    /// group's posts, in post order (ascending release), then section and
+    /// change order.
+    pub attention: Vec<ChangelogDeploymentGroupAttention>,
+    /// The highlights of the group's posts, in post order.
+    pub highlights: Vec<ChangelogDeploymentGroupHighlight>,
+}
+
+/// One `list_deployment_groups` page, newest deployment first. An empty
+/// `next_page_token` means the last page.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ChangelogDeploymentGroupsPage {
+    pub groups: Vec<ChangelogDeploymentGroupSummary>,
     pub next_page_token: String,
 }
