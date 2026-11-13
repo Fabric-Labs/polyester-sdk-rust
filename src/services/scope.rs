@@ -13,12 +13,6 @@ pub fn explicit_subaccount(id: u64) -> Result<u64> {
     Ok(id)
 }
 
-/// Refuse an explicit `Some(0)` in a caller-built request before it is sent;
-/// `None` still means no sub-account.
-pub fn request_subaccount(id: Option<u64>) -> Result<()> {
-    id.map_or(Ok(()), |id| explicit_subaccount(id).map(drop))
-}
-
 pub fn optional_subaccount(ctx: &ServiceContext, explicit: Option<u64>) -> Result<Option<u64>> {
     if let Some(id) = explicit {
         return explicit_subaccount(id).map(Some);
@@ -34,6 +28,17 @@ pub fn optional_subaccount(ctx: &ServiceContext, explicit: Option<u64>) -> Resul
         return Ok(Some(parse_account_id(s, "subaccount_id")?));
     }
     Ok(None)
+}
+
+/// The sub-account of a caller-built request whose sub-account field is a
+/// plain `u64`, where 0 is unset: a non-zero ID is sent unchanged, and 0 takes
+/// the configured default sub-account, as `None` does in
+/// [`optional_subaccount`]. With no default it stays 0, the main account.
+pub fn plain_subaccount(ctx: &ServiceContext, id: u64) -> Result<u64> {
+    if id != 0 {
+        return Ok(id);
+    }
+    Ok(optional_subaccount(ctx, None)?.unwrap_or(0))
 }
 
 pub fn require_account_id(ctx: &ServiceContext) -> Result<String> {

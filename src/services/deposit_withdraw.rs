@@ -156,10 +156,14 @@ impl DepositService {
         Ok(deposit_addresses_list_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied. An API key needs
-    /// `CREATE_DEPOSIT_ADDRESS` on its API-key policy.
-    pub async fn create_address(&self, req: CreateDepositAddressRequest) -> Result<DepositAddress> {
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
+    /// An API key needs `CREATE_DEPOSIT_ADDRESS` on its API-key policy.
+    pub async fn create_address(
+        &self,
+        mut req: CreateDepositAddressRequest,
+    ) -> Result<DepositAddress> {
+        req.subaccount_id = scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),
             self.ctx.factory.connect_config(),

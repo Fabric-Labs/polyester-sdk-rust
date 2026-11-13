@@ -29,8 +29,8 @@ impl BalancesService {
         )
     }
 
-    pub async fn list(&self, req: GetBalancesRequest) -> Result<BalancesList> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn list(&self, mut req: GetBalancesRequest) -> Result<BalancesList> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -45,9 +45,9 @@ impl BalancesService {
 
     pub async fn get_balance_history(
         &self,
-        req: GetBalanceHistoryRequest,
+        mut req: GetBalanceHistoryRequest,
     ) -> Result<BalanceHistory> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -62,9 +62,9 @@ impl BalancesService {
 
     pub async fn get_equity_history(
         &self,
-        req: GetEquityHistorySeriesRequest,
+        mut req: GetEquityHistorySeriesRequest,
     ) -> Result<EquityHistory> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -79,9 +79,9 @@ impl BalancesService {
 
     pub async fn list_transfers(
         &self,
-        req: crate::proto::ledger::read::v1::ListTransfersRequest,
+        mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> Result<TransfersList> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,

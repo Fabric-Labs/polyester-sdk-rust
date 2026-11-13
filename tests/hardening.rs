@@ -5604,7 +5604,7 @@ async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
     let with = client
         .sub_accounts
         .get(
-            42,
+            &polyester::codecs::scalars::format_id(42),
             GetSubaccountOpts {
                 include_balances: true,
                 ..Default::default()
@@ -5624,7 +5624,10 @@ async fn l2_subaccount_get_requests_and_parses_balances_only_when_asked() {
 
     let without = client
         .sub_accounts
-        .get(42, GetSubaccountOpts::default())
+        .get(
+            &polyester::codecs::scalars::format_id(42),
+            GetSubaccountOpts::default(),
+        )
         .await
         .expect("get without balances");
     assert!(without.balances.is_none());
@@ -8806,6 +8809,7 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
     use polyester::proto::auth::v1 as book;
     use polyester::proto::chain::deposit::v1 as deposit;
     use polyester::proto::chain::guard::v1 as guard;
+    use polyester::proto::ledger::read::v1 as ledger;
     use polyester::proto::orders::v1 as orders;
     use polyester::proto::triggers::v1 as triggers;
 
@@ -8836,6 +8840,12 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
             "ResumeTrigger" => scope!(triggers::ResumeTriggerRequest),
             "GetTrigger" => scope!(triggers::GetTriggerRequest),
             "ListTriggers" => scope!(triggers::ListTriggersRequest),
+            "ListTriggerEvents" => scope!(triggers::ListTriggerEventsRequest),
+            "CancelOco" => scope!(triggers::CancelOcoRequest),
+            "GetBalances" => scope!(ledger::GetBalancesRequest),
+            "GetBalanceHistory" => scope!(ledger::GetBalanceHistoryRequest),
+            "GetEquityHistorySeries" => scope!(ledger::GetEquityHistorySeriesRequest),
+            "ListTransfers" => scope!(ledger::ListTransfersRequest),
             // Plain `u64` fields: zero is what an unset field sends.
             "CreateDepositAddress" => plain(
                 deposit::CreateDepositAddressRequest::decode_from_slice(body)
@@ -8856,6 +8866,51 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
                 book::CopyAddressBookEntryRequest::decode_from_slice(body)
                     .unwrap()
                     .target_subaccount_id,
+            ),
+            "ListAddressBookEntries" => plain(
+                book::ListAddressBookEntriesRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListTransferCounterparties" => plain(
+                book::ListTransferCounterpartiesRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListTransferDestinations" => plain(
+                book::ListTransferDestinationsRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListInternalTransferWhitelistEntries" => plain(
+                book::ListInternalTransferWhitelistEntriesRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "GetWithdrawWhitelistView" => plain(
+                book::GetWithdrawWhitelistViewRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "GetAddressBookView" => plain(
+                book::GetAddressBookViewRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListSubaccountMembers" => plain(
+                book::ListSubaccountMembersRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListSubaccountActivity" => plain(
+                book::ListSubaccountEventsRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "GetGuardSignerStatus" => plain(
+                guard::GetGuardSignerStatusRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
             ),
             "CreateGuardSignerWallet" => plain(
                 guard::CreateGuardSignerWalletRequest::decode_from_slice(body)
@@ -9156,25 +9211,81 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
     }
 }
 
-// Raw-request methods belong to the caller who built the request: a configured
-// default is never applied, and nothing the caller set is replaced.
+// A raw request that leaves its sub-account unset (`None`, or 0 for a plain
+// `u64` field) is sent for the configured default sub-account, as the typed
+// helpers are; a sub-account the caller set is sent unchanged, and with no
+// default nothing is added. A copy's target is a destination, not the scope
+// the call acts in, so it is still sent as built.
 #[tokio::test]
-async fn raw_write_requests_are_sent_as_built() {
+async fn raw_requests_use_the_default_subaccount_when_unset() {
     use polyester::proto::auth::v1::{
         CopyAddressBookEntryRequest, CreateAddressBookEntryRequest, CreateAddressBookTagRequest,
+        GetAddressBookViewRequest, GetWithdrawWhitelistViewRequest, ListAddressBookEntriesRequest,
+        ListInternalTransferWhitelistEntriesRequest, ListSubaccountEventsRequest,
+        ListSubaccountMembersRequest, ListTransferCounterpartiesRequest,
+        ListTransferDestinationsRequest,
     };
     use polyester::proto::chain::deposit::v1::CreateDepositAddressRequest;
     use polyester::proto::chain::guard::v1::{
         BatchSignProtectedActionsRequest, CreateGuardSignerWalletRequest,
-        ExportGuardSignerWalletRequest, RotateGuardSignerWalletRequest, SignProtectedActionRequest,
+        ExportGuardSignerWalletRequest, GetGuardSignerStatusRequest,
+        RotateGuardSignerWalletRequest, SignProtectedActionRequest,
+    };
+    use polyester::proto::ledger::read::v1::{
+        GetBalanceHistoryRequest, GetBalancesRequest, GetEquityHistorySeriesRequest,
+        ListTransfersRequest,
     };
     use polyester::proto::orders::v1::CancelOrderRequest;
     use polyester::proto::triggers::v1::{
-        CancelTriggerRequest, PauseTriggerRequest, ResumeTriggerRequest,
+        CancelOcoRequest, CancelTriggerRequest, GetTriggerRequest, ListTriggerEventsRequest,
+        ListTriggersRequest, PauseTriggerRequest, ResumeTriggerRequest,
     };
 
-    let (_server, client, seen) = scope_capture_client(Some(42)).await;
-    for subaccount_id in [None, Some(44), Some(42)] {
+    for (default, sub, want) in [
+        (Some(42), None, Some(42)),
+        (Some(42), Some(44), Some(44)),
+        (Some(42), Some(42), Some(42)),
+        (None, Some(44), Some(44)),
+        (None, None, None),
+    ] {
+        let (_server, client, seen) = scope_capture_client(default).await;
+        let subaccount_id = sub;
+        let plain_id = sub.unwrap_or(0);
+        let _ = client
+            .balances
+            .list(GetBalancesRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .balances
+            .get_balance_history(GetBalanceHistoryRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .balances
+            .get_equity_history(GetEquityHistorySeriesRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .balances
+            .list_transfers(ListTransfersRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .transfers
+            .list(ListTransfersRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
         let _ = client
             .orders
             .cancel(CancelOrderRequest {
@@ -9184,8 +9295,39 @@ async fn raw_write_requests_are_sent_as_built() {
             .await;
         let _ = client
             .triggers
+            .list(ListTriggersRequest {
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .get(GetTriggerRequest {
+                trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .list_events(ListTriggerEventsRequest {
+                trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
             .cancel(CancelTriggerRequest {
                 trigger_id: 9,
+                subaccount_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .triggers
+            .cancel_oco(CancelOcoRequest {
+                order_list_id: 9,
                 subaccount_id,
                 ..Default::default()
             })
@@ -9206,10 +9348,51 @@ async fn raw_write_requests_are_sent_as_built() {
                 ..Default::default()
             })
             .await;
-        let plain_id = subaccount_id.unwrap_or(0);
         let _ = client
             .deposit
             .create_address(CreateDepositAddressRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .list_entries(ListAddressBookEntriesRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .list_transfer_counterparties(ListTransferCounterpartiesRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .list_transfer_destinations(ListTransferDestinationsRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .list_internal_transfer_whitelist_entries(ListInternalTransferWhitelistEntriesRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .get_withdraw_whitelist_view(GetWithdrawWhitelistViewRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .address_book
+            .get_view(GetAddressBookViewRequest {
                 subaccount_id: plain_id,
                 ..Default::default()
             })
@@ -9229,9 +9412,9 @@ async fn raw_write_requests_are_sent_as_built() {
             })
             .await;
         let _ = client
-            .address_book
-            .copy_entry(CopyAddressBookEntryRequest {
-                target_subaccount_id: plain_id,
+            .guard_signer
+            .get_status(GetGuardSignerStatusRequest {
+                subaccount_id: plain_id,
                 ..Default::default()
             })
             .await;
@@ -9270,26 +9453,219 @@ async fn raw_write_requests_are_sent_as_built() {
                 ..Default::default()
             })
             .await;
+        let _ = client
+            .sub_accounts
+            .list_members(ListSubaccountMembersRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let _ = client
+            .sub_accounts
+            .list_activity(ListSubaccountEventsRequest {
+                subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
         let got = std::mem::take(&mut *seen.lock().unwrap());
         let expected: Vec<(String, Option<u64>)> = [
+            "GetBalances",
+            "GetBalanceHistory",
+            "GetEquityHistorySeries",
+            "ListTransfers",
+            "ListTransfers",
             "CancelOrder",
+            "ListTriggers",
+            "GetTrigger",
+            "ListTriggerEvents",
             "CancelTrigger",
+            "CancelOco",
             "PauseTrigger",
             "ResumeTrigger",
             "CreateDepositAddress",
+            "ListAddressBookEntries",
+            "ListTransferCounterparties",
+            "ListTransferDestinations",
+            "ListInternalTransferWhitelistEntries",
+            "GetWithdrawWhitelistView",
+            "GetAddressBookView",
             "CreateAddressBookEntry",
             "CreateAddressBookTag",
-            "CopyAddressBookEntry",
+            "GetGuardSignerStatus",
             "CreateGuardSignerWallet",
             "SignProtectedAction",
             "BatchSignProtectedActions",
             "RotateGuardSignerWallet",
             "ExportGuardSignerWallet",
+            "ListSubaccountMembers",
+            "ListSubaccountActivity",
         ]
-        .map(|rpc| (rpc.to_owned(), subaccount_id))
+        .map(|rpc| (rpc.to_owned(), want))
         .to_vec();
-        assert_eq!(got, expected);
+        let wrong: Vec<_> = got
+            .iter()
+            .zip(&expected)
+            .filter(|(got, want)| got != want)
+            .collect();
+        assert!(
+            got.len() == expected.len() && wrong.is_empty(),
+            "default={default:?} sub={sub:?}: {} requests, wrong {wrong:?}",
+            got.len()
+        );
+
+        // The copy's target is sent exactly as built.
+        let _ = client
+            .address_book
+            .copy_entry(CopyAddressBookEntryRequest {
+                target_subaccount_id: plain_id,
+                ..Default::default()
+            })
+            .await;
+        let got = std::mem::take(&mut *seen.lock().unwrap());
+        assert_eq!(got, vec![("CopyAddressBookEntry".to_owned(), sub)]);
     }
+}
+
+// Reads take the public IDs other reads return: `sub_accounts.get` takes a
+// sub-account's public ID (base58, or decimal), and `triggers.list_events_by_id`
+// a trigger's, with the configured default sub-account as the typed helpers
+// apply it. An ID that does not parse, or names 0, is refused before sending.
+#[tokio::test]
+async fn subaccount_and_trigger_event_reads_take_public_ids() {
+    use polyester::codecs::scalars::format_id;
+    use polyester::models::ListTriggerEventsOpts;
+    use polyester::proto::auth::v1::GetSubaccountRequest;
+    use polyester::proto::triggers::v1::{ListTriggerEventsRequest, TriggerEventType};
+    use polyester::services::GetSubaccountOpts;
+
+    const SUB: u64 = 98_765_432_109_876_543;
+    const TRIGGER: u64 = 13_835_058_055_282_163_729;
+    type Seen = Arc<std::sync::Mutex<Vec<(String, u64, Option<u64>, i32, u32, String)>>>;
+    let seen = Seen::default();
+    let captured = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        let rpc = request.path.rsplit('/').next().unwrap().to_owned();
+        let row = match rpc.as_str() {
+            "GetSubaccount" => {
+                let req = GetSubaccountRequest::decode_from_slice(&request.body).unwrap();
+                (rpc, req.subaccount_id, None, 0, 0, String::new())
+            }
+            "ListTriggerEvents" => {
+                let req = ListTriggerEventsRequest::decode_from_slice(&request.body).unwrap();
+                (
+                    rpc,
+                    req.trigger_id,
+                    req.subaccount_id,
+                    req.event_type.to_i32(),
+                    req.limit,
+                    req.page_token,
+                )
+            }
+            _ => return hardening_support::HttpScript::NotFound,
+        };
+        captured.lock().unwrap().push(row);
+        json_body(
+            400,
+            "application/json",
+            r#"{"code":"failed_precondition","message":"capture complete"}"#,
+        )
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: server.base_url(),
+        api_key_id: Some("public-ids".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        default_sub_account_id: Some(format_id(42)),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for id in [
+        format_id(SUB),
+        SUB.to_string(),
+        format!(" {} ", format_id(SUB)),
+    ] {
+        let _ = client
+            .sub_accounts
+            .get(&id, GetSubaccountOpts::default())
+            .await;
+    }
+    let _ = client
+        .triggers
+        .list_events_by_id(&format_id(TRIGGER), ListTriggerEventsOpts::default())
+        .await;
+    let _ = client
+        .triggers
+        .list_events_by_id(
+            &TRIGGER.to_string(),
+            ListTriggerEventsOpts {
+                subaccount_id: Some(44),
+                limit: Some(25),
+                event_type: Some("fired".into()),
+                page_token: Some("next".into()),
+            },
+        )
+        .await;
+    let fired = TriggerEventType::EVENT_FIRED as i32;
+    assert_eq!(
+        std::mem::take(&mut *seen.lock().unwrap()),
+        vec![
+            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
+            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
+            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
+            (
+                "ListTriggerEvents".to_owned(),
+                TRIGGER,
+                Some(42),
+                0,
+                0,
+                String::new()
+            ),
+            (
+                "ListTriggerEvents".to_owned(),
+                TRIGGER,
+                Some(44),
+                fired,
+                25,
+                "next".to_owned()
+            ),
+        ]
+    );
+
+    let refused = [
+        client
+            .sub_accounts
+            .get("1", GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .sub_accounts
+            .get("not-base58!", GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .triggers
+            .list_events_by_id("", ListTriggerEventsOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .triggers
+            .list_events_by_id(
+                &format_id(TRIGGER),
+                ListTriggerEventsOpts {
+                    event_type: Some("exploded".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map(|_| ()),
+    ];
+    for result in refused {
+        let err = result.expect_err("refused before sending");
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+    }
+    assert!(seen.lock().unwrap().is_empty(), "nothing else was sent");
 }
 
 // A quantity scale of 0 is a real scale. The published config omits a zero
@@ -9864,7 +10240,7 @@ async fn explicit_subaccount_zero_is_refused_before_sending() {
         client.api_keys.list(Some(0)).await.map(|_| ()),
         client
             .sub_accounts
-            .get(0, GetSubaccountOpts::default())
+            .get("1", GetSubaccountOpts::default())
             .await
             .map(|_| ()),
     ];

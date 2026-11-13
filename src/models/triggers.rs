@@ -320,6 +320,21 @@ pub struct ListTriggersOpts {
     pub client_list_id: Option<String>,
 }
 
+/// Typed options for [`crate::services::TriggersService::list_events_by_id`].
+#[derive(Debug, Clone, Default)]
+pub struct ListTriggerEventsOpts {
+    /// The sub-account the trigger belongs to; `None` uses the configured
+    /// default sub-account, and with none the main account.
+    pub subaccount_id: Option<u64>,
+    /// Omitted or `Some(0)` uses the server default.
+    pub limit: Option<u32>,
+    /// Only events of this type: `fired`, `canceled`, `updated`, `failed`,
+    /// `activated`, `armed` or `fire_refused`. Another label is refused with
+    /// [`crate::Error::Validation`] before sending. `None` lists every type.
+    pub event_type: Option<String>,
+    pub page_token: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TriggerStopDetails {
     pub trigger_price: Option<Price>,

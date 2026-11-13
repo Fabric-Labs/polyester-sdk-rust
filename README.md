@@ -67,10 +67,13 @@ Create and update accept atomic `new_tags`: new tags are created and attached in
 the same protected request. When `tag_ids` is also selected on update, the
 result is those ids plus the new tags; otherwise currently attached tags are
 preserved and `new_tags` are appended. `AddressBookViewInvalidation` includes
-`view_revision`. `get_view` is a proto pass-through (`ApiData.raw`); set
-`minimum_view_revision` on the request. Regenerated raw views include
-`view_revision`, and each entry in them keeps its own `revision`, the
-`expected_revision` for updating that entry. Twitter social-verification `start` forwards the handle as-is,
+`view_revision`. Entries carry their destination (`external` or `internal`),
+`note`, `scope` and `created_at` / `updated_at`. `get_view` returns a typed
+`AddressBookView` (set `minimum_view_revision` on the request) whose entries
+use the same public IDs as `list_entries`, and each keeps its own `revision`,
+the `expected_revision` for updating that entry. `get_withdraw_whitelist_view`,
+`list_transfer_counterparties`, `list_transfer_destinations` and
+`list_internal_transfer_whitelist_entries` are typed the same way. Twitter social-verification `start` forwards the handle as-is,
 including an optional leading `@`.
 
 Rows marked **Yes** mean that an SDK wrapper exists; deployment authorization
@@ -1085,8 +1088,10 @@ Order writes still require those policy fields and reject `None`.
 For writes, `oco=true` requires take-profit plus exactly one stop leg
 (`stop_loss` or `trailing_stop`); one-leg OCO policies are rejected locally.
 
-`triggers.list_events` returns the same not-found error as `triggers.get`
-for an unreadable trigger. It retries catching-up `UNAVAILABLE` responses
+`triggers.list_events_by_id(trigger_id, ListTriggerEventsOpts)` lists a
+trigger's events by the public trigger ID `triggers.list` returns, with the
+configured default sub-account. `triggers.list_events` returns the same
+not-found error as `triggers.get` for an unreadable trigger. It retries catching-up `UNAVAILABLE` responses
 with the same bounded policy and request as trigger reads.
 
 A trailing stop created with an activation price the market has already

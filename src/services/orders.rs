@@ -1580,10 +1580,10 @@ impl OrdersService {
     /// `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
     /// rate limit, repeats included.
     ///
-    /// Sends `req` as built: the configured default subaccount is not applied.
-    /// Use [`Self::cancel_with`] to apply it.
-    pub async fn cancel(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    /// An unset `subaccount_id` takes the configured default sub-account, as
+    /// the typed helpers do; a sub-account set on `req` is sent unchanged.
+    pub async fn cancel(&self, mut req: CancelOrderRequest) -> Result<OrderMutationResult> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
