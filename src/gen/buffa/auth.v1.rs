@@ -305,6 +305,172 @@ impl ::buffa::Enumeration for ApiKeyPurpose {
         &[Self::PURPOSE_UNSPECIFIED, Self::STANDARD, Self::ASSISTANT]
     }
 }
+/// AssistantKeyPreset is a fixed permission set for a Polyester AI assistant
+/// key. SetAssistantKeys turns it into an API policy of the key's main account,
+/// named after the preset, so the policy and the key need only the set's one
+/// step-up proof. No preset ever allows a money-out action (EXTERNAL_WITHDRAW,
+/// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK, MANAGE_AUTO_WITHDRAW), API-key or
+/// policy management, or any action that weakens account security.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AssistantKeyPreset {
+    /// No preset selected.
+    PRESET_UNSPECIFIED = 0i32,
+    /// Read actions only: READ_BALANCES, READ_SPOT, READ_INTERNAL_TRANSFERS,
+    /// READ_AUTO_WITHDRAW, READ_API_KEYS, READ_SUBACCOUNTS and
+    /// READ_DEPOSIT_ADDRESSES. On the main account, also READ_PRICE_ALERTS, a
+    /// main-account permission. Policy name "Polyester AI - Read only (main
+    /// account)" on the main account, "Polyester AI - Read only (sub-account)"
+    /// on a sub-account.
+    READ_ONLY = 1i32,
+    /// READ_ONLY plus TRADE_SPOT, SWAP and CREATE_DEPOSIT_ADDRESS: the assistant
+    /// also places, changes and cancels orders and triggers, and swaps, each only
+    /// after the user approves that change, and creates deposit addresses, which
+    /// move no funds out. On the main account, also MANAGE_PRICE_ALERTS: price
+    /// alerts move no funds. Policy name "Polyester AI - Trade with
+    /// approval (main account)" on the main account, "Polyester AI - Trade with
+    /// approval (sub-account)" on a sub-account.
+    TRADE_WITH_APPROVAL = 2i32,
+}
+impl AssistantKeyPreset {
+    ///Idiomatic alias for [`Self::PRESET_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const PresetUnspecified: Self = Self::PRESET_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::READ_ONLY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadOnly: Self = Self::READ_ONLY;
+    ///Idiomatic alias for [`Self::TRADE_WITH_APPROVAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TradeWithApproval: Self = Self::TRADE_WITH_APPROVAL;
+}
+impl ::core::default::Default for AssistantKeyPreset {
+    fn default() -> Self {
+        Self::PRESET_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AssistantKeyPreset {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AssistantKeyPreset {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AssistantKeyPreset;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(AssistantKeyPreset)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AssistantKeyPreset, E> {
+                <AssistantKeyPreset as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AssistantKeyPreset, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AssistantKeyPreset as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AssistantKeyPreset, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AssistantKeyPreset as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AssistantKeyPreset, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AssistantKeyPreset {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AssistantKeyPreset {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::PRESET_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::READ_ONLY),
+            2i32 => ::core::option::Option::Some(Self::TRADE_WITH_APPROVAL),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::PRESET_UNSPECIFIED => "PRESET_UNSPECIFIED",
+            Self::READ_ONLY => "READ_ONLY",
+            Self::TRADE_WITH_APPROVAL => "TRADE_WITH_APPROVAL",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "PRESET_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::PRESET_UNSPECIFIED)
+            }
+            "READ_ONLY" => ::core::option::Option::Some(Self::READ_ONLY),
+            "TRADE_WITH_APPROVAL" => {
+                ::core::option::Option::Some(Self::TRADE_WITH_APPROVAL)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::PRESET_UNSPECIFIED, Self::READ_ONLY, Self::TRADE_WITH_APPROVAL]
+    }
+}
 /// ApiKey is public API key metadata. It never includes the private key or seed.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -2714,7 +2880,8 @@ pub struct AssistantKeySpec {
     pub public_key_ed25519: ::buffa::alloc::vec::Vec<u8>,
     /// API policy that bounds the key (opaque ID). It must belong to the same
     /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
-    /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+    /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
+    /// exactly one of policy_id and preset.
     ///
     /// Field 3: `policy_id`
     #[serde(
@@ -2752,6 +2919,19 @@ pub struct AssistantKeySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
     )]
     pub registration_proof: ::buffa::alloc::vec::Vec<u8>,
+    /// Permission preset that bounds the key, instead of policy_id. The key is
+    /// bound to the preset's policy in the key's main account: the existing one
+    /// with the preset's name and exactly its actions over all markets, else one
+    /// created in the same change. The response's policy_id names it. Set
+    /// exactly one of policy_id and preset.
+    ///
+    /// Field 6: `preset`
+    #[serde(
+        rename = "preset",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub preset: ::buffa::EnumValue<AssistantKeyPreset>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2764,6 +2944,7 @@ impl ::core::fmt::Debug for AssistantKeySpec {
             .field("policy_id", &self.policy_id)
             .field("registration_deadline", &self.registration_deadline)
             .field("registration_proof", &self.registration_proof)
+            .field("preset", &self.preset)
             .finish()
     }
 }
@@ -2825,6 +3006,12 @@ impl ::buffa::Message for AssistantKeySpec {
                 += 1u32
                     + ::buffa::types::bytes_encoded_len(&self.registration_proof) as u32;
         }
+        {
+            let val = self.preset.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2850,6 +3037,12 @@ impl ::buffa::Message for AssistantKeySpec {
         }
         if !self.registration_proof.is_empty() {
             ::buffa::types::put_bytes_field(5u32, &self.registration_proof, buf);
+        }
+        {
+            let val = self.preset.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(6u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2905,6 +3098,15 @@ impl ::buffa::Message for AssistantKeySpec {
                 )?;
                 ::buffa::types::merge_bytes(&mut self.registration_proof, buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.preset = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2918,6 +3120,7 @@ impl ::buffa::Message for AssistantKeySpec {
         self.policy_id = 0u64;
         self.registration_deadline = ::buffa::MessageField::none();
         self.registration_proof.clear();
+        self.preset = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -51237,7 +51440,8 @@ pub mod __buffa {
             pub public_key_ed25519: &'a [u8],
             /// API policy that bounds the key (opaque ID). It must belong to the same
             /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
-            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
+            /// exactly one of policy_id and preset.
             ///
             /// Field 3: `policy_id`
             pub policy_id: u64,
@@ -51258,6 +51462,14 @@ pub mod __buffa {
             ///
             /// Field 5: `registration_proof`
             pub registration_proof: &'a [u8],
+            /// Permission preset that bounds the key, instead of policy_id. The key is
+            /// bound to the preset's policy in the key's main account: the existing one
+            /// with the preset's name and exactly its actions over all markets, else one
+            /// created in the same change. The response's policy_id names it. Set
+            /// exactly one of policy_id and preset.
+            ///
+            /// Field 6: `preset`
+            pub preset: ::buffa::EnumValue<super::super::AssistantKeyPreset>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssistantKeySpecView<'a> {
@@ -51350,6 +51562,15 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.preset = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -51391,6 +51612,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     registration_proof: (self.registration_proof).to_vec(),
+                    preset: self.preset,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -51431,6 +51653,12 @@ pub mod __buffa {
                             + ::buffa::types::bytes_encoded_len(&self.registration_proof)
                                 as u32;
                 }
+                {
+                    let val = self.preset.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -51461,6 +51689,12 @@ pub mod __buffa {
                 }
                 if !self.registration_proof.is_empty() {
                     ::buffa::types::put_bytes_field(5u32, &self.registration_proof, buf);
+                }
+                {
+                    let val = self.preset.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(6u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -51522,6 +51756,9 @@ pub mod __buffa {
                             "registrationProof",
                             &::buffa::json_helpers::BytesJson(self.registration_proof),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.preset) {
+                    __map.serialize_entry("preset", &self.preset)?;
                 }
                 __map.end()
             }
@@ -51637,7 +51874,8 @@ pub mod __buffa {
             }
             /// API policy that bounds the key (opaque ID). It must belong to the same
             /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
-            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW.
+            /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
+            /// exactly one of policy_id and preset.
             ///
             /// Field 3: `policy_id`
             #[must_use]
@@ -51668,6 +51906,19 @@ pub mod __buffa {
             #[must_use]
             pub fn registration_proof(&self) -> &'_ [u8] {
                 self.0.reborrow().registration_proof
+            }
+            /// Permission preset that bounds the key, instead of policy_id. The key is
+            /// bound to the preset's policy in the key's main account: the existing one
+            /// with the preset's name and exactly its actions over all markets, else one
+            /// created in the same change. The response's policy_id names it. Set
+            /// exactly one of policy_id and preset.
+            ///
+            /// Field 6: `preset`
+            #[must_use]
+            pub fn preset(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::AssistantKeyPreset> {
+                self.0.reborrow().preset
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssistantKeySpecView<'static>>>

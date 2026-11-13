@@ -1536,6 +1536,13 @@ pub enum ErrorCode {
     ERROR_CODE_PEG_REFERENCE_UNAVAILABLE = 313i32,
     /// Entry peg has an invalid reference or unsupported combination.
     ERROR_CODE_INVALID_PEG = 314i32,
+    /// ModifyTrigger attempted to set a new or different nonzero activation
+    /// price after the trailing stop started tracking. Nothing changed: the
+    /// existing peak or trough and trigger price keep protecting the position.
+    /// Clearing activation with zero and repeating the current activation price
+    /// remain valid. To wait for a new activation price, cancel the trigger and
+    /// create a new one.
+    ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE = 315i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2153,6 +2160,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_INVALID_PEG`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const InvalidPeg: Self = Self::ERROR_CODE_INVALID_PEG;
+    ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerActivationPriceNotModifiable: Self = Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2793,6 +2803,11 @@ impl ::buffa::Enumeration for ErrorCode {
                 ::core::option::Option::Some(Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE)
             }
             314i32 => ::core::option::Option::Some(Self::ERROR_CODE_INVALID_PEG),
+            315i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3228,6 +3243,9 @@ impl ::buffa::Enumeration for ErrorCode {
                 "ERROR_CODE_PEG_REFERENCE_UNAVAILABLE"
             }
             Self::ERROR_CODE_INVALID_PEG => "ERROR_CODE_INVALID_PEG",
+            Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE => {
+                "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -3947,6 +3965,11 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_INVALID_PEG" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_INVALID_PEG)
             }
+            "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4157,6 +4180,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_PEG_LIMIT_VIOLATION,
             Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE,
             Self::ERROR_CODE_INVALID_PEG,
+            Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
         ]
     }
 }
@@ -21423,7 +21447,10 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub version: u32,
-    /// Batch-replace identity that admitted this order. Zero for other origins.
+    /// Batch-replace identity that admitted this order, retained after it ends.
+    /// Also set for batch-replaced trigger-generated orders. Zero when this order
+    /// was not admitted by a batch replacement; a later batch replacing this order
+    /// does not change its admission identity.
     ///
     /// Field 27: `batch_request_id`
     #[serde(
@@ -23880,6 +23907,7 @@ pub struct GetOrderHistoryRequest {
     )]
     pub start_ts_ns: ::core::option::Option<u64>,
     /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+    /// Omit for no upper bound; an explicit zero returns an empty page.
     ///
     /// Field 11: `end_ts_ns`
     #[serde(
@@ -24530,6 +24558,7 @@ pub struct GetUserTradesRequest {
     )]
     pub start_ts_ns: ::core::option::Option<u64>,
     /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+    /// Omit for no upper bound; an explicit zero returns an empty page.
     ///
     /// Field 11: `end_ts_ns`
     #[serde(
@@ -49830,7 +49859,10 @@ pub mod __buffa {
             ///
             /// Field 26: `version`
             pub version: u32,
-            /// Batch-replace identity that admitted this order. Zero for other origins.
+            /// Batch-replace identity that admitted this order, retained after it ends.
+            /// Also set for batch-replaced trigger-generated orders. Zero when this order
+            /// was not admitted by a batch replacement; a later batch replacing this order
+            /// does not change its admission identity.
             ///
             /// Field 27: `batch_request_id`
             pub batch_request_id: u64,
@@ -51505,7 +51537,10 @@ pub mod __buffa {
             pub fn version(&self) -> u32 {
                 self.0.reborrow().version
             }
-            /// Batch-replace identity that admitted this order. Zero for other origins.
+            /// Batch-replace identity that admitted this order, retained after it ends.
+            /// Also set for batch-replaced trigger-generated orders. Zero when this order
+            /// was not admitted by a batch replacement; a later batch replacing this order
+            /// does not change its admission identity.
             ///
             /// Field 27: `batch_request_id`
             #[must_use]
@@ -54182,6 +54217,7 @@ pub mod __buffa {
             /// Field 10: `start_ts_ns`
             pub start_ts_ns: ::core::option::Option<u64>,
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+            /// Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 11: `end_ts_ns`
             pub end_ts_ns: ::core::option::Option<u64>,
@@ -54725,6 +54761,7 @@ pub mod __buffa {
                 self.0.reborrow().start_ts_ns
             }
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+            /// Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 11: `end_ts_ns`
             #[must_use]
@@ -55164,6 +55201,7 @@ pub mod __buffa {
             /// Field 10: `start_ts_ns`
             pub start_ts_ns: ::core::option::Option<u64>,
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+            /// Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 11: `end_ts_ns`
             pub end_ts_ns: ::core::option::Option<u64>,
@@ -55741,6 +55779,7 @@ pub mod __buffa {
                 self.0.reborrow().start_ts_ns
             }
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
+            /// Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 11: `end_ts_ns`
             #[must_use]

@@ -4965,16 +4965,16 @@ pub struct ListTransfersRequest {
     )]
     pub ts_min_us: u64,
     /// Optional upper transfer timestamp bound in microseconds since epoch (UTC),
-    /// inclusive.
+    /// inclusive. Omit for no upper bound; an explicit zero returns an empty page.
     ///
     /// Field 5: `ts_max_us`
     #[serde(
         rename = "tsMaxUs",
         alias = "ts_max_us",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
     )]
-    pub ts_max_us: u64,
+    pub ts_max_us: ::core::option::Option<u64>,
     /// Optional filter by transfer reason.
     ///
     /// Field 6: `transfer_code`
@@ -5039,6 +5039,13 @@ impl ListTransfersRequest {
         self.subaccount_id = Some(value);
         self
     }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::ts_max_us`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_ts_max_us(mut self, value: u64) -> Self {
+        self.ts_max_us = Some(value);
+        self
+    }
 }
 ::buffa::impl_default_instance!(ListTransfersRequest);
 impl ::buffa::MessageName for ListTransfersRequest {
@@ -5070,8 +5077,8 @@ impl ::buffa::Message for ListTransfersRequest {
         if self.ts_min_us != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_min_us) as u32;
         }
-        if self.ts_max_us != 0u64 {
-            size += 1u32 + ::buffa::types::uint64_encoded_len(self.ts_max_us) as u32;
+        if let Some(v) = self.ts_max_us {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
         }
         {
             let val = self.transfer_code.to_i32();
@@ -5107,8 +5114,8 @@ impl ::buffa::Message for ListTransfersRequest {
         if self.ts_min_us != 0u64 {
             ::buffa::types::put_uint64_field(4u32, self.ts_min_us, buf);
         }
-        if self.ts_max_us != 0u64 {
-            ::buffa::types::put_uint64_field(5u32, self.ts_max_us, buf);
+        if let Some(v) = self.ts_max_us {
+            ::buffa::types::put_uint64_field(5u32, v, buf);
         }
         {
             let val = self.transfer_code.to_i32();
@@ -5170,7 +5177,9 @@ impl ::buffa::Message for ListTransfersRequest {
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.ts_max_us = ::buffa::types::decode_uint64(buf)?;
+                self.ts_max_us = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
             }
             6u32 => {
                 ::buffa::encoding::check_wire_type(
@@ -5207,7 +5216,7 @@ impl ::buffa::Message for ListTransfersRequest {
         self.limit = 0u32;
         self.reversed = false;
         self.ts_min_us = 0u64;
-        self.ts_max_us = 0u64;
+        self.ts_max_us = ::core::option::Option::None;
         self.transfer_code = ::buffa::EnumValue::from(0);
         self.ledger = 0u32;
         self.page_token.clear();
@@ -13713,10 +13722,10 @@ pub mod __buffa {
             /// Field 4: `ts_min_us`
             pub ts_min_us: u64,
             /// Optional upper transfer timestamp bound in microseconds since epoch (UTC),
-            /// inclusive.
+            /// inclusive. Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 5: `ts_max_us`
-            pub ts_max_us: u64,
+            pub ts_max_us: ::core::option::Option<u64>,
             /// Optional filter by transfer reason.
             ///
             /// Field 6: `transfer_code`
@@ -13801,7 +13810,7 @@ pub mod __buffa {
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.ts_max_us = ::buffa::types::decode_uint64(&mut cur)?;
+                        view.ts_max_us = Some(::buffa::types::decode_uint64(&mut cur)?);
                     }
                     6u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -13891,10 +13900,8 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint64_encoded_len(self.ts_min_us) as u32;
                 }
-                if self.ts_max_us != 0u64 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint64_encoded_len(self.ts_max_us) as u32;
+                if let Some(v) = self.ts_max_us {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
                 }
                 {
                     let val = self.transfer_code.to_i32();
@@ -13935,8 +13942,8 @@ pub mod __buffa {
                 if self.ts_min_us != 0u64 {
                     ::buffa::types::put_uint64_field(4u32, self.ts_min_us, buf);
                 }
-                if self.ts_max_us != 0u64 {
-                    ::buffa::types::put_uint64_field(5u32, self.ts_max_us, buf);
+                if let Some(v) = self.ts_max_us {
+                    ::buffa::types::put_uint64_field(5u32, v, buf);
                 }
                 {
                     let val = self.transfer_code.to_i32();
@@ -13995,11 +14002,11 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.ts_min_us),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.ts_max_us) {
+                if let ::core::option::Option::Some(__v) = self.ts_max_us {
                     __map
                         .serialize_entry(
                             "tsMaxUs",
-                            &::buffa::json_helpers::ProtoJson(&self.ts_max_us),
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(
@@ -14147,11 +14154,11 @@ pub mod __buffa {
                 self.0.reborrow().ts_min_us
             }
             /// Optional upper transfer timestamp bound in microseconds since epoch (UTC),
-            /// inclusive.
+            /// inclusive. Omit for no upper bound; an explicit zero returns an empty page.
             ///
             /// Field 5: `ts_max_us`
             #[must_use]
-            pub fn ts_max_us(&self) -> u64 {
+            pub fn ts_max_us(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().ts_max_us
             }
             /// Optional filter by transfer reason.

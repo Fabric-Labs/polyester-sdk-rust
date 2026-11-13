@@ -184,11 +184,16 @@ pub enum LifecycleReason {
     /// execution ends REFUNDED like one rejected at validation.
     ZIPPER_EXECUTION_REJECTED = 102i32,
     /// Zipper withdraw execution failed after the withdrawal's destination
-    /// transaction was committed, and Zipper reviews it manually: the user may
-    /// have received the funds on the destination chain. The flow ends FAILED,
-    /// and its FAILED step's transaction is that destination transaction.
-    /// Nothing is refunded to the account, and the request fee is kept; Zipper
-    /// settles the withdrawal with the user outside Polyester Chain.
+    /// transaction was committed, and the bridge operator reviews it manually:
+    /// the user may have received the funds on the destination chain. The flow
+    /// ends FAILED, and its FAILED step's transaction is that destination
+    /// transaction. Nothing is refunded to the account, and the request fee is
+    /// kept. Whatever Zipper reason code the failure carries, `zipper_reason`
+    /// keeps that code, with the reason_id
+    /// `withdrawal.execution_failed.under_review` and a message that the
+    /// withdrawal failed, is under review by the bridge operator, and its funds
+    /// were not returned to the account. Neither promises a timeline or an
+    /// outcome.
     ZIPPER_WITHDRAW_EXECUTION_FAILED = 103i32,
     /// Zipper deposit refund failed.
     ZIPPER_DEPOSIT_REFUND_FAILED = 104i32,
@@ -5572,7 +5577,8 @@ pub struct FlowSummaryView {
     /// Gross principal amount for the flow in 18-decimal unified asset units.
     /// Request fees are exposed separately in request_fee. Specific fulfillment
     /// steps may carry a net movement amount when the step represents external
-    /// delivery.
+    /// delivery. A deposit keeps its deposited amount after Zipper returned it
+    /// or transferred it out, which is not the amount Zipper paid.
     ///
     /// Field 9: `amount_e18`
     #[serde(
@@ -6957,6 +6963,12 @@ pub struct FlowStepView {
     pub polyester_chain_id: u32,
     /// Amount represented by this step in 18-decimal unified asset units. Steps
     /// may carry the actual net movement amount when fees have already been taken.
+    /// Unset on the step that pays out a deposit Zipper's compliance screening
+    /// rejected: `FLOW_STEP_REFUNDED`, Zipper's return of the deposit, and
+    /// `FLOW_STEP_FAILED` with `ZIPPER_COMPLIANCE_TRANSFERRED`. Zipper pays out
+    /// the deposit less its fees and does not report the amount it paid or the
+    /// fees, so the deposited amount on the flow's summary is not the amount
+    /// paid.
     ///
     /// Field 9: `amount_e18`
     #[serde(
@@ -7837,7 +7849,8 @@ pub struct FlowStepActivityView {
     pub required_rejections: u32,
     /// Amount posted by the underlying movement represented by this activity, in
     /// 18-decimal unified asset units. This may be a net movement amount for
-    /// fee-bearing fulfillment activity.
+    /// fee-bearing fulfillment activity. Unset on the activities of a step that
+    /// carries no `amount_e18` because Zipper paid out a rejected deposit.
     ///
     /// Field 14: `amount_e18`
     #[serde(
@@ -13133,7 +13146,8 @@ pub mod __buffa {
             /// Gross principal amount for the flow in 18-decimal unified asset units.
             /// Request fees are exposed separately in request_fee. Specific fulfillment
             /// steps may carry a net movement amount when the step represents external
-            /// delivery.
+            /// delivery. A deposit keeps its deposited amount after Zipper returned it
+            /// or transferred it out, which is not the amount Zipper paid.
             ///
             /// Field 9: `amount_e18`
             pub amount_e18: ::buffa::MessageFieldView<
@@ -14523,7 +14537,8 @@ pub mod __buffa {
             /// Gross principal amount for the flow in 18-decimal unified asset units.
             /// Request fees are exposed separately in request_fee. Specific fulfillment
             /// steps may carry a net movement amount when the step represents external
-            /// delivery.
+            /// delivery. A deposit keeps its deposited amount after Zipper returned it
+            /// or transferred it out, which is not the amount Zipper paid.
             ///
             /// Field 9: `amount_e18`
             #[must_use]
@@ -15424,6 +15439,12 @@ pub mod __buffa {
             pub polyester_chain_id: u32,
             /// Amount represented by this step in 18-decimal unified asset units. Steps
             /// may carry the actual net movement amount when fees have already been taken.
+            /// Unset on the step that pays out a deposit Zipper's compliance screening
+            /// rejected: `FLOW_STEP_REFUNDED`, Zipper's return of the deposit, and
+            /// `FLOW_STEP_FAILED` with `ZIPPER_COMPLIANCE_TRANSFERRED`. Zipper pays out
+            /// the deposit less its fees and does not report the amount it paid or the
+            /// fees, so the deposited amount on the flow's summary is not the amount
+            /// paid.
             ///
             /// Field 9: `amount_e18`
             pub amount_e18: ::buffa::MessageFieldView<
@@ -16501,6 +16522,12 @@ pub mod __buffa {
             }
             /// Amount represented by this step in 18-decimal unified asset units. Steps
             /// may carry the actual net movement amount when fees have already been taken.
+            /// Unset on the step that pays out a deposit Zipper's compliance screening
+            /// rejected: `FLOW_STEP_REFUNDED`, Zipper's return of the deposit, and
+            /// `FLOW_STEP_FAILED` with `ZIPPER_COMPLIANCE_TRANSFERRED`. Zipper pays out
+            /// the deposit less its fees and does not report the amount it paid or the
+            /// fees, so the deposited amount on the flow's summary is not the amount
+            /// paid.
             ///
             /// Field 9: `amount_e18`
             #[must_use]
@@ -16765,7 +16792,8 @@ pub mod __buffa {
             pub required_rejections: u32,
             /// Amount posted by the underlying movement represented by this activity, in
             /// 18-decimal unified asset units. This may be a net movement amount for
-            /// fee-bearing fulfillment activity.
+            /// fee-bearing fulfillment activity. Unset on the activities of a step that
+            /// carries no `amount_e18` because Zipper paid out a rejected deposit.
             ///
             /// Field 14: `amount_e18`
             pub amount_e18: ::buffa::MessageFieldView<
@@ -17628,7 +17656,8 @@ pub mod __buffa {
             }
             /// Amount posted by the underlying movement represented by this activity, in
             /// 18-decimal unified asset units. This may be a net movement amount for
-            /// fee-bearing fulfillment activity.
+            /// fee-bearing fulfillment activity. Unset on the activities of a step that
+            /// carries no `amount_e18` because Zipper paid out a rejected deposit.
             ///
             /// Field 14: `amount_e18`
             #[must_use]

@@ -792,7 +792,9 @@ pub struct ZipperReasonDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ZipperReasonCode>,
-    /// Stable reason identifier suitable for localization lookup.
+    /// Stable reason identifier suitable for localization lookup. A withdrawal
+    /// whose execution failed (lifecycle reason ZIPPER_WITHDRAW_EXECUTION_FAILED)
+    /// has `withdrawal.execution_failed.under_review`, whatever the code.
     ///
     /// Field 2: `reason_id`
     #[serde(
@@ -802,7 +804,9 @@ pub struct ZipperReasonDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub reason_id: ::buffa::alloc::string::String,
-    /// User-displayable English explanation of the outcome.
+    /// User-displayable English explanation of the outcome. For a withdrawal
+    /// whose execution failed, that it failed and is under review by the bridge
+    /// operator, and that its funds were not returned to the account.
     ///
     /// Field 3: `message`
     #[serde(
@@ -3191,11 +3195,15 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ZipperReasonCode>,
-            /// Stable reason identifier suitable for localization lookup.
+            /// Stable reason identifier suitable for localization lookup. A withdrawal
+            /// whose execution failed (lifecycle reason ZIPPER_WITHDRAW_EXECUTION_FAILED)
+            /// has `withdrawal.execution_failed.under_review`, whatever the code.
             ///
             /// Field 2: `reason_id`
             pub reason_id: &'a str,
-            /// User-displayable English explanation of the outcome.
+            /// User-displayable English explanation of the outcome. For a withdrawal
+            /// whose execution failed, that it failed and is under review by the bridge
+            /// operator, and that its funds were not returned to the account.
             ///
             /// Field 3: `message`
             pub message: &'a str,
@@ -3473,14 +3481,18 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ZipperReasonCode> {
                 self.0.reborrow().code
             }
-            /// Stable reason identifier suitable for localization lookup.
+            /// Stable reason identifier suitable for localization lookup. A withdrawal
+            /// whose execution failed (lifecycle reason ZIPPER_WITHDRAW_EXECUTION_FAILED)
+            /// has `withdrawal.execution_failed.under_review`, whatever the code.
             ///
             /// Field 2: `reason_id`
             #[must_use]
             pub fn reason_id(&self) -> &'_ str {
                 self.0.reborrow().reason_id
             }
-            /// User-displayable English explanation of the outcome.
+            /// User-displayable English explanation of the outcome. For a withdrawal
+            /// whose execution failed, that it failed and is under review by the bridge
+            /// operator, and that its funds were not returned to the account.
             ///
             /// Field 3: `message`
             #[must_use]

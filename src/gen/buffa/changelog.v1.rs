@@ -570,6 +570,317 @@ impl ::buffa::Enumeration for Surface {
         ]
     }
 }
+/// Environment is a Polyester network with its own changelog.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum Environment {
+    /// Not set. Never returned.
+    ENVIRONMENT_UNSPECIFIED = 0i32,
+    /// Development network.
+    DEVNET = 1i32,
+    /// Test network.
+    TESTNET = 2i32,
+    /// Main network.
+    MAINNET = 3i32,
+}
+impl Environment {
+    ///Idiomatic alias for [`Self::ENVIRONMENT_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const EnvironmentUnspecified: Self = Self::ENVIRONMENT_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DEVNET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Devnet: Self = Self::DEVNET;
+    ///Idiomatic alias for [`Self::TESTNET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Testnet: Self = Self::TESTNET;
+    ///Idiomatic alias for [`Self::MAINNET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Mainnet: Self = Self::MAINNET;
+}
+impl ::core::default::Default for Environment {
+    fn default() -> Self {
+        Self::ENVIRONMENT_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for Environment {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for Environment {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = Environment;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(Environment)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<Environment, E> {
+                <Environment as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<Environment, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <Environment as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<Environment, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <Environment as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<Environment, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for Environment {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for Environment {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ENVIRONMENT_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::DEVNET),
+            2i32 => ::core::option::Option::Some(Self::TESTNET),
+            3i32 => ::core::option::Option::Some(Self::MAINNET),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ENVIRONMENT_UNSPECIFIED => "ENVIRONMENT_UNSPECIFIED",
+            Self::DEVNET => "DEVNET",
+            Self::TESTNET => "TESTNET",
+            Self::MAINNET => "MAINNET",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ENVIRONMENT_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ENVIRONMENT_UNSPECIFIED)
+            }
+            "DEVNET" => ::core::option::Option::Some(Self::DEVNET),
+            "TESTNET" => ::core::option::Option::Some(Self::TESTNET),
+            "MAINNET" => ::core::option::Option::Some(Self::MAINNET),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::ENVIRONMENT_UNSPECIFIED, Self::DEVNET, Self::TESTNET, Self::MAINNET]
+    }
+}
+/// ChangeAvailability is how one change of a release differs from its release
+/// in one environment.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ChangeAvailability {
+    /// Not set. Never returned.
+    AVAILABILITY_UNSPECIFIED = 0i32,
+    /// Available in the environment while its release is still pending there.
+    AHEAD = 1i32,
+    /// Not yet available in the environment although its release is live there.
+    PENDING = 2i32,
+    /// Not available in the environment for now, whatever its release's status.
+    UNAVAILABLE = 3i32,
+}
+impl ChangeAvailability {
+    ///Idiomatic alias for [`Self::AVAILABILITY_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AvailabilityUnspecified: Self = Self::AVAILABILITY_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::AHEAD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Ahead: Self = Self::AHEAD;
+    ///Idiomatic alias for [`Self::PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Pending: Self = Self::PENDING;
+    ///Idiomatic alias for [`Self::UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unavailable: Self = Self::UNAVAILABLE;
+}
+impl ::core::default::Default for ChangeAvailability {
+    fn default() -> Self {
+        Self::AVAILABILITY_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ChangeAvailability {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ChangeAvailability {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ChangeAvailability;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(ChangeAvailability)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ChangeAvailability, E> {
+                <ChangeAvailability as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ChangeAvailability, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ChangeAvailability as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ChangeAvailability, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ChangeAvailability as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ChangeAvailability, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChangeAvailability {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ChangeAvailability {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::AVAILABILITY_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::AHEAD),
+            2i32 => ::core::option::Option::Some(Self::PENDING),
+            3i32 => ::core::option::Option::Some(Self::UNAVAILABLE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::AVAILABILITY_UNSPECIFIED => "AVAILABILITY_UNSPECIFIED",
+            Self::AHEAD => "AHEAD",
+            Self::PENDING => "PENDING",
+            Self::UNAVAILABLE => "UNAVAILABLE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "AVAILABILITY_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::AVAILABILITY_UNSPECIFIED)
+            }
+            "AHEAD" => ::core::option::Option::Some(Self::AHEAD),
+            "PENDING" => ::core::option::Option::Some(Self::PENDING),
+            "UNAVAILABLE" => ::core::option::Option::Some(Self::UNAVAILABLE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::AVAILABILITY_UNSPECIFIED, Self::AHEAD, Self::PENDING, Self::UNAVAILABLE]
+    }
+}
 /// SortDirection orders changes by post publication time.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -716,6 +1027,378 @@ impl ::buffa::Enumeration for SortDirection {
         &[Self::SORT_DIRECTION_UNSPECIFIED, Self::SORT_ASC, Self::SORT_DESC]
     }
 }
+/// EnvironmentStatus says whether a release is live in one environment.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct EnvironmentStatus {
+    /// Environment.
+    ///
+    /// Field 1: `environment`
+    #[serde(
+        rename = "environment",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub environment: ::buffa::EnumValue<Environment>,
+    /// When the release went live in the environment. Omitted while it is
+    /// pending there.
+    ///
+    /// Field 2: `live_at`
+    #[serde(
+        rename = "liveAt",
+        alias = "live_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub live_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for EnvironmentStatus {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("EnvironmentStatus")
+            .field("environment", &self.environment)
+            .field("live_at", &self.live_at)
+            .finish()
+    }
+}
+impl EnvironmentStatus {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.EnvironmentStatus";
+}
+::buffa::impl_default_instance!(EnvironmentStatus);
+impl ::buffa::MessageName for EnvironmentStatus {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "EnvironmentStatus";
+    const FULL_NAME: &'static str = "changelog.v1.EnvironmentStatus";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.EnvironmentStatus";
+}
+impl ::buffa::Message for EnvironmentStatus {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.live_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.live_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if self.live_at.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.live_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.environment = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.live_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.environment = ::buffa::EnumValue::from(0);
+        self.live_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for EnvironmentStatus {
+    const PROTO_FQN: &'static str = "changelog.v1.EnvironmentStatus";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for EnvironmentStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ENVIRONMENT_STATUS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.EnvironmentStatus",
+    to_json: ::buffa::type_registry::any_to_json::<EnvironmentStatus>,
+    from_json: ::buffa::type_registry::any_from_json::<EnvironmentStatus>,
+    is_wkt: false,
+};
+/// ChangeException is the status of one change in one environment where it
+/// differs from its release's status.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ChangeException {
+    /// Environment.
+    ///
+    /// Field 1: `environment`
+    #[serde(
+        rename = "environment",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub environment: ::buffa::EnumValue<Environment>,
+    /// How the change differs from its release there.
+    ///
+    /// Field 2: `availability`
+    #[serde(
+        rename = "availability",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub availability: ::buffa::EnumValue<ChangeAvailability>,
+    /// When the change became available in the environment; set for AHEAD only.
+    ///
+    /// Field 3: `live_at`
+    #[serde(
+        rename = "liveAt",
+        alias = "live_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub live_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ChangeException {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ChangeException")
+            .field("environment", &self.environment)
+            .field("availability", &self.availability)
+            .field("live_at", &self.live_at)
+            .finish()
+    }
+}
+impl ChangeException {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ChangeException";
+}
+::buffa::impl_default_instance!(ChangeException);
+impl ::buffa::MessageName for ChangeException {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "ChangeException";
+    const FULL_NAME: &'static str = "changelog.v1.ChangeException";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ChangeException";
+}
+impl ::buffa::Message for ChangeException {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.availability.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.live_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.live_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        {
+            let val = self.availability.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.live_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.live_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.environment = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.availability = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.live_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.environment = ::buffa::EnumValue::from(0);
+        self.availability = ::buffa::EnumValue::from(0);
+        self.live_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ChangeException {
+    const PROTO_FQN: &'static str = "changelog.v1.ChangeException";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ChangeException {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CHANGE_EXCEPTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.ChangeException",
+    to_json: ::buffa::type_registry::any_to_json::<ChangeException>,
+    from_json: ::buffa::type_registry::any_from_json::<ChangeException>,
+    is_wkt: false,
+};
 /// Change is one announced change. A republished post may reword or withdraw it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -800,6 +1483,18 @@ pub struct Change {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub surfaces: ::buffa::alloc::vec::Vec<::buffa::EnumValue<Surface>>,
+    /// Environments where this change differs from its release's status, in any
+    /// environment, not only this one. Empty outside release posts and when the
+    /// change follows its release everywhere.
+    ///
+    /// Field 10: `environment_exceptions`
+    #[serde(
+        rename = "environmentExceptions",
+        alias = "environment_exceptions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub environment_exceptions: ::buffa::alloc::vec::Vec<ChangeException>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -816,6 +1511,7 @@ impl ::core::fmt::Debug for Change {
             .field("migration_guidance", &self.migration_guidance)
             .field("audiences", &self.audiences)
             .field("surfaces", &self.surfaces)
+            .field("environment_exceptions", &self.environment_exceptions)
             .finish()
     }
 }
@@ -862,7 +1558,7 @@ impl ::buffa::Message for Change {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -908,12 +1604,20 @@ impl ::buffa::Message for Change {
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
+        for v in &self.environment_exceptions {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -963,6 +1667,10 @@ impl ::buffa::Message for Change {
             for v in &self.surfaces {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
             }
+        }
+        for v in &self.environment_exceptions {
+            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1112,6 +1820,15 @@ impl ::buffa::Message for Change {
                     );
                 }
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.environment_exceptions.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1129,6 +1846,7 @@ impl ::buffa::Message for Change {
         self.migration_guidance = ::core::option::Option::None;
         self.audiences.clear();
         self.surfaces.clear();
+        self.environment_exceptions.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -1520,6 +2238,41 @@ pub struct PostSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub revision: u32,
+    /// Release the post announces, for example "0.92.9". Omitted for posts that
+    /// do not announce one release. A release post has the same slug, for
+    /// example "v0.92.9", and the same content in every environment, and is
+    /// listed in every environment, including environments where it is still
+    /// pending.
+    ///
+    /// Field 14: `release_version`
+    #[serde(
+        rename = "releaseVersion",
+        alias = "release_version",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub release_version: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Status of the post's release in each environment: DEVNET, TESTNET and
+    /// MAINNET, in that order. Empty for posts without release_version. The
+    /// status changes when the release goes live, without a new revision.
+    ///
+    /// Field 15: `environments`
+    #[serde(
+        rename = "environments",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub environments: ::buffa::alloc::vec::Vec<EnvironmentStatus>,
+    /// Slug of the deployment group that brought the release to this
+    /// environment. Omitted while the release is pending here and for posts
+    /// without release_version.
+    ///
+    /// Field 16: `deployment_group_slug`
+    #[serde(
+        rename = "deploymentGroupSlug",
+        alias = "deployment_group_slug",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub deployment_group_slug: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1540,6 +2293,9 @@ impl ::core::fmt::Debug for PostSummary {
             .field("bug_fix_count", &self.bug_fix_count)
             .field("updated_at", &self.updated_at)
             .field("revision", &self.revision)
+            .field("release_version", &self.release_version)
+            .field("environments", &self.environments)
+            .field("deployment_group_slug", &self.deployment_group_slug)
             .finish()
     }
 }
@@ -1549,6 +2305,28 @@ impl PostSummary {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.PostSummary";
+}
+impl PostSummary {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::release_version`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_release_version(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.release_version = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::deployment_group_slug`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_deployment_group_slug(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.deployment_group_slug = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(PostSummary);
 impl ::buffa::MessageName for PostSummary {
@@ -1632,6 +2410,20 @@ impl ::buffa::Message for PostSummary {
         if self.revision != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.revision) as u32;
         }
+        if let Some(ref v) = self.release_version {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        for v in &self.environments {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if let Some(ref v) = self.deployment_group_slug {
+            size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1683,6 +2475,16 @@ impl ::buffa::Message for PostSummary {
         }
         if self.revision != 0u32 {
             ::buffa::types::put_uint32_field(13u32, self.revision, buf);
+        }
+        if let Some(ref v) = self.release_version {
+            ::buffa::types::put_string_field(14u32, v, buf);
+        }
+        for v in &self.environments {
+            ::buffa::types::put_len_delimited_header(15u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.deployment_group_slug {
+            ::buffa::types::put_string_field(16u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1800,6 +2602,39 @@ impl ::buffa::Message for PostSummary {
                 )?;
                 self.revision = ::buffa::types::decode_uint32(buf)?;
             }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .release_version
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.environments.push(elem);
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .deployment_group_slug
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1821,6 +2656,9 @@ impl ::buffa::Message for PostSummary {
         self.bug_fix_count = 0u32;
         self.updated_at = ::buffa::MessageField::none();
         self.revision = 0u32;
+        self.release_version = ::core::option::Option::None;
+        self.environments.clear();
+        self.deployment_group_slug = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3504,6 +4342,1787 @@ pub const __LIST_CHANGES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     from_json: ::buffa::type_registry::any_from_json::<ListChangesResponse>,
     is_wkt: false,
 };
+/// DeploymentGroupPost is one published release post a deployment group
+/// brought.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeploymentGroupPost {
+    /// Post slug, for example "v0.92.9".
+    ///
+    /// Field 1: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    /// Release the post announces, for example "0.92.9".
+    ///
+    /// Field 2: `release_version`
+    #[serde(
+        rename = "releaseVersion",
+        alias = "release_version",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub release_version: ::buffa::alloc::string::String,
+    /// Post title.
+    ///
+    /// Field 3: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    /// Time of first publication of the post.
+    ///
+    /// Field 4: `published_at`
+    #[serde(
+        rename = "publishedAt",
+        alias = "published_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub published_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Published revision of the post, starting at 1.
+    ///
+    /// Field 5: `revision`
+    #[serde(
+        rename = "revision",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub revision: u32,
+    /// When the post's current revision was published.
+    ///
+    /// Field 6: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeploymentGroupPost {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeploymentGroupPost")
+            .field("slug", &self.slug)
+            .field("release_version", &self.release_version)
+            .field("title", &self.title)
+            .field("published_at", &self.published_at)
+            .field("revision", &self.revision)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
+}
+impl DeploymentGroupPost {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupPost";
+}
+::buffa::impl_default_instance!(DeploymentGroupPost);
+impl ::buffa::MessageName for DeploymentGroupPost {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "DeploymentGroupPost";
+    const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupPost";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupPost";
+}
+impl ::buffa::Message for DeploymentGroupPost {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.slug.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+        }
+        if !self.release_version.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.release_version) as u32;
+        }
+        if !self.title.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+        }
+        if self.published_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.published_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.revision != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.revision) as u32;
+        }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.slug, buf);
+        }
+        if !self.release_version.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.title, buf);
+        }
+        if self.published_at.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.published_at.write_to(__cache, buf);
+        }
+        if self.revision != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.revision, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.updated_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.release_version, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.published_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.revision = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.slug.clear();
+        self.release_version.clear();
+        self.title.clear();
+        self.published_at = ::buffa::MessageField::none();
+        self.revision = 0u32;
+        self.updated_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeploymentGroupPost {
+    const PROTO_FQN: &'static str = "changelog.v1.DeploymentGroupPost";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeploymentGroupPost {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPLOYMENT_GROUP_POST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.DeploymentGroupPost",
+    to_json: ::buffa::type_registry::any_to_json::<DeploymentGroupPost>,
+    from_json: ::buffa::type_registry::any_from_json::<DeploymentGroupPost>,
+    is_wkt: false,
+};
+/// DeploymentGroupSummary describes one deployment group without its details.
+/// A deployment group is one deployment to this environment that raised its
+/// release version, and brought every release above the previous group's
+/// version up to and including its own.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeploymentGroupSummary {
+    /// Stable shareable identifier: the environment and the group's own
+    /// release, for example "testnet-v0.92.9". It never changes.
+    ///
+    /// Field 1: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    /// Environment the group was deployed to.
+    ///
+    /// Field 2: `environment`
+    #[serde(
+        rename = "environment",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub environment: ::buffa::EnumValue<Environment>,
+    /// When the deployment ran.
+    ///
+    /// Field 3: `occurred_at`
+    #[serde(
+        rename = "occurredAt",
+        alias = "occurred_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub occurred_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// The group's own, highest release, for example "0.92.9".
+    ///
+    /// Field 4: `release_version`
+    #[serde(
+        rename = "releaseVersion",
+        alias = "release_version",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub release_version: ::buffa::alloc::string::String,
+    /// Release tag of the group's own release, for example "v0.92.9". Omitted
+    /// when unknown.
+    ///
+    /// Field 5: `release_tag`
+    #[serde(
+        rename = "releaseTag",
+        alias = "release_tag",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub release_tag: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Release of the previous deployment group. Omitted for the first group.
+    ///
+    /// Field 6: `previous_release_version`
+    #[serde(
+        rename = "previousReleaseVersion",
+        alias = "previous_release_version",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub previous_release_version: ::core::option::Option<::buffa::alloc::string::String>,
+    /// Every release the group brought, ascending, for example \["0.92.8",
+    /// "0.92.9"\].
+    ///
+    /// Field 7: `versions`
+    #[serde(
+        rename = "versions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub versions: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// Published release posts of those releases, ascending by release. A
+    /// release without a published post has none.
+    ///
+    /// Field 8: `posts`
+    #[serde(
+        rename = "posts",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub posts: ::buffa::alloc::vec::Vec<DeploymentGroupPost>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeploymentGroupSummary {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeploymentGroupSummary")
+            .field("slug", &self.slug)
+            .field("environment", &self.environment)
+            .field("occurred_at", &self.occurred_at)
+            .field("release_version", &self.release_version)
+            .field("release_tag", &self.release_tag)
+            .field("previous_release_version", &self.previous_release_version)
+            .field("versions", &self.versions)
+            .field("posts", &self.posts)
+            .finish()
+    }
+}
+impl DeploymentGroupSummary {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupSummary";
+}
+impl DeploymentGroupSummary {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::release_tag`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_release_tag(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.release_tag = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::previous_release_version`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_previous_release_version(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.previous_release_version = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(DeploymentGroupSummary);
+impl ::buffa::MessageName for DeploymentGroupSummary {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "DeploymentGroupSummary";
+    const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupSummary";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupSummary";
+}
+impl ::buffa::Message for DeploymentGroupSummary {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.slug.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+        }
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.occurred_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.occurred_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.release_version.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.release_version) as u32;
+        }
+        if let Some(ref v) = self.release_tag {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if let Some(ref v) = self.previous_release_version {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        for v in &self.versions {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        for v in &self.posts {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.slug, buf);
+        }
+        {
+            let val = self.environment.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if self.occurred_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.occurred_at.write_to(__cache, buf);
+        }
+        if !self.release_version.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.release_version, buf);
+        }
+        if let Some(ref v) = self.release_tag {
+            ::buffa::types::put_string_field(5u32, v, buf);
+        }
+        if let Some(ref v) = self.previous_release_version {
+            ::buffa::types::put_string_field(6u32, v, buf);
+        }
+        for v in &self.versions {
+            ::buffa::types::put_string_field(7u32, v, buf);
+        }
+        for v in &self.posts {
+            ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.environment = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.occurred_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.release_version, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .release_tag
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .previous_release_version
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.versions.push(::buffa::types::decode_string(buf)?);
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.posts.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.slug.clear();
+        self.environment = ::buffa::EnumValue::from(0);
+        self.occurred_at = ::buffa::MessageField::none();
+        self.release_version.clear();
+        self.release_tag = ::core::option::Option::None;
+        self.previous_release_version = ::core::option::Option::None;
+        self.versions.clear();
+        self.posts.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeploymentGroupSummary {
+    const PROTO_FQN: &'static str = "changelog.v1.DeploymentGroupSummary";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeploymentGroupSummary {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPLOYMENT_GROUP_SUMMARY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.DeploymentGroupSummary",
+    to_json: ::buffa::type_registry::any_to_json::<DeploymentGroupSummary>,
+    from_json: ::buffa::type_registry::any_from_json::<DeploymentGroupSummary>,
+    is_wkt: false,
+};
+/// DeploymentGroupAttention is one change of a deployment group that needs
+/// attention.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeploymentGroupAttention {
+    /// Slug of the release post that announces the change.
+    ///
+    /// Field 1: `post_slug`
+    #[serde(
+        rename = "postSlug",
+        alias = "post_slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub post_slug: ::buffa::alloc::string::String,
+    /// Release of that post.
+    ///
+    /// Field 2: `release_version`
+    #[serde(
+        rename = "releaseVersion",
+        alias = "release_version",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub release_version: ::buffa::alloc::string::String,
+    /// The change, as in its post.
+    ///
+    /// Field 3: `change`
+    #[serde(
+        rename = "change",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub change: ::buffa::MessageField<Change>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeploymentGroupAttention {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeploymentGroupAttention")
+            .field("post_slug", &self.post_slug)
+            .field("release_version", &self.release_version)
+            .field("change", &self.change)
+            .finish()
+    }
+}
+impl DeploymentGroupAttention {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupAttention";
+}
+::buffa::impl_default_instance!(DeploymentGroupAttention);
+impl ::buffa::MessageName for DeploymentGroupAttention {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "DeploymentGroupAttention";
+    const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupAttention";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupAttention";
+}
+impl ::buffa::Message for DeploymentGroupAttention {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.post_slug.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.post_slug) as u32;
+        }
+        if !self.release_version.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.release_version) as u32;
+        }
+        if self.change.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.change.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.post_slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.post_slug, buf);
+        }
+        if !self.release_version.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+        }
+        if self.change.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.change.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.post_slug, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.release_version, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.change.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.post_slug.clear();
+        self.release_version.clear();
+        self.change = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeploymentGroupAttention {
+    const PROTO_FQN: &'static str = "changelog.v1.DeploymentGroupAttention";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeploymentGroupAttention {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPLOYMENT_GROUP_ATTENTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.DeploymentGroupAttention",
+    to_json: ::buffa::type_registry::any_to_json::<DeploymentGroupAttention>,
+    from_json: ::buffa::type_registry::any_from_json::<DeploymentGroupAttention>,
+    is_wkt: false,
+};
+/// DeploymentGroupHighlight is one highlight of a release post in a deployment
+/// group.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeploymentGroupHighlight {
+    /// Slug of the release post.
+    ///
+    /// Field 1: `post_slug`
+    #[serde(
+        rename = "postSlug",
+        alias = "post_slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub post_slug: ::buffa::alloc::string::String,
+    /// Release of that post.
+    ///
+    /// Field 2: `release_version`
+    #[serde(
+        rename = "releaseVersion",
+        alias = "release_version",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub release_version: ::buffa::alloc::string::String,
+    /// Highlight text, inline Markdown.
+    ///
+    /// Field 3: `text`
+    #[serde(
+        rename = "text",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub text: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeploymentGroupHighlight {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeploymentGroupHighlight")
+            .field("post_slug", &self.post_slug)
+            .field("release_version", &self.release_version)
+            .field("text", &self.text)
+            .finish()
+    }
+}
+impl DeploymentGroupHighlight {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupHighlight";
+}
+::buffa::impl_default_instance!(DeploymentGroupHighlight);
+impl ::buffa::MessageName for DeploymentGroupHighlight {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "DeploymentGroupHighlight";
+    const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupHighlight";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupHighlight";
+}
+impl ::buffa::Message for DeploymentGroupHighlight {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.post_slug.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.post_slug) as u32;
+        }
+        if !self.release_version.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.release_version) as u32;
+        }
+        if !self.text.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.text) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.post_slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.post_slug, buf);
+        }
+        if !self.release_version.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+        }
+        if !self.text.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.text, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.post_slug, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.release_version, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.text, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.post_slug.clear();
+        self.release_version.clear();
+        self.text.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeploymentGroupHighlight {
+    const PROTO_FQN: &'static str = "changelog.v1.DeploymentGroupHighlight";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeploymentGroupHighlight {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPLOYMENT_GROUP_HIGHLIGHT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.DeploymentGroupHighlight",
+    to_json: ::buffa::type_registry::any_to_json::<DeploymentGroupHighlight>,
+    from_json: ::buffa::type_registry::any_from_json::<DeploymentGroupHighlight>,
+    is_wkt: false,
+};
+/// DeploymentGroup is one complete deployment group.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeploymentGroup {
+    /// Group summary.
+    ///
+    /// Field 1: `summary`
+    #[serde(
+        rename = "summary",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub summary: ::buffa::MessageField<DeploymentGroupSummary>,
+    /// Breaking changes and changes with action_required across the group's
+    /// posts, in post order (ascending release), then section and change order.
+    ///
+    /// Field 2: `attention`
+    #[serde(
+        rename = "attention",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub attention: ::buffa::alloc::vec::Vec<DeploymentGroupAttention>,
+    /// Highlights of the group's posts, in post order.
+    ///
+    /// Field 3: `highlights`
+    #[serde(
+        rename = "highlights",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub highlights: ::buffa::alloc::vec::Vec<DeploymentGroupHighlight>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeploymentGroup {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeploymentGroup")
+            .field("summary", &self.summary)
+            .field("attention", &self.attention)
+            .field("highlights", &self.highlights)
+            .finish()
+    }
+}
+impl DeploymentGroup {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroup";
+}
+::buffa::impl_default_instance!(DeploymentGroup);
+impl ::buffa::MessageName for DeploymentGroup {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "DeploymentGroup";
+    const FULL_NAME: &'static str = "changelog.v1.DeploymentGroup";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroup";
+}
+impl ::buffa::Message for DeploymentGroup {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.summary.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.summary.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.attention {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.highlights {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.summary.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.summary.write_to(__cache, buf);
+        }
+        for v in &self.attention {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.highlights {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.summary.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.attention.push(elem);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.highlights.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.summary = ::buffa::MessageField::none();
+        self.attention.clear();
+        self.highlights.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeploymentGroup {
+    const PROTO_FQN: &'static str = "changelog.v1.DeploymentGroup";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeploymentGroup {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPLOYMENT_GROUP_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.DeploymentGroup",
+    to_json: ::buffa::type_registry::any_to_json::<DeploymentGroup>,
+    from_json: ::buffa::type_registry::any_from_json::<DeploymentGroup>,
+    is_wkt: false,
+};
+/// ListDeploymentGroupsRequest pages through this environment's deployment
+/// groups, newest first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDeploymentGroupsRequest {
+    /// Maximum groups to return. 0 means the default of 20; maximum 100.
+    ///
+    /// Field 1: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub limit: u32,
+    /// Opaque, keyset-backed, exclusive cursor from a previous response.
+    /// Bound to deployment time and slug.
+    ///
+    /// Field 2: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDeploymentGroupsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDeploymentGroupsRequest")
+            .field("limit", &self.limit)
+            .field("page_token", &self.page_token)
+            .finish()
+    }
+}
+impl ListDeploymentGroupsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsRequest";
+}
+::buffa::impl_default_instance!(ListDeploymentGroupsRequest);
+impl ::buffa::MessageName for ListDeploymentGroupsRequest {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "ListDeploymentGroupsRequest";
+    const FULL_NAME: &'static str = "changelog.v1.ListDeploymentGroupsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsRequest";
+}
+impl ::buffa::Message for ListDeploymentGroupsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.limit != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.limit != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.limit, buf);
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.limit = 0u32;
+        self.page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDeploymentGroupsRequest {
+    const PROTO_FQN: &'static str = "changelog.v1.ListDeploymentGroupsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDeploymentGroupsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DEPLOYMENT_GROUPS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.ListDeploymentGroupsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListDeploymentGroupsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDeploymentGroupsRequest>,
+    is_wkt: false,
+};
+/// ListDeploymentGroupsResponse returns deployment group summaries, newest
+/// first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDeploymentGroupsResponse {
+    /// Group summaries ordered by deployment time descending, then slug
+    /// descending.
+    ///
+    /// Field 1: `groups`
+    #[serde(
+        rename = "groups",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub groups: ::buffa::alloc::vec::Vec<DeploymentGroupSummary>,
+    /// Cursor for the next page. Empty when no more results exist.
+    ///
+    /// Field 2: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDeploymentGroupsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDeploymentGroupsResponse")
+            .field("groups", &self.groups)
+            .field("next_page_token", &self.next_page_token)
+            .finish()
+    }
+}
+impl ListDeploymentGroupsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsResponse";
+}
+::buffa::impl_default_instance!(ListDeploymentGroupsResponse);
+impl ::buffa::MessageName for ListDeploymentGroupsResponse {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "ListDeploymentGroupsResponse";
+    const FULL_NAME: &'static str = "changelog.v1.ListDeploymentGroupsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsResponse";
+}
+impl ::buffa::Message for ListDeploymentGroupsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.groups {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.groups {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.groups.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.groups.clear();
+        self.next_page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDeploymentGroupsResponse {
+    const PROTO_FQN: &'static str = "changelog.v1.ListDeploymentGroupsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDeploymentGroupsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DEPLOYMENT_GROUPS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.ListDeploymentGroupsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListDeploymentGroupsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDeploymentGroupsResponse>,
+    is_wkt: false,
+};
+/// GetDeploymentGroupRequest selects one deployment group.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetDeploymentGroupRequest {
+    /// Group slug, for example "testnet-v0.92.9".
+    ///
+    /// Field 1: `slug`
+    #[serde(
+        rename = "slug",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub slug: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetDeploymentGroupRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetDeploymentGroupRequest").field("slug", &self.slug).finish()
+    }
+}
+impl GetDeploymentGroupRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupRequest";
+}
+::buffa::impl_default_instance!(GetDeploymentGroupRequest);
+impl ::buffa::MessageName for GetDeploymentGroupRequest {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "GetDeploymentGroupRequest";
+    const FULL_NAME: &'static str = "changelog.v1.GetDeploymentGroupRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupRequest";
+}
+impl ::buffa::Message for GetDeploymentGroupRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.slug.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.slug.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.slug, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.slug, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.slug.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetDeploymentGroupRequest {
+    const PROTO_FQN: &'static str = "changelog.v1.GetDeploymentGroupRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetDeploymentGroupRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_DEPLOYMENT_GROUP_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.GetDeploymentGroupRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetDeploymentGroupRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetDeploymentGroupRequest>,
+    is_wkt: false,
+};
+/// GetDeploymentGroupResponse returns one complete deployment group.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetDeploymentGroupResponse {
+    /// The group with its attention changes and highlights.
+    ///
+    /// Field 1: `group`
+    #[serde(
+        rename = "group",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub group: ::buffa::MessageField<DeploymentGroup>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetDeploymentGroupResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetDeploymentGroupResponse").field("group", &self.group).finish()
+    }
+}
+impl GetDeploymentGroupResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupResponse";
+}
+::buffa::impl_default_instance!(GetDeploymentGroupResponse);
+impl ::buffa::MessageName for GetDeploymentGroupResponse {
+    const PACKAGE: &'static str = "changelog.v1";
+    const NAME: &'static str = "GetDeploymentGroupResponse";
+    const FULL_NAME: &'static str = "changelog.v1.GetDeploymentGroupResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupResponse";
+}
+impl ::buffa::Message for GetDeploymentGroupResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.group.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.group.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.group.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.group.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.group.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.group = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetDeploymentGroupResponse {
+    const PROTO_FQN: &'static str = "changelog.v1.GetDeploymentGroupResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetDeploymentGroupResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_DEPLOYMENT_GROUP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/changelog.v1.GetDeploymentGroupResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetDeploymentGroupResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetDeploymentGroupResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -3521,6 +6140,743 @@ pub mod __buffa {
     pub mod view {
         #[allow(unused_imports)]
         use super::*;
+        /// EnvironmentStatus says whether a release is live in one environment.
+        #[derive(Clone, Debug, Default)]
+        pub struct EnvironmentStatusView<'a> {
+            /// Environment.
+            ///
+            /// Field 1: `environment`
+            pub environment: ::buffa::EnumValue<super::super::Environment>,
+            /// When the release went live in the environment. Omitted while it is
+            /// pending there.
+            ///
+            /// Field 2: `live_at`
+            pub live_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for EnvironmentStatusView<'a> {
+            type Owned = super::super::EnvironmentStatus;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.environment = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.live_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.live_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::EnvironmentStatus,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::EnvironmentStatus,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::EnvironmentStatus {
+                    environment: self.environment,
+                    live_at: match self.live_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for EnvironmentStatusView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.live_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.live_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if self.live_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.live_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for EnvironmentStatusView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.environment,
+                ) {
+                    __map.serialize_entry("environment", &self.environment)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.live_at.as_option() {
+                        __map.serialize_entry("liveAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for EnvironmentStatusView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "EnvironmentStatus";
+            const FULL_NAME: &'static str = "changelog.v1.EnvironmentStatus";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.EnvironmentStatus";
+        }
+        ::buffa::impl_default_view_instance!(EnvironmentStatusView);
+        ::buffa::impl_view_reborrow!(EnvironmentStatusView);
+        /** Self-contained, `'static` owned view of a `EnvironmentStatus` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`EnvironmentStatusView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`EnvironmentStatusView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct EnvironmentStatusOwnedView(
+            ::buffa::OwnedView<EnvironmentStatusView<'static>>,
+        );
+        impl EnvironmentStatusOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    EnvironmentStatusOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    EnvironmentStatusOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::EnvironmentStatus,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    EnvironmentStatusOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`EnvironmentStatusView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &EnvironmentStatusView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::EnvironmentStatus,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Environment.
+            ///
+            /// Field 1: `environment`
+            #[must_use]
+            pub fn environment(&self) -> ::buffa::EnumValue<super::super::Environment> {
+                self.0.reborrow().environment
+            }
+            /// When the release went live in the environment. Omitted while it is
+            /// pending there.
+            ///
+            /// Field 2: `live_at`
+            #[must_use]
+            pub fn live_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().live_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<EnvironmentStatusView<'static>>>
+        for EnvironmentStatusOwnedView {
+            fn from(inner: ::buffa::OwnedView<EnvironmentStatusView<'static>>) -> Self {
+                EnvironmentStatusOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<EnvironmentStatusOwnedView>
+        for ::buffa::OwnedView<EnvironmentStatusView<'static>> {
+            fn from(wrapper: EnvironmentStatusOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<EnvironmentStatusView<'static>>>
+        for EnvironmentStatusOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<EnvironmentStatusView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::EnvironmentStatus {
+            type View<'a> = EnvironmentStatusView<'a>;
+            type ViewHandle = EnvironmentStatusOwnedView;
+        }
+        impl ::serde::Serialize for EnvironmentStatusOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ChangeException is the status of one change in one environment where it
+        /// differs from its release's status.
+        #[derive(Clone, Debug, Default)]
+        pub struct ChangeExceptionView<'a> {
+            /// Environment.
+            ///
+            /// Field 1: `environment`
+            pub environment: ::buffa::EnumValue<super::super::Environment>,
+            /// How the change differs from its release there.
+            ///
+            /// Field 2: `availability`
+            pub availability: ::buffa::EnumValue<super::super::ChangeAvailability>,
+            /// When the change became available in the environment; set for AHEAD only.
+            ///
+            /// Field 3: `live_at`
+            pub live_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ChangeExceptionView<'a> {
+            type Owned = super::super::ChangeException;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.environment = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.availability = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.live_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.live_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChangeException,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ChangeException,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ChangeException {
+                    environment: self.environment,
+                    availability: self.availability,
+                    live_at: match self.live_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ChangeExceptionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.availability.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.live_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.live_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.availability.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.live_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.live_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ChangeExceptionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.environment,
+                ) {
+                    __map.serialize_entry("environment", &self.environment)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.availability,
+                ) {
+                    __map.serialize_entry("availability", &self.availability)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.live_at.as_option() {
+                        __map.serialize_entry("liveAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ChangeExceptionView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "ChangeException";
+            const FULL_NAME: &'static str = "changelog.v1.ChangeException";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ChangeException";
+        }
+        ::buffa::impl_default_view_instance!(ChangeExceptionView);
+        ::buffa::impl_view_reborrow!(ChangeExceptionView);
+        /** Self-contained, `'static` owned view of a `ChangeException` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ChangeExceptionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ChangeExceptionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ChangeExceptionOwnedView(
+            ::buffa::OwnedView<ChangeExceptionView<'static>>,
+        );
+        impl ChangeExceptionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChangeExceptionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChangeExceptionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ChangeException,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ChangeExceptionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ChangeExceptionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ChangeExceptionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ChangeException,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Environment.
+            ///
+            /// Field 1: `environment`
+            #[must_use]
+            pub fn environment(&self) -> ::buffa::EnumValue<super::super::Environment> {
+                self.0.reborrow().environment
+            }
+            /// How the change differs from its release there.
+            ///
+            /// Field 2: `availability`
+            #[must_use]
+            pub fn availability(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::ChangeAvailability> {
+                self.0.reborrow().availability
+            }
+            /// When the change became available in the environment; set for AHEAD only.
+            ///
+            /// Field 3: `live_at`
+            #[must_use]
+            pub fn live_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().live_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ChangeExceptionView<'static>>>
+        for ChangeExceptionOwnedView {
+            fn from(inner: ::buffa::OwnedView<ChangeExceptionView<'static>>) -> Self {
+                ChangeExceptionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ChangeExceptionOwnedView>
+        for ::buffa::OwnedView<ChangeExceptionView<'static>> {
+            fn from(wrapper: ChangeExceptionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ChangeExceptionView<'static>>>
+        for ChangeExceptionOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ChangeExceptionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ChangeException {
+            type View<'a> = ChangeExceptionView<'a>;
+            type ViewHandle = ChangeExceptionOwnedView;
+        }
+        impl ::serde::Serialize for ChangeExceptionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// Change is one announced change. A republished post may reword or withdraw it.
         #[derive(Clone, Debug, Default)]
         pub struct ChangeView<'a> {
@@ -3566,6 +6922,15 @@ pub mod __buffa {
             pub surfaces: ::buffa::RepeatedView<
                 'a,
                 ::buffa::EnumValue<super::super::Surface>,
+            >,
+            /// Environments where this change differs from its release's status, in any
+            /// environment, not only this one. Empty outside release posts and when the
+            /// change follows its release everywhere.
+            ///
+            /// Field 10: `environment_exceptions`
+            pub environment_exceptions: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ChangeExceptionView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -3719,6 +7084,21 @@ pub mod __buffa {
                             );
                         }
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.environment_exceptions
+                            .push(
+                                <super::super::__buffa::view::ChangeExceptionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -3751,6 +7131,11 @@ pub mod __buffa {
                     migration_guidance: self.migration_guidance.map(|s| s.to_string()),
                     audiences: self.audiences.to_vec(),
                     surfaces: self.surfaces.to_vec(),
+                    environment_exceptions: self
+                        .environment_exceptions
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -3761,7 +7146,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ChangeView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -3812,13 +7197,21 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
+                for v in &self.environment_exceptions {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -3868,6 +7261,14 @@ pub mod __buffa {
                     for v in &self.surfaces {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
                     }
+                }
+                for v in &self.environment_exceptions {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -3929,6 +7330,13 @@ pub mod __buffa {
                         .serialize_entry(
                             "surfaces",
                             &::buffa::json_helpers::EnumSeqJson(&self.surfaces),
+                        )?;
+                }
+                if !self.environment_exceptions.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "environmentExceptions",
+                            &*self.environment_exceptions,
                         )?;
                 }
                 __map.end()
@@ -4089,6 +7497,20 @@ pub mod __buffa {
                 &self,
             ) -> &::buffa::RepeatedView<'_, ::buffa::EnumValue<super::super::Surface>> {
                 &self.0.reborrow().surfaces
+            }
+            /// Environments where this change differs from its release's status, in any
+            /// environment, not only this one. Empty outside release posts and when the
+            /// change follows its release everywhere.
+            ///
+            /// Field 10: `environment_exceptions`
+            #[must_use]
+            pub fn environment_exceptions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ChangeExceptionView<'_>,
+            > {
+                &self.0.reborrow().environment_exceptions
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ChangeView<'static>>>
@@ -4567,6 +7989,29 @@ pub mod __buffa {
             ///
             /// Field 13: `revision`
             pub revision: u32,
+            /// Release the post announces, for example "0.92.9". Omitted for posts that
+            /// do not announce one release. A release post has the same slug, for
+            /// example "v0.92.9", and the same content in every environment, and is
+            /// listed in every environment, including environments where it is still
+            /// pending.
+            ///
+            /// Field 14: `release_version`
+            pub release_version: ::core::option::Option<&'a str>,
+            /// Status of the post's release in each environment: DEVNET, TESTNET and
+            /// MAINNET, in that order. Empty for posts without release_version. The
+            /// status changes when the release goes live, without a new revision.
+            ///
+            /// Field 15: `environments`
+            pub environments: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::EnvironmentStatusView<'a>,
+            >,
+            /// Slug of the deployment group that brought the release to this
+            /// environment. Omitted while the release is pending here and for posts
+            /// without release_version.
+            ///
+            /// Field 16: `deployment_group_slug`
+            pub deployment_group_slug: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for PostSummaryView<'a> {
@@ -4753,6 +8198,39 @@ pub mod __buffa {
                         )?;
                         view.revision = ::buffa::types::decode_uint32(&mut cur)?;
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_version = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.deployment_group_slug = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.environments
+                            .push(
+                                <super::super::__buffa::view::EnvironmentStatusView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4816,6 +8294,15 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     revision: self.revision,
+                    release_version: self.release_version.map(|s| s.to_string()),
+                    environments: self
+                        .environments
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    deployment_group_slug: self
+                        .deployment_group_slug
+                        .map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4910,6 +8397,20 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.revision) as u32;
                 }
+                if let Some(ref v) = self.release_version {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                for v in &self.environments {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if let Some(ref v) = self.deployment_group_slug {
+                    size += 2u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -4982,6 +8483,20 @@ pub mod __buffa {
                 }
                 if self.revision != 0u32 {
                     ::buffa::types::put_uint32_field(13u32, self.revision, buf);
+                }
+                if let Some(ref v) = self.release_version {
+                    ::buffa::types::put_string_field(14u32, v, buf);
+                }
+                for v in &self.environments {
+                    ::buffa::types::put_len_delimited_header(
+                        15u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.deployment_group_slug {
+                    ::buffa::types::put_string_field(16u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5097,6 +8612,15 @@ pub mod __buffa {
                             "revision",
                             &::buffa::json_helpers::ProtoJson(&self.revision),
                         )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.release_version {
+                    __map.serialize_entry("releaseVersion", __v)?;
+                }
+                if !self.environments.is_empty() {
+                    __map.serialize_entry("environments", &*self.environments)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.deployment_group_slug {
+                    __map.serialize_entry("deploymentGroupSlug", __v)?;
                 }
                 __map.end()
             }
@@ -5296,6 +8820,40 @@ pub mod __buffa {
             #[must_use]
             pub fn revision(&self) -> u32 {
                 self.0.reborrow().revision
+            }
+            /// Release the post announces, for example "0.92.9". Omitted for posts that
+            /// do not announce one release. A release post has the same slug, for
+            /// example "v0.92.9", and the same content in every environment, and is
+            /// listed in every environment, including environments where it is still
+            /// pending.
+            ///
+            /// Field 14: `release_version`
+            #[must_use]
+            pub fn release_version(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().release_version
+            }
+            /// Status of the post's release in each environment: DEVNET, TESTNET and
+            /// MAINNET, in that order. Empty for posts without release_version. The
+            /// status changes when the release goes live, without a new revision.
+            ///
+            /// Field 15: `environments`
+            #[must_use]
+            pub fn environments(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::EnvironmentStatusView<'_>,
+            > {
+                &self.0.reborrow().environments
+            }
+            /// Slug of the deployment group that brought the release to this
+            /// environment. Omitted while the release is pending here and for posts
+            /// without release_version.
+            ///
+            /// Field 16: `deployment_group_slug`
+            #[must_use]
+            pub fn deployment_group_slug(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().deployment_group_slug
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<PostSummaryView<'static>>>
@@ -8451,9 +12009,3486 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// DeploymentGroupPost is one published release post a deployment group
+        /// brought.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeploymentGroupPostView<'a> {
+            /// Post slug, for example "v0.92.9".
+            ///
+            /// Field 1: `slug`
+            pub slug: &'a str,
+            /// Release the post announces, for example "0.92.9".
+            ///
+            /// Field 2: `release_version`
+            pub release_version: &'a str,
+            /// Post title.
+            ///
+            /// Field 3: `title`
+            pub title: &'a str,
+            /// Time of first publication of the post.
+            ///
+            /// Field 4: `published_at`
+            pub published_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Published revision of the post, starting at 1.
+            ///
+            /// Field 5: `revision`
+            pub revision: u32,
+            /// When the post's current revision was published.
+            ///
+            /// Field 6: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeploymentGroupPostView<'a> {
+            type Owned = super::super::DeploymentGroupPost;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.slug = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_version = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.title = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.published_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.published_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.revision = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupPost,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupPost,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeploymentGroupPost {
+                    slug: self.slug.to_string(),
+                    release_version: self.release_version.to_string(),
+                    title: self.title.to_string(),
+                    published_at: match self.published_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    revision: self.revision,
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeploymentGroupPostView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.slug.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+                }
+                if !self.release_version.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.release_version)
+                                as u32;
+                }
+                if !self.title.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+                }
+                if self.published_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.published_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.revision != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.revision) as u32;
+                }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.slug.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.slug, buf);
+                }
+                if !self.release_version.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+                }
+                if !self.title.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.title, buf);
+                }
+                if self.published_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.published_at.write_to(__cache, buf);
+                }
+                if self.revision != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.revision, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeploymentGroupPostView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+                    __map.serialize_entry("slug", self.slug)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.release_version) {
+                    __map.serialize_entry("releaseVersion", self.release_version)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.title) {
+                    __map.serialize_entry("title", self.title)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .published_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("publishedAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.revision) {
+                    __map
+                        .serialize_entry(
+                            "revision",
+                            &::buffa::json_helpers::ProtoJson(&self.revision),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeploymentGroupPostView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "DeploymentGroupPost";
+            const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupPost";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupPost";
+        }
+        ::buffa::impl_default_view_instance!(DeploymentGroupPostView);
+        ::buffa::impl_view_reborrow!(DeploymentGroupPostView);
+        /** Self-contained, `'static` owned view of a `DeploymentGroupPost` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeploymentGroupPostView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeploymentGroupPostView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeploymentGroupPostOwnedView(
+            ::buffa::OwnedView<DeploymentGroupPostView<'static>>,
+        );
+        impl DeploymentGroupPostOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupPostOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupPostOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeploymentGroupPost,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupPostOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeploymentGroupPostView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeploymentGroupPostView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupPost,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Post slug, for example "v0.92.9".
+            ///
+            /// Field 1: `slug`
+            #[must_use]
+            pub fn slug(&self) -> &'_ str {
+                self.0.reborrow().slug
+            }
+            /// Release the post announces, for example "0.92.9".
+            ///
+            /// Field 2: `release_version`
+            #[must_use]
+            pub fn release_version(&self) -> &'_ str {
+                self.0.reborrow().release_version
+            }
+            /// Post title.
+            ///
+            /// Field 3: `title`
+            #[must_use]
+            pub fn title(&self) -> &'_ str {
+                self.0.reborrow().title
+            }
+            /// Time of first publication of the post.
+            ///
+            /// Field 4: `published_at`
+            #[must_use]
+            pub fn published_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().published_at
+            }
+            /// Published revision of the post, starting at 1.
+            ///
+            /// Field 5: `revision`
+            #[must_use]
+            pub fn revision(&self) -> u32 {
+                self.0.reborrow().revision
+            }
+            /// When the post's current revision was published.
+            ///
+            /// Field 6: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DeploymentGroupPostView<'static>>>
+        for DeploymentGroupPostOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeploymentGroupPostView<'static>>,
+            ) -> Self {
+                DeploymentGroupPostOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeploymentGroupPostOwnedView>
+        for ::buffa::OwnedView<DeploymentGroupPostView<'static>> {
+            fn from(wrapper: DeploymentGroupPostOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DeploymentGroupPostView<'static>>>
+        for DeploymentGroupPostOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeploymentGroupPostView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeploymentGroupPost {
+            type View<'a> = DeploymentGroupPostView<'a>;
+            type ViewHandle = DeploymentGroupPostOwnedView;
+        }
+        impl ::serde::Serialize for DeploymentGroupPostOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeploymentGroupSummary describes one deployment group without its details.
+        /// A deployment group is one deployment to this environment that raised its
+        /// release version, and brought every release above the previous group's
+        /// version up to and including its own.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeploymentGroupSummaryView<'a> {
+            /// Stable shareable identifier: the environment and the group's own
+            /// release, for example "testnet-v0.92.9". It never changes.
+            ///
+            /// Field 1: `slug`
+            pub slug: &'a str,
+            /// Environment the group was deployed to.
+            ///
+            /// Field 2: `environment`
+            pub environment: ::buffa::EnumValue<super::super::Environment>,
+            /// When the deployment ran.
+            ///
+            /// Field 3: `occurred_at`
+            pub occurred_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The group's own, highest release, for example "0.92.9".
+            ///
+            /// Field 4: `release_version`
+            pub release_version: &'a str,
+            /// Release tag of the group's own release, for example "v0.92.9". Omitted
+            /// when unknown.
+            ///
+            /// Field 5: `release_tag`
+            pub release_tag: ::core::option::Option<&'a str>,
+            /// Release of the previous deployment group. Omitted for the first group.
+            ///
+            /// Field 6: `previous_release_version`
+            pub previous_release_version: ::core::option::Option<&'a str>,
+            /// Every release the group brought, ascending, for example \["0.92.8",
+            /// "0.92.9"\].
+            ///
+            /// Field 7: `versions`
+            pub versions: ::buffa::RepeatedView<'a, &'a str>,
+            /// Published release posts of those releases, ascending by release. A
+            /// release without a published post has none.
+            ///
+            /// Field 8: `posts`
+            pub posts: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DeploymentGroupPostView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeploymentGroupSummaryView<'a> {
+            type Owned = super::super::DeploymentGroupSummary;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.slug = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.environment = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.occurred_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.occurred_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_version = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_tag = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.previous_release_version = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.versions.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.posts
+                            .push(
+                                <super::super::__buffa::view::DeploymentGroupPostView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupSummary,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupSummary,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeploymentGroupSummary {
+                    slug: self.slug.to_string(),
+                    environment: self.environment,
+                    occurred_at: match self.occurred_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    release_version: self.release_version.to_string(),
+                    release_tag: self.release_tag.map(|s| s.to_string()),
+                    previous_release_version: self
+                        .previous_release_version
+                        .map(|s| s.to_string()),
+                    versions: self.versions.iter().map(|s| s.to_string()).collect(),
+                    posts: self
+                        .posts
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeploymentGroupSummaryView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.slug.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+                }
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.occurred_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.occurred_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.release_version.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.release_version)
+                                as u32;
+                }
+                if let Some(ref v) = self.release_tag {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if let Some(ref v) = self.previous_release_version {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                for v in &self.versions {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                for v in &self.posts {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.slug.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.slug, buf);
+                }
+                {
+                    let val = self.environment.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if self.occurred_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.occurred_at.write_to(__cache, buf);
+                }
+                if !self.release_version.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.release_version, buf);
+                }
+                if let Some(ref v) = self.release_tag {
+                    ::buffa::types::put_string_field(5u32, v, buf);
+                }
+                if let Some(ref v) = self.previous_release_version {
+                    ::buffa::types::put_string_field(6u32, v, buf);
+                }
+                for v in &self.versions {
+                    ::buffa::types::put_string_field(7u32, v, buf);
+                }
+                for v in &self.posts {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeploymentGroupSummaryView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+                    __map.serialize_entry("slug", self.slug)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.environment,
+                ) {
+                    __map.serialize_entry("environment", &self.environment)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .occurred_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("occurredAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.release_version) {
+                    __map.serialize_entry("releaseVersion", self.release_version)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.release_tag {
+                    __map.serialize_entry("releaseTag", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.previous_release_version
+                {
+                    __map.serialize_entry("previousReleaseVersion", __v)?;
+                }
+                if !self.versions.is_empty() {
+                    __map.serialize_entry("versions", &*self.versions)?;
+                }
+                if !self.posts.is_empty() {
+                    __map.serialize_entry("posts", &*self.posts)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeploymentGroupSummaryView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "DeploymentGroupSummary";
+            const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupSummary";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupSummary";
+        }
+        ::buffa::impl_default_view_instance!(DeploymentGroupSummaryView);
+        ::buffa::impl_view_reborrow!(DeploymentGroupSummaryView);
+        /** Self-contained, `'static` owned view of a `DeploymentGroupSummary` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeploymentGroupSummaryView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeploymentGroupSummaryView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeploymentGroupSummaryOwnedView(
+            ::buffa::OwnedView<DeploymentGroupSummaryView<'static>>,
+        );
+        impl DeploymentGroupSummaryOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupSummaryOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupSummaryOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeploymentGroupSummary,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupSummaryOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeploymentGroupSummaryView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeploymentGroupSummaryView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupSummary,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable shareable identifier: the environment and the group's own
+            /// release, for example "testnet-v0.92.9". It never changes.
+            ///
+            /// Field 1: `slug`
+            #[must_use]
+            pub fn slug(&self) -> &'_ str {
+                self.0.reborrow().slug
+            }
+            /// Environment the group was deployed to.
+            ///
+            /// Field 2: `environment`
+            #[must_use]
+            pub fn environment(&self) -> ::buffa::EnumValue<super::super::Environment> {
+                self.0.reborrow().environment
+            }
+            /// When the deployment ran.
+            ///
+            /// Field 3: `occurred_at`
+            #[must_use]
+            pub fn occurred_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().occurred_at
+            }
+            /// The group's own, highest release, for example "0.92.9".
+            ///
+            /// Field 4: `release_version`
+            #[must_use]
+            pub fn release_version(&self) -> &'_ str {
+                self.0.reborrow().release_version
+            }
+            /// Release tag of the group's own release, for example "v0.92.9". Omitted
+            /// when unknown.
+            ///
+            /// Field 5: `release_tag`
+            #[must_use]
+            pub fn release_tag(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().release_tag
+            }
+            /// Release of the previous deployment group. Omitted for the first group.
+            ///
+            /// Field 6: `previous_release_version`
+            #[must_use]
+            pub fn previous_release_version(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().previous_release_version
+            }
+            /// Every release the group brought, ascending, for example \["0.92.8",
+            /// "0.92.9"\].
+            ///
+            /// Field 7: `versions`
+            #[must_use]
+            pub fn versions(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().versions
+            }
+            /// Published release posts of those releases, ascending by release. A
+            /// release without a published post has none.
+            ///
+            /// Field 8: `posts`
+            #[must_use]
+            pub fn posts(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DeploymentGroupPostView<'_>,
+            > {
+                &self.0.reborrow().posts
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeploymentGroupSummaryView<'static>>,
+        > for DeploymentGroupSummaryOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeploymentGroupSummaryView<'static>>,
+            ) -> Self {
+                DeploymentGroupSummaryOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeploymentGroupSummaryOwnedView>
+        for ::buffa::OwnedView<DeploymentGroupSummaryView<'static>> {
+            fn from(wrapper: DeploymentGroupSummaryOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeploymentGroupSummaryView<'static>>,
+        > for DeploymentGroupSummaryOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeploymentGroupSummaryView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeploymentGroupSummary {
+            type View<'a> = DeploymentGroupSummaryView<'a>;
+            type ViewHandle = DeploymentGroupSummaryOwnedView;
+        }
+        impl ::serde::Serialize for DeploymentGroupSummaryOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeploymentGroupAttention is one change of a deployment group that needs
+        /// attention.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeploymentGroupAttentionView<'a> {
+            /// Slug of the release post that announces the change.
+            ///
+            /// Field 1: `post_slug`
+            pub post_slug: &'a str,
+            /// Release of that post.
+            ///
+            /// Field 2: `release_version`
+            pub release_version: &'a str,
+            /// The change, as in its post.
+            ///
+            /// Field 3: `change`
+            pub change: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ChangeView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeploymentGroupAttentionView<'a> {
+            type Owned = super::super::DeploymentGroupAttention;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.post_slug = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_version = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.change.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.change = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ChangeView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupAttention,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupAttention,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeploymentGroupAttention {
+                    post_slug: self.post_slug.to_string(),
+                    release_version: self.release_version.to_string(),
+                    change: match self.change.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::Change,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeploymentGroupAttentionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.post_slug.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.post_slug) as u32;
+                }
+                if !self.release_version.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.release_version)
+                                as u32;
+                }
+                if self.change.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.change.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.post_slug.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.post_slug, buf);
+                }
+                if !self.release_version.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+                }
+                if self.change.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.change.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeploymentGroupAttentionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.post_slug) {
+                    __map.serialize_entry("postSlug", self.post_slug)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.release_version) {
+                    __map.serialize_entry("releaseVersion", self.release_version)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.change.as_option() {
+                        __map.serialize_entry("change", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeploymentGroupAttentionView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "DeploymentGroupAttention";
+            const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupAttention";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupAttention";
+        }
+        ::buffa::impl_default_view_instance!(DeploymentGroupAttentionView);
+        ::buffa::impl_view_reborrow!(DeploymentGroupAttentionView);
+        /** Self-contained, `'static` owned view of a `DeploymentGroupAttention` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeploymentGroupAttentionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeploymentGroupAttentionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeploymentGroupAttentionOwnedView(
+            ::buffa::OwnedView<DeploymentGroupAttentionView<'static>>,
+        );
+        impl DeploymentGroupAttentionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupAttentionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupAttentionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeploymentGroupAttention,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupAttentionOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeploymentGroupAttentionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeploymentGroupAttentionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupAttention,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Slug of the release post that announces the change.
+            ///
+            /// Field 1: `post_slug`
+            #[must_use]
+            pub fn post_slug(&self) -> &'_ str {
+                self.0.reborrow().post_slug
+            }
+            /// Release of that post.
+            ///
+            /// Field 2: `release_version`
+            #[must_use]
+            pub fn release_version(&self) -> &'_ str {
+                self.0.reborrow().release_version
+            }
+            /// The change, as in its post.
+            ///
+            /// Field 3: `change`
+            #[must_use]
+            pub fn change(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ChangeView<'_>,
+            > {
+                &self.0.reborrow().change
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeploymentGroupAttentionView<'static>>,
+        > for DeploymentGroupAttentionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeploymentGroupAttentionView<'static>>,
+            ) -> Self {
+                DeploymentGroupAttentionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeploymentGroupAttentionOwnedView>
+        for ::buffa::OwnedView<DeploymentGroupAttentionView<'static>> {
+            fn from(wrapper: DeploymentGroupAttentionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeploymentGroupAttentionView<'static>>,
+        > for DeploymentGroupAttentionOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeploymentGroupAttentionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeploymentGroupAttention {
+            type View<'a> = DeploymentGroupAttentionView<'a>;
+            type ViewHandle = DeploymentGroupAttentionOwnedView;
+        }
+        impl ::serde::Serialize for DeploymentGroupAttentionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeploymentGroupHighlight is one highlight of a release post in a deployment
+        /// group.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeploymentGroupHighlightView<'a> {
+            /// Slug of the release post.
+            ///
+            /// Field 1: `post_slug`
+            pub post_slug: &'a str,
+            /// Release of that post.
+            ///
+            /// Field 2: `release_version`
+            pub release_version: &'a str,
+            /// Highlight text, inline Markdown.
+            ///
+            /// Field 3: `text`
+            pub text: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeploymentGroupHighlightView<'a> {
+            type Owned = super::super::DeploymentGroupHighlight;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.post_slug = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.release_version = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.text = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupHighlight,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupHighlight,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeploymentGroupHighlight {
+                    post_slug: self.post_slug.to_string(),
+                    release_version: self.release_version.to_string(),
+                    text: self.text.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeploymentGroupHighlightView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.post_slug.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.post_slug) as u32;
+                }
+                if !self.release_version.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.release_version)
+                                as u32;
+                }
+                if !self.text.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.text) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.post_slug.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.post_slug, buf);
+                }
+                if !self.release_version.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.release_version, buf);
+                }
+                if !self.text.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.text, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeploymentGroupHighlightView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.post_slug) {
+                    __map.serialize_entry("postSlug", self.post_slug)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.release_version) {
+                    __map.serialize_entry("releaseVersion", self.release_version)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.text) {
+                    __map.serialize_entry("text", self.text)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeploymentGroupHighlightView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "DeploymentGroupHighlight";
+            const FULL_NAME: &'static str = "changelog.v1.DeploymentGroupHighlight";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroupHighlight";
+        }
+        ::buffa::impl_default_view_instance!(DeploymentGroupHighlightView);
+        ::buffa::impl_view_reborrow!(DeploymentGroupHighlightView);
+        /** Self-contained, `'static` owned view of a `DeploymentGroupHighlight` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeploymentGroupHighlightView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeploymentGroupHighlightView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeploymentGroupHighlightOwnedView(
+            ::buffa::OwnedView<DeploymentGroupHighlightView<'static>>,
+        );
+        impl DeploymentGroupHighlightOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupHighlightOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupHighlightOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeploymentGroupHighlight,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupHighlightOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DeploymentGroupHighlightView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeploymentGroupHighlightView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroupHighlight,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Slug of the release post.
+            ///
+            /// Field 1: `post_slug`
+            #[must_use]
+            pub fn post_slug(&self) -> &'_ str {
+                self.0.reborrow().post_slug
+            }
+            /// Release of that post.
+            ///
+            /// Field 2: `release_version`
+            #[must_use]
+            pub fn release_version(&self) -> &'_ str {
+                self.0.reborrow().release_version
+            }
+            /// Highlight text, inline Markdown.
+            ///
+            /// Field 3: `text`
+            #[must_use]
+            pub fn text(&self) -> &'_ str {
+                self.0.reborrow().text
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeploymentGroupHighlightView<'static>>,
+        > for DeploymentGroupHighlightOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeploymentGroupHighlightView<'static>>,
+            ) -> Self {
+                DeploymentGroupHighlightOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeploymentGroupHighlightOwnedView>
+        for ::buffa::OwnedView<DeploymentGroupHighlightView<'static>> {
+            fn from(wrapper: DeploymentGroupHighlightOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeploymentGroupHighlightView<'static>>,
+        > for DeploymentGroupHighlightOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeploymentGroupHighlightView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeploymentGroupHighlight {
+            type View<'a> = DeploymentGroupHighlightView<'a>;
+            type ViewHandle = DeploymentGroupHighlightOwnedView;
+        }
+        impl ::serde::Serialize for DeploymentGroupHighlightOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeploymentGroup is one complete deployment group.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeploymentGroupView<'a> {
+            /// Group summary.
+            ///
+            /// Field 1: `summary`
+            pub summary: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DeploymentGroupSummaryView<'a>,
+            >,
+            /// Breaking changes and changes with action_required across the group's
+            /// posts, in post order (ascending release), then section and change order.
+            ///
+            /// Field 2: `attention`
+            pub attention: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DeploymentGroupAttentionView<'a>,
+            >,
+            /// Highlights of the group's posts, in post order.
+            ///
+            /// Field 3: `highlights`
+            pub highlights: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DeploymentGroupHighlightView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeploymentGroupView<'a> {
+            type Owned = super::super::DeploymentGroup;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.summary.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.summary = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DeploymentGroupSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.attention
+                            .push(
+                                <super::super::__buffa::view::DeploymentGroupAttentionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.highlights
+                            .push(
+                                <super::super::__buffa::view::DeploymentGroupHighlightView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroup,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroup,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeploymentGroup {
+                    summary: match self.summary.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DeploymentGroupSummary,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    attention: self
+                        .attention
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    highlights: self
+                        .highlights
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeploymentGroupView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.summary.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.summary.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.attention {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.highlights {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.summary.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.summary.write_to(__cache, buf);
+                }
+                for v in &self.attention {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.highlights {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeploymentGroupView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.summary.as_option() {
+                        __map.serialize_entry("summary", __v)?;
+                    }
+                }
+                if !self.attention.is_empty() {
+                    __map.serialize_entry("attention", &*self.attention)?;
+                }
+                if !self.highlights.is_empty() {
+                    __map.serialize_entry("highlights", &*self.highlights)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeploymentGroupView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "DeploymentGroup";
+            const FULL_NAME: &'static str = "changelog.v1.DeploymentGroup";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.DeploymentGroup";
+        }
+        ::buffa::impl_default_view_instance!(DeploymentGroupView);
+        ::buffa::impl_view_reborrow!(DeploymentGroupView);
+        /** Self-contained, `'static` owned view of a `DeploymentGroup` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeploymentGroupView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeploymentGroupView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeploymentGroupOwnedView(
+            ::buffa::OwnedView<DeploymentGroupView<'static>>,
+        );
+        impl DeploymentGroupOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeploymentGroup,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeploymentGroupOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeploymentGroupView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeploymentGroupView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeploymentGroup,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Group summary.
+            ///
+            /// Field 1: `summary`
+            #[must_use]
+            pub fn summary(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DeploymentGroupSummaryView<'_>,
+            > {
+                &self.0.reborrow().summary
+            }
+            /// Breaking changes and changes with action_required across the group's
+            /// posts, in post order (ascending release), then section and change order.
+            ///
+            /// Field 2: `attention`
+            #[must_use]
+            pub fn attention(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DeploymentGroupAttentionView<'_>,
+            > {
+                &self.0.reborrow().attention
+            }
+            /// Highlights of the group's posts, in post order.
+            ///
+            /// Field 3: `highlights`
+            #[must_use]
+            pub fn highlights(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DeploymentGroupHighlightView<'_>,
+            > {
+                &self.0.reborrow().highlights
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DeploymentGroupView<'static>>>
+        for DeploymentGroupOwnedView {
+            fn from(inner: ::buffa::OwnedView<DeploymentGroupView<'static>>) -> Self {
+                DeploymentGroupOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeploymentGroupOwnedView>
+        for ::buffa::OwnedView<DeploymentGroupView<'static>> {
+            fn from(wrapper: DeploymentGroupOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DeploymentGroupView<'static>>>
+        for DeploymentGroupOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeploymentGroupView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeploymentGroup {
+            type View<'a> = DeploymentGroupView<'a>;
+            type ViewHandle = DeploymentGroupOwnedView;
+        }
+        impl ::serde::Serialize for DeploymentGroupOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDeploymentGroupsRequest pages through this environment's deployment
+        /// groups, newest first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDeploymentGroupsRequestView<'a> {
+            /// Maximum groups to return. 0 means the default of 20; maximum 100.
+            ///
+            /// Field 1: `limit`
+            pub limit: u32,
+            /// Opaque, keyset-backed, exclusive cursor from a previous response.
+            /// Bound to deployment time and slug.
+            ///
+            /// Field 2: `page_token`
+            pub page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDeploymentGroupsRequestView<'a> {
+            type Owned = super::super::ListDeploymentGroupsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDeploymentGroupsRequest {
+                    limit: self.limit,
+                    page_token: self.page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDeploymentGroupsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.limit != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.limit != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.limit, buf);
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDeploymentGroupsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&self.limit),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDeploymentGroupsRequestView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "ListDeploymentGroupsRequest";
+            const FULL_NAME: &'static str = "changelog.v1.ListDeploymentGroupsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListDeploymentGroupsRequestView);
+        ::buffa::impl_view_reborrow!(ListDeploymentGroupsRequestView);
+        /** Self-contained, `'static` owned view of a `ListDeploymentGroupsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDeploymentGroupsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDeploymentGroupsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDeploymentGroupsRequestOwnedView(
+            ::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>>,
+        );
+        impl ListDeploymentGroupsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDeploymentGroupsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDeploymentGroupsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDeploymentGroupsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Maximum groups to return. 0 means the default of 20; maximum 100.
+            ///
+            /// Field 1: `limit`
+            #[must_use]
+            pub fn limit(&self) -> u32 {
+                self.0.reborrow().limit
+            }
+            /// Opaque, keyset-backed, exclusive cursor from a previous response.
+            /// Bound to deployment time and slug.
+            ///
+            /// Field 2: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>>,
+        > for ListDeploymentGroupsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>>,
+            ) -> Self {
+                ListDeploymentGroupsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDeploymentGroupsRequestOwnedView>
+        for ::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>> {
+            fn from(wrapper: ListDeploymentGroupsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>>,
+        > for ListDeploymentGroupsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDeploymentGroupsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDeploymentGroupsRequest {
+            type View<'a> = ListDeploymentGroupsRequestView<'a>;
+            type ViewHandle = ListDeploymentGroupsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListDeploymentGroupsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDeploymentGroupsResponse returns deployment group summaries, newest
+        /// first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDeploymentGroupsResponseView<'a> {
+            /// Group summaries ordered by deployment time descending, then slug
+            /// descending.
+            ///
+            /// Field 1: `groups`
+            pub groups: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DeploymentGroupSummaryView<'a>,
+            >,
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            pub next_page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDeploymentGroupsResponseView<'a> {
+            type Owned = super::super::ListDeploymentGroupsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.groups
+                            .push(
+                                <super::super::__buffa::view::DeploymentGroupSummaryView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDeploymentGroupsResponse {
+                    groups: self
+                        .groups
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_page_token: self.next_page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDeploymentGroupsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.groups {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.groups {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDeploymentGroupsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.groups.is_empty() {
+                    __map.serialize_entry("groups", &*self.groups)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDeploymentGroupsResponseView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "ListDeploymentGroupsResponse";
+            const FULL_NAME: &'static str = "changelog.v1.ListDeploymentGroupsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.ListDeploymentGroupsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListDeploymentGroupsResponseView);
+        ::buffa::impl_view_reborrow!(ListDeploymentGroupsResponseView);
+        /** Self-contained, `'static` owned view of a `ListDeploymentGroupsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDeploymentGroupsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDeploymentGroupsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDeploymentGroupsResponseOwnedView(
+            ::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>>,
+        );
+        impl ListDeploymentGroupsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDeploymentGroupsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDeploymentGroupsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDeploymentGroupsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDeploymentGroupsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDeploymentGroupsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Group summaries ordered by deployment time descending, then slug
+            /// descending.
+            ///
+            /// Field 1: `groups`
+            #[must_use]
+            pub fn groups(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DeploymentGroupSummaryView<'_>,
+            > {
+                &self.0.reborrow().groups
+            }
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>>,
+        > for ListDeploymentGroupsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>>,
+            ) -> Self {
+                ListDeploymentGroupsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDeploymentGroupsResponseOwnedView>
+        for ::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>> {
+            fn from(wrapper: ListDeploymentGroupsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>>,
+        > for ListDeploymentGroupsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDeploymentGroupsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDeploymentGroupsResponse {
+            type View<'a> = ListDeploymentGroupsResponseView<'a>;
+            type ViewHandle = ListDeploymentGroupsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListDeploymentGroupsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetDeploymentGroupRequest selects one deployment group.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetDeploymentGroupRequestView<'a> {
+            /// Group slug, for example "testnet-v0.92.9".
+            ///
+            /// Field 1: `slug`
+            pub slug: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetDeploymentGroupRequestView<'a> {
+            type Owned = super::super::GetDeploymentGroupRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.slug = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetDeploymentGroupRequest {
+                    slug: self.slug.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetDeploymentGroupRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.slug.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.slug) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.slug.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.slug, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetDeploymentGroupRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.slug) {
+                    __map.serialize_entry("slug", self.slug)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetDeploymentGroupRequestView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "GetDeploymentGroupRequest";
+            const FULL_NAME: &'static str = "changelog.v1.GetDeploymentGroupRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetDeploymentGroupRequestView);
+        ::buffa::impl_view_reborrow!(GetDeploymentGroupRequestView);
+        /** Self-contained, `'static` owned view of a `GetDeploymentGroupRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetDeploymentGroupRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetDeploymentGroupRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetDeploymentGroupRequestOwnedView(
+            ::buffa::OwnedView<GetDeploymentGroupRequestView<'static>>,
+        );
+        impl GetDeploymentGroupRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetDeploymentGroupRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetDeploymentGroupRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetDeploymentGroupRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Group slug, for example "testnet-v0.92.9".
+            ///
+            /// Field 1: `slug`
+            #[must_use]
+            pub fn slug(&self) -> &'_ str {
+                self.0.reborrow().slug
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetDeploymentGroupRequestView<'static>>,
+        > for GetDeploymentGroupRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetDeploymentGroupRequestView<'static>>,
+            ) -> Self {
+                GetDeploymentGroupRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetDeploymentGroupRequestOwnedView>
+        for ::buffa::OwnedView<GetDeploymentGroupRequestView<'static>> {
+            fn from(wrapper: GetDeploymentGroupRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetDeploymentGroupRequestView<'static>>,
+        > for GetDeploymentGroupRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetDeploymentGroupRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetDeploymentGroupRequest {
+            type View<'a> = GetDeploymentGroupRequestView<'a>;
+            type ViewHandle = GetDeploymentGroupRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetDeploymentGroupRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetDeploymentGroupResponse returns one complete deployment group.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetDeploymentGroupResponseView<'a> {
+            /// The group with its attention changes and highlights.
+            ///
+            /// Field 1: `group`
+            pub group: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DeploymentGroupView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetDeploymentGroupResponseView<'a> {
+            type Owned = super::super::GetDeploymentGroupResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.group.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.group = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DeploymentGroupView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetDeploymentGroupResponse {
+                    group: match self.group.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DeploymentGroup,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetDeploymentGroupResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.group.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.group.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.group.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.group.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetDeploymentGroupResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.group.as_option() {
+                        __map.serialize_entry("group", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetDeploymentGroupResponseView<'a> {
+            const PACKAGE: &'static str = "changelog.v1";
+            const NAME: &'static str = "GetDeploymentGroupResponse";
+            const FULL_NAME: &'static str = "changelog.v1.GetDeploymentGroupResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/changelog.v1.GetDeploymentGroupResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetDeploymentGroupResponseView);
+        ::buffa::impl_view_reborrow!(GetDeploymentGroupResponseView);
+        /** Self-contained, `'static` owned view of a `GetDeploymentGroupResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetDeploymentGroupResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetDeploymentGroupResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetDeploymentGroupResponseOwnedView(
+            ::buffa::OwnedView<GetDeploymentGroupResponseView<'static>>,
+        );
+        impl GetDeploymentGroupResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetDeploymentGroupResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDeploymentGroupResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetDeploymentGroupResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetDeploymentGroupResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDeploymentGroupResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The group with its attention changes and highlights.
+            ///
+            /// Field 1: `group`
+            #[must_use]
+            pub fn group(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DeploymentGroupView<'_>,
+            > {
+                &self.0.reborrow().group
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetDeploymentGroupResponseView<'static>>,
+        > for GetDeploymentGroupResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetDeploymentGroupResponseView<'static>>,
+            ) -> Self {
+                GetDeploymentGroupResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetDeploymentGroupResponseOwnedView>
+        for ::buffa::OwnedView<GetDeploymentGroupResponseView<'static>> {
+            fn from(wrapper: GetDeploymentGroupResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetDeploymentGroupResponseView<'static>>,
+        > for GetDeploymentGroupResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetDeploymentGroupResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetDeploymentGroupResponse {
+            type View<'a> = GetDeploymentGroupResponseView<'a>;
+            type ViewHandle = GetDeploymentGroupResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetDeploymentGroupResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
+        reg.register_json_any(super::__ENVIRONMENT_STATUS_JSON_ANY);
+        reg.register_json_any(super::__CHANGE_EXCEPTION_JSON_ANY);
         reg.register_json_any(super::__CHANGE_JSON_ANY);
         reg.register_json_any(super::__SECTION_JSON_ANY);
         reg.register_json_any(super::__POST_SUMMARY_JSON_ANY);
@@ -8465,8 +15500,25 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_CHANGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CHANGE_ENTRY_JSON_ANY);
         reg.register_json_any(super::__LIST_CHANGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_GROUP_POST_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_GROUP_SUMMARY_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_GROUP_ATTENTION_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_GROUP_HIGHLIGHT_JSON_ANY);
+        reg.register_json_any(super::__DEPLOYMENT_GROUP_JSON_ANY);
+        reg.register_json_any(super::__LIST_DEPLOYMENT_GROUPS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_DEPLOYMENT_GROUPS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_GROUP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_DEPLOYMENT_GROUP_RESPONSE_JSON_ANY);
     }
 }
+#[doc(inline)]
+pub use self::__buffa::view::EnvironmentStatusView;
+#[doc(inline)]
+pub use self::__buffa::view::EnvironmentStatusOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ChangeExceptionView;
+#[doc(inline)]
+pub use self::__buffa::view::ChangeExceptionOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ChangeView;
 #[doc(inline)]
@@ -8511,5 +15563,41 @@ pub use self::__buffa::view::ChangeEntryOwnedView;
 pub use self::__buffa::view::ListChangesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListChangesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupPostView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupPostOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupSummaryView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupSummaryOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupAttentionView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupAttentionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupHighlightView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupHighlightOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupView;
+#[doc(inline)]
+pub use self::__buffa::view::DeploymentGroupOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDeploymentGroupsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDeploymentGroupsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDeploymentGroupsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDeploymentGroupsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentGroupRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentGroupRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentGroupResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDeploymentGroupResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

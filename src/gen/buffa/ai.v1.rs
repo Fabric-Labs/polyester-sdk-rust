@@ -1210,6 +1210,222 @@ impl ::buffa::Enumeration for AssistantKeyState {
         &[Self::KEY_STATE_UNSPECIFIED, Self::ACTIVE, Self::DISABLED]
     }
 }
+/// DisplaySetting is one of the client's display preferences the assistant may
+/// change for the user: cosmetic settings the user can change back at any
+/// time. Each value names the values the assistant may apply to it, exactly as
+/// DisplaySettingAction.value carries them. Security, funds, API keys,
+/// permissions and notification channels are never display settings.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DisplaySetting {
+    /// Not a setting; never sent.
+    SETTING_UNSPECIFIED = 0i32,
+    /// Light or dark mode: "light", "dark", or "system" to follow the device.
+    APPEARANCE = 1i32,
+    /// Interface language: "en" (English), "fr" (French) or "zh-CN"
+    /// (Simplified Chinese).
+    LANGUAGE = 2i32,
+    /// Fiat currency amounts are also shown in: the code of one of the fiat
+    /// currencies GetCurrencyConversionConfig lists, for example "EUR".
+    CURRENCY = 3i32,
+    /// Date format, as a pattern: "MMM dd, yyyy", "MM/dd/yyyy", "dd/MM/yyyy",
+    /// "yyyy-MM-dd", "yyyy/MM/dd", "yyyy.MM.dd", "dd-MM-yyyy", "dd.MM.yyyy" or
+    /// "dd MMM yyyy".
+    DATE_FORMAT = 4i32,
+    /// Time format: "12h" or "24h".
+    TIME_FORMAT = 5i32,
+    /// Number separators: "US" (1,234,567.89), "EU" (1.234.567,89), "SPACE"
+    /// (1 234 567,89), "CH" (1'234'567.89), "IN" (12,34,567.89) or "NONE"
+    /// (1234567.89).
+    NUMBER_FORMAT = 6i32,
+    /// First day of the week: "1" (Monday) to "6" (Saturday), or "0" (Sunday).
+    WEEK_START = 7i32,
+    /// Sound effects: "on" or "off".
+    SOUNDS = 8i32,
+}
+impl DisplaySetting {
+    ///Idiomatic alias for [`Self::SETTING_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SettingUnspecified: Self = Self::SETTING_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::APPEARANCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Appearance: Self = Self::APPEARANCE;
+    ///Idiomatic alias for [`Self::LANGUAGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Language: Self = Self::LANGUAGE;
+    ///Idiomatic alias for [`Self::CURRENCY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Currency: Self = Self::CURRENCY;
+    ///Idiomatic alias for [`Self::DATE_FORMAT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DateFormat: Self = Self::DATE_FORMAT;
+    ///Idiomatic alias for [`Self::TIME_FORMAT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TimeFormat: Self = Self::TIME_FORMAT;
+    ///Idiomatic alias for [`Self::NUMBER_FORMAT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NumberFormat: Self = Self::NUMBER_FORMAT;
+    ///Idiomatic alias for [`Self::WEEK_START`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const WeekStart: Self = Self::WEEK_START;
+    ///Idiomatic alias for [`Self::SOUNDS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Sounds: Self = Self::SOUNDS;
+}
+impl ::core::default::Default for DisplaySetting {
+    fn default() -> Self {
+        Self::SETTING_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DisplaySetting {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DisplaySetting {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DisplaySetting;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(DisplaySetting)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DisplaySetting, E> {
+                <DisplaySetting as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DisplaySetting, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DisplaySetting as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DisplaySetting, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DisplaySetting as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DisplaySetting, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DisplaySetting {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DisplaySetting {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::SETTING_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::APPEARANCE),
+            2i32 => ::core::option::Option::Some(Self::LANGUAGE),
+            3i32 => ::core::option::Option::Some(Self::CURRENCY),
+            4i32 => ::core::option::Option::Some(Self::DATE_FORMAT),
+            5i32 => ::core::option::Option::Some(Self::TIME_FORMAT),
+            6i32 => ::core::option::Option::Some(Self::NUMBER_FORMAT),
+            7i32 => ::core::option::Option::Some(Self::WEEK_START),
+            8i32 => ::core::option::Option::Some(Self::SOUNDS),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::SETTING_UNSPECIFIED => "SETTING_UNSPECIFIED",
+            Self::APPEARANCE => "APPEARANCE",
+            Self::LANGUAGE => "LANGUAGE",
+            Self::CURRENCY => "CURRENCY",
+            Self::DATE_FORMAT => "DATE_FORMAT",
+            Self::TIME_FORMAT => "TIME_FORMAT",
+            Self::NUMBER_FORMAT => "NUMBER_FORMAT",
+            Self::WEEK_START => "WEEK_START",
+            Self::SOUNDS => "SOUNDS",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "SETTING_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::SETTING_UNSPECIFIED)
+            }
+            "APPEARANCE" => ::core::option::Option::Some(Self::APPEARANCE),
+            "LANGUAGE" => ::core::option::Option::Some(Self::LANGUAGE),
+            "CURRENCY" => ::core::option::Option::Some(Self::CURRENCY),
+            "DATE_FORMAT" => ::core::option::Option::Some(Self::DATE_FORMAT),
+            "TIME_FORMAT" => ::core::option::Option::Some(Self::TIME_FORMAT),
+            "NUMBER_FORMAT" => ::core::option::Option::Some(Self::NUMBER_FORMAT),
+            "WEEK_START" => ::core::option::Option::Some(Self::WEEK_START),
+            "SOUNDS" => ::core::option::Option::Some(Self::SOUNDS),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::SETTING_UNSPECIFIED,
+            Self::APPEARANCE,
+            Self::LANGUAGE,
+            Self::CURRENCY,
+            Self::DATE_FORMAT,
+            Self::TIME_FORMAT,
+            Self::NUMBER_FORMAT,
+            Self::WEEK_START,
+            Self::SOUNDS,
+        ]
+    }
+}
 /// ReferencePriceSource names the market price a ReferencePrice is.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -3797,8 +4013,9 @@ pub struct BalancesTable {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub balances: ::buffa::alloc::vec::Vec<super::super::ledger::read::v1::AssetBalance>,
-    /// Trading account (subaccount) the balances were read from: the run's account, as
-    /// SendMessageRequest.subaccount_id named it.
+    /// Account the balances were read from: the run's trading account, as
+    /// SendMessageRequest.subaccount_id named it, or the caller's main account
+    /// when the request named none.
     ///
     /// Field 2: `account_id`
     #[serde(
@@ -6779,6 +6996,14 @@ pub const __RECALLED_MEMORY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 /// every answer, and they are not reported here. The event follows that call's
 /// ToolFinished event with ok true; a failed search has a ToolFinished event
 /// with ok false and no MemoriesRecalled event.
+///
+/// In an existing conversation, the assistant also gets the memories the user
+/// saved or changed in their other conversations since its previous answer in
+/// this one, whatever the message is about. When there are any, the run reports
+/// them before the answer as a memory_updates tool call (ToolStarted and
+/// ToolFinished with ok true) and its MemoriesRecalled event, so a client can
+/// show that memory was updated from another conversation. Otherwise the run
+/// has no memory_updates call.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -6794,8 +7019,10 @@ pub struct MemoriesRecalled {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub tool_call_id: ::buffa::alloc::string::String,
-    /// The relevant memories found, at most 8, most relevant first; never a
-    /// profile memory. Empty when none is relevant.
+    /// For a recall_memories call: the relevant memories found, at most 8, most
+    /// relevant first, empty when none is relevant. For a memory_updates call:
+    /// the memories saved or changed in other conversations, at most 20, newest
+    /// first, never empty. Never a profile memory.
     ///
     /// Field 2: `memories`
     #[serde(
@@ -7098,6 +7325,215 @@ pub const __DESTINATIONS_SUGGESTED_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     type_url: "type.googleapis.com/ai.v1.DestinationsSuggested",
     to_json: ::buffa::type_registry::any_to_json::<DestinationsSuggested>,
     from_json: ::buffa::type_registry::any_from_json::<DestinationsSuggested>,
+    is_wkt: false,
+};
+/// DisplaySettingAction asks the client to change one of its display settings
+/// for the user, or, when the user did not say to what, to show that setting's
+/// choices in the conversation so the user picks one. The setting is one the
+/// run's SendMessage declared in display_settings. The event follows the
+/// ToolFinished event, with ok true, of the set_display_preference call that
+/// chose it.
+///
+/// Apply an action once, when it arrives in a run the client sent and follows:
+/// replaying a run's events later, for example to show an earlier
+/// conversation, applies none of them again. Offer the user a way to undo the
+/// change, back to the value the setting had before. A client that no longer
+/// has the setting, or does not accept the value, changes nothing.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DisplaySettingAction {
+    /// Identifier of the tool call, as in its ToolStarted and ToolFinished
+    /// events.
+    ///
+    /// Field 1: `tool_call_id`
+    #[serde(
+        rename = "toolCallId",
+        alias = "tool_call_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tool_call_id: ::buffa::alloc::string::String,
+    /// The setting, never SETTING_UNSPECIFIED.
+    ///
+    /// Field 2: `setting`
+    #[serde(
+        rename = "setting",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub setting: ::buffa::EnumValue<DisplaySetting>,
+    /// The value to apply, one of the setting's values as DisplaySetting lists
+    /// them. Omitted when the user did not name one: show the setting's choices
+    /// instead, and change nothing until the user picks.
+    ///
+    /// Field 3: `value`
+    #[serde(rename = "value", skip_serializing_if = "::core::option::Option::is_none")]
+    pub value: ::core::option::Option<::buffa::alloc::string::String>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DisplaySettingAction {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DisplaySettingAction")
+            .field("tool_call_id", &self.tool_call_id)
+            .field("setting", &self.setting)
+            .field("value", &self.value)
+            .finish()
+    }
+}
+impl DisplaySettingAction {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DisplaySettingAction";
+}
+impl DisplaySettingAction {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::value`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_value(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(DisplaySettingAction);
+impl ::buffa::MessageName for DisplaySettingAction {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "DisplaySettingAction";
+    const FULL_NAME: &'static str = "ai.v1.DisplaySettingAction";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DisplaySettingAction";
+}
+impl ::buffa::Message for DisplaySettingAction {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.tool_call_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.tool_call_id) as u32;
+        }
+        {
+            let val = self.setting.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(ref v) = self.value {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.tool_call_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.tool_call_id, buf);
+        }
+        {
+            let val = self.setting.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if let Some(ref v) = self.value {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tool_call_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.setting = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self.value.get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.tool_call_id.clear();
+        self.setting = ::buffa::EnumValue::from(0);
+        self.value = ::core::option::Option::None;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DisplaySettingAction {
+    const PROTO_FQN: &'static str = "ai.v1.DisplaySettingAction";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DisplaySettingAction {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DISPLAY_SETTING_ACTION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.DisplaySettingAction",
+    to_json: ::buffa::type_registry::any_to_json::<DisplaySettingAction>,
+    from_json: ::buffa::type_registry::any_from_json::<DisplaySettingAction>,
     is_wkt: false,
 };
 /// SkillLoaded reports that the assistant loaded a skill: instructions for one
@@ -18211,6 +18647,14 @@ impl ::buffa::Message for RunEvent {
                         += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::run_event::Event::DisplaySettingAction(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -18339,6 +18783,14 @@ impl ::buffa::Message for RunEvent {
                 __buffa::oneof::run_event::Event::DestinationsSuggested(x) => {
                     ::buffa::types::put_len_delimited_header(
                         16u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::run_event::Event::DisplaySettingAction(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        17u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -18654,6 +19106,28 @@ impl ::buffa::Message for RunEvent {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.event = ::core::option::Option::Some(
                         __buffa::oneof::run_event::Event::DestinationsSuggested(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            17u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::run_event::Event::DisplaySettingAction(
+                        ref mut existing,
+                    ),
+                ) = self.event
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.event = ::core::option::Option::Some(
+                        __buffa::oneof::run_event::Event::DisplaySettingAction(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -19060,6 +19534,30 @@ impl<'de> serde::Deserialize<'de> for RunEvent {
                                 }
                                 __oneof_event = Some(
                                     __buffa::oneof::run_event::Event::DestinationsSuggested(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "displaySettingAction" | "display_setting_action" => {
+                            let v: ::core::option::Option<DisplaySettingAction> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            DisplaySettingAction,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_event.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'event'",
+                                        ),
+                                    );
+                                }
+                                __oneof_event = Some(
+                                    __buffa::oneof::run_event::Event::DisplaySettingAction(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -19891,6 +20389,208 @@ pub const __DESTINATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa
     from_json: ::buffa::type_registry::any_from_json::<Destination>,
     is_wkt: false,
 };
+/// CurrentPage is the page of the client the user is on as they send a message.
+/// It names the page by its template and title, never by its address: a client
+/// must never send the URL the user sees, its query string or fragment, or any
+/// id, symbol or other value taken from the path.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CurrentPage {
+    /// The id of the client's destination for the page, when the page is one of
+    /// its destinations, for example "page-settings": lowercase letters, digits
+    /// and hyphens, 1 to 64 characters, as in Destination.id. Omit it for a page
+    /// that is none of them.
+    ///
+    /// Field 1: `destination_id`
+    #[serde(
+        rename = "destinationId",
+        alias = "destination_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub destination_id: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The page's route template, each variable path segment named by its
+    /// parameter in brackets, for example "/account/settings/\[section\]": it
+    /// starts with "/" and has at most 200 characters, each a letter, a digit or
+    /// one of "/", "-", "_", ".", "\[" and "\]".
+    ///
+    /// Field 2: `route`
+    #[serde(
+        rename = "route",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub route: ::buffa::alloc::string::String,
+    /// The page's title as the client shows it, for example "Settings", 1 to 80
+    /// characters. Never the user's own data, such as an account label.
+    ///
+    /// Field 3: `title`
+    #[serde(
+        rename = "title",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub title: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CurrentPage {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CurrentPage")
+            .field("destination_id", &self.destination_id)
+            .field("route", &self.route)
+            .field("title", &self.title)
+            .finish()
+    }
+}
+impl CurrentPage {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.CurrentPage";
+}
+impl CurrentPage {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::destination_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_destination_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.destination_id = Some(value.into());
+        self
+    }
+}
+::buffa::impl_default_instance!(CurrentPage);
+impl ::buffa::MessageName for CurrentPage {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "CurrentPage";
+    const FULL_NAME: &'static str = "ai.v1.CurrentPage";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.CurrentPage";
+}
+impl ::buffa::Message for CurrentPage {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if let Some(ref v) = self.destination_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if !self.route.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.route) as u32;
+        }
+        if !self.title.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(ref v) = self.destination_id {
+            ::buffa::types::put_string_field(1u32, v, buf);
+        }
+        if !self.route.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.route, buf);
+        }
+        if !self.title.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.title, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .destination_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.route, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.title, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.destination_id = ::core::option::Option::None;
+        self.route.clear();
+        self.title.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CurrentPage {
+    const PROTO_FQN: &'static str = "ai.v1.CurrentPage";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CurrentPage {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CURRENT_PAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.CurrentPage",
+    to_json: ::buffa::type_registry::any_to_json::<CurrentPage>,
+    from_json: ::buffa::type_registry::any_from_json::<CurrentPage>,
+    is_wkt: false,
+};
 /// SendMessageRequest sends the caller's message and starts a run that answers
 /// it.
 #[derive(Clone, PartialEq, Default)]
@@ -19930,9 +20630,12 @@ pub struct SendMessageRequest {
     pub idempotency_key: ::buffa::alloc::string::String,
     /// Trading account (subaccount) the run reads and acts on. It must be one
     /// the caller's account owns; any other value, also one that does not
-    /// exist, is INVALID_ARGUMENT. Omit it to answer without account data: the
-    /// run then has no account tools. It is part of the request the idempotency
-    /// key covers.
+    /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+    /// reads the main account (its balances, funding included, every trading
+    /// account with its equity, API keys, price alerts, fee rates and
+    /// permissions) and places, changes or cancels no order, trigger or swap;
+    /// asked to trade, it asks the user to select a trading account. It is part
+    /// of the request the idempotency key covers.
     ///
     /// Field 4: `subaccount_id`
     #[serde(
@@ -19954,6 +20657,33 @@ pub struct SendMessageRequest {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub destinations: ::buffa::alloc::vec::Vec<Destination>,
+    /// The page the user is on as they send the message. The run is told it, so
+    /// it can say which page the user is on and point within that page rather
+    /// than suggest it again. Omit it for a client without pages: the run is then
+    /// told nothing about where the user is. It is part of the request the
+    /// idempotency key covers: a retry sends the page the first attempt sent.
+    ///
+    /// Field 6: `page`
+    #[serde(
+        rename = "page",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub page: ::buffa::MessageField<CurrentPage>,
+    /// The display settings the client can change for the user when the run
+    /// asks it to (DisplaySettingAction), each at most once; their order does
+    /// not matter. Declare only those the client offers the user now. Omit them
+    /// for a client without display settings: the run then changes none and
+    /// points the user to their settings instead. They are part of the request
+    /// the idempotency key covers.
+    ///
+    /// Field 7: `display_settings`
+    #[serde(
+        rename = "displaySettings",
+        alias = "display_settings",
+        with = "::buffa::json_helpers::repeated_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
+    )]
+    pub display_settings: ::buffa::alloc::vec::Vec<::buffa::EnumValue<DisplaySetting>>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -19966,6 +20696,8 @@ impl ::core::fmt::Debug for SendMessageRequest {
             .field("idempotency_key", &self.idempotency_key)
             .field("subaccount_id", &self.subaccount_id)
             .field("destinations", &self.destinations)
+            .field("page", &self.page)
+            .field("display_settings", &self.display_settings)
             .finish()
     }
 }
@@ -20032,6 +20764,23 @@ impl ::buffa::Message for SendMessageRequest {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.page.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.page.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.display_settings.is_empty() {
+            let payload: u32 = self
+                .display_settings
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20057,6 +20806,21 @@ impl ::buffa::Message for SendMessageRequest {
         for v in &self.destinations {
             ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
+        }
+        if self.page.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.page.write_to(__cache, buf);
+        }
+        if !self.display_settings.is_empty() {
+            let payload: u32 = self
+                .display_settings
+                .iter()
+                .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(7u32, payload, buf);
+            for v in &self.display_settings {
+                ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -20112,6 +20876,55 @@ impl ::buffa::Message for SendMessageRequest {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.destinations.push(elem);
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.page.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.display_settings.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.display_settings
+                            .push(
+                                ::buffa::EnumValue::from(
+                                    ::buffa::types::decode_int32(&mut limited)?,
+                                ),
+                            );
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.display_settings
+                        .push(
+                            ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?),
+                        );
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20125,6 +20938,8 @@ impl ::buffa::Message for SendMessageRequest {
         self.idempotency_key.clear();
         self.subaccount_id = ::core::option::Option::None;
         self.destinations.clear();
+        self.page = ::buffa::MessageField::none();
+        self.display_settings.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -26572,8 +27387,9 @@ pub mod __buffa {
                     'a,
                 >,
             >,
-            /// Trading account (subaccount) the balances were read from: the run's account, as
-            /// SendMessageRequest.subaccount_id named it.
+            /// Account the balances were read from: the run's trading account, as
+            /// SendMessageRequest.subaccount_id named it, or the caller's main account
+            /// when the request named none.
             ///
             /// Field 2: `account_id`
             pub account_id: u64,
@@ -26855,8 +27671,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().balances
             }
-            /// Trading account (subaccount) the balances were read from: the run's account, as
-            /// SendMessageRequest.subaccount_id named it.
+            /// Account the balances were read from: the run's trading account, as
+            /// SendMessageRequest.subaccount_id named it, or the caller's main account
+            /// when the request named none.
             ///
             /// Field 2: `account_id`
             #[must_use]
@@ -31843,6 +32660,14 @@ pub mod __buffa {
         /// every answer, and they are not reported here. The event follows that call's
         /// ToolFinished event with ok true; a failed search has a ToolFinished event
         /// with ok false and no MemoriesRecalled event.
+        ///
+        /// In an existing conversation, the assistant also gets the memories the user
+        /// saved or changed in their other conversations since its previous answer in
+        /// this one, whatever the message is about. When there are any, the run reports
+        /// them before the answer as a memory_updates tool call (ToolStarted and
+        /// ToolFinished with ok true) and its MemoriesRecalled event, so a client can
+        /// show that memory was updated from another conversation. Otherwise the run
+        /// has no memory_updates call.
         #[derive(Clone, Debug, Default)]
         pub struct MemoriesRecalledView<'a> {
             /// Identifier of the search's tool call, as in its ToolStarted and
@@ -31850,8 +32675,10 @@ pub mod __buffa {
             ///
             /// Field 1: `tool_call_id`
             pub tool_call_id: &'a str,
-            /// The relevant memories found, at most 8, most relevant first; never a
-            /// profile memory. Empty when none is relevant.
+            /// For a recall_memories call: the relevant memories found, at most 8, most
+            /// relevant first, empty when none is relevant. For a memory_updates call:
+            /// the memories saved or changed in other conversations, at most 20, newest
+            /// first, never empty. Never a profile memory.
             ///
             /// Field 2: `memories`
             pub memories: ::buffa::RepeatedView<
@@ -32129,8 +32956,10 @@ pub mod __buffa {
             pub fn tool_call_id(&self) -> &'_ str {
                 self.0.reborrow().tool_call_id
             }
-            /// The relevant memories found, at most 8, most relevant first; never a
-            /// profile memory. Empty when none is relevant.
+            /// For a recall_memories call: the relevant memories found, at most 8, most
+            /// relevant first, empty when none is relevant. For a memory_updates call:
+            /// the memories saved or changed in other conversations, at most 20, newest
+            /// first, never empty. Never a profile memory.
             ///
             /// Field 2: `memories`
             #[must_use]
@@ -32480,6 +33309,361 @@ pub mod __buffa {
             type ViewHandle = DestinationsSuggestedOwnedView;
         }
         impl ::serde::Serialize for DestinationsSuggestedOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DisplaySettingAction asks the client to change one of its display settings
+        /// for the user, or, when the user did not say to what, to show that setting's
+        /// choices in the conversation so the user picks one. The setting is one the
+        /// run's SendMessage declared in display_settings. The event follows the
+        /// ToolFinished event, with ok true, of the set_display_preference call that
+        /// chose it.
+        ///
+        /// Apply an action once, when it arrives in a run the client sent and follows:
+        /// replaying a run's events later, for example to show an earlier
+        /// conversation, applies none of them again. Offer the user a way to undo the
+        /// change, back to the value the setting had before. A client that no longer
+        /// has the setting, or does not accept the value, changes nothing.
+        #[derive(Clone, Debug, Default)]
+        pub struct DisplaySettingActionView<'a> {
+            /// Identifier of the tool call, as in its ToolStarted and ToolFinished
+            /// events.
+            ///
+            /// Field 1: `tool_call_id`
+            pub tool_call_id: &'a str,
+            /// The setting, never SETTING_UNSPECIFIED.
+            ///
+            /// Field 2: `setting`
+            pub setting: ::buffa::EnumValue<super::super::DisplaySetting>,
+            /// The value to apply, one of the setting's values as DisplaySetting lists
+            /// them. Omitted when the user did not name one: show the setting's choices
+            /// instead, and change nothing until the user picks.
+            ///
+            /// Field 3: `value`
+            pub value: ::core::option::Option<&'a str>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DisplaySettingActionView<'a> {
+            type Owned = super::super::DisplaySettingAction;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.tool_call_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.setting = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.value = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DisplaySettingAction,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DisplaySettingAction,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DisplaySettingAction {
+                    tool_call_id: self.tool_call_id.to_string(),
+                    setting: self.setting,
+                    value: self.value.map(|s| s.to_string()),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DisplaySettingActionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.tool_call_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.tool_call_id)
+                                as u32;
+                }
+                {
+                    let val = self.setting.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(ref v) = self.value {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.tool_call_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.tool_call_id, buf);
+                }
+                {
+                    let val = self.setting.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if let Some(ref v) = self.value {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DisplaySettingActionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.tool_call_id) {
+                    __map.serialize_entry("toolCallId", self.tool_call_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.setting,
+                ) {
+                    __map.serialize_entry("setting", &self.setting)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.value {
+                    __map.serialize_entry("value", __v)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DisplaySettingActionView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "DisplaySettingAction";
+            const FULL_NAME: &'static str = "ai.v1.DisplaySettingAction";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DisplaySettingAction";
+        }
+        ::buffa::impl_default_view_instance!(DisplaySettingActionView);
+        ::buffa::impl_view_reborrow!(DisplaySettingActionView);
+        /** Self-contained, `'static` owned view of a `DisplaySettingAction` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DisplaySettingActionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DisplaySettingActionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DisplaySettingActionOwnedView(
+            ::buffa::OwnedView<DisplaySettingActionView<'static>>,
+        );
+        impl DisplaySettingActionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DisplaySettingActionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DisplaySettingActionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DisplaySettingAction,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DisplaySettingActionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DisplaySettingActionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DisplaySettingActionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DisplaySettingAction,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Identifier of the tool call, as in its ToolStarted and ToolFinished
+            /// events.
+            ///
+            /// Field 1: `tool_call_id`
+            #[must_use]
+            pub fn tool_call_id(&self) -> &'_ str {
+                self.0.reborrow().tool_call_id
+            }
+            /// The setting, never SETTING_UNSPECIFIED.
+            ///
+            /// Field 2: `setting`
+            #[must_use]
+            pub fn setting(&self) -> ::buffa::EnumValue<super::super::DisplaySetting> {
+                self.0.reborrow().setting
+            }
+            /// The value to apply, one of the setting's values as DisplaySetting lists
+            /// them. Omitted when the user did not name one: show the setting's choices
+            /// instead, and change nothing until the user picks.
+            ///
+            /// Field 3: `value`
+            #[must_use]
+            pub fn value(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().value
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DisplaySettingActionView<'static>>>
+        for DisplaySettingActionOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DisplaySettingActionView<'static>>,
+            ) -> Self {
+                DisplaySettingActionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DisplaySettingActionOwnedView>
+        for ::buffa::OwnedView<DisplaySettingActionView<'static>> {
+            fn from(wrapper: DisplaySettingActionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DisplaySettingActionView<'static>>,
+        > for DisplaySettingActionOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DisplaySettingActionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DisplaySettingAction {
+            type View<'a> = DisplaySettingActionView<'a>;
+            type ViewHandle = DisplaySettingActionOwnedView;
+        }
+        impl ::serde::Serialize for DisplaySettingActionOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -48500,6 +49684,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    17u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                                ref mut existing,
+                            ),
+                        ) = view.event
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.event = Some(
+                                super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::DisplaySettingActionView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -48657,6 +49872,15 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::run_event::Event::DestinationsSuggested(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::run_event::Event::DisplaySettingAction(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -48834,6 +50058,16 @@ pub mod __buffa {
                                 += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 2u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -49000,6 +50234,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                17u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -49109,6 +50353,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("destinationsSuggested", v)?;
+                        }
+                        super::super::__buffa::view::oneof::run_event::Event::DisplaySettingAction(
+                            v,
+                        ) => {
+                            __map.serialize_entry("displaySettingAction", v)?;
                         }
                     }
                 }
@@ -50683,6 +51932,347 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// CurrentPage is the page of the client the user is on as they send a message.
+        /// It names the page by its template and title, never by its address: a client
+        /// must never send the URL the user sees, its query string or fragment, or any
+        /// id, symbol or other value taken from the path.
+        #[derive(Clone, Debug, Default)]
+        pub struct CurrentPageView<'a> {
+            /// The id of the client's destination for the page, when the page is one of
+            /// its destinations, for example "page-settings": lowercase letters, digits
+            /// and hyphens, 1 to 64 characters, as in Destination.id. Omit it for a page
+            /// that is none of them.
+            ///
+            /// Field 1: `destination_id`
+            pub destination_id: ::core::option::Option<&'a str>,
+            /// The page's route template, each variable path segment named by its
+            /// parameter in brackets, for example "/account/settings/\[section\]": it
+            /// starts with "/" and has at most 200 characters, each a letter, a digit or
+            /// one of "/", "-", "_", ".", "\[" and "\]".
+            ///
+            /// Field 2: `route`
+            pub route: &'a str,
+            /// The page's title as the client shows it, for example "Settings", 1 to 80
+            /// characters. Never the user's own data, such as an account label.
+            ///
+            /// Field 3: `title`
+            pub title: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CurrentPageView<'a> {
+            type Owned = super::super::CurrentPage;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_id = Some(
+                            ::buffa::types::borrow_str(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.route = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.title = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CurrentPage,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CurrentPage,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CurrentPage {
+                    destination_id: self.destination_id.map(|s| s.to_string()),
+                    route: self.route.to_string(),
+                    title: self.title.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CurrentPageView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if let Some(ref v) = self.destination_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if !self.route.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.route) as u32;
+                }
+                if !self.title.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.title) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(ref v) = self.destination_id {
+                    ::buffa::types::put_string_field(1u32, v, buf);
+                }
+                if !self.route.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.route, buf);
+                }
+                if !self.title.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.title, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CurrentPageView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.destination_id {
+                    __map.serialize_entry("destinationId", __v)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.route) {
+                    __map.serialize_entry("route", self.route)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.title) {
+                    __map.serialize_entry("title", self.title)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CurrentPageView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "CurrentPage";
+            const FULL_NAME: &'static str = "ai.v1.CurrentPage";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.CurrentPage";
+        }
+        ::buffa::impl_default_view_instance!(CurrentPageView);
+        ::buffa::impl_view_reborrow!(CurrentPageView);
+        /** Self-contained, `'static` owned view of a `CurrentPage` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CurrentPageView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CurrentPageView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CurrentPageOwnedView(::buffa::OwnedView<CurrentPageView<'static>>);
+        impl CurrentPageOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrentPageOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrentPageOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CurrentPage,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CurrentPageOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`CurrentPageView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CurrentPageView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CurrentPage,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The id of the client's destination for the page, when the page is one of
+            /// its destinations, for example "page-settings": lowercase letters, digits
+            /// and hyphens, 1 to 64 characters, as in Destination.id. Omit it for a page
+            /// that is none of them.
+            ///
+            /// Field 1: `destination_id`
+            #[must_use]
+            pub fn destination_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().destination_id
+            }
+            /// The page's route template, each variable path segment named by its
+            /// parameter in brackets, for example "/account/settings/\[section\]": it
+            /// starts with "/" and has at most 200 characters, each a letter, a digit or
+            /// one of "/", "-", "_", ".", "\[" and "\]".
+            ///
+            /// Field 2: `route`
+            #[must_use]
+            pub fn route(&self) -> &'_ str {
+                self.0.reborrow().route
+            }
+            /// The page's title as the client shows it, for example "Settings", 1 to 80
+            /// characters. Never the user's own data, such as an account label.
+            ///
+            /// Field 3: `title`
+            #[must_use]
+            pub fn title(&self) -> &'_ str {
+                self.0.reborrow().title
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<CurrentPageView<'static>>>
+        for CurrentPageOwnedView {
+            fn from(inner: ::buffa::OwnedView<CurrentPageView<'static>>) -> Self {
+                CurrentPageOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CurrentPageOwnedView>
+        for ::buffa::OwnedView<CurrentPageView<'static>> {
+            fn from(wrapper: CurrentPageOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<CurrentPageView<'static>>>
+        for CurrentPageOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<CurrentPageView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CurrentPage {
+            type View<'a> = CurrentPageView<'a>;
+            type ViewHandle = CurrentPageOwnedView;
+        }
+        impl ::serde::Serialize for CurrentPageOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// SendMessageRequest sends the caller's message and starts a run that answers
         /// it.
         #[derive(Clone, Debug, Default)]
@@ -50703,9 +52293,12 @@ pub mod __buffa {
             pub idempotency_key: &'a str,
             /// Trading account (subaccount) the run reads and acts on. It must be one
             /// the caller's account owns; any other value, also one that does not
-            /// exist, is INVALID_ARGUMENT. Omit it to answer without account data: the
-            /// run then has no account tools. It is part of the request the idempotency
-            /// key covers.
+            /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+            /// reads the main account (its balances, funding included, every trading
+            /// account with its equity, API keys, price alerts, fee rates and
+            /// permissions) and places, changes or cancels no order, trigger or swap;
+            /// asked to trade, it asks the user to select a trading account. It is part
+            /// of the request the idempotency key covers.
             ///
             /// Field 4: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -50718,6 +52311,28 @@ pub mod __buffa {
             pub destinations: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::DestinationView<'a>,
+            >,
+            /// The page the user is on as they send the message. The run is told it, so
+            /// it can say which page the user is on and point within that page rather
+            /// than suggest it again. Omit it for a client without pages: the run is then
+            /// told nothing about where the user is. It is part of the request the
+            /// idempotency key covers: a retry sends the page the first attempt sent.
+            ///
+            /// Field 6: `page`
+            pub page: ::buffa::MessageFieldView<
+                super::super::__buffa::view::CurrentPageView<'a>,
+            >,
+            /// The display settings the client can change for the user when the run
+            /// asks it to (DisplaySettingAction), each at most once; their order does
+            /// not matter. Declare only those the client offers the user now. Omit them
+            /// for a client without display settings: the run then changes none and
+            /// points the user to their settings instead. They are part of the request
+            /// the idempotency key covers.
+            ///
+            /// Field 7: `display_settings`
+            pub display_settings: ::buffa::RepeatedView<
+                'a,
+                ::buffa::EnumValue<super::super::DisplaySetting>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -50784,6 +52399,31 @@ pub mod __buffa {
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.page.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.page = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::CurrentPageView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -50798,6 +52438,39 @@ pub mod __buffa {
                                     __sub_ctx,
                                 )?,
                             );
+                    }
+                    7u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.display_settings
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.display_settings
+                                    .push(
+                                        ::buffa::EnumValue::from(
+                                            ::buffa::types::decode_int32(&mut pcur)?,
+                                        ),
+                                    );
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.display_settings
+                                .push(
+                                    ::buffa::EnumValue::from(
+                                        ::buffa::types::decode_int32(&mut cur)?,
+                                    ),
+                                );
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -50837,6 +52510,15 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    page: match self.page.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::CurrentPage,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    display_settings: self.display_settings.to_vec(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -50874,6 +52556,24 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.page.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.page.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.display_settings.is_empty() {
+                    let payload: u32 = self
+                        .display_settings
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -50904,6 +52604,25 @@ pub mod __buffa {
                         buf,
                     );
                     v.write_to(__cache, buf);
+                }
+                if self.page.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.page.write_to(__cache, buf);
+                }
+                if !self.display_settings.is_empty() {
+                    let payload: u32 = self
+                        .display_settings
+                        .iter()
+                        .map(|v| ::buffa::types::int32_encoded_len(v.to_i32()) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(7u32, payload, buf);
+                    for v in &self.display_settings {
+                        ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -50948,6 +52667,18 @@ pub mod __buffa {
                 }
                 if !self.destinations.is_empty() {
                     __map.serialize_entry("destinations", &*self.destinations)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.page.as_option() {
+                        __map.serialize_entry("page", __v)?;
+                    }
+                }
+                if !self.display_settings.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "displaySettings",
+                            &::buffa::json_helpers::EnumSeqJson(&self.display_settings),
+                        )?;
                 }
                 __map.end()
             }
@@ -51070,9 +52801,12 @@ pub mod __buffa {
             }
             /// Trading account (subaccount) the run reads and acts on. It must be one
             /// the caller's account owns; any other value, also one that does not
-            /// exist, is INVALID_ARGUMENT. Omit it to answer without account data: the
-            /// run then has no account tools. It is part of the request the idempotency
-            /// key covers.
+            /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+            /// reads the main account (its balances, funding included, every trading
+            /// account with its equity, API keys, price alerts, fee rates and
+            /// permissions) and places, changes or cancels no order, trigger or swap;
+            /// asked to trade, it asks the user to select a trading account. It is part
+            /// of the request the idempotency key covers.
             ///
             /// Field 4: `subaccount_id`
             #[must_use]
@@ -51093,6 +52827,38 @@ pub mod __buffa {
                 super::super::__buffa::view::DestinationView<'_>,
             > {
                 &self.0.reborrow().destinations
+            }
+            /// The page the user is on as they send the message. The run is told it, so
+            /// it can say which page the user is on and point within that page rather
+            /// than suggest it again. Omit it for a client without pages: the run is then
+            /// told nothing about where the user is. It is part of the request the
+            /// idempotency key covers: a retry sends the page the first attempt sent.
+            ///
+            /// Field 6: `page`
+            #[must_use]
+            pub fn page(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::CurrentPageView<'_>,
+            > {
+                &self.0.reborrow().page
+            }
+            /// The display settings the client can change for the user when the run
+            /// asks it to (DisplaySettingAction), each at most once; their order does
+            /// not matter. Declare only those the client offers the user now. Omit them
+            /// for a client without display settings: the run then changes none and
+            /// points the user to their settings instead. They are part of the request
+            /// the idempotency key covers.
+            ///
+            /// Field 7: `display_settings`
+            #[must_use]
+            pub fn display_settings(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                ::buffa::EnumValue<super::super::DisplaySetting>,
+            > {
+                &self.0.reborrow().display_settings
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SendMessageRequestView<'static>>>
@@ -59388,6 +61154,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    DisplaySettingAction(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::DisplaySettingActionView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -60091,6 +61864,9 @@ pub mod __buffa {
                         super::super::super::DestinationsSuggested,
                     >,
                 ),
+                DisplaySettingAction(
+                    ::buffa::alloc::boxed::Box<super::super::super::DisplaySettingAction>,
+                ),
             }
             impl ::buffa::Oneof for Event {}
             impl From<super::super::super::TextDelta> for Event {
@@ -60244,6 +62020,17 @@ pub mod __buffa {
                     Self::Some(Event::from(v))
                 }
             }
+            impl From<super::super::super::DisplaySettingAction> for Event {
+                fn from(v: super::super::super::DisplaySettingAction) -> Self {
+                    Self::DisplaySettingAction(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::DisplaySettingAction>
+            for ::core::option::Option<Event> {
+                fn from(v: super::super::super::DisplaySettingAction) -> Self {
+                    Self::Some(Event::from(v))
+                }
+            }
             impl serde::Serialize for Event {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -60294,6 +62081,9 @@ pub mod __buffa {
                         Self::DestinationsSuggested(v) => {
                             map.serialize_entry("destinationsSuggested", v)?;
                         }
+                        Self::DisplaySettingAction(v) => {
+                            map.serialize_entry("displaySettingAction", v)?;
+                        }
                     }
                     map.end()
                 }
@@ -60325,6 +62115,7 @@ pub mod __buffa {
         reg.register_json_any(super::__RECALLED_MEMORY_JSON_ANY);
         reg.register_json_any(super::__MEMORIES_RECALLED_JSON_ANY);
         reg.register_json_any(super::__DESTINATIONS_SUGGESTED_JSON_ANY);
+        reg.register_json_any(super::__DISPLAY_SETTING_ACTION_JSON_ANY);
         reg.register_json_any(super::__SKILL_LOADED_JSON_ANY);
         reg.register_json_any(super::__SUBAGENT_STARTED_JSON_ANY);
         reg.register_json_any(super::__SUBAGENT_FINISHED_JSON_ANY);
@@ -60362,6 +62153,7 @@ pub mod __buffa {
         reg.register_json_any(super::__ASSISTANT_KEY_ACCOUNT_JSON_ANY);
         reg.register_json_any(super::__PREPARED_ASSISTANT_KEY_JSON_ANY);
         reg.register_json_any(super::__DESTINATION_JSON_ANY);
+        reg.register_json_any(super::__CURRENT_PAGE_JSON_ANY);
         reg.register_json_any(super::__SEND_MESSAGE_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SEND_MESSAGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__WATCH_RUN_REQUEST_JSON_ANY);
@@ -60483,6 +62275,10 @@ pub use self::__buffa::view::MemoriesRecalledOwnedView;
 pub use self::__buffa::view::DestinationsSuggestedView;
 #[doc(inline)]
 pub use self::__buffa::view::DestinationsSuggestedOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DisplaySettingActionView;
+#[doc(inline)]
+pub use self::__buffa::view::DisplaySettingActionOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::SkillLoadedView;
 #[doc(inline)]
@@ -60631,6 +62427,10 @@ pub use self::__buffa::view::PreparedAssistantKeyOwnedView;
 pub use self::__buffa::view::DestinationView;
 #[doc(inline)]
 pub use self::__buffa::view::DestinationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CurrentPageView;
+#[doc(inline)]
+pub use self::__buffa::view::CurrentPageOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::SendMessageRequestView;
 #[doc(inline)]
