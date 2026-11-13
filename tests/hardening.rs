@@ -16,6 +16,8 @@ mod catalog_startup_recovery;
 mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
+#[path = "contract_74af7f3/mod.rs"]
+mod contract_74af7f3;
 #[path = "contract_e339360/mod.rs"]
 mod contract_e339360;
 #[path = "error_chain_redaction/mod.rs"]

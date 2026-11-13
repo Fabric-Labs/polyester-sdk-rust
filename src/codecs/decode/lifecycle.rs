@@ -228,6 +228,33 @@ mod tests {
         assert_eq!(zipper.message, "Deposit amount is below the minimum");
     }
 
+    /// A withdrawal whose execution failed after its destination transaction
+    /// keeps the server's reason id and message, which say it is under review,
+    /// whatever the code, including when the bridge gave none.
+    #[test]
+    fn withdraw_execution_failed_keeps_the_review_message() {
+        for code in [None, Some(ZipperReasonCode::DepositAmountBelowMinimum)] {
+            let msg = FlowSummaryView {
+                flow_id: "flow-w".into(),
+                lifecycle_reason: LifecycleReason::ZIPPER_WITHDRAW_EXECUTION_FAILED.into(),
+                zipper_reason: ProtoZipperReasonDetails {
+                    code: code.map(Into::into).unwrap_or_default(),
+                    reason_id: "withdrawal.execution_failed.under_review".into(),
+                    message: "Failed, under review by the bridge operator. The funds were not returned to your account.".into(),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            };
+            let flow = flow_summary_message_from_proto(&msg);
+            assert_eq!(flow.lifecycle_reason, "zipper_withdraw_execution_failed");
+            let zipper = flow.zipper_reason.expect("zipper_reason");
+            assert_eq!(zipper.code, code.map_or(0, |c| c as i32));
+            assert_eq!(zipper.reason_id, "withdrawal.execution_failed.under_review");
+            assert!(zipper.message.starts_with("Failed, under review"));
+        }
+    }
+
     #[test]
     fn lifecycle_reason_preserves_unknown_codes() {
         let msg = FlowSummaryView {

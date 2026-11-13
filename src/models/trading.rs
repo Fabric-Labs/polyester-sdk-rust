@@ -101,7 +101,11 @@ pub struct Order {
     pub expire_at: Option<String>,
     /// Public ID of the batch replace that admitted the order, as
     /// [`BatchReplaceOrdersResult::batch_request_id`]; empty for every other
-    /// origin.
+    /// origin. It is kept after the order ends, filled or canceled, also for
+    /// a batch-replaced order a trigger placed, and a later batch that
+    /// replaces this order does not change it. An opaque ID: compare it only
+    /// with other `batch_request_id` values of the same account. Orders that
+    /// ended before the server retained it may read empty.
     pub batch_request_id: String,
     /// Why a `rejected` order was refused: the order error code the Orders
     /// API returns for the same refusal, formatted like

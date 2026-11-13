@@ -1397,8 +1397,11 @@ impl OrdersService {
     ///
     /// The status is retained for 60 seconds from the batch's acceptance and
     /// is readable as soon as [`Self::batch_replace`] returns; each item's
-    /// phase then advances asynchronously. `batch_request_id` is the exact
-    /// 64-bit `batch_request_id` that [`Self::batch_replace`] returned. An
+    /// phase then advances asynchronously. `batch_request_id` is the public
+    /// `batch_request_id` that [`Self::batch_replace`] returned, passed back
+    /// unchanged: an opaque ID that carries no meaning outside the account
+    /// that submitted the batch, so compare it only with other
+    /// `batch_request_id` values of that account. An
     /// item refused after admission reads `rejected` with its code; see
     /// [`crate::models::BatchReplaceStatusItem::error_code`].
     ///
