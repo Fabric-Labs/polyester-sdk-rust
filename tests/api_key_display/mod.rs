@@ -7,6 +7,7 @@
 use super::hardening_support::{HttpScript, MockHttpServer};
 use buffa::Message as _;
 use polyester::codecs::decode::{api_key_from_bytes, api_keys_list_from_proto};
+use polyester::codecs::scalars::format_id;
 use polyester::models::ApiKeySummary;
 use polyester::proto::auth::v1::{
     ApiKey as ProtoApiKey, ApiKeyStatus, GetApiKeyRequest, GetApiKeyResponse, GetSubaccountRequest,
@@ -192,7 +193,7 @@ async fn sub_accounts_get_returns_api_keys_when_asked() {
         let (client, _http) = server(wire).await;
         let plain = client
             .sub_accounts
-            .get(SUBACCOUNT, GetSubaccountOpts::default())
+            .get(&format_id(SUBACCOUNT), GetSubaccountOpts::default())
             .await
             .expect("get");
         assert!(plain.api_keys.is_empty(), "{wire:?}: keys without asking");
@@ -200,7 +201,7 @@ async fn sub_accounts_get_returns_api_keys_when_asked() {
         let with_keys = client
             .sub_accounts
             .get(
-                SUBACCOUNT,
+                &format_id(SUBACCOUNT),
                 GetSubaccountOpts {
                     include_api_keys: true,
                     ..Default::default()

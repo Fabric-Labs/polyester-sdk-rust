@@ -156,7 +156,7 @@ async fn sub_accounts_get_returns_members_invites_and_policy_when_asked() {
         let (client, _http, requests) = server(wire, true).await;
         let plain = client
             .sub_accounts
-            .get(SUBACCOUNT, GetSubaccountOpts::default())
+            .get(&format_id(SUBACCOUNT), GetSubaccountOpts::default())
             .await
             .expect("get");
         assert!(plain.members.is_empty(), "{wire:?}: members without asking");
@@ -166,7 +166,7 @@ async fn sub_accounts_get_returns_members_invites_and_policy_when_asked() {
         let got = client
             .sub_accounts
             .get(
-                SUBACCOUNT,
+                &format_id(SUBACCOUNT),
                 GetSubaccountOpts {
                     include_members: true,
                     include_invites: true,
@@ -269,7 +269,7 @@ async fn sub_accounts_get_without_attached_policy_reads_none() {
         let got = client
             .sub_accounts
             .get(
-                SUBACCOUNT,
+                &format_id(SUBACCOUNT),
                 GetSubaccountOpts {
                     include_policy: true,
                     ..Default::default()

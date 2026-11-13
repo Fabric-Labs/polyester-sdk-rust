@@ -446,9 +446,13 @@ impl SubAccountsService {
     /// [`GetSubaccountOpts::include_balances`] the result also carries the
     /// sub-account's balances (an empty list when it holds none); without it
     /// `balances` is `None`.
+    ///
+    /// `subaccount_id` is the sub-account's public ID as `sub_accounts.list`
+    /// returns it (base58, or decimal). One that does not parse, or names 0,
+    /// is refused with `Error::Validation` before sending.
     pub async fn get(
         &self,
-        subaccount_id: u64,
+        subaccount_id: &str,
         opts: GetSubaccountOpts,
     ) -> crate::errors::Result<crate::models::GetSubaccountResult> {
         use crate::codecs::decode::{get_subaccount_from_proto, invite_direction_from_label};
@@ -456,7 +460,10 @@ impl SubAccountsService {
         let invites_direction = invite_direction_from_label(&opts.invites_direction)
             .map_err(crate::errors::Error::validation)?;
         let req = GetSubaccountRequest {
-            subaccount_id: super::scope::explicit_subaccount(subaccount_id)?,
+            subaccount_id: crate::codecs::scalars::parse_account_id(
+                subaccount_id,
+                "subaccount_id",
+            )?,
             include_api_keys: opts.include_api_keys,
             include_members: opts.include_members,
             include_invites: opts.include_invites,
@@ -596,6 +603,10 @@ impl AddressBookService {
     /// refused with `permission_denied` and `AUTH_SUBACCOUNT_ACCESS_DENIED`.
     /// The other address-book reads (entries, transfer counterparties and
     /// destinations, internal-transfer whitelist) follow the same rule.
+    ///
+    /// The address-book calls that take a request with a `subaccount_id`
+    /// send the configured default sub-account when it is 0 (unset), as the
+    /// typed helpers do; a non-zero one is sent unchanged.
     pub async fn list_books(
         &self,
         req: crate::proto::auth::v1::ListAddressBooksRequest,
@@ -618,9 +629,10 @@ impl AddressBookService {
 
     pub async fn list_entries(
         &self,
-        req: crate::proto::auth::v1::ListAddressBookEntriesRequest,
+        mut req: crate::proto::auth::v1::ListAddressBookEntriesRequest,
     ) -> crate::errors::Result<crate::models::AddressBookEntriesList> {
         use crate::codecs::decode::list_entries_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -638,9 +650,10 @@ impl AddressBookService {
 
     pub async fn list_transfer_counterparties(
         &self,
-        req: crate::proto::auth::v1::ListTransferCounterpartiesRequest,
-    ) -> crate::errors::Result<crate::models::ApiData> {
-        use crate::codecs::decode::api_data_from_proto;
+        mut req: crate::proto::auth::v1::ListTransferCounterpartiesRequest,
+    ) -> crate::errors::Result<crate::models::TransferCounterpartiesList> {
+        use crate::codecs::decode::list_counterparties_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -653,14 +666,15 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(api_data_from_proto(&resp))
+        Ok(list_counterparties_from_proto(&resp))
     }
 
     pub async fn list_transfer_destinations(
         &self,
-        req: crate::proto::auth::v1::ListTransferDestinationsRequest,
-    ) -> crate::errors::Result<crate::models::ApiData> {
-        use crate::codecs::decode::api_data_from_proto;
+        mut req: crate::proto::auth::v1::ListTransferDestinationsRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookTransferDestinationsList> {
+        use crate::codecs::decode::list_destinations_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -673,14 +687,15 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(api_data_from_proto(&resp))
+        Ok(list_destinations_from_proto(&resp))
     }
 
     pub async fn list_internal_transfer_whitelist_entries(
         &self,
-        req: crate::proto::auth::v1::ListInternalTransferWhitelistEntriesRequest,
-    ) -> crate::errors::Result<crate::models::ApiData> {
-        use crate::codecs::decode::api_data_from_proto;
+        mut req: crate::proto::auth::v1::ListInternalTransferWhitelistEntriesRequest,
+    ) -> crate::errors::Result<crate::models::InternalTransferWhitelistEntriesList> {
+        use crate::codecs::decode::list_internal_whitelist_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -693,14 +708,15 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(api_data_from_proto(&resp))
+        Ok(list_internal_whitelist_from_proto(&resp))
     }
 
     pub async fn get_withdraw_whitelist_view(
         &self,
-        req: crate::proto::auth::v1::GetWithdrawWhitelistViewRequest,
-    ) -> crate::errors::Result<crate::models::ApiData> {
-        use crate::codecs::decode::api_data_from_proto;
+        mut req: crate::proto::auth::v1::GetWithdrawWhitelistViewRequest,
+    ) -> crate::errors::Result<Option<crate::models::WithdrawWhitelistView>> {
+        use crate::codecs::decode::withdraw_whitelist_view_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -713,16 +729,20 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(api_data_from_proto(&resp))
+        Ok(withdraw_whitelist_view_from_proto(&resp))
     }
 
-    /// Proto pass-through. Set `minimum_view_revision` on the request; the
-    /// regenerated `ApiData.raw` payload includes `view_revision`.
+    /// Read the composed address-book view: books, entries, recent
+    /// destinations, tags and the withdraw whitelist, with the public IDs
+    /// `list_entries` and the other reads return. Set `minimum_view_revision`
+    /// on the request to read a view at least as recent as an invalidation's
+    /// `view_revision`.
     pub async fn get_view(
         &self,
-        req: crate::proto::auth::v1::GetAddressBookViewRequest,
-    ) -> crate::errors::Result<crate::models::ApiData> {
-        use crate::codecs::decode::api_data_from_proto;
+        mut req: crate::proto::auth::v1::GetAddressBookViewRequest,
+    ) -> crate::errors::Result<crate::models::AddressBookView> {
+        use crate::codecs::decode::address_book_view_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -735,7 +755,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(api_data_from_proto(&resp))
+        Ok(address_book_view_from_proto(&resp))
     }
 
     /// Build an update request that selects `new_tags` via FieldMask.
@@ -767,13 +787,14 @@ impl AddressBookService {
         }
     }
 
-    /// Sends `req` as built: set its subaccount field to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn create_entry(
         &self,
-        req: crate::proto::auth::v1::CreateAddressBookEntryRequest,
+        mut req: crate::proto::auth::v1::CreateAddressBookEntryRequest,
     ) -> crate::errors::Result<crate::models::AddressBookEntry> {
         use crate::codecs::decode::entry_from_create_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -827,8 +848,9 @@ impl AddressBookService {
         Ok(())
     }
 
-    /// Sends `req` as built: set its subaccount field to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// Sends `req` as built: `target_subaccount_id` names the address book the
+    /// entry is copied to (0 is the main account's), so the configured default
+    /// sub-account is not applied to it.
     pub async fn copy_entry(
         &self,
         req: crate::proto::auth::v1::CopyAddressBookEntryRequest,
@@ -849,13 +871,14 @@ impl AddressBookService {
         entry_from_copy_proto(&resp)
     }
 
-    /// Sends `req` as built: set its subaccount field to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn create_tag(
         &self,
-        req: crate::proto::auth::v1::CreateAddressBookTagRequest,
+        mut req: crate::proto::auth::v1::CreateAddressBookTagRequest,
     ) -> crate::errors::Result<crate::models::AddressBookTag> {
         use crate::codecs::decode::tag_from_create_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -911,12 +934,15 @@ impl AddressBookService {
 }
 
 impl TransfersService {
+    /// List ledger transfers. An unset `subaccount_id` takes the configured
+    /// default sub-account, as the typed helpers do; a sub-account set on
+    /// `req` is sent unchanged.
     pub async fn list(
         &self,
-        req: crate::proto::ledger::read::v1::ListTransfersRequest,
+        mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> crate::errors::Result<crate::models::TransfersList> {
         use crate::codecs::decode::transfers_list_from_proto;
-        super::scope::request_subaccount(req.subaccount_id)?;
+        req.subaccount_id = super::scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1192,11 +1218,15 @@ impl GuardSignerService {
     /// `AUTH_API_KEY_ACCESS_DENIED`) for a sub-account another main account
     /// owns, even one shared with the key's main account: read that one with
     /// a key of the owning main account.
+    ///
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn get_status(
         &self,
-        req: crate::proto::chain::guard::v1::GetGuardSignerStatusRequest,
+        mut req: crate::proto::chain::guard::v1::GetGuardSignerStatusRequest,
     ) -> crate::errors::Result<Option<crate::models::GuardSignerStatus>> {
         use crate::codecs::decode::status_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1212,13 +1242,14 @@ impl GuardSignerService {
         Ok(status_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn create_wallet(
         &self,
-        req: crate::proto::chain::guard::v1::CreateGuardSignerWalletRequest,
+        mut req: crate::proto::chain::guard::v1::CreateGuardSignerWalletRequest,
     ) -> crate::errors::Result<crate::models::CreateGuardSignerWalletResult> {
         use crate::codecs::decode::create_wallet_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1234,13 +1265,14 @@ impl GuardSignerService {
         Ok(create_wallet_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn sign_protected_action(
         &self,
-        req: crate::proto::chain::guard::v1::SignProtectedActionRequest,
+        mut req: crate::proto::chain::guard::v1::SignProtectedActionRequest,
     ) -> crate::errors::Result<Option<crate::models::GuardApproval>> {
         use crate::codecs::decode::sign_protected_action_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1256,13 +1288,14 @@ impl GuardSignerService {
         Ok(sign_protected_action_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn batch_sign_protected_actions(
         &self,
-        req: crate::proto::chain::guard::v1::BatchSignProtectedActionsRequest,
+        mut req: crate::proto::chain::guard::v1::BatchSignProtectedActionsRequest,
     ) -> crate::errors::Result<crate::models::BatchSignProtectedActionsResult> {
         use crate::codecs::decode::batch_sign_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1278,13 +1311,14 @@ impl GuardSignerService {
         Ok(batch_sign_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn rotate_wallet(
         &self,
-        req: crate::proto::chain::guard::v1::RotateGuardSignerWalletRequest,
+        mut req: crate::proto::chain::guard::v1::RotateGuardSignerWalletRequest,
     ) -> crate::errors::Result<crate::models::RotateGuardSignerWalletResult> {
         use crate::codecs::decode::rotate_wallet_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;
@@ -1300,13 +1334,14 @@ impl GuardSignerService {
         Ok(rotate_wallet_from_proto(&resp))
     }
 
-    /// Sends `req` as built: set `subaccount_id` on it to choose the subaccount.
-    /// The configured default subaccount is not applied.
+    /// A `subaccount_id` of 0 (unset) takes the configured default
+    /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
     pub async fn export_wallet(
         &self,
-        req: crate::proto::chain::guard::v1::ExportGuardSignerWalletRequest,
+        mut req: crate::proto::chain::guard::v1::ExportGuardSignerWalletRequest,
     ) -> crate::errors::Result<crate::models::ExportGuardSignerWalletResult> {
         use crate::codecs::decode::export_wallet_from_proto;
+        req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
             use super::unary;

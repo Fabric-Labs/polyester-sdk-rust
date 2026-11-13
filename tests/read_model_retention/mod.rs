@@ -21,7 +21,6 @@ use polyester::proto::orders::v1::{
 use polyester::proto::privatews::v1::Unit as ProtoUnit;
 use polyester::transport::WireFormat;
 use polyester::{Client, Config};
-use serde_json::{Value, json};
 
 const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const WIRES: [WireFormat; 2] = [WireFormat::Binary, WireFormat::Json];
@@ -333,10 +332,12 @@ fn address_book_view() -> GetAddressBookViewResponse {
     }
 }
 
-/// The Rust view is the response as protobuf JSON in `ApiData::raw`, where
-/// each entry keeps its own revision; protobuf JSON omits a 0.
+/// The typed view keeps each entry's own revision (0 when the server sends
+/// none) and names each entry by the public ID `list_entries` returns, on
+/// both wires.
 #[tokio::test]
 async fn address_book_view_entries_keep_their_own_revision() {
+    use polyester::codecs::scalars::format_id;
     for wire in WIRES {
         let (client, _http) = server(
             wire,
@@ -351,25 +352,27 @@ async fn address_book_view_entries_keep_their_own_revision() {
             .get_view(GetAddressBookViewRequest::default())
             .await
             .expect("get_view");
-        let entries = &view.raw["entries"];
-        let revisions = |kind: &str| -> Vec<Value> {
-            entries[kind]
-                .as_array()
-                .unwrap_or_else(|| panic!("{wire:?}: {kind} entries in {}", view.raw))
-                .iter()
-                .map(|row| row["revision"].clone())
-                .collect()
-        };
+        let entries = view.entries.as_ref().expect("entries");
+        let external: Vec<(String, u64)> = entries
+            .external
+            .iter()
+            .map(|row| (row.address_book_entry_id.clone(), row.revision))
+            .collect();
+        let internal: Vec<(String, u64)> = entries
+            .internal
+            .iter()
+            .map(|row| (row.address_book_entry_id.clone(), row.revision))
+            .collect();
         assert_eq!(
-            revisions("external"),
-            vec![json!("7"), Value::Null],
+            external,
+            vec![(format_id(11), 7), (format_id(12), 0)],
             "{wire:?}"
         );
         assert_eq!(
-            revisions("internal"),
-            vec![json!("19"), json!("2")],
+            internal,
+            vec![(format_id(21), 19), (format_id(22), 2)],
             "{wire:?}"
         );
-        assert_eq!(view.raw["viewRevision"], json!("99"), "{wire:?}");
+        assert_eq!(view.view_revision, 99, "{wire:?}");
     }
 }

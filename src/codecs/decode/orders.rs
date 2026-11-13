@@ -1492,6 +1492,38 @@ mod tests {
         assert_eq!(order.expire_at.as_deref(), Some("2023-11-14T22:13:20Z"));
     }
 
+    // The expiry is the exact second and nanoseconds sent, also in the last
+    // nanoseconds of a second, where a float conversion rounds up a second.
+    #[test]
+    fn order_expire_at_keeps_the_last_nanoseconds_of_a_second() {
+        for (nanos, want) in [
+            (999_999_999, "2026-11-13T18:00:00.999999999Z"),
+            (999_999_404, "2026-11-13T18:00:00.999999404Z"),
+            (999_999_403, "2026-11-13T18:00:00.999999403Z"),
+            (123_456_789, "2026-11-13T18:00:00.123456789Z"),
+            (0, "2026-11-13T18:00:00Z"),
+        ] {
+            let msg = ProtoOrder {
+                order_id: 42,
+                symbol_id: 1,
+                time_in_force: TimeInForce::Gtd.into(),
+                expire_at: buffa_types::google::protobuf::Timestamp {
+                    seconds: 1_794_592_800,
+                    nanos,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            };
+            let decoded = <ProtoOrder as buffa::Message>::decode_from_slice(
+                &buffa::Message::encode_to_vec(&msg),
+            )
+            .unwrap();
+            let order = order_from_proto(&decoded).unwrap();
+            assert_eq!(order.expire_at.as_deref(), Some(want), "nanos {nanos}");
+        }
+    }
+
     #[test]
     fn order_orig_qty_is_current_accepted_total() {
         let before = order_from_proto(&ProtoOrder {

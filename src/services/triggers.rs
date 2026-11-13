@@ -14,8 +14,9 @@ use crate::errors::{Error, Result};
 use crate::models::{
     BatchCancelTriggersResult, CancelOcoResult, CreateOcoParams, CreateOcoResult, CreateOrderType,
     CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType, FeeAsset,
-    ListTriggersOpts, ModifyTriggerParams, OcoLegParams, ResumeTriggerParams, Trigger,
-    TriggerEvent, TriggerEventsList, TriggerMutationResult, TriggersList,
+    ListTriggerEventsOpts, ListTriggersOpts, ModifyTriggerParams, OcoLegParams,
+    ResumeTriggerParams, Trigger, TriggerEvent, TriggerEventsList, TriggerMutationResult,
+    TriggersList,
 };
 use crate::proto::orders::v1::{
     FeeAsset as ProtoFeeAsset, RiskExecution, RiskLimitGtc, SelfTradePreventionMode, Side,
@@ -222,8 +223,8 @@ impl TriggersService {
     /// rather than return the trigger's previous state. The retry starts at
     /// 25 ms, doubles up to 500 ms and gives up after about 2 s, returning
     /// the last error.
-    pub async fn list(&self, req: ListTriggersRequest) -> Result<TriggersList> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn list(&self, mut req: ListTriggersRequest) -> Result<TriggersList> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         // Triggers are labelled with their symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -305,8 +306,8 @@ impl TriggersService {
     /// Once a create, modify, pause or resume has answered, this returns the
     /// trigger as changed: it retries `unavailable` (HTTP 503) with the same
     /// request, as [`Self::list`] does, and never falls back to a cached copy.
-    pub async fn get(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn get(&self, mut req: GetTriggerRequest) -> Result<Option<Trigger>> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         // The trigger is labelled with its symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -1007,11 +1008,11 @@ impl TriggersService {
         trigger_mutation_from_create(&resp)
     }
 
-    /// Sends `req` as built: the configured default subaccount is not applied.
-    /// Use [`Self::cancel_by_id`] to apply it.
+    /// An unset `subaccount_id` takes the configured default sub-account, as
+    /// the typed helpers do; a sub-account set on `req` is sent unchanged.
     /// A trigger that has already ended is refused as for [`Self::cancel_by_id`].
-    pub async fn cancel(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn cancel(&self, mut req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1075,10 +1076,10 @@ impl TriggersService {
         create_oco_from_proto(&resp)
     }
 
-    /// Sends `req` as built: the configured default subaccount is not applied.
-    /// Use [`Self::cancel_oco_by_id`] to apply it.
-    pub async fn cancel_oco(&self, req: CancelOcoRequest) -> Result<CancelOcoResult> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    /// An unset `subaccount_id` takes the configured default sub-account, as
+    /// the typed helpers do; a sub-account set on `req` is sent unchanged.
+    pub async fn cancel_oco(&self, mut req: CancelOcoRequest) -> Result<CancelOcoResult> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1143,11 +1144,11 @@ impl TriggersService {
         batch_cancel_triggers_from_proto(&resp)
     }
 
-    /// Sends `req` as built: the configured default subaccount is not applied.
-    /// Use [`Self::pause_by_id`] to apply it.
+    /// An unset `subaccount_id` takes the configured default sub-account, as
+    /// the typed helpers do; a sub-account set on `req` is sent unchanged.
     /// A trigger that has already ended is refused as for [`Self::pause_by_id`].
-    pub async fn pause(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn pause(&self, mut req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1183,11 +1184,11 @@ impl TriggersService {
         .await
     }
 
-    /// Sends `req` as built: the configured default subaccount is not applied.
-    /// Use [`Self::resume_with`] to apply it.
+    /// An unset `subaccount_id` takes the configured default sub-account, as
+    /// the typed helpers do; a sub-account set on `req` is sent unchanged.
     /// A trigger that has already ended is refused as for [`Self::resume_by_id`].
-    pub async fn resume(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn resume(&self, mut req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1282,8 +1283,11 @@ impl TriggersService {
         trigger_mutation_from_modify(&resp)
     }
 
-    pub async fn list_events(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
-        super::scope::request_subaccount(req.subaccount_id)?;
+    pub async fn list_events(
+        &self,
+        mut req: ListTriggerEventsRequest,
+    ) -> Result<TriggerEventsList> {
+        req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -1295,6 +1299,33 @@ impl TriggersService {
         .await?
         .into_owned();
         trigger_events_list_from_proto(&resp)
+    }
+
+    /// List a trigger's events by the public trigger ID that create and list
+    /// calls return (base58, or decimal), with the filters of
+    /// [`ListTriggerEventsOpts`]. The configured default sub-account applies
+    /// when `opts.subaccount_id` is `None`. An ID that does not parse, or an
+    /// unknown event type, is refused with `Error::Validation` before sending.
+    pub async fn list_events_by_id(
+        &self,
+        trigger_id: &str,
+        opts: ListTriggerEventsOpts,
+    ) -> Result<TriggerEventsList> {
+        use crate::codecs::decode::trigger_event_type_from_label;
+        let mut req = ListTriggerEventsRequest {
+            trigger_id: id_to_u64(trigger_id, "trigger_id")?,
+            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            // Proto u32: 0 means omit / server default.
+            limit: opts.limit.unwrap_or(0),
+            page_token: opts.page_token.unwrap_or_default(),
+            ..Default::default()
+        };
+        if let Some(label) = opts.event_type.as_deref() {
+            req.event_type = trigger_event_type_from_label(label)
+                .map_err(Error::validation)?
+                .into();
+        }
+        self.list_events(req).await
     }
 
     /// Subscribe to private trigger updates (requires `realtime` feature).
