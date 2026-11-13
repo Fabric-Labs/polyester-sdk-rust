@@ -1034,10 +1034,58 @@ async fn credential_refusals_read_the_same_on_every_rest_endpoint() {
                 json!({"code": code, "title": "t", "detail": "d", "status": status}).to_string();
             let (err, calls) = call(op, status, PROBLEM, &body, None).await;
             let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
-            assert_eq!(calls, 1, "{case}");
+            // A trigger read retries an unavailable answer until its budget
+            // is spent; every other refusal, and any write, is sent once.
+            if op == "read" && code == "AUTH_TEMPORARILY_UNAVAILABLE" {
+                assert!(calls > 1, "{case}: calls={calls}");
+            } else {
+                assert_eq!(calls, 1, "{case}");
+            }
             assert_eq!(err.auth_code(), Some(auth), "{case}: {err:?}");
             assert_flags(&err, retryable, false, &case);
         }
+    }
+}
+
+/// Authentication that was briefly unavailable refused a trigger read before
+/// it ran: the read retries it, over REST and ConnectRPC, and succeeds once
+/// authentication answers. A write gets the retryable refusal after one
+/// request.
+#[tokio::test(flavor = "multi_thread")]
+async fn trigger_reads_recover_from_transient_auth_unavailability() {
+    use polyester::proto::auth::v1::{AuthErrorCode as Auth, AuthErrorDetail};
+    let rest =
+        json!({"code": "AUTH_TEMPORARILY_UNAVAILABLE", "title": "t", "detail": "d", "status": 503})
+            .to_string();
+    let detail = AuthErrorDetail {
+        code: Auth::AUTH_TEMPORARILY_UNAVAILABLE.into(),
+        ..Default::default()
+    };
+    let connect = json!({
+        "code": "unavailable",
+        "message": "authentication temporarily unavailable",
+        "details": [{
+            "type": "auth.v1.AuthErrorDetail",
+            "value": base64::engine::general_purpose::STANDARD.encode(detail.encode_to_bytes()),
+        }],
+    })
+    .to_string();
+    for (shape, content_type, body) in [
+        ("rest", PROBLEM, rest.as_str()),
+        ("connect", JSON, connect.as_str()),
+    ] {
+        let (err, calls) = call("read", 503, content_type, body, Some(1)).await;
+        assert!(err.is_none(), "{shape}: {err:?}");
+        assert_eq!(calls, 2, "{shape}");
+        let (err, calls) = call("write", 503, content_type, body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{shape}: expected an error"));
+        assert_eq!(calls, 1, "{shape} write");
+        assert_eq!(
+            err.auth_code(),
+            Some(Auth::AUTH_TEMPORARILY_UNAVAILABLE),
+            "{shape}: {err:?}"
+        );
+        assert_flags(&err, true, false, shape);
     }
 }
 

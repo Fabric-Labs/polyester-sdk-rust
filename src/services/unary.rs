@@ -114,6 +114,8 @@ where
 
 /// Whether a read may retry, by what the error means and not only its code: a
 /// typed refusal at HTTP 503, such as `ACCOUNT_ROUTING_INVALID`, is final.
+/// Authentication that was briefly unavailable (`AUTH_TEMPORARILY_UNAVAILABLE`,
+/// over REST or ConnectRPC) refused the read before it ran, so it is retried.
 fn is_real_unavailability(err: &ConnectError) -> bool {
     if !matches!(
         err.code,
@@ -123,6 +125,8 @@ fn is_real_unavailability(err: &ConnectError) -> bool {
     }
     let mapped = Factory::map_error(err.clone());
     mapped.mutation_outcome_unknown()
+        || mapped.auth_code()
+            == Some(crate::proto::auth::v1::AuthErrorCode::AUTH_TEMPORARILY_UNAVAILABLE)
         || !matches!(mapped, Error::Api { .. } | Error::RateLimit { .. })
 }
 
