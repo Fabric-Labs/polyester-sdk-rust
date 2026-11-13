@@ -119,7 +119,18 @@ pub fn levels_from_orderbook_side(levels: &[OrderbookLevel]) -> BookSide {
     }))
 }
 
-/// Apply a delta; returns `(new_seq, needs_refresh)`.
+/// Apply a delta; returns `(new_seq, out_of_sync)`.
+///
+/// Each update is the difference between two published views of the depth
+/// tier: it applies only to a book at exactly its `book_seq_start`, the
+/// previous update's `book_seq_end`, and leaves the book at `book_seq_end`.
+/// An update that ends at or before `current_seq` is stale and is dropped
+/// (`out_of_sync` false). Any other update that does not start at
+/// `current_seq`, including one that overlaps it, is a gap, as is a malformed
+/// one: the book is left unchanged and `out_of_sync` is true. A book out of
+/// sync recovers with the next `reset`, the full view the publisher sends
+/// periodically and after a gap; fetching a snapshot does not line it up
+/// with the stream.
 pub fn apply_delta(
     bids: &mut BookSide,
     asks: &mut BookSide,
@@ -138,7 +149,7 @@ pub fn apply_delta(
         return (current_seq, true);
     }
     // Keep seq as u64 end-to-end. Never coerce parse failures to 0 (that disables
-    // gap detection). Invalid/overflowing sequences fail toward refresh.
+    // gap detection). Invalid sequences put the book out of sync.
     let seq_start = delta.book_seq_start;
     let seq_end = delta.book_seq_end;
     if seq_end < seq_start {
@@ -149,11 +160,11 @@ pub fn apply_delta(
     if delta.reset && seq_end <= current_seq {
         return (current_seq, false);
     }
-    if !delta.reset && seq_start > current_seq.saturating_add(1) {
-        return (current_seq, true);
-    }
     if !delta.reset && seq_end <= current_seq {
         return (current_seq, false);
+    }
+    if !delta.reset && seq_start != current_seq {
+        return (current_seq, true);
     }
     if delta.reset {
         bids.clear();
@@ -302,7 +313,7 @@ mod tests {
     fn ticket_8583_apply_delta_keeps_valid_deletions_and_inserts() {
         let mut bids = BookSide::from([(100, 5), (99, 1)]);
         let mut asks = BookSide::from([(200, 3)]);
-        let update = delta(11, 11, &[(99, 0), (0, 0)], &[(201, 2)], false);
+        let update = delta(10, 11, &[(99, 0), (0, 0)], &[(201, 2)], false);
         assert_eq!(apply_delta(&mut bids, &mut asks, 10, &update), (11, false));
         assert_eq!(bids, BookSide::from([(100, 5)]));
         assert_eq!(asks, BookSide::from([(200, 3), (201, 2)]));
@@ -342,28 +353,64 @@ mod tests {
     fn apply_delta_detects_gap() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::from([(200, 3)]);
-        let (seq, needs_refresh) = apply_delta(
+        let (seq, out_of_sync) = apply_delta(
             &mut bids,
             &mut asks,
             3,
             &delta(5, 6, &[(100, 7)], &[], false),
         );
-        assert!(needs_refresh);
+        assert!(out_of_sync);
         assert_eq!(seq, 3);
         assert_eq!(bids.get(&100), Some(&5));
+    }
+
+    /// An update applies only to the view it was computed from: one that
+    /// starts one past the book's sequence, or overlaps it, is a gap.
+    #[test]
+    fn apply_delta_requires_the_exact_starting_view() {
+        for (name, update) in [
+            ("one past", delta(4, 6, &[(100, 7)], &[], false)),
+            ("overlapping", delta(2, 6, &[(100, 7)], &[], false)),
+        ] {
+            let mut bids = BookSide::from([(100, 5)]);
+            let mut asks = BookSide::from([(200, 3)]);
+            let (seq, out_of_sync) = apply_delta(&mut bids, &mut asks, 3, &update);
+            assert!(out_of_sync, "{name}");
+            assert_eq!(seq, 3, "{name}");
+            assert_eq!(bids, BookSide::from([(100, 5)]), "{name}");
+            assert_eq!(asks, BookSide::from([(200, 3)]), "{name}");
+        }
+        // The sequence can advance without any change to the book.
+        let mut bids = BookSide::from([(100, 5)]);
+        let mut asks = BookSide::new();
+        assert_eq!(
+            apply_delta(&mut bids, &mut asks, 3, &delta(3, 9, &[], &[], false)),
+            (9, false)
+        );
+        // A reset applies whatever its start.
+        assert_eq!(
+            apply_delta(
+                &mut bids,
+                &mut asks,
+                3,
+                &delta(0, 12, &[(90, 1)], &[], true)
+            ),
+            (12, false)
+        );
+        assert_eq!(bids, BookSide::from([(90, 1)]));
     }
 
     #[test]
     fn apply_delta_updates_book() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::from([(200, 3)]);
-        let (seq, needs_refresh) = apply_delta(
+        let (seq, out_of_sync) = apply_delta(
             &mut bids,
             &mut asks,
             3,
             &delta(3, 4, &[(100, 7)], &[], false),
         );
-        assert!(!needs_refresh);
+        assert!(!out_of_sync);
         assert_eq!(seq, 4);
         assert_eq!(bids.get(&100), Some(&7));
     }
@@ -372,28 +419,28 @@ mod tests {
     fn apply_delta_skips_stale() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::new();
-        let (seq, needs_refresh) = apply_delta(
+        let (seq, out_of_sync) = apply_delta(
             &mut bids,
             &mut asks,
             5,
             &delta(3, 4, &[(100, 9)], &[], false),
         );
-        assert!(!needs_refresh);
+        assert!(!out_of_sync);
         assert_eq!(seq, 5);
         assert_eq!(bids.get(&100), Some(&5));
     }
 
     #[test]
-    fn apply_delta_inverted_seq_fails_toward_refresh() {
+    fn apply_delta_inverted_seq_is_out_of_sync() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::new();
-        let (seq, needs_refresh) = apply_delta(
+        let (seq, out_of_sync) = apply_delta(
             &mut bids,
             &mut asks,
             3,
             &delta(9, 2, &[(100, 9)], &[], false),
         );
-        assert!(needs_refresh);
+        assert!(out_of_sync);
         assert_eq!(seq, 3);
         assert_eq!(bids.get(&100), Some(&5));
     }
@@ -402,13 +449,13 @@ mod tests {
     fn apply_delta_rejects_malformed_levels_without_advancing_or_mutating() {
         let mut bids = BookSide::from([(100, 5)]);
         let mut asks = BookSide::from([(200, 3)]);
-        let (seq, needs_refresh) = apply_delta(
+        let (seq, out_of_sync) = apply_delta(
             &mut bids,
             &mut asks,
             1,
             &delta(2, 2, &[(100, -1), (101, 4)], &[], false),
         );
-        assert!(needs_refresh);
+        assert!(out_of_sync);
         assert_eq!(seq, 1);
         assert_eq!(bids, BookSide::from([(100, 5)]));
         assert_eq!(asks, BookSide::from([(200, 3)]));
@@ -424,8 +471,8 @@ mod tests {
         ] {
             let before_bids = bids.clone();
             let before_asks = asks.clone();
-            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
-            assert!(!needs_refresh);
+            let (seq, out_of_sync) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(!out_of_sync);
             assert_eq!(seq, 100);
             assert_eq!(bids, before_bids);
             assert_eq!(asks, before_asks);
@@ -446,8 +493,8 @@ mod tests {
                 .collect::<BookSide>();
             let mut bids = BookSide::from([(100, 5)]);
             let mut asks = BookSide::from([(200, 3)]);
-            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
-            assert!(!needs_refresh);
+            let (seq, out_of_sync) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(!out_of_sync);
             assert_eq!(seq, expected_seq);
             assert_eq!(bids, expected_bids);
             assert!(asks.is_empty());
@@ -455,15 +502,15 @@ mod tests {
     }
 
     #[test]
-    fn poly_4688_malformed_reset_requests_refresh_without_mutation() {
+    fn poly_4688_malformed_reset_is_out_of_sync_without_mutation() {
         for reset in [
             delta(102, 101, &[(101, 4)], &[], true),
             delta(101, 102, &[(101, -1)], &[], true),
         ] {
             let mut bids = BookSide::from([(100, 5)]);
             let mut asks = BookSide::from([(200, 3)]);
-            let (seq, needs_refresh) = apply_delta(&mut bids, &mut asks, 100, &reset);
-            assert!(needs_refresh);
+            let (seq, out_of_sync) = apply_delta(&mut bids, &mut asks, 100, &reset);
+            assert!(out_of_sync);
             assert_eq!(seq, 100);
             assert_eq!(bids, BookSide::from([(100, 5)]));
             assert_eq!(asks, BookSide::from([(200, 3)]));

@@ -329,7 +329,10 @@ pub struct OrderbookData {
     ///
     /// This is the server's value as sent, never inferred from the levels. A
     /// live [`crate::orderbook::Subscription`] view carries the value of the
-    /// last snapshot it fetched. A server that predates this field always
-    /// reports false.
+    /// last snapshot it fetched, and false from an update the book missed
+    /// (an update that does not start at the book's `book_seq`) until the
+    /// next full `reset` view the publisher sends, about every 30 seconds
+    /// and after a gap. A server that predates this field always reports
+    /// false.
     pub available: bool,
 }

@@ -901,7 +901,7 @@ async fn managed_orderbook_overflow_terminates_receiver_callback_task_and_socket
     let active = Arc::new(AtomicUsize::new(0));
     let publication = OrderBookDelta {
         symbol_id: 1,
-        book_seq_start: 2,
+        book_seq_start: 1,
         book_seq_end: 2,
         ..Default::default()
     }
@@ -999,7 +999,7 @@ async fn orderbook_view_after_delta(
 
     let publication = OrderBookDelta {
         symbol_id: 1,
-        book_seq_start: 2,
+        book_seq_start: 1,
         book_seq_end: 2,
         reset,
         bids: vec![PriceLevel {
@@ -7095,8 +7095,8 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
 
 #[tokio::test]
 async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
-    use hardening_support::{HttpScript, centrifugo_publication};
-    use polyester::proto::orderbook::v1::{GetOrderBookResponse, OrderBookDelta};
+    use hardening_support::HttpScript;
+    use polyester::proto::orderbook::v1::GetOrderBookResponse;
     let calls = Arc::new(AtomicUsize::new(0));
     let count = calls.clone();
     let http = MockHttpServer::spawn(move |_| {
@@ -7104,7 +7104,9 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
             connect_proto_ok(&GetOrderBookResponse {
                 symbol_id: 1,
                 book_seq: 1,
-                available: true,
+                // An unavailable book is requested again; every later
+                // snapshot request fails.
+                available: false,
                 ..Default::default()
             })
         } else {
@@ -7115,7 +7117,7 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
         }
     })
     .await;
-    let (url, tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
+    let (url, _tx, task) = ticket_ws(vec![centrifugo_ok_reply(2)], None).await;
     let client = ticket_book_client(http.base_url(), url);
     let mut sub = client
         .orderbook
@@ -7129,16 +7131,6 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
     let errors = Arc::new(std::sync::Mutex::new(Vec::new()));
     let reported = errors.clone();
     sub.set_on_error(move |err| reported.lock().unwrap().push(err));
-    tx.send(centrifugo_publication(
-        &OrderBookDelta {
-            symbol_id: 1,
-            book_seq_start: 3,
-            book_seq_end: 3,
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    ))
-    .unwrap();
     assert!(
         tokio::time::timeout(Duration::from_secs(10), sub.updates().recv())
             .await
@@ -7190,7 +7182,9 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
         let seq = if mode == "contiguous" { 1 } else { 5 };
         tx.send(centrifugo_publication(
             &OrderBookDelta {
-                book_seq_start: seq,
+                // A contiguous update starts at the snapshot's sequence; a
+                // reset at 0.
+                book_seq_start: if mode == "gap" { 4 } else { 0 },
                 book_seq_end: seq,
                 reset: mode == "reset",
                 bids: vec![PriceLevel {
@@ -7208,9 +7202,12 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
             .unwrap()
             .unwrap();
         if mode == "gap" {
-            assert_eq!(view.book_seq, "0", "gap must refetch, never apply");
+            // Never applied, and no snapshot is fetched: the book waits for
+            // the next reset and says it is not current.
+            assert_eq!(view.book_seq, "0", "a gap must never apply");
             assert!(view.bids.is_empty());
-            assert_eq!(calls.load(Ordering::SeqCst), 2);
+            assert!(!view.available);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
         } else {
             assert_eq!(view.book_seq, seq.to_string());
             assert_eq!(view.bids.len(), 1);
@@ -7922,7 +7919,7 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
             let ws = if live_delta {
                 let delta = OrderBookDelta {
                     symbol_id: 1,
-                    book_seq_start: 2,
+                    book_seq_start: 1,
                     book_seq_end: 2,
                     bids: vec![PriceLevel {
                         price_ticks: bid,
@@ -8062,7 +8059,7 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
             .map(|seq| {
                 OrderBookDelta {
                     symbol_id: 1,
-                    book_seq_start: seq,
+                    book_seq_start: seq - 1,
                     book_seq_end: seq,
                     bids: vec![level(71_600_000, seq as i64)],
                     ..Default::default()
@@ -8167,7 +8164,7 @@ async fn l2_orderbook_reports_time_since_last_publication() {
         let ws = if publishes {
             let delta = OrderBookDelta {
                 symbol_id: 1,
-                book_seq_start: 2,
+                book_seq_start: 1,
                 book_seq_end: 2,
                 bids: vec![level(71_600_000, 5)],
                 ..Default::default()
@@ -8264,8 +8261,8 @@ async fn l2_orderbook_reports_time_since_last_publication() {
 /// The delta is published right after the subscribe reply, so it reaches the
 /// client before or after the first snapshot read answers, depending on
 /// timing; `first_snapshot_delay` holds that answer back to choose. A refused
-/// delta is rebuilt from a second snapshot read, which answers the book as of
-/// sequence 2.
+/// delta leaves the book out of sync until the next reset, so no second
+/// snapshot is read.
 async fn raw_zero_delta_subscription(
     side: &str,
     bucket: &str,
@@ -8282,7 +8279,7 @@ async fn raw_zero_delta_subscription(
     };
     let delta = OrderBookDelta {
         symbol_id: 1,
-        book_seq_start: 2,
+        book_seq_start: 1,
         book_seq_end: 2,
         bids: if side == "bids" {
             vec![level.clone()]
@@ -8356,16 +8353,18 @@ async fn raw_zero_delta_subscription(
         })
         .await;
     if quantity > 0 {
-        // Refused like any malformed delta: never shown, the book is rebuilt from a
-        // fresh snapshot, and the stream stays open. The first snapshot has a view
-        // only when it was shown before the delta arrived; a delta buffered behind
-        // it is refused before it is shown, so the rebuilt book is the first view.
+        // Refused like any malformed delta: never shown, and the stream stays
+        // open. The book keeps its snapshot levels but is no longer current:
+        // it waits for the publisher's next reset, and fetches no snapshot.
+        // The snapshot has a view of its own only when it was shown before
+        // the delta arrived; a delta buffered behind it is refused before it
+        // is shown, so the out-of-sync book is the first view.
         let mut subscription = result.unwrap();
         let mut views = 0;
         loop {
             let view = tokio::time::timeout(Duration::from_secs(3), subscription.updates().recv())
                 .await
-                .unwrap_or_else(|_| panic!("no view after the refreshed snapshot ({views} views)"))
+                .unwrap_or_else(|_| panic!("no view after the refused delta ({views} views)"))
                 .expect("a raw zero price must not close the stream");
             views += 1;
             assert_eq!(view.bids.len(), 1, "corrupt delta was emitted: {view:?}");
@@ -8374,17 +8373,15 @@ async fn raw_zero_delta_subscription(
                 view.bids[0].qty.as_ref().unwrap().as_scaled(),
                 view.asks[0].qty.as_ref().unwrap().as_scaled(),
             );
-            match view.book_seq.as_str() {
-                "1" if views == 1 => assert_eq!(quantities, (3, 4), "{view:?}"),
-                "2" => {
-                    assert_eq!(quantities, (5, 6), "{view:?}");
-                    break;
-                }
-                _ => panic!("corrupt delta was emitted: {view:?}"),
+            assert_eq!(view.book_seq, "1", "corrupt delta was emitted: {view:?}");
+            assert_eq!(quantities, (3, 4), "{view:?}");
+            if !view.available {
+                break;
             }
+            assert_eq!(views, 1, "only the snapshot view is current: {view:?}");
         }
         assert!(subscription.err().is_none(), "{:?}", subscription.err());
-        assert_eq!(http.requests.load(Ordering::SeqCst), 2);
+        assert_eq!(http.requests.load(Ordering::SeqCst), 1);
         subscription.close();
     } else {
         let mut subscription = result.unwrap();
@@ -8450,7 +8447,7 @@ fn first_snapshot_delays() -> Vec<Duration> {
 }
 
 #[tokio::test]
-async fn l2_raw_zero_bid_delta_is_refused_and_resyncs() {
+async fn l2_raw_zero_bid_delta_is_refused_and_waits_for_a_reset() {
     for delay in first_snapshot_delays() {
         for bucket in ["", "0.001", "0.1"] {
             raw_zero_delta_subscription("bids", bucket, 9, 50, delay).await;
@@ -8459,7 +8456,7 @@ async fn l2_raw_zero_bid_delta_is_refused_and_resyncs() {
 }
 
 #[tokio::test]
-async fn l2_raw_zero_ask_delta_is_refused_and_resyncs() {
+async fn l2_raw_zero_ask_delta_is_refused_and_waits_for_a_reset() {
     for delay in first_snapshot_delays() {
         for bucket in ["", "0.001", "0.1"] {
             raw_zero_delta_subscription("asks", bucket, 9, 50, delay).await;
