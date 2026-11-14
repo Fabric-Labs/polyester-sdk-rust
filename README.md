@@ -93,7 +93,9 @@ for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
 `READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
 `sub_accounts.get`, which leaves out an expansion the key may not read rather
 than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
-`READ_BALANCES` for `withdraw.get_wallet_balances`. A key scoped to the main
+`READ_BALANCES` for `withdraw.get_wallet_balances`, and `READ_STATEMENTS` for
+`statements.export_page` and `statements.export` (`READ_BALANCES` does not grant
+it). A key scoped to the main
 account also needs `READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) for the main
 account's address-book reads, as a sub-account's book already did. VIP status
 and social verification need a key scoped to the main account. A key scoped to
@@ -380,6 +382,15 @@ client.wait_for_catalogs().await?;
 The hydrated zipper config also seeds each variant's supply, read with
 `catalogs.supply_for_zipped_asset_id`; `zipper.subscribe_zipped_asset_supply(true)`
 keeps it current.
+
+Each variant of `zipper.get_deposit_withdraw_config` says whether its route
+accepts new deposits and new withdrawals: `deposit_status` and
+`withdrawal_status` read `"normal"` or `"suspended"`, and are empty while
+availability is not known. `accepts_deposits()` and `accepts_withdrawals()` are
+true only for `"normal"`, so stop a user before they send funds or start a
+withdrawal on a suspended or unknown route. A suspension can stop one direction
+only; funds sent while deposits are suspended are delayed, not lost. The config
+is cacheable for 10 seconds: read it again to see a suspension start or end.
 
 Catalogs supply scales and symbol IDs for encoding. Tick/step/minimum
 quantity and notional checks are venue-owned (preview/admission); the SDK does
@@ -1058,6 +1069,42 @@ reads `"0.10.0"`; a build made after one reads `"0.10.0-12-g4e21a2f09670"`,
 which is not a semantic version, so compare `release()` (the part before the
 first `-`) rather than parsing it.
 
+## Maintenance and incident status
+
+`client.list_status_events(opts)` returns one page of the environment's
+scheduled maintenance and incidents, latest start first
+(`system.v1.SystemService/ListStatusEvents`), and `client.status_events(opts)`
+streams every page, sending the same `states` and `kinds` with each page token.
+Both are public: no API key, never signed, and answers can be up to 10 seconds
+old. With no `states` the server returns current and upcoming events
+(`"scheduled"` and `"in_progress"`); the SDK does not expand the default.
+
+```rust,no_run
+use polyester::services::ListStatusEventsOptions;
+
+let page = client
+    .list_status_events(ListStatusEventsOptions {
+        kinds: vec!["maintenance".into()],
+        ..Default::default()
+    })
+    .await?;
+for event in &page.events {
+    println!("{} {} {} {:?}", event.id, event.state, event.title, event.services);
+}
+```
+
+Each `StatusEvent` has a base58 `id`, a `kind` (`"maintenance"` or
+`"incident"`), a `state` (`"scheduled"`, `"in_progress"`, `"completed"` or
+`"cancelled"`), the affected `services` (`"trading"`, `"market_data"`,
+`"deposits"`, `"withdrawals"`, `"transfers"`, `"accounts"`, `"api"`,
+`"quickswap"`, `"app"`), `markets` and `assets`, an incident's `impact`
+(`"degraded"`, `"partial_outage"` or `"major_outage"`; empty otherwise), and
+progress notes in `updates`, oldest first. `end_time` is `None` for an incident
+with no expected end, `cancelled_at` is set only once cancelled, and
+`details_url` is `None` when the event has no announcement. To keep a banner
+current, poll at most every 10 seconds and compare `updated_at` per `id`; a
+state change caused only by time passing does not move `updated_at`.
+
 ## Triggers
 
 `triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
@@ -1096,7 +1143,12 @@ with the same bounded policy and request as trigger reads.
 
 A trailing stop created with an activation price the market has already
 reached now ends `FAILED` with reason
-`TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244).
+`TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244). So does a
+stop-loss or take-profit whose trigger price the watched price, the last or
+the index price alike, has reached when the trigger takes effect, a few
+milliseconds after it is submitted: it never armed and placed nothing.
+`triggers.create` returns the trigger ID before that, so read the trigger to
+learn the outcome, and place the order directly if you meant to act at once.
 `ModifyTrigger` and order modifies that would make it act at once are refused
 with `ERROR_CODE_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (302), leaving the
 existing state unchanged. To start trailing from the market, clear the
@@ -1412,6 +1464,44 @@ the owner removed it as a member: drop the sub-account from your list. A
 removal carries no role, so `role` is `None`; no role is assumed. A role or
 access change keeps `revision` and `updated_at`, so apply each update in the
 order it arrives rather than by revision.
+
+## Account statements
+
+`client.statements` exports an account's balance movements for a period as
+CSV (`ledger.read.v1.LedgerReadService/ExportStatement`), for reconciliation
+and tax reporting: one account (the main account or one sub-account),
+optionally one asset, for a period of at most 366 days. It is signed like the
+other ledger reads, and an unset `subaccount_id` takes the configured default
+sub-account. `start_time` (inclusive) and `end_time` (exclusive) are required.
+
+```rust,no_run
+use polyester::services::ExportStatementOptions;
+use std::time::{Duration, UNIX_EPOCH};
+
+let statement = client
+    .statements
+    .export(ExportStatementOptions {
+        start_time: Some(UNIX_EPOCH + Duration::from_secs(1_790_812_800)),
+        end_time: Some(UNIX_EPOCH + Duration::from_secs(1_793_491_200)),
+        ..Default::default()
+    })
+    .await?;
+std::fs::write("statement.csv", &statement.csv)?;
+for row in statement.rows()? {
+    println!("{} {} {} {} fee {}", row.kind, row.account, row.asset, row.amount, row.fee);
+}
+```
+
+`export` follows `next_page_token` with the same fields and concatenates the
+pages; `export_page` reads one page (at most 2000 ledger movements, an entry
+never split, the header row on the first page only). The CSV is kept as sent:
+RFC 4180, UTF-8, CRLF line endings. `rows()` and
+`codecs::decode::parse_statement_csv` read its columns by header name, so
+columns a later release appends are ignored, and keep every amount an exact
+decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
+`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
+`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
+internal transfer (empty for other entries).
 
 ## Errors, retries, and withdrawal identity
 
@@ -1772,6 +1862,17 @@ an update until the next reset. A server that predates the field reports false.
 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.
+
+`market_data.list_asset_info(&asset_ids)` returns team-maintained asset
+information (`marketdata.v1.MarketDataService/ListAssetInfo`), public and
+unsigned: a plain-text `description`, official links (`website_url`,
+`whitepaper_url`, `explorer_urls`, `x_url`, `telegram_url`, `discord_url`,
+`github_url`), the launch `issue_date` as `YYYY-MM-DD` text and `issue_price`
+(an exact decimal `amount` in `USD`; `None` when unknown, distinct from a known
+zero). Pass the numeric asset IDs (the spot config's `ledger_id`), or none for
+every saved entry. The result is complete, in ascending `asset_id` order, with
+no paging; assets never edited are left out. Empty strings and lists mean
+unknown: hide them.
 
 Merged market overview stream (snapshot + live updates):
 
