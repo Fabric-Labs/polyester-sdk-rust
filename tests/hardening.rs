@@ -20,6 +20,8 @@ mod changelog_revisions;
 mod contract_74af7f3;
 #[path = "contract_e339360/mod.rs"]
 mod contract_e339360;
+#[path = "contract_ebbbeac/mod.rs"]
+mod contract_ebbbeac;
 #[path = "error_chain_redaction/mod.rs"]
 mod error_chain_redaction;
 mod hardening_support;
