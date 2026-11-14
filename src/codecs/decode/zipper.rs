@@ -1,5 +1,6 @@
 //! Zipper deposit/withdraw config decoder.
 
+use crate::codecs::decode::changelog_enum_label;
 use crate::codecs::scalars::format_ledger_u64;
 use crate::errors::{Error, Result};
 use crate::models::{
@@ -82,6 +83,8 @@ pub fn deposit_withdraw_config_from_proto(
                             address: v.ztoken_address.clone(),
                             decimals: v.ztoken_decimals,
                         },
+                        deposit_status: changelog_enum_label(&v.deposit_status),
+                        withdrawal_status: changelog_enum_label(&v.withdrawal_status),
                     })
                     .collect(),
             })
@@ -237,5 +240,56 @@ mod tests {
         assert_eq!(bare.chains[0].memo_requirement, "");
         assert_eq!(bare.chains[0].memo_label, "");
         assert_eq!(bare.chains[0].memo_format_hint, "");
+    }
+
+    /// Each variant says whether its route accepts new deposits and new
+    /// withdrawals. Only `NORMAL` accepts: an unspecified (or, over JSON,
+    /// absent) status and one newer than this SDK are not available.
+    #[test]
+    fn variant_route_status_reads_each_direction() {
+        use crate::proto::chain::zipper::v1::{AssetChainVariant, RouteStatus};
+
+        let variant = |deposit: buffa::EnumValue<RouteStatus>,
+                       withdrawal: buffa::EnumValue<RouteStatus>| {
+            let msg = GetDepositWithdrawConfigResponse {
+                assets: vec![AssetConfig {
+                    asset: "USDT".into(),
+                    variants: vec![AssetChainVariant {
+                        zipped_asset_id: 3,
+                        chain_id: 2,
+                        deposit_status: deposit,
+                        withdrawal_status: withdrawal,
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            deposit_withdraw_config_from_proto(&msg).assets[0].variants[0].clone()
+        };
+
+        let split = variant(RouteStatus::NORMAL.into(), RouteStatus::SUSPENDED.into());
+        assert_eq!(split.deposit_status, "normal");
+        assert_eq!(split.withdrawal_status, "suspended");
+        assert!(split.accepts_deposits());
+        assert!(!split.accepts_withdrawals());
+
+        let unknown = variant(
+            RouteStatus::STATUS_UNSPECIFIED.into(),
+            buffa::EnumValue::Unknown(7),
+        );
+        assert_eq!(unknown.deposit_status, "");
+        assert_eq!(unknown.withdrawal_status, "unknown(7)");
+        assert!(!unknown.accepts_deposits());
+        assert!(!unknown.accepts_withdrawals());
+
+        let json: GetDepositWithdrawConfigResponse = serde_json::from_str(
+            r#"{"assets":[{"asset":"USDT","variants":[{"zippedAssetId":3,"withdrawalStatus":"NORMAL"}]}]}"#,
+        )
+        .unwrap();
+        let absent = &deposit_withdraw_config_from_proto(&json).assets[0].variants[0];
+        assert_eq!(absent.deposit_status, "");
+        assert!(!absent.accepts_deposits());
+        assert!(absent.accepts_withdrawals());
     }
 }
