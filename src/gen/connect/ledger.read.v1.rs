@@ -60,6 +60,14 @@ pub type OwnedGetBalancesRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetBalancesResponseView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::GetBalancesResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ExportStatementRequestView<'static>>`.
+pub type OwnedExportStatementRequestView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ExportStatementResponseView<'static>>`.
+pub type OwnedExportStatementResponseView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::GetBalanceHistoryResponse>
 for crate::proto::ledger::read::v1::__buffa::view::GetBalanceHistoryResponseView<'_> {
     fn encode(
@@ -204,6 +212,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ExportStatementResponse>
+for crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ExportStatementResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const LEDGER_READ_SERVICE_SERVICE_NAME: &str = "ledger.read.v1.LedgerReadService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBalanceHistory` RPC.
@@ -257,6 +285,15 @@ pub const LEDGER_READ_SERVICE_LIST_TRANSFERS_SPEC: ::connectrpc::Spec = ::connec
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const LEDGER_READ_SERVICE_GET_BALANCES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/ledger.read.v1.LedgerReadService/GetBalances",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ExportStatement` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ledger.read.v1.LedgerReadService/ExportStatement",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -454,6 +491,31 @@ pub trait LedgerReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ledger::read::v1::GetBalancesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Export an account statement for a period as CSV, one page at a time.
+    /// Covers one account, optionally one asset, for a period of at most 366
+    /// days. API keys need the READ_STATEMENTS policy action.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn export_statement<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ledger::read::v1::ExportStatementRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ledger::read::v1::ExportStatementResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -663,6 +725,35 @@ impl<S: LedgerReadService> LedgerReadServiceExt for S {
                 },
             )
             .with_spec(LEDGER_READ_SERVICE_GET_BALANCES_SPEC)
+            .route_view(
+                LEDGER_READ_SERVICE_SERVICE_NAME,
+                "ExportStatement",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ledger::read::v1::ExportStatementRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.export_statement(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ledger::read::v1::ExportStatementResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -755,6 +846,12 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(LEDGER_READ_SERVICE_GET_BALANCES_SPEC),
+                )
+            }
+            "ExportStatement" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC),
                 )
             }
             _ => None,
@@ -895,6 +992,27 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                         .await?
                         .encode::<
                             crate::proto::ledger::read::v1::GetBalancesResponse,
+                        >(format)
+                })
+            }
+            "ExportStatement" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ledger::read::v1::ExportStatementRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ledger::read::v1::ExportStatementRequest,
+                    >::from_parts(&req, &body);
+                    svc.export_statement(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ledger::read::v1::ExportStatementResponse,
                         >(format)
                 })
             }
@@ -1265,6 +1383,51 @@ where
                 &self.config,
                 LEDGER_READ_SERVICE_SERVICE_NAME,
                 "GetBalances",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ExportStatement RPC. Sends a request to /ledger.read.v1.LedgerReadService/ExportStatement.
+    pub async fn export_statement(
+        &self,
+        request: crate::proto::ledger::read::v1::ExportStatementRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.export_statement_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ExportStatement RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn export_statement_with_options(
+        &self,
+        request: crate::proto::ledger::read::v1::ExportStatementRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                LEDGER_READ_SERVICE_SERVICE_NAME,
+                "ExportStatement",
                 request,
                 options,
             )

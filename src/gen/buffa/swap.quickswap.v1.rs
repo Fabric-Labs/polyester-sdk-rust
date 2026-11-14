@@ -156,9 +156,11 @@ impl ::buffa::Enumeration for QuoteBasis {
 pub enum FeeKind {
     /// No kind; never returned.
     FEE_UNSPECIFIED = 0i32,
-    /// Service fee of one trading leg: the leg's pair fee in basis points of
-    /// what the leg receives. A two-leg route has one per leg. On a bridge, the
-    /// one bridge fee in basis points of the credited amount, charged at payout.
+    /// Service fee of one trading leg, credited to Polyester, in basis points
+    /// of what the leg receives: the leg's pair fee, capped by any fee ceiling
+    /// agreed with the broker. A two-leg route has one per leg. On a bridge,
+    /// the one bridge fee, capped the same way, in basis points of the credited
+    /// amount, charged at payout.
     SERVICE = 1i32,
     /// Broker fee of one trading leg, the request's broker_bps of what the leg
     /// receives, credited to the broker's default vault. A two-leg route has one
@@ -1811,10 +1813,11 @@ pub enum ErrorCode {
     /// QuickSwaps already created continue.
     BROKER_DISABLED = 18i32,
     /// A broker limit was reached: the unfunded QuickSwaps held at once, the
-    /// QuickSwaps created per hour, the request rate of the API key, or the
-    /// affiliate vaults the broker may create. Nothing is bound to the key. A
-    /// funded or expired QuickSwap frees an unfunded slot; when the response
-    /// carries a Retry-After header, retry after that many seconds.
+    /// QuickSwaps created per hour, the request rate of the API key or of a
+    /// member's account, or the affiliate vaults the broker may create. Nothing
+    /// is bound to the key. A funded or expired QuickSwap frees an unfunded
+    /// slot; when the response carries a Retry-After header, retry after that
+    /// many seconds.
     BROKER_LIMIT = 19i32,
     /// An affiliate names a vault that is not an active affiliate vault of the
     /// broker: unknown, not yet created, disabled, another broker's, or the
@@ -8259,8 +8262,9 @@ pub struct QuickSwap {
     )]
     pub version: u64,
     /// Fee schedule version fixed at creation. Every execution or bridge payout
-    /// of this QuickSwap is charged that version's service fees, whatever later
-    /// versions change.
+    /// of this QuickSwap is charged that version's service fees, capped by the
+    /// broker's fee ceiling in force at creation if one applies, whatever later
+    /// versions or ceiling changes make.
     ///
     /// Field 28: `fee_schedule_version`
     #[serde(
@@ -32454,8 +32458,8 @@ impl ::buffa::Enumeration for ReferralCommissionBasis {
     }
 }
 /// ReferralRates are the referral rates of one route category, in whole basis
-/// points of the swapped amount. Both come out of the broker fee; the
-/// Polyester service fee is never reduced.
+/// points of the swapped amount. Both come out of the broker fee; a referral
+/// never reduces the Polyester service fee.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -45847,8 +45851,9 @@ pub mod __buffa {
             /// Field 26: `version`
             pub version: u64,
             /// Fee schedule version fixed at creation. Every execution or bridge payout
-            /// of this QuickSwap is charged that version's service fees, whatever later
-            /// versions change.
+            /// of this QuickSwap is charged that version's service fees, capped by the
+            /// broker's fee ceiling in force at creation if one applies, whatever later
+            /// versions or ceiling changes make.
             ///
             /// Field 28: `fee_schedule_version`
             pub fee_schedule_version: u64,
@@ -47301,8 +47306,9 @@ pub mod __buffa {
                 self.0.reborrow().version
             }
             /// Fee schedule version fixed at creation. Every execution or bridge payout
-            /// of this QuickSwap is charged that version's service fees, whatever later
-            /// versions change.
+            /// of this QuickSwap is charged that version's service fees, capped by the
+            /// broker's fee ceiling in force at creation if one applies, whatever later
+            /// versions or ceiling changes make.
             ///
             /// Field 28: `fee_schedule_version`
             #[must_use]
@@ -87968,8 +87974,8 @@ pub mod __buffa {
             }
         }
         /// ReferralRates are the referral rates of one route category, in whole basis
-        /// points of the swapped amount. Both come out of the broker fee; the
-        /// Polyester service fee is never reduced.
+        /// points of the swapped amount. Both come out of the broker fee; a referral
+        /// never reduces the Polyester service fee.
         #[derive(Clone, Debug, Default)]
         pub struct ReferralRatesView<'a> {
             /// Taken off the referred user's fee.

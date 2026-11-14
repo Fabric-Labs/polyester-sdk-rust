@@ -71,7 +71,19 @@ pub struct ParsedRequest {
     #[allow(dead_code)]
     pub method: String,
     pub path: String,
+    /// Request headers, names in lower case, in the order sent.
+    #[allow(dead_code)]
+    pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+}
+
+impl ParsedRequest {
+    /// Whether the request carries `name` (any case).
+    #[allow(dead_code)]
+    pub fn has_header(&self, name: &str) -> bool {
+        let name = name.to_ascii_lowercase();
+        self.headers.iter().any(|(k, _)| *k == name)
+    }
 }
 
 pub enum HttpScript {
@@ -178,12 +190,23 @@ impl MockHttpServer {
                     let method = parts.next().unwrap_or("").to_owned();
                     let path = parts.next().unwrap_or("/").to_owned();
                     let path = path.split('?').next().unwrap_or(&path).to_owned();
+                    let headers = lines
+                        .by_ref()
+                        .take_while(|line| !line.is_empty())
+                        .filter_map(|line| line.split_once(':'))
+                        .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_owned()))
+                        .collect();
                     let body = buf[..n]
                         .windows(4)
                         .position(|window| window == b"\r\n\r\n")
                         .map(|index| buf[index + 4..n].to_vec())
                         .unwrap_or_default();
-                    match handler(ParsedRequest { method, path, body }) {
+                    match handler(ParsedRequest {
+                        method,
+                        path,
+                        headers,
+                        body,
+                    }) {
                         HttpScript::NotFound => {
                             let _ = stream
                                 .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")

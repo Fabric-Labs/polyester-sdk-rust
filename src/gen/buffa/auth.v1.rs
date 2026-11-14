@@ -317,11 +317,11 @@ pub enum AssistantKeyPreset {
     /// No preset selected.
     PRESET_UNSPECIFIED = 0i32,
     /// Read actions only: READ_BALANCES, READ_SPOT, READ_INTERNAL_TRANSFERS,
-    /// READ_AUTO_WITHDRAW, READ_API_KEYS, READ_SUBACCOUNTS and
-    /// READ_DEPOSIT_ADDRESSES. On the main account, also READ_PRICE_ALERTS, a
-    /// main-account permission. Policy name "Polyester AI - Read only (main
-    /// account)" on the main account, "Polyester AI - Read only (sub-account)"
-    /// on a sub-account.
+    /// READ_AUTO_WITHDRAW, READ_API_KEYS, READ_SUBACCOUNTS,
+    /// READ_DEPOSIT_ADDRESSES and READ_STATEMENTS. On the main account, also
+    /// READ_PRICE_ALERTS, a main-account permission. Policy name "Polyester AI -
+    /// Read only (main account)" on the main account, "Polyester AI - Read only
+    /// (sub-account)" on a sub-account.
     READ_ONLY = 1i32,
     /// READ_ONLY plus TRADE_SPOT, SWAP and CREATE_DEPOSIT_ADDRESS: the assistant
     /// also places, changes and cancels orders and triggers, and swaps, each only
@@ -4019,6 +4019,10 @@ pub enum PolicyAction {
     /// Allow creating, updating, and cancelling the main account's price alerts.
     /// It does not allow listing them. Main-account permission.
     MANAGE_PRICE_ALERTS = 37i32,
+    /// Allow exporting account statements: the account's balance movements for a
+    /// period, with fees and the balance after each entry. It grants no other
+    /// balance or transfer read.
+    READ_STATEMENTS = 38i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4123,6 +4127,9 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::MANAGE_PRICE_ALERTS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ManagePriceAlerts: Self = Self::MANAGE_PRICE_ALERTS;
+    ///Idiomatic alias for [`Self::READ_STATEMENTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadStatements: Self = Self::READ_STATEMENTS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -4252,6 +4259,7 @@ impl ::buffa::Enumeration for PolicyAction {
             35i32 => ::core::option::Option::Some(Self::READ_GUARD_SIGNER_STATUS),
             36i32 => ::core::option::Option::Some(Self::READ_PRICE_ALERTS),
             37i32 => ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS),
+            38i32 => ::core::option::Option::Some(Self::READ_STATEMENTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -4294,6 +4302,7 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_GUARD_SIGNER_STATUS => "READ_GUARD_SIGNER_STATUS",
             Self::READ_PRICE_ALERTS => "READ_PRICE_ALERTS",
             Self::MANAGE_PRICE_ALERTS => "MANAGE_PRICE_ALERTS",
+            Self::READ_STATEMENTS => "READ_STATEMENTS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4366,6 +4375,7 @@ impl ::buffa::Enumeration for PolicyAction {
             "MANAGE_PRICE_ALERTS" => {
                 ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS)
             }
+            "READ_STATEMENTS" => ::core::option::Option::Some(Self::READ_STATEMENTS),
             _ => ::core::option::Option::None,
         }
     }
@@ -4405,6 +4415,7 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_GUARD_SIGNER_STATUS,
             Self::READ_PRICE_ALERTS,
             Self::MANAGE_PRICE_ALERTS,
+            Self::READ_STATEMENTS,
         ]
     }
 }
@@ -10667,6 +10678,8 @@ pub enum SubaccountPermission {
     SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW = 27i32,
     /// Quote, create, and view Swaps of the sub-account's Trading balance.
     SUBACCOUNT_PERMISSION_SWAP = 28i32,
+    /// Export account statements of the sub-account.
+    SUBACCOUNT_PERMISSION_READ_STATEMENTS = 29i32,
 }
 impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -10756,6 +10769,9 @@ impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_SWAP`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Swap: Self = Self::SUBACCOUNT_PERMISSION_SWAP;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadStatements: Self = Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS;
 }
 impl ::core::default::Default for SubaccountPermission {
     fn default() -> Self {
@@ -10965,6 +10981,9 @@ impl ::buffa::Enumeration for SubaccountPermission {
                 )
             }
             28i32 => ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_SWAP),
+            29i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -11054,6 +11073,9 @@ impl ::buffa::Enumeration for SubaccountPermission {
                 "SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW"
             }
             Self::SUBACCOUNT_PERMISSION_SWAP => "SUBACCOUNT_PERMISSION_SWAP",
+            Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS => {
+                "SUBACCOUNT_PERMISSION_READ_STATEMENTS"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -11177,6 +11199,9 @@ impl ::buffa::Enumeration for SubaccountPermission {
             "SUBACCOUNT_PERMISSION_SWAP" => {
                 ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_SWAP)
             }
+            "SUBACCOUNT_PERMISSION_READ_STATEMENTS" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -11211,6 +11236,7 @@ impl ::buffa::Enumeration for SubaccountPermission {
             Self::SUBACCOUNT_PERMISSION_READ_AUTO_WITHDRAW,
             Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW,
             Self::SUBACCOUNT_PERMISSION_SWAP,
+            Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS,
         ]
     }
 }

@@ -101,6 +101,46 @@ mod tests {
         assert_eq!(purpose(buffa::EnumValue::from(9)), "UNKNOWN(9)");
     }
 
+    /// An update returns the same complete key a read does: its policy ID,
+    /// Ed25519 public key, creator and fractional creation time included.
+    #[test]
+    fn api_key_update_and_get_read_the_same_complete_key() {
+        let key = ProtoApiKey {
+            key_id: "ak_0123456789abcdef0123456789abcdef".into(),
+            label: "desk".into(),
+            created_by_actor: "alice".into(),
+            public_key_ed25519: vec![0xab; 32],
+            policy_id: Some(42),
+            created_at: Timestamp {
+                seconds: 1_794_501_295,
+                nanos: 912_958_000,
+                ..Default::default()
+            }
+            .into(),
+            revision: 5,
+            ..Default::default()
+        };
+        let updated = api_key_from_update_proto(&UpdateApiKeyResponse {
+            api_key: key.clone().into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let read = api_key_from_get_proto(&GetApiKeyResponse {
+            api_key: key.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(updated, read);
+        assert_eq!(updated.policy_id, format_uint64_id(42));
+        assert_eq!(updated.public_key_ed25519, "ab".repeat(32));
+        assert_eq!(updated.created_by_actor, "alice");
+        let created = updated.created_at.as_ref().unwrap();
+        assert_eq!(
+            (created.seconds, created.nanos),
+            (1_794_501_295, 912_958_000)
+        );
+    }
+
     #[test]
     fn api_keys_list_maps_status() {
         let msg = ListApiKeysResponse {

@@ -11,6 +11,7 @@ mod market_data;
 mod orders;
 mod profile;
 mod scope;
+mod statements;
 pub(crate) mod system;
 mod thin;
 mod triggers;
@@ -35,6 +36,8 @@ pub use market_data::{
 pub(crate) use orders::scale_order;
 pub use orders::{OrdersService, TradesService};
 pub use profile::ProfileService;
+pub use statements::{ExportStatementOptions, StatementsService};
+pub use system::ListStatusEventsOptions;
 pub use thin::*;
 pub use triggers::TriggersService;
 

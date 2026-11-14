@@ -16,8 +16,8 @@ use crate::services::{
     ChainAnalyticsService, ChangelogService, DepositService, FeeService, GuardSignerService,
     HeatmapService, InternalTransfersService, LifecycleService, MarketDataService,
     MarketOverviewService, OrderbookService, OrdersService, PoliciesService, RateLimitService,
-    ServiceContext, SocialVerificationService, SubAccountsService, TradesService, TransfersService,
-    TriggersService, VipService, WithdrawService, ZipperService,
+    ServiceContext, SocialVerificationService, StatementsService, SubAccountsService,
+    TradesService, TransfersService, TriggersService, VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -156,6 +156,9 @@ pub struct Client {
     pub rate_limits: RateLimitService,
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
+    /// Account statement exports (CSV); signed like the other ledger reads.
+    /// An API key needs `READ_STATEMENTS` on its policy.
+    pub statements: StatementsService,
     pub withdraw: WithdrawService,
     /// Price alerts of the root account. Devnet only: not yet available on
     /// testnet. An API key needs `READ_PRICE_ALERTS` to list and
@@ -287,6 +290,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            statements: StatementsService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
@@ -400,6 +404,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            statements: StatementsService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
@@ -564,6 +569,31 @@ impl Client {
     /// build follows.
     pub async fn get_version(&self) -> Result<crate::models::ServerVersion> {
         crate::services::system::get_version(&self.factory).await
+    }
+
+    /// One page of the environment's scheduled maintenance and incidents,
+    /// latest start first (`system.v1.SystemService/ListStatusEvents`).
+    /// Needs no API key and is never signed; answers can be up to 10 seconds
+    /// old. With no `states` the server returns current and upcoming events.
+    /// To keep a banner current, poll at most every 10 seconds and compare
+    /// `updated_at` per `id`.
+    pub async fn list_status_events(
+        &self,
+        opts: crate::services::ListStatusEventsOptions,
+    ) -> Result<crate::models::StatusEventsPage> {
+        crate::services::system::list_status_events(&self.factory, opts).await
+    }
+
+    /// Every status event matching `opts` from `opts.page_token` on,
+    /// fetching pages as the stream is polled and sending the same `states`
+    /// and `kinds` with each page token. States follow the clock, so an
+    /// event that changes state between two pages can be missing from both
+    /// or appear on both: match events by `id`.
+    pub fn status_events(
+        &self,
+        opts: crate::services::ListStatusEventsOptions,
+    ) -> impl futures_util::Stream<Item = Result<crate::models::StatusEvent>> + Send + 'static {
+        crate::services::system::status_events(self.factory.clone(), opts)
     }
 
     /// Why the spot config failed to load, if it did: the

@@ -2,6 +2,7 @@
 
 mod address_book;
 mod alerts;
+mod asset_info;
 mod auth;
 mod balances;
 mod changelog;
@@ -13,6 +14,7 @@ mod market;
 mod policies;
 mod ratelimit;
 mod realtime;
+mod statements;
 mod sub_accounts;
 mod system;
 mod trading;
@@ -24,6 +26,7 @@ mod zipper;
 
 pub use address_book::*;
 pub use alerts::*;
+pub use asset_info::*;
 pub use auth::*;
 pub use balances::*;
 pub use changelog::*;
@@ -35,6 +38,7 @@ pub use market::*;
 pub use policies::*;
 pub use ratelimit::*;
 pub use realtime::*;
+pub use statements::*;
 pub use sub_accounts::*;
 pub use system::*;
 pub use trading::*;

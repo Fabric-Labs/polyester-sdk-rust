@@ -1,24 +1,25 @@
 use super::ServiceContext;
 use super::unary;
 use crate::codecs::decode::{
-    candles_columns_from_proto, candles_from_proto, currency_conversion_config_from_proto,
-    currency_conversion_rates_from_proto, depth_enum_for_levels, market_overview_list_from_proto,
-    market_trades_from_proto, orderbook_from_proto, orderbook_snapshot_depth,
-    orderbook_stream_tier, require_published_stream_depth, spot_config_from_proto,
-    spot_volume_history_from_proto,
+    asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
+    currency_conversion_config_from_proto, currency_conversion_rates_from_proto,
+    depth_enum_for_levels, market_overview_list_from_proto, market_trades_from_proto,
+    orderbook_from_proto, orderbook_snapshot_depth, orderbook_stream_tier,
+    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
 use crate::connect::orderbook::v1::OrderbookServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::{
-    Candle, CandlesResult, CurrencyConversionConfig, CurrencyConversionRates, GetCandlesOpts,
-    GetTradesOpts, MarketOverviewList, MarketTradesResult, OrderbookData, SpotConfig,
-    SpotVolumeHistory,
+    AssetInfo, Candle, CandlesResult, CurrencyConversionConfig, CurrencyConversionRates,
+    GetCandlesOpts, GetTradesOpts, MarketOverviewList, MarketTradesResult, OrderbookData,
+    SpotConfig, SpotVolumeHistory,
 };
 use crate::models::{MarketOverviewEntry, MarketTrade, OrderBookDeltaUpdate};
 use crate::proto::marketdata::v1::{
-    GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest, Timeframe,
+    GetCandlesColumnsRequest, GetCandlesRequest, GetSpotConfigRequest, GetTradesRequest,
+    ListAssetInfoRequest, Timeframe,
 };
 use crate::proto::marketoverview::v1::{
     GetCurrencyConversionConfigRequest, GetCurrencyConversionRatesRequest,
@@ -117,6 +118,26 @@ impl MarketDataService {
         .await?
         .into_owned();
         spot_config_from_proto(&resp)
+    }
+
+    /// Team-maintained asset information: descriptions, official links and
+    /// known launch dates and prices (`marketdata.v1.MarketDataService/ListAssetInfo`).
+    /// Public: no API key is needed and the request is never signed.
+    ///
+    /// Pass the numeric asset IDs to read (the spot config's `ledger_id`), or
+    /// none for every saved entry. Duplicate and unknown IDs are ignored, and
+    /// assets never edited are left out. The result is complete, with no
+    /// paging, in ascending `asset_id` order.
+    pub async fn list_asset_info(&self, asset_ids: &[u32]) -> Result<Vec<AssetInfo>> {
+        let req = ListAssetInfoRequest {
+            asset_ids: asset_ids.to_vec(),
+            ..Default::default()
+        };
+        // "/marketdata.v1.MarketDataService/ListAssetInfo"
+        let resp = unary::await_public(self.client().list_asset_info(req))
+            .await?
+            .into_owned();
+        Ok(asset_info_list_from_proto(&resp))
     }
 
     /// Recent public trades for a symbol (resolves `symbol_id` via catalogs after hydrate).
