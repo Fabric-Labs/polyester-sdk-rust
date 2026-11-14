@@ -393,6 +393,16 @@ fn labels_to_enums<T: Enumeration>(
     labels: &[String],
     field: &str,
 ) -> Result<Vec<buffa::EnumValue<T>>> {
+    filter_labels_to_enums("list_changes", labels, field)
+}
+
+/// Map a filter's lowercase labels to known enum values for `endpoint`. The
+/// unspecified value and unknown labels are rejected before anything is sent.
+pub(crate) fn filter_labels_to_enums<T: Enumeration>(
+    endpoint: &str,
+    labels: &[String],
+    field: &str,
+) -> Result<Vec<buffa::EnumValue<T>>> {
     labels
         .iter()
         .map(|label| {
@@ -400,7 +410,7 @@ fn labels_to_enums<T: Enumeration>(
                 .filter(|value| value.to_i32() != 0)
                 .map(buffa::EnumValue::from)
                 .ok_or_else(|| {
-                    Error::validation(format!("list_changes {field}: unknown label {label:?}"))
+                    Error::validation(format!("{endpoint} {field}: unknown label {label:?}"))
                 })
         })
         .collect()
@@ -419,7 +429,7 @@ fn sort_direction(sort: Option<&str>) -> Result<SortDirection> {
 
 /// An exact protobuf `Timestamp`, as protobuf's own conversions write one:
 /// `seconds` rounds toward negative infinity and `nanos` is never negative.
-fn timestamp_field(time: Option<SystemTime>) -> buffa::MessageField<Timestamp> {
+pub(crate) fn timestamp_field(time: Option<SystemTime>) -> buffa::MessageField<Timestamp> {
     let Some(time) = time else {
         return buffa::MessageField::none();
     };

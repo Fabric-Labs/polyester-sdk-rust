@@ -35,6 +35,7 @@ pub use market_data::{
 pub(crate) use orders::scale_order;
 pub use orders::{OrdersService, TradesService};
 pub use profile::ProfileService;
+pub use system::ListStatusEventsOptions;
 pub use thin::*;
 pub use triggers::TriggersService;
 

@@ -566,6 +566,31 @@ impl Client {
         crate::services::system::get_version(&self.factory).await
     }
 
+    /// One page of the environment's scheduled maintenance and incidents,
+    /// latest start first (`system.v1.SystemService/ListStatusEvents`).
+    /// Needs no API key and is never signed; answers can be up to 10 seconds
+    /// old. With no `states` the server returns current and upcoming events.
+    /// To keep a banner current, poll at most every 10 seconds and compare
+    /// `updated_at` per `id`.
+    pub async fn list_status_events(
+        &self,
+        opts: crate::services::ListStatusEventsOptions,
+    ) -> Result<crate::models::StatusEventsPage> {
+        crate::services::system::list_status_events(&self.factory, opts).await
+    }
+
+    /// Every status event matching `opts` from `opts.page_token` on,
+    /// fetching pages as the stream is polled and sending the same `states`
+    /// and `kinds` with each page token. States follow the clock, so an
+    /// event that changes state between two pages can be missing from both
+    /// or appear on both: match events by `id`.
+    pub fn status_events(
+        &self,
+        opts: crate::services::ListStatusEventsOptions,
+    ) -> impl futures_util::Stream<Item = Result<crate::models::StatusEvent>> + Send + 'static {
+        crate::services::system::status_events(self.factory.clone(), opts)
+    }
+
     /// Why the spot config failed to load, if it did: the
     /// [`Error::CatalogLoad`] that [`Self::wait_for_catalogs`] returns.
     pub fn catalogs_last_error(&self) -> Option<Error> {
