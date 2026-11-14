@@ -255,6 +255,35 @@ mod tests {
         assert_eq!(PolicyAction::MANAGE_PRICE_ALERTS.to_i32(), 37);
     }
 
+    /// The statement export permission reads by name on both policy kinds
+    /// and keeps its number.
+    #[test]
+    fn statement_export_policy_action_reads_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let actions = vec![
+            PolicyAction::READ_BALANCES.into(),
+            PolicyAction::READ_STATEMENTS.into(),
+        ];
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: actions.clone(),
+            ..Default::default()
+        });
+        let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
+            actions,
+            ..Default::default()
+        });
+        for decoded in [&api.actions, &sub.actions] {
+            assert_eq!(decoded, &["READ_BALANCES", "READ_STATEMENTS"]);
+        }
+        assert_eq!(PolicyAction::READ_STATEMENTS.to_i32(), 38);
+        assert_eq!(
+            PolicyAction::from_proto_name("READ_STATEMENTS"),
+            Some(PolicyAction::READ_STATEMENTS)
+        );
+    }
+
     /// Every `PolicyAction`, the POLY-9102 account permissions included,
     /// reads as its proto name and parses back to the same value. Unset
     /// entries are skipped and a value newer than this SDK keeps its number.
@@ -282,6 +311,7 @@ mod tests {
             PolicyAction::CLAIM_DAILY_REWARD,
             PolicyAction::READ_CHECKPOINTS,
             PolicyAction::READ_REWARDS,
+            PolicyAction::READ_STATEMENTS,
         ] {
             assert!(known.contains(&added), "{added:?}");
         }
