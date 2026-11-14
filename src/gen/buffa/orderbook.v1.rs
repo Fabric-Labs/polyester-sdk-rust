@@ -808,18 +808,24 @@ pub const __GET_ORDER_BOOK_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<GetOrderBookResponse>,
     is_wkt: false,
 };
-/// OrderBookDelta is an incremental update to the orderbook state.
-/// Uses scaled integers (binary protobuf) for realtime streaming performance.
+/// OrderBookDelta is an incremental update to the orderbook state of one depth
+/// tier: the difference between two published views of the tier's top levels
+/// per side. Uses scaled integers (binary protobuf) for realtime streaming
+/// performance.
 ///
 /// Semantics:
 /// - For each side, each \[price_ticks\] entry is a SET at that price:
 ///   - qty_scaled \> 0 =\> set/replace that level quantity
-///   - qty_scaled == 0 =\> delete that level
+///   - qty_scaled == 0 =\> remove that level from the tier's view
 /// - reset=true indicates the book should be cleared before applying any levels.
+///   A reset carrying the full view is sent periodically, currently about every
+///   30 seconds, and after a sequence gap.
 ///
-/// Clients are expected to initialize from GetOrderBook (snapshot) and then
-/// apply deltas in order. If a gap is detected, clients should refetch a
-/// snapshot.
+/// To start, subscribe, then fetch GetOrderBook with the tier's depth. Drop
+/// deltas whose book_seq_end is at most the snapshot's book_seq, and apply the
+/// first delta only when its book_seq_start equals that book_seq; then apply
+/// each delta only when its book_seq_start equals the previous book_seq_end.
+/// Otherwise, or after a gap, wait for the next reset.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -834,8 +840,9 @@ pub struct OrderBookDelta {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Monotonic book sequence range covered by this update.
-    /// When reset=true, book_seq_start may be 0.
+    /// Book sequence of the view this update applies to: the previous update's
+    /// book_seq_end. Apply it only to a book at exactly this sequence. 0 when
+    /// reset=true.
     ///
     /// Field 2: `book_seq_start`
     #[serde(
@@ -845,8 +852,9 @@ pub struct OrderBookDelta {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_seq_start: u64,
-    /// Monotonic book sequence at the end of this update's range. Consumers can
-    /// retain it as the last applied sequence and ignore updates that do not advance it.
+    /// Book sequence of the view after this update. It can advance without any
+    /// change to the book. Consumers can retain it as the last applied sequence
+    /// and ignore updates that do not advance it.
     ///
     /// Field 3: `book_seq_end`
     #[serde(
@@ -2283,31 +2291,39 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// OrderBookDelta is an incremental update to the orderbook state.
-        /// Uses scaled integers (binary protobuf) for realtime streaming performance.
+        /// OrderBookDelta is an incremental update to the orderbook state of one depth
+        /// tier: the difference between two published views of the tier's top levels
+        /// per side. Uses scaled integers (binary protobuf) for realtime streaming
+        /// performance.
         ///
         /// Semantics:
         /// - For each side, each \[price_ticks\] entry is a SET at that price:
         ///   - qty_scaled \> 0 =\> set/replace that level quantity
-        ///   - qty_scaled == 0 =\> delete that level
+        ///   - qty_scaled == 0 =\> remove that level from the tier's view
         /// - reset=true indicates the book should be cleared before applying any levels.
+        ///   A reset carrying the full view is sent periodically, currently about every
+        ///   30 seconds, and after a sequence gap.
         ///
-        /// Clients are expected to initialize from GetOrderBook (snapshot) and then
-        /// apply deltas in order. If a gap is detected, clients should refetch a
-        /// snapshot.
+        /// To start, subscribe, then fetch GetOrderBook with the tier's depth. Drop
+        /// deltas whose book_seq_end is at most the snapshot's book_seq, and apply the
+        /// first delta only when its book_seq_start equals that book_seq; then apply
+        /// each delta only when its book_seq_start equals the previous book_seq_end.
+        /// Otherwise, or after a gap, wait for the next reset.
         #[derive(Clone, Debug, Default)]
         pub struct OrderBookDeltaView<'a> {
             /// Numeric symbol identifier.
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Monotonic book sequence range covered by this update.
-            /// When reset=true, book_seq_start may be 0.
+            /// Book sequence of the view this update applies to: the previous update's
+            /// book_seq_end. Apply it only to a book at exactly this sequence. 0 when
+            /// reset=true.
             ///
             /// Field 2: `book_seq_start`
             pub book_seq_start: u64,
-            /// Monotonic book sequence at the end of this update's range. Consumers can
-            /// retain it as the last applied sequence and ignore updates that do not advance it.
+            /// Book sequence of the view after this update. It can advance without any
+            /// change to the book. Consumers can retain it as the last applied sequence
+            /// and ignore updates that do not advance it.
             ///
             /// Field 3: `book_seq_end`
             pub book_seq_end: u64,
@@ -2767,16 +2783,18 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Monotonic book sequence range covered by this update.
-            /// When reset=true, book_seq_start may be 0.
+            /// Book sequence of the view this update applies to: the previous update's
+            /// book_seq_end. Apply it only to a book at exactly this sequence. 0 when
+            /// reset=true.
             ///
             /// Field 2: `book_seq_start`
             #[must_use]
             pub fn book_seq_start(&self) -> u64 {
                 self.0.reborrow().book_seq_start
             }
-            /// Monotonic book sequence at the end of this update's range. Consumers can
-            /// retain it as the last applied sequence and ignore updates that do not advance it.
+            /// Book sequence of the view after this update. It can advance without any
+            /// change to the book. Consumers can retain it as the last applied sequence
+            /// and ignore updates that do not advance it.
             ///
             /// Field 3: `book_seq_end`
             #[must_use]

@@ -253,6 +253,17 @@ impl Market {
     fn update(&self, change: impl FnOnce(&mut Book)) {
         change(&mut self.book.lock().unwrap());
     }
+
+    /// Sends the tier's full view as a reset at the book's sequence, as the
+    /// publisher does periodically and after a gap.
+    fn reset(&self, tier: u32) {
+        let mut book = self.book.lock().unwrap();
+        let bids = top_bids(&book.bids, tier);
+        let asks = top_asks(&book.asks, tier);
+        let seq = book.seq;
+        self.send(tier, 0, seq, &bids, &asks, true);
+        book.published.insert(tier, Published { bids, asks, seq });
+    }
 }
 
 async fn book(client: &Client, depth: Option<u32>, bucket: Option<&str>) -> Subscription {
@@ -520,8 +531,11 @@ async fn levels_outside_the_view_stay_tracked() {
     assert_eq!(qtys(&promoted.bids)[index], 33);
 }
 
+/// A gap leaves the book out of sync until the next reset: the view says so,
+/// later updates are ignored, and no snapshot is fetched, since one would not
+/// line up with the stream either.
 #[tokio::test]
-async fn gap_in_a_delta_outside_the_view_refreshes_at_the_tier() {
+async fn gap_in_a_delta_outside_the_view_waits_for_the_next_reset() {
     let market = Market::spawn(600).await;
     let client = market.client();
     let mut sub = book(&client, Some(10), None).await;
@@ -535,11 +549,24 @@ async fn gap_in_a_delta_outside_the_view_refreshes_at_the_tier() {
         book.seq = 200;
     });
     market.send(20, 150, 200, &Side::from([(deep, 44)]), &Side::new(), false);
-    let refreshed = next_view(&mut sub, "view after the gap refresh").await;
+    let stale = next_view(&mut sub, "view after the gap").await;
+    assert!(
+        !stale.available,
+        "a book that missed an update is not current"
+    );
+    assert_eq!(stale.book_seq, "100");
 
-    assert_eq!(market.snapshots(), [20, 20]);
-    assert_eq!(refreshed.book_seq, "200");
-    assert_eq!(refreshed.bids.len(), 10);
+    // A later update continues the missed one, not this book: ignored.
+    market.publish(|book| {
+        book.bids.insert(BEST_BID, 9);
+    });
+    market.reset(20);
+    let recovered = next_view(&mut sub, "view after the reset").await;
+    assert!(recovered.available);
+    assert_eq!(recovered.book_seq, "201");
+    assert_eq!(qtys(&recovered.bids)[0], 9);
+    assert_eq!(recovered.bids.len(), 10);
+    assert_eq!(market.snapshots(), [20], "no snapshot is fetched on a gap");
 }
 
 #[tokio::test]
@@ -555,15 +582,17 @@ async fn sequence_zero_snapshot_still_detects_a_gap_at_a_trimmed_depth() {
 
     market.update(|book| book.seq = 6);
     market.send(20, 5, 6, &Side::from([(BEST_BID, 8)]), &Side::new(), false);
-    let refreshed = next_view(&mut sub, "view after the gap refresh").await;
+    let stale = next_view(&mut sub, "view after the gap").await;
 
-    assert_eq!(market.snapshots(), [20, 20]);
-    assert_eq!(refreshed.book_seq, "6");
-    assert_eq!(
-        qtys(&refreshed.bids)[0],
-        5,
-        "the gapped delta must not apply"
-    );
+    assert_eq!(market.snapshots(), [20]);
+    assert!(!stale.available);
+    assert_eq!(stale.book_seq, "0");
+    assert_eq!(qtys(&stale.bids)[0], 5, "the gapped delta must not apply");
+
+    market.reset(20);
+    let recovered = next_view(&mut sub, "view after the reset").await;
+    assert!(recovered.available);
+    assert_eq!(recovered.book_seq, "6");
 }
 
 #[tokio::test]
@@ -575,7 +604,7 @@ async fn sequence_zero_snapshot_applies_the_next_contiguous_delta() {
     market.await_subscribed(20).await;
     next_view(&mut sub, "first view").await;
 
-    market.send(20, 1, 1, &Side::from([(BEST_BID, 8)]), &Side::new(), false);
+    market.send(20, 0, 1, &Side::from([(BEST_BID, 8)]), &Side::new(), false);
     let updated = next_view(&mut sub, "view after a delta").await;
 
     assert_eq!(updated.book_seq, "1");
@@ -658,9 +687,9 @@ async fn coarse_bucket_above_the_price_shows_the_zero_bid_at_a_trimmed_depth() {
     assert_eq!(ticks(&view.asks), [100000 * UNIT]);
 }
 
-// Refused before it reaches the book: rebuilt from a fresh tier snapshot, still open.
+// Refused before it reaches the book, which waits for the next reset, still open.
 #[tokio::test]
-async fn zero_price_outside_the_trimmed_view_resyncs_at_the_tier() {
+async fn zero_price_outside_the_trimmed_view_waits_for_the_next_reset() {
     let market = Market::spawn(600).await;
     let client = market.client();
     let mut sub = book(&client, Some(10), None).await;
@@ -668,11 +697,18 @@ async fn zero_price_outside_the_trimmed_view_resyncs_at_the_tier() {
     let first = next_view(&mut sub, "first view").await;
 
     market.send(20, 100, 101, &Side::from([(0, 5)]), &Side::new(), false);
-    let refreshed = next_view(&mut sub, "view after the refused delta").await;
-    assert_eq!(refreshed.book_seq, first.book_seq);
-    assert_eq!(ticks(&refreshed.bids), ticks(&first.bids));
-    assert_eq!(market.snapshots(), [20, 20]);
+    let stale = next_view(&mut sub, "view after the refused delta").await;
+    assert!(!stale.available);
+    assert_eq!(stale.book_seq, first.book_seq);
+    assert_eq!(ticks(&stale.bids), ticks(&first.bids));
     assert!(sub.err().is_none(), "{:?}", sub.err());
+
+    market.update(|book| book.seq = 101);
+    market.reset(20);
+    let recovered = next_view(&mut sub, "view after the reset").await;
+    assert!(recovered.available);
+    assert_eq!(recovered.book_seq, "101");
+    assert_eq!(market.snapshots(), [20]);
 }
 
 #[tokio::test]

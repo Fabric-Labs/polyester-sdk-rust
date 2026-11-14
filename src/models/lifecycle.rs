@@ -1,11 +1,22 @@
 //! Lifecycle flow models (Go `models/trading.go` lifecycle parity).
 
 /// Specific Zipper reason details when a notable outcome has a catalog entry.
+///
+/// Show `message`, or localize with `reason_id`, rather than text keyed by
+/// `code`: they can describe the outcome when the code does not. A
+/// withdrawal whose execution failed after its destination transaction was
+/// committed (lifecycle reason `zipper_withdraw_execution_failed`) reads
+/// `withdrawal.execution_failed.under_review` and a message that it is under
+/// review by the bridge operator and its funds were not returned, whatever
+/// the code, which is 0 when the bridge gave none. It is not a refund, and
+/// the user may have received the funds on the destination chain.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ZipperReasonDetails {
     /// Numeric [`crate::proto::chain::zipper::v1::ZipperReasonCode`] wire value.
     pub code: i32,
+    /// Stable reason identifier for localization.
     pub reason_id: String,
+    /// User-displayable English explanation of the outcome.
     pub message: String,
 }
 

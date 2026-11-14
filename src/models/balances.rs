@@ -82,6 +82,13 @@ pub struct TransferSide {
 pub struct LedgerTransfer {
     pub asset_id: u32,
     pub amount: String,
+    /// The `ledger.v1.TransferCode` number. `TRADING_WITHDRAW_REQUEST_FEE`
+    /// (1065) is not a fee: it is the debit of a withdrawal from the Trading
+    /// account that was rejected or failed to execute, for the whole amount
+    /// sent for it, its request fee included; `WITHDRAW_FAILED` (1075) is the
+    /// same debit for a withdrawal from the Funding account. A rejected
+    /// withdrawal refunds that amount less the request fee to the account's
+    /// own wallet; one that failed to execute is not refunded.
     pub transfer_type: i32,
     pub account_code: i32,
     pub timestamp: i64,

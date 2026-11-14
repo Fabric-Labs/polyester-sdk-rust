@@ -24,6 +24,22 @@ pub type OwnedListChangesRequestView = ::buffa::view::OwnedView<
 pub type OwnedListChangesResponseView = ::buffa::view::OwnedView<
     crate::proto::changelog::v1::__buffa::view::ListChangesResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListDeploymentGroupsRequestView<'static>>`.
+pub type OwnedListDeploymentGroupsRequestView = ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListDeploymentGroupsResponseView<'static>>`.
+pub type OwnedListDeploymentGroupsResponseView = ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetDeploymentGroupRequestView<'static>>`.
+pub type OwnedGetDeploymentGroupRequestView = ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetDeploymentGroupResponseView<'static>>`.
+pub type OwnedGetDeploymentGroupResponseView = ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::changelog::v1::ListPostsResponse>
 for crate::proto::changelog::v1::__buffa::view::ListPostsResponseView<'_> {
     fn encode(
@@ -84,6 +100,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::changelog::v1::ListDeploymentGroupsResponse>
+for crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::changelog::v1::ListDeploymentGroupsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::changelog::v1::GetDeploymentGroupResponse>
+for crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::changelog::v1::GetDeploymentGroupResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const CHANGELOG_SERVICE_SERVICE_NAME: &str = "changelog.v1.ChangelogService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListPosts` RPC.
@@ -110,6 +166,24 @@ pub const CHANGELOG_SERVICE_GET_POST_SPEC: ::connectrpc::Spec = ::connectrpc::Sp
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const CHANGELOG_SERVICE_LIST_CHANGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/changelog.v1.ChangelogService/ListChanges",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListDeploymentGroups` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CHANGELOG_SERVICE_LIST_DEPLOYMENT_GROUPS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/changelog.v1.ChangelogService/ListDeploymentGroups",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetDeploymentGroup` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CHANGELOG_SERVICE_GET_DEPLOYMENT_GROUP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/changelog.v1.ChangelogService/GetDeploymentGroup",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
@@ -237,6 +311,54 @@ pub trait ChangelogService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// List this environment's deployment groups, newest first: each deployment
+    /// that brought new releases, with the release posts it brought.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_deployment_groups<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::changelog::v1::ListDeploymentGroupsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Get one deployment group by slug, with the changes that need attention
+    /// and the highlights of its release posts.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_deployment_group<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::changelog::v1::GetDeploymentGroupRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::changelog::v1::GetDeploymentGroupResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -356,6 +478,64 @@ impl<S: ChangelogService> ChangelogServiceExt for S {
                 },
             )
             .with_spec(CHANGELOG_SERVICE_LIST_CHANGES_SPEC)
+            .route_view_idempotent(
+                CHANGELOG_SERVICE_SERVICE_NAME,
+                "ListDeploymentGroups",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_deployment_groups(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::changelog::v1::ListDeploymentGroupsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANGELOG_SERVICE_LIST_DEPLOYMENT_GROUPS_SPEC)
+            .route_view_idempotent(
+                CHANGELOG_SERVICE_SERVICE_NAME,
+                "GetDeploymentGroup",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::changelog::v1::GetDeploymentGroupRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_deployment_group(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::changelog::v1::GetDeploymentGroupResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CHANGELOG_SERVICE_GET_DEPLOYMENT_GROUP_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -426,6 +606,18 @@ impl<T: ChangelogService> ::connectrpc::Dispatcher for ChangelogServiceServer<T>
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
                         .with_spec(CHANGELOG_SERVICE_LIST_CHANGES_SPEC),
+                )
+            }
+            "ListDeploymentGroups" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(CHANGELOG_SERVICE_LIST_DEPLOYMENT_GROUPS_SPEC),
+                )
+            }
+            "GetDeploymentGroup" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(CHANGELOG_SERVICE_GET_DEPLOYMENT_GROUP_SPEC),
                 )
             }
             _ => None,
@@ -499,6 +691,48 @@ impl<T: ChangelogService> ::connectrpc::Dispatcher for ChangelogServiceServer<T>
                         .await?
                         .encode::<
                             crate::proto::changelog::v1::ListChangesResponse,
+                        >(format)
+                })
+            }
+            "ListDeploymentGroups" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_deployment_groups(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::changelog::v1::ListDeploymentGroupsResponse,
+                        >(format)
+                })
+            }
+            "GetDeploymentGroup" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::changelog::v1::GetDeploymentGroupRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::changelog::v1::GetDeploymentGroupRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_deployment_group(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::changelog::v1::GetDeploymentGroupResponse,
                         >(format)
                 })
             }
@@ -727,6 +961,96 @@ where
                 &self.config,
                 CHANGELOG_SERVICE_SERVICE_NAME,
                 "ListChanges",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListDeploymentGroups RPC. Sends a request to /changelog.v1.ChangelogService/ListDeploymentGroups.
+    pub async fn list_deployment_groups(
+        &self,
+        request: crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_deployment_groups_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListDeploymentGroups RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_deployment_groups_with_options(
+        &self,
+        request: crate::proto::changelog::v1::ListDeploymentGroupsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::changelog::v1::__buffa::view::ListDeploymentGroupsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANGELOG_SERVICE_SERVICE_NAME,
+                "ListDeploymentGroups",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetDeploymentGroup RPC. Sends a request to /changelog.v1.ChangelogService/GetDeploymentGroup.
+    pub async fn get_deployment_group(
+        &self,
+        request: crate::proto::changelog::v1::GetDeploymentGroupRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_deployment_group_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetDeploymentGroup RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_deployment_group_with_options(
+        &self,
+        request: crate::proto::changelog::v1::GetDeploymentGroupRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::changelog::v1::__buffa::view::GetDeploymentGroupResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CHANGELOG_SERVICE_SERVICE_NAME,
+                "GetDeploymentGroup",
                 request,
                 options,
             )

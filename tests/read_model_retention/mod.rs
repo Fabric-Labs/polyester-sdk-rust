@@ -280,6 +280,43 @@ async fn order_reads_keep_batch_request_id() {
     }
 }
 
+/// An order a batch replace admitted keeps that batch's ID after it ends,
+/// filled or canceled, in history reads and on the order stream.
+#[tokio::test]
+async fn ended_orders_keep_batch_request_id() {
+    for status in [OrderStatus::FILLED, OrderStatus::CANCELED] {
+        let mut order = batch_order(18_446_744_073_709_551_614);
+        order.status = status.into();
+        for wire in WIRES {
+            let label = format!("{wire:?}/{status:?}");
+            let (client, _http) = server(
+                wire,
+                Fixture {
+                    key: absent_key(),
+                    order: order.clone(),
+                },
+            )
+            .await;
+            let history = client
+                .orders
+                .list_history(None, None)
+                .await
+                .expect("list_history");
+            assert_batch(
+                &format!("{label} list_history"),
+                &history.orders[0],
+                "jpXCZedGfVP",
+            );
+        }
+        let unit = ProtoUnit {
+            orders: vec![order],
+            ..Default::default()
+        };
+        let decoded = orders_unit_from_proto(&unit).expect("unit");
+        assert_batch("stream", &decoded.orders[0], "jpXCZedGfVP");
+    }
+}
+
 #[test]
 fn order_stream_keeps_batch_request_id() {
     for (id, want) in BATCH_CASES {

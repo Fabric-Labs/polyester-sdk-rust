@@ -167,6 +167,12 @@ pub enum NotificationType {
     /// not approve it, the linked Telegram account may be in someone else's
     /// hands: unlink it and review the account's sessions.
     TELEGRAM_APPROVAL = 2i32,
+    /// A payout address of a QuickSwap broker vault the caller is an Owner or
+    /// Finance member of was requested to be added or removed, or the change
+    /// was applied or not. Category SECURITY; detail broker_allowlist. If no
+    /// member of the broker requested it, act before the address becomes
+    /// payable: an added address is payable 24 hours after it is listed.
+    BROKER_ALLOWLIST_CHANGE = 3i32,
 }
 impl NotificationType {
     ///Idiomatic alias for [`Self::TYPE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -178,6 +184,9 @@ impl NotificationType {
     ///Idiomatic alias for [`Self::TELEGRAM_APPROVAL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TelegramApproval: Self = Self::TELEGRAM_APPROVAL;
+    ///Idiomatic alias for [`Self::BROKER_ALLOWLIST_CHANGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BrokerAllowlistChange: Self = Self::BROKER_ALLOWLIST_CHANGE;
 }
 impl ::core::default::Default for NotificationType {
     fn default() -> Self {
@@ -278,6 +287,7 @@ impl ::buffa::Enumeration for NotificationType {
             0i32 => ::core::option::Option::Some(Self::TYPE_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::PRICE_ALERT),
             2i32 => ::core::option::Option::Some(Self::TELEGRAM_APPROVAL),
+            3i32 => ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE),
             _ => ::core::option::Option::None,
         }
     }
@@ -289,6 +299,7 @@ impl ::buffa::Enumeration for NotificationType {
             Self::TYPE_UNSPECIFIED => "TYPE_UNSPECIFIED",
             Self::PRICE_ALERT => "PRICE_ALERT",
             Self::TELEGRAM_APPROVAL => "TELEGRAM_APPROVAL",
+            Self::BROKER_ALLOWLIST_CHANGE => "BROKER_ALLOWLIST_CHANGE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -296,11 +307,19 @@ impl ::buffa::Enumeration for NotificationType {
             "TYPE_UNSPECIFIED" => ::core::option::Option::Some(Self::TYPE_UNSPECIFIED),
             "PRICE_ALERT" => ::core::option::Option::Some(Self::PRICE_ALERT),
             "TELEGRAM_APPROVAL" => ::core::option::Option::Some(Self::TELEGRAM_APPROVAL),
+            "BROKER_ALLOWLIST_CHANGE" => {
+                ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE)
+            }
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::TYPE_UNSPECIFIED, Self::PRICE_ALERT, Self::TELEGRAM_APPROVAL]
+        &[
+            Self::TYPE_UNSPECIFIED,
+            Self::PRICE_ALERT,
+            Self::TELEGRAM_APPROVAL,
+            Self::BROKER_ALLOWLIST_CHANGE,
+        ]
     }
 }
 /// NotificationCategory groups notification types for filtering and counts.
@@ -815,6 +834,334 @@ impl ::buffa::Enumeration for TelegramApprovalAction {
         ]
     }
 }
+/// BrokerAllowlistEvent is what happened to a broker vault payout address
+/// change.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BrokerAllowlistEvent {
+    /// Not set. Never returned.
+    BROKER_ALLOWLIST_EVENT_UNSPECIFIED = 0i32,
+    /// A member requested the change.
+    CHANGE_REQUESTED = 1i32,
+    /// The change was applied.
+    CHANGE_APPLIED = 2i32,
+    /// The change was not applied, and never will be; nothing changed.
+    CHANGE_NOT_APPLIED = 3i32,
+}
+impl BrokerAllowlistEvent {
+    ///Idiomatic alias for [`Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BrokerAllowlistEventUnspecified: Self = Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::CHANGE_REQUESTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChangeRequested: Self = Self::CHANGE_REQUESTED;
+    ///Idiomatic alias for [`Self::CHANGE_APPLIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChangeApplied: Self = Self::CHANGE_APPLIED;
+    ///Idiomatic alias for [`Self::CHANGE_NOT_APPLIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ChangeNotApplied: Self = Self::CHANGE_NOT_APPLIED;
+}
+impl ::core::default::Default for BrokerAllowlistEvent {
+    fn default() -> Self {
+        Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BrokerAllowlistEvent {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BrokerAllowlistEvent {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BrokerAllowlistEvent;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(BrokerAllowlistEvent)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BrokerAllowlistEvent, E> {
+                <BrokerAllowlistEvent as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BrokerAllowlistEvent, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BrokerAllowlistEvent as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BrokerAllowlistEvent, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BrokerAllowlistEvent as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BrokerAllowlistEvent, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BrokerAllowlistEvent {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BrokerAllowlistEvent {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED)
+            }
+            1i32 => ::core::option::Option::Some(Self::CHANGE_REQUESTED),
+            2i32 => ::core::option::Option::Some(Self::CHANGE_APPLIED),
+            3i32 => ::core::option::Option::Some(Self::CHANGE_NOT_APPLIED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED => {
+                "BROKER_ALLOWLIST_EVENT_UNSPECIFIED"
+            }
+            Self::CHANGE_REQUESTED => "CHANGE_REQUESTED",
+            Self::CHANGE_APPLIED => "CHANGE_APPLIED",
+            Self::CHANGE_NOT_APPLIED => "CHANGE_NOT_APPLIED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BROKER_ALLOWLIST_EVENT_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED)
+            }
+            "CHANGE_REQUESTED" => ::core::option::Option::Some(Self::CHANGE_REQUESTED),
+            "CHANGE_APPLIED" => ::core::option::Option::Some(Self::CHANGE_APPLIED),
+            "CHANGE_NOT_APPLIED" => {
+                ::core::option::Option::Some(Self::CHANGE_NOT_APPLIED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BROKER_ALLOWLIST_EVENT_UNSPECIFIED,
+            Self::CHANGE_REQUESTED,
+            Self::CHANGE_APPLIED,
+            Self::CHANGE_NOT_APPLIED,
+        ]
+    }
+}
+/// BrokerAllowlistAction is what a broker vault payout address change does.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum BrokerAllowlistAction {
+    /// Not set. Never returned.
+    BROKER_ALLOWLIST_ACTION_UNSPECIFIED = 0i32,
+    /// Adds the address to the vault's payout address allowlist.
+    ADD_DESTINATION = 1i32,
+    /// Removes the address from the vault's payout address allowlist.
+    REMOVE_DESTINATION = 2i32,
+}
+impl BrokerAllowlistAction {
+    ///Idiomatic alias for [`Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BrokerAllowlistActionUnspecified: Self = Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ADD_DESTINATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AddDestination: Self = Self::ADD_DESTINATION;
+    ///Idiomatic alias for [`Self::REMOVE_DESTINATION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RemoveDestination: Self = Self::REMOVE_DESTINATION;
+}
+impl ::core::default::Default for BrokerAllowlistAction {
+    fn default() -> Self {
+        Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for BrokerAllowlistAction {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for BrokerAllowlistAction {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = BrokerAllowlistAction;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(BrokerAllowlistAction)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<BrokerAllowlistAction, E> {
+                <BrokerAllowlistAction as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<BrokerAllowlistAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BrokerAllowlistAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<BrokerAllowlistAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <BrokerAllowlistAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<BrokerAllowlistAction, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BrokerAllowlistAction {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for BrokerAllowlistAction {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED)
+            }
+            1i32 => ::core::option::Option::Some(Self::ADD_DESTINATION),
+            2i32 => ::core::option::Option::Some(Self::REMOVE_DESTINATION),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED => {
+                "BROKER_ALLOWLIST_ACTION_UNSPECIFIED"
+            }
+            Self::ADD_DESTINATION => "ADD_DESTINATION",
+            Self::REMOVE_DESTINATION => "REMOVE_DESTINATION",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BROKER_ALLOWLIST_ACTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED)
+            }
+            "ADD_DESTINATION" => ::core::option::Option::Some(Self::ADD_DESTINATION),
+            "REMOVE_DESTINATION" => {
+                ::core::option::Option::Some(Self::REMOVE_DESTINATION)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BROKER_ALLOWLIST_ACTION_UNSPECIFIED,
+            Self::ADD_DESTINATION,
+            Self::REMOVE_DESTINATION,
+        ]
+    }
+}
 /// ErrorDetail is attached to Notification API errors as an error detail of
 /// type notifications.v1.ErrorDetail.
 #[derive(Clone, PartialEq, Default)]
@@ -1118,6 +1465,14 @@ impl ::buffa::Message for Notification {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::notification::Detail::BrokerAllowlist(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1172,6 +1527,14 @@ impl ::buffa::Message for Notification {
                 __buffa::oneof::notification::Detail::TelegramApproval(x) => {
                     ::buffa::types::put_len_delimited_header(
                         11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::notification::Detail::BrokerAllowlist(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -1290,6 +1653,28 @@ impl ::buffa::Message for Notification {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.detail = ::core::option::Option::Some(
                         __buffa::oneof::notification::Detail::TelegramApproval(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::notification::Detail::BrokerAllowlist(
+                        ref mut existing,
+                    ),
+                ) = self.detail
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.detail = ::core::option::Option::Some(
+                        __buffa::oneof::notification::Detail::BrokerAllowlist(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -1512,6 +1897,30 @@ impl<'de> serde::Deserialize<'de> for Notification {
                                 }
                                 __oneof_detail = Some(
                                     __buffa::oneof::notification::Detail::TelegramApproval(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "brokerAllowlist" | "broker_allowlist" => {
+                            let v: ::core::option::Option<BrokerAllowlistNotice> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            BrokerAllowlistNotice,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_detail.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'detail'",
+                                        ),
+                                    );
+                                }
+                                __oneof_detail = Some(
+                                    __buffa::oneof::notification::Detail::BrokerAllowlist(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -2312,6 +2721,354 @@ pub const __TELEGRAM_APPROVAL_NOTICE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     type_url: "type.googleapis.com/notifications.v1.TelegramApprovalNotice",
     to_json: ::buffa::type_registry::any_to_json::<TelegramApprovalNotice>,
     from_json: ::buffa::type_registry::any_from_json::<TelegramApprovalNotice>,
+    is_wkt: false,
+};
+/// BrokerAllowlistNotice is a change of a QuickSwap broker vault's payout
+/// address allowlist, as the broker's records show it. Read the change with
+/// QuickSwapBrokerService.ListVaultAllowlistChanges.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BrokerAllowlistNotice {
+    /// Broker name.
+    ///
+    /// Field 1: `broker`
+    #[serde(
+        rename = "broker",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub broker: ::buffa::alloc::string::String,
+    /// Public sub-account ID of the vault.
+    ///
+    /// Field 2: `vault_account_id`
+    #[serde(
+        rename = "vaultAccountId",
+        alias = "vault_account_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub vault_account_id: u64,
+    /// Public ID of the change, as ListVaultAllowlistChanges returns it.
+    ///
+    /// Field 3: `change_id`
+    #[serde(
+        rename = "changeId",
+        alias = "change_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub change_id: u64,
+    /// What happened to the change.
+    ///
+    /// Field 4: `event`
+    #[serde(
+        rename = "event",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub event: ::buffa::EnumValue<BrokerAllowlistEvent>,
+    /// What the change does.
+    ///
+    /// Field 5: `action`
+    #[serde(
+        rename = "action",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub action: ::buffa::EnumValue<BrokerAllowlistAction>,
+    /// Destination chain identifier of the address.
+    ///
+    /// Field 6: `destination_chain_id`
+    #[serde(
+        rename = "destinationChainId",
+        alias = "destination_chain_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub destination_chain_id: u64,
+    /// The address, in canonical form.
+    ///
+    /// Field 7: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    /// The requesting member's name for an added address; empty when none.
+    ///
+    /// Field 8: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
+    /// Public account ID of the member who requested the change.
+    ///
+    /// Field 9: `requested_by_account_id`
+    #[serde(
+        rename = "requestedByAccountId",
+        alias = "requested_by_account_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub requested_by_account_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BrokerAllowlistNotice {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BrokerAllowlistNotice")
+            .field("broker", &self.broker)
+            .field("vault_account_id", &self.vault_account_id)
+            .field("change_id", &self.change_id)
+            .field("event", &self.event)
+            .field("action", &self.action)
+            .field("destination_chain_id", &self.destination_chain_id)
+            .field("destination_address", &self.destination_address)
+            .field("label", &self.label)
+            .field("requested_by_account_id", &self.requested_by_account_id)
+            .finish()
+    }
+}
+impl BrokerAllowlistNotice {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.BrokerAllowlistNotice";
+}
+::buffa::impl_default_instance!(BrokerAllowlistNotice);
+impl ::buffa::MessageName for BrokerAllowlistNotice {
+    const PACKAGE: &'static str = "notifications.v1";
+    const NAME: &'static str = "BrokerAllowlistNotice";
+    const FULL_NAME: &'static str = "notifications.v1.BrokerAllowlistNotice";
+    const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.BrokerAllowlistNotice";
+}
+impl ::buffa::Message for BrokerAllowlistNotice {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.broker.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.broker) as u32;
+        }
+        if self.vault_account_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.change_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        {
+            let val = self.event.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.action.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.destination_chain_id != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.destination_chain_id)
+                        as u32;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        if !self.label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        }
+        if self.requested_by_account_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.broker.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.broker, buf);
+        }
+        if self.vault_account_id != 0u64 {
+            ::buffa::types::put_fixed64_field(2u32, self.vault_account_id, buf);
+        }
+        if self.change_id != 0u64 {
+            ::buffa::types::put_fixed64_field(3u32, self.change_id, buf);
+        }
+        {
+            let val = self.event.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        {
+            let val = self.action.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        if self.destination_chain_id != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.destination_chain_id, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(7u32, &self.destination_address, buf);
+        }
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.label, buf);
+        }
+        if self.requested_by_account_id != 0u64 {
+            ::buffa::types::put_fixed64_field(9u32, self.requested_by_account_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.broker, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.vault_account_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.change_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.event = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.action = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.destination_chain_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.requested_by_account_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.broker.clear();
+        self.vault_account_id = 0u64;
+        self.change_id = 0u64;
+        self.event = ::buffa::EnumValue::from(0);
+        self.action = ::buffa::EnumValue::from(0);
+        self.destination_chain_id = 0u64;
+        self.destination_address.clear();
+        self.label.clear();
+        self.requested_by_account_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BrokerAllowlistNotice {
+    const PROTO_FQN: &'static str = "notifications.v1.BrokerAllowlistNotice";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BrokerAllowlistNotice {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BROKER_ALLOWLIST_NOTICE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/notifications.v1.BrokerAllowlistNotice",
+    to_json: ::buffa::type_registry::any_to_json::<BrokerAllowlistNotice>,
+    from_json: ::buffa::type_registry::any_from_json::<BrokerAllowlistNotice>,
     is_wkt: false,
 };
 /// ListNotificationsRequest lists the caller's notifications.
@@ -4988,6 +5745,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                                ref mut existing,
+                            ),
+                        ) = view.detail
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.detail = Some(
+                                super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::BrokerAllowlistNoticeView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5055,6 +5843,15 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::notification::Detail::TelegramApproval(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::notification::Detail::BrokerAllowlist(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -5139,6 +5936,16 @@ pub mod __buffa {
                                 += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -5206,6 +6013,16 @@ pub mod __buffa {
                         ) => {
                             ::buffa::types::put_len_delimited_header(
                                 11u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
+                        super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                12u32,
                                 __cache.consume_next(),
                                 buf,
                             );
@@ -5279,6 +6096,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("telegramApproval", v)?;
+                        }
+                        super::super::__buffa::view::oneof::notification::Detail::BrokerAllowlist(
+                            v,
+                        ) => {
+                            __map.serialize_entry("brokerAllowlist", v)?;
                         }
                     }
                 }
@@ -6824,6 +7646,579 @@ pub mod __buffa {
             type ViewHandle = TelegramApprovalNoticeOwnedView;
         }
         impl ::serde::Serialize for TelegramApprovalNoticeOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BrokerAllowlistNotice is a change of a QuickSwap broker vault's payout
+        /// address allowlist, as the broker's records show it. Read the change with
+        /// QuickSwapBrokerService.ListVaultAllowlistChanges.
+        #[derive(Clone, Debug, Default)]
+        pub struct BrokerAllowlistNoticeView<'a> {
+            /// Broker name.
+            ///
+            /// Field 1: `broker`
+            pub broker: &'a str,
+            /// Public sub-account ID of the vault.
+            ///
+            /// Field 2: `vault_account_id`
+            pub vault_account_id: u64,
+            /// Public ID of the change, as ListVaultAllowlistChanges returns it.
+            ///
+            /// Field 3: `change_id`
+            pub change_id: u64,
+            /// What happened to the change.
+            ///
+            /// Field 4: `event`
+            pub event: ::buffa::EnumValue<super::super::BrokerAllowlistEvent>,
+            /// What the change does.
+            ///
+            /// Field 5: `action`
+            pub action: ::buffa::EnumValue<super::super::BrokerAllowlistAction>,
+            /// Destination chain identifier of the address.
+            ///
+            /// Field 6: `destination_chain_id`
+            pub destination_chain_id: u64,
+            /// The address, in canonical form.
+            ///
+            /// Field 7: `destination_address`
+            pub destination_address: &'a str,
+            /// The requesting member's name for an added address; empty when none.
+            ///
+            /// Field 8: `label`
+            pub label: &'a str,
+            /// Public account ID of the member who requested the change.
+            ///
+            /// Field 9: `requested_by_account_id`
+            pub requested_by_account_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for BrokerAllowlistNoticeView<'a> {
+            type Owned = super::super::BrokerAllowlistNotice;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.broker = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.vault_account_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.change_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.event = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.action = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.destination_chain_id = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.requested_by_account_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BrokerAllowlistNotice,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BrokerAllowlistNotice,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BrokerAllowlistNotice {
+                    broker: self.broker.to_string(),
+                    vault_account_id: self.vault_account_id,
+                    change_id: self.change_id,
+                    event: self.event,
+                    action: self.action,
+                    destination_chain_id: self.destination_chain_id,
+                    destination_address: self.destination_address.to_string(),
+                    label: self.label.to_string(),
+                    requested_by_account_id: self.requested_by_account_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for BrokerAllowlistNoticeView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.broker.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.broker) as u32;
+                }
+                if self.vault_account_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.change_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                {
+                    let val = self.event.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.action.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.destination_chain_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.destination_chain_id,
+                            ) as u32;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                if !self.label.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                }
+                if self.requested_by_account_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.broker.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.broker, buf);
+                }
+                if self.vault_account_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(2u32, self.vault_account_id, buf);
+                }
+                if self.change_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(3u32, self.change_id, buf);
+                }
+                {
+                    let val = self.event.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.action.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                if self.destination_chain_id != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        6u32,
+                        self.destination_chain_id,
+                        buf,
+                    );
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        7u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.label, buf);
+                }
+                if self.requested_by_account_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(
+                        9u32,
+                        self.requested_by_account_id,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BrokerAllowlistNoticeView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.broker) {
+                    __map.serialize_entry("broker", self.broker)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.vault_account_id) {
+                    __map
+                        .serialize_entry(
+                            "vaultAccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.vault_account_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.change_id) {
+                    __map
+                        .serialize_entry(
+                            "changeId",
+                            &::buffa::json_helpers::ProtoJson(&self.change_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.event) {
+                    __map.serialize_entry("event", &self.event)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.action) {
+                    __map.serialize_entry("action", &self.action)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.destination_chain_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationChainId",
+                            &::buffa::json_helpers::ProtoJson(&self.destination_chain_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.requested_by_account_id,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "requestedByAccountId",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.requested_by_account_id,
+                            ),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BrokerAllowlistNoticeView<'a> {
+            const PACKAGE: &'static str = "notifications.v1";
+            const NAME: &'static str = "BrokerAllowlistNotice";
+            const FULL_NAME: &'static str = "notifications.v1.BrokerAllowlistNotice";
+            const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.BrokerAllowlistNotice";
+        }
+        ::buffa::impl_default_view_instance!(BrokerAllowlistNoticeView);
+        ::buffa::impl_view_reborrow!(BrokerAllowlistNoticeView);
+        /** Self-contained, `'static` owned view of a `BrokerAllowlistNotice` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BrokerAllowlistNoticeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BrokerAllowlistNoticeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BrokerAllowlistNoticeOwnedView(
+            ::buffa::OwnedView<BrokerAllowlistNoticeView<'static>>,
+        );
+        impl BrokerAllowlistNoticeOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BrokerAllowlistNoticeOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BrokerAllowlistNoticeOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BrokerAllowlistNotice,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BrokerAllowlistNoticeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`BrokerAllowlistNoticeView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BrokerAllowlistNoticeView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BrokerAllowlistNotice,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Broker name.
+            ///
+            /// Field 1: `broker`
+            #[must_use]
+            pub fn broker(&self) -> &'_ str {
+                self.0.reborrow().broker
+            }
+            /// Public sub-account ID of the vault.
+            ///
+            /// Field 2: `vault_account_id`
+            #[must_use]
+            pub fn vault_account_id(&self) -> u64 {
+                self.0.reborrow().vault_account_id
+            }
+            /// Public ID of the change, as ListVaultAllowlistChanges returns it.
+            ///
+            /// Field 3: `change_id`
+            #[must_use]
+            pub fn change_id(&self) -> u64 {
+                self.0.reborrow().change_id
+            }
+            /// What happened to the change.
+            ///
+            /// Field 4: `event`
+            #[must_use]
+            pub fn event(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BrokerAllowlistEvent> {
+                self.0.reborrow().event
+            }
+            /// What the change does.
+            ///
+            /// Field 5: `action`
+            #[must_use]
+            pub fn action(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::BrokerAllowlistAction> {
+                self.0.reborrow().action
+            }
+            /// Destination chain identifier of the address.
+            ///
+            /// Field 6: `destination_chain_id`
+            #[must_use]
+            pub fn destination_chain_id(&self) -> u64 {
+                self.0.reborrow().destination_chain_id
+            }
+            /// The address, in canonical form.
+            ///
+            /// Field 7: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+            /// The requesting member's name for an added address; empty when none.
+            ///
+            /// Field 8: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
+            }
+            /// Public account ID of the member who requested the change.
+            ///
+            /// Field 9: `requested_by_account_id`
+            #[must_use]
+            pub fn requested_by_account_id(&self) -> u64 {
+                self.0.reborrow().requested_by_account_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BrokerAllowlistNoticeView<'static>>,
+        > for BrokerAllowlistNoticeOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<BrokerAllowlistNoticeView<'static>>,
+            ) -> Self {
+                BrokerAllowlistNoticeOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BrokerAllowlistNoticeOwnedView>
+        for ::buffa::OwnedView<BrokerAllowlistNoticeView<'static>> {
+            fn from(wrapper: BrokerAllowlistNoticeOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BrokerAllowlistNoticeView<'static>>,
+        > for BrokerAllowlistNoticeOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<BrokerAllowlistNoticeView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::BrokerAllowlistNotice {
+            type View<'a> = BrokerAllowlistNoticeView<'a>;
+            type ViewHandle = BrokerAllowlistNoticeOwnedView;
+        }
+        impl ::serde::Serialize for BrokerAllowlistNoticeOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -11200,6 +12595,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    BrokerAllowlist(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::BrokerAllowlistNoticeView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -11221,6 +12623,11 @@ pub mod __buffa {
                 TelegramApproval(
                     ::buffa::alloc::boxed::Box<
                         super::super::super::TelegramApprovalNotice,
+                    >,
+                ),
+                BrokerAllowlist(
+                    ::buffa::alloc::boxed::Box<
+                        super::super::super::BrokerAllowlistNotice,
                     >,
                 ),
             }
@@ -11247,6 +12654,17 @@ pub mod __buffa {
                     Self::Some(Detail::from(v))
                 }
             }
+            impl From<super::super::super::BrokerAllowlistNotice> for Detail {
+                fn from(v: super::super::super::BrokerAllowlistNotice) -> Self {
+                    Self::BrokerAllowlist(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::BrokerAllowlistNotice>
+            for ::core::option::Option<Detail> {
+                fn from(v: super::super::super::BrokerAllowlistNotice) -> Self {
+                    Self::Some(Detail::from(v))
+                }
+            }
             impl serde::Serialize for Detail {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -11261,6 +12679,9 @@ pub mod __buffa {
                         Self::TelegramApproval(v) => {
                             map.serialize_entry("telegramApproval", v)?;
                         }
+                        Self::BrokerAllowlist(v) => {
+                            map.serialize_entry("brokerAllowlist", v)?;
+                        }
                     }
                     map.end()
                 }
@@ -11274,6 +12695,7 @@ pub mod __buffa {
         reg.register_json_any(super::__PRICE_ALERT_NOTICE_JSON_ANY);
         reg.register_json_any(super::__NOTICE_FIELD_JSON_ANY);
         reg.register_json_any(super::__TELEGRAM_APPROVAL_NOTICE_JSON_ANY);
+        reg.register_json_any(super::__BROKER_ALLOWLIST_NOTICE_JSON_ANY);
         reg.register_json_any(super::__LIST_NOTIFICATIONS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_NOTIFICATIONS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_NOTIFICATION_REQUEST_JSON_ANY);
@@ -11309,6 +12731,10 @@ pub use self::__buffa::view::NoticeFieldOwnedView;
 pub use self::__buffa::view::TelegramApprovalNoticeView;
 #[doc(inline)]
 pub use self::__buffa::view::TelegramApprovalNoticeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BrokerAllowlistNoticeView;
+#[doc(inline)]
+pub use self::__buffa::view::BrokerAllowlistNoticeOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListNotificationsRequestView;
 #[doc(inline)]

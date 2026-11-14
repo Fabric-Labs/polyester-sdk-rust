@@ -812,8 +812,11 @@ fn gateway_rejection(status: StatusCode, code: String) -> Option<ConnectError> {
 
 /// REST problem codes that ConnectRPC answers with an `auth.v1.AuthErrorDetail`,
 /// with the Connect code it uses: a sub-account owner role lock (HTTP 412,
-/// `failed_precondition`) and an API key on a session-only method (HTTP 403,
-/// `permission_denied`).
+/// `failed_precondition`), an API key on a session-only method (HTTP 403,
+/// `permission_denied`), the replay record's capacity (HTTP 429,
+/// `resource_exhausted`) and authentication that is temporarily unavailable
+/// (HTTP 503, `unavailable`), which the account endpoints answer too: it
+/// refused the request before it was processed, so it is retryable.
 fn rest_auth_problem(code: &str) -> Option<(ErrorCode, crate::proto::auth::v1::AuthErrorCode)> {
     use crate::errors::auth_codes;
     use crate::proto::auth::v1::AuthErrorCode;
@@ -829,6 +832,10 @@ fn rest_auth_problem(code: &str) -> Option<(ErrorCode, crate::proto::auth::v1::A
         "REPLAY_CAPACITY_EXHAUSTED" | auth_codes::REPLAY_CAPACITY_EXHAUSTED => Some((
             ErrorCode::ResourceExhausted,
             AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED,
+        )),
+        auth_codes::TEMPORARILY_UNAVAILABLE => Some((
+            ErrorCode::Unavailable,
+            AuthErrorCode::AUTH_TEMPORARILY_UNAVAILABLE,
         )),
         _ => None,
     }

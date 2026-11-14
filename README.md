@@ -908,9 +908,32 @@ requests are rate-limited per client address. Responses are newest post first.
   matching change published at or after `t`, each once with the wording last
   received. They filter on first publication, so they don't report an edit to
   an older post; compare `revision` for that.
+- `list_deployment_groups(opts)` returns one page of this environment's
+  deployment groups, newest deployment first: each deployment that raised the
+  release version, with every release it brought (`versions`, ascending) and
+  their published release posts (`posts`); `deployment_groups(opts)` is a
+  stream over every page. `limit` defaults to 20 (maximum 100).
+- `get_deployment_group(slug)` returns one group, such as `testnet-v0.92.9`,
+  with the changes that need attention (breaking or `action_required`) and the
+  highlights of its posts. An unknown slug is `Error::Api` with code
+  `NotFound`. Until the environment publishes release posts, the list is empty
+  and every slug is unknown.
 
-Category, audience and surface are lowercase labels (`breaking_change`, `api`,
-`market_makers`, `market_data`, `quickswap`, `rewards`, ...; see the
+A release post (one post per release, such as `v0.92.9`, with the same slug
+and content in every environment) carries `release_version`,
+`environments` (its release's status on devnet, testnet and mainnet, in that
+order, with `live_at` set once it went live there) and
+`deployment_group_slug` (the group that brought it here, `None` while it is
+pending here). They are `None` or empty on other posts. `environments` changes
+when the release goes live somewhere without a new `revision`, so compare the
+whole summary to notice it. A change's `environment_exceptions` names the
+environments where it differs from its release: `ahead` (already available
+while the release is pending there, with `live_at`), `pending` or
+`unavailable`.
+
+Category, audience, surface, environment and availability are lowercase
+labels (`breaking_change`, `api`, `market_makers`, `market_data`, `quickswap`,
+`rewards`, `testnet`, `ahead`, ...; see the
 `CHANGELOG_*` constants in `polyester::models`). A value newer than this SDK
 reads as `unknown(<n>)`. `ChangelogSection::surface` is the product area a
 section covers, empty for a section not tied to one area (such as the changes
@@ -935,6 +958,14 @@ let newest = client.changelog.get_post(&posts[0].slug).await?;
 
 let since = UNIX_EPOCH + Duration::from_secs(1_767_225_600); // 2026-01-01
 let breaking = client.changelog.breaking_changes_since(since).await?;
+let groups = client
+    .changelog
+    .list_deployment_groups(Default::default())
+    .await?;
+if let Some(group) = groups.groups.first() {
+    let group = client.changelog.get_deployment_group(&group.slug).await?;
+    println!("{} brought {:?}", group.summary.slug, group.summary.versions);
+}
 let api_changes = client
     .changelog
     .list_changes(ListChangelogChangesOptions {
@@ -1627,8 +1658,12 @@ because an older API could answer it for a few seconds after admission. After
 the window, reconcile the individual orders with `orders.get` and never send
 an accepted batch again. An order the batch admitted reads back from
 `orders.get`, `orders.list_open`, `orders.list_history` and `orders.subscribe`
-with `Order::batch_request_id` set to the admission's `batch_request_id`; it is
-empty for an order of any other origin. An item's `updated_ts_ns` is an
+with `Order::batch_request_id` set to the admission's `batch_request_id`, also
+after it is filled or canceled; it is empty for an order of any other origin.
+`batch_request_id` is an opaque public ID: pass it back unchanged and compare
+it only with other values of the same account. An ID received before the
+exchange made it opaque reads `not_found`; reconcile those batches by their
+orders. An item's `updated_ts_ns` is an
 observation time, not the refusal's identity. A
 refused item reads `rejected` with `code`, the refusal without its
 `ERROR_CODE_` prefix (`POST_ONLY_CROSS`); `item.error_code()` gives the full
@@ -1732,8 +1767,8 @@ book is current, so an empty side means no liquidity. When it is false the
 book is being built or was invalidated: its levels are unknown, not empty, so
 fetch it again later instead of reading empty sides as no liquidity. It is the
 server's value as sent, never inferred from the levels; a managed order book
-subscription carries the value of its last snapshot. A server that predates
-the field reports false.
+subscription carries the value of its last snapshot, and false after it missed
+an update until the next reset. A server that predates the field reports false.
 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.
@@ -1881,6 +1916,18 @@ subscribe there:
 
 A snapshot applied with the publications buffered behind it adds one view, at the
 last buffered sequence.
+
+Each update is the difference between two published views of its depth, and applies
+only to a book at exactly its `book_seq_start`, the previous update's `book_seq_end`.
+The managed book drops updates that end at or before its sequence, and applies the
+first one after a snapshot only when it starts at the snapshot's `book_seq`. An
+update that starts anywhere else, or is malformed, is a gap: the book is not changed,
+its next view reports `available: false` with the levels it had, and later updates
+are ignored until the next `reset`, the full view the publisher sends periodically
+(currently about every 30 seconds) and after a gap. The book does not fetch a
+snapshot on a gap: one would not line up with the stream either. A manual
+`refresh_snapshot()` or a reconnect also brings it back. `polyester::orderbook::apply_delta`
+follows the same rule and reports a gap as out of sync.
 
 A stream that stops and a market with nothing to report look alike, since no view
 arrives in either case. `since_last_publication()` on a managed order book tells them

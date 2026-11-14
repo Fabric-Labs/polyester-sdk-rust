@@ -1569,8 +1569,9 @@ pub const __MARKET_OVERVIEW_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[serde(default)]
 pub struct ListMarketOverviewRequest {
     /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
-    /// every configured market, including disabled ones. Markets whose delisting
-    /// time has passed are never returned.
+    /// every configured market, including disabled ones. An ID that names no
+    /// configured market is rejected as invalid. Markets whose delisting time has
+    /// passed are never returned.
     ///
     /// Field 1: `symbol_id`
     #[serde(
@@ -5752,8 +5753,9 @@ pub mod __buffa {
         #[derive(Clone, Debug, Default)]
         pub struct ListMarketOverviewRequestView<'a> {
             /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
-            /// every configured market, including disabled ones. Markets whose delisting
-            /// time has passed are never returned.
+            /// every configured market, including disabled ones. An ID that names no
+            /// configured market is rejected as invalid. Markets whose delisting time has
+            /// passed are never returned.
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: ::buffa::RepeatedView<'a, u32>,
@@ -6226,8 +6228,9 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
             /// Filter by stable numeric pair IDs from GetSpotConfig. When empty, returns
-            /// every configured market, including disabled ones. Markets whose delisting
-            /// time has passed are never returned.
+            /// every configured market, including disabled ones. An ID that names no
+            /// configured market is rejected as invalid. Markets whose delisting time has
+            /// passed are never returned.
             ///
             /// Field 1: `symbol_id`
             #[must_use]

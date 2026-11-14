@@ -1,5 +1,5 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop 78792a57aa2f497889083493df0495bf9949da6e docs/errors.json",
+  "source": "Fabric-Labs/polyester-proto develop 74af7f312c344bd89066183e42e966d8ddf7f16d docs/errors.json",
   "bad_requests": [
     {"catalog": "core:generic","code": "INVALID_ARGUMENT","status": 400,"retryable": false},
     {"catalog": "internal-transfer-api:transfererrors","code": "DESTINATION_INACTIVE","status": 400,"retryable": false},
@@ -18,10 +18,7 @@
     {"catalog": "ledger-api-read:ledgererrors","code": "INVALID_ARGUMENT","status": 400,"retryable": false},
     {"catalog": "ledger-api-read:ledgererrors","code": "INVALID_SUBACCOUNT_ID","status": 400,"retryable": false},
     {"catalog": "ledger-api-read:ledgererrors","code": "MISSING_ACCOUNT_ID","status": 400,"retryable": false},
-    {"catalog": "ledger-api-read:ledgererrors","code": "MISSING_HEADERS","status": 400,"retryable": false},
     {"catalog": "ledger-api-read:ledgererrors","code": "MISSING_WALLET","status": 400,"retryable": false},
-    {"catalog": "ledger-api-read:ledgererrors","code": "RECV_WINDOW_INVALID","status": 400,"retryable": false},
-    {"catalog": "ledger-api-read:ledgererrors","code": "TIMESTAMP_SKEW","status": 400,"retryable": true},
     {"catalog": "marketdata-api-read:marketdataerrors","code": "BAD_REQUEST","status": 400,"retryable": false},
     {"catalog": "marketdata-api-read:marketdataerrors","code": "INVALID_ARGUMENT","status": 400,"retryable": false},
     {"catalog": "md-market-overview:marketoverviewerrors","code": "BAD_REQUEST","status": 400,"retryable": false},
@@ -145,6 +142,7 @@
     {"catalog": "orders-api-write:ordererrors","code": "TRAILING_SIDE_NOT_SUPPORTED","status": 400,"retryable": false},
     {"catalog": "orders-api-write:ordererrors","code": "TRAILING_STOP_ORDER_TYPE_UNSUPPORTED","status": 400,"retryable": false},
     {"catalog": "orders-api-write:ordererrors","code": "TRIGGER_ACTIVATION_PRICE_INVALID","status": 400,"retryable": false},
+    {"catalog": "orders-api-write:ordererrors","code": "TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE","status": 400,"retryable": false},
     {"catalog": "orders-api-write:ordererrors","code": "TRIGGER_BUY_REQUIRES_LIMIT","status": 400,"retryable": false},
     {"catalog": "orders-api-write:ordererrors","code": "TRIGGER_CHILD_PRICE_NOT_MODIFIABLE","status": 400,"retryable": false},
     {"catalog": "orders-api-write:ordererrors","code": "TRIGGER_DIRECTION_INVALID","status": 400,"retryable": false},

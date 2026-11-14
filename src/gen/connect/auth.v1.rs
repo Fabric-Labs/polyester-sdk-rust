@@ -473,8 +473,9 @@ pub trait ApiKeyService: Send + Sync + 'static {
         >,
     > + Send;
     /// Create or replace the caller's Polyester AI assistant key set: one
-    /// ASSISTANT key per enabled account, each bounded by its API policy. One
-    /// fresh step-up proof covers the whole set, and the change is all or
+    /// ASSISTANT key per enabled account, each bounded by its API policy or by a
+    /// permission preset. One fresh step-up proof covers the whole set,
+    /// including the policies its presets create, and the change is all or
     /// nothing. An entry whose account already has an assistant key with the same
     /// public key keeps that key, with its status, and takes the requested
     /// policy; any other entry replaces the account's key. Accounts left out of

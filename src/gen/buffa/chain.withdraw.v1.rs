@@ -3191,7 +3191,12 @@ pub struct AutoWithdrawStep {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub intent_id: ::buffa::alloc::string::String,
-    /// Destination-network transaction hash once the withdrawal completed.
+    /// Destination-network transaction hash, set once Zipper committed the
+    /// withdrawal's destination transaction and empty before. On a completed
+    /// step it is the delivery. When the withdrawal's execution failed after
+    /// that commit, the step fails with withdrawal_failed and keeps this hash:
+    /// the funds were not returned to the account, and the bridge operator
+    /// reviews the withdrawal.
     ///
     /// Field 9: `tx_hash`
     #[serde(
@@ -12996,7 +13001,12 @@ pub mod __buffa {
             ///
             /// Field 8: `intent_id`
             pub intent_id: &'a str,
-            /// Destination-network transaction hash once the withdrawal completed.
+            /// Destination-network transaction hash, set once Zipper committed the
+            /// withdrawal's destination transaction and empty before. On a completed
+            /// step it is the delivery. When the withdrawal's execution failed after
+            /// that commit, the step fails with withdrawal_failed and keeps this hash:
+            /// the funds were not returned to the account, and the bridge operator
+            /// reviews the withdrawal.
             ///
             /// Field 9: `tx_hash`
             pub tx_hash: &'a str,
@@ -13705,7 +13715,12 @@ pub mod __buffa {
             pub fn intent_id(&self) -> &'_ str {
                 self.0.reborrow().intent_id
             }
-            /// Destination-network transaction hash once the withdrawal completed.
+            /// Destination-network transaction hash, set once Zipper committed the
+            /// withdrawal's destination transaction and empty before. On a completed
+            /// step it is the delivery. When the withdrawal's execution failed after
+            /// that commit, the step fails with withdrawal_failed and keeps this hash:
+            /// the funds were not returned to the account, and the bridge operator
+            /// reviews the withdrawal.
             ///
             /// Field 9: `tx_hash`
             #[must_use]

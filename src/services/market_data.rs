@@ -928,6 +928,7 @@ impl OrderbookService {
             asks: BookSide::new(),
             book_seq: 0,
             available: false,
+            awaiting_reset: false,
             last_view_unavailable: false,
             recheck_pending: false,
             recheck_delay: UNAVAILABLE_SNAPSHOT_INITIAL_DELAY,
@@ -960,8 +961,11 @@ impl OrderbookService {
                 }
                 let (bids, asks, book_seq, available) = {
                     let mut s = crate::realtime::lock_unpoisoned(&state);
-                    s.last_view_unavailable = !s.available;
-                    (s.bids.clone(), s.asks.clone(), s.book_seq, s.available)
+                    // A book that missed an update is not current until the
+                    // next reset, whatever its snapshot said.
+                    let available = s.available && !s.awaiting_reset;
+                    s.last_view_unavailable = !available;
+                    (s.bids.clone(), s.asks.clone(), s.book_seq, available)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = match build_orderbook_data(
@@ -1007,29 +1011,38 @@ impl OrderbookService {
             }) as Arc<dyn Fn() + Send + Sync>
         };
 
-        // Applies one delta to the book without emitting a view; on a sequence
-        // gap it requests a refresh and returns false.
+        // Applies one delta to the book without emitting a view, and reports
+        // whether the view changed. An update that does not continue the book
+        // (a sequence gap, or a malformed update) leaves it out of sync: the
+        // next view reports it unavailable and later updates are ignored until
+        // a reset, the full view the publisher sends about every 30 seconds
+        // and after a gap, or a new snapshot replaces it. A snapshot fetched
+        // now would not line up with the stream either, so none is requested.
         let apply_one = {
             let state = state.clone();
-            let stream_slot = stream_slot.clone();
             Arc::new(move |delta: OrderBookDeltaUpdate| {
-                let needs_refresh = {
-                    let mut s = crate::realtime::lock_unpoisoned(&state);
-                    let BookState {
-                        bids,
-                        asks,
-                        book_seq,
-                        ..
-                    } = &mut *s;
-                    let (new_seq, needs_refresh) = apply_delta(bids, asks, *book_seq, &delta);
-                    *book_seq = new_seq;
-                    needs_refresh
-                };
-                if needs_refresh {
-                    if let Some(stream) = crate::realtime::lock_unpoisoned(&stream_slot).as_ref() {
-                        stream.request_refresh();
-                    }
+                let mut s = crate::realtime::lock_unpoisoned(&state);
+                if s.awaiting_reset && !delta.reset {
                     return false;
+                }
+                let BookState {
+                    bids,
+                    asks,
+                    book_seq,
+                    ..
+                } = &mut *s;
+                let (new_seq, out_of_sync) = apply_delta(bids, asks, *book_seq, &delta);
+                let advanced = new_seq != *book_seq;
+                *book_seq = new_seq;
+                if out_of_sync {
+                    // The first gap of an episode changes the view: it is no
+                    // longer current.
+                    let first = !s.awaiting_reset;
+                    s.awaiting_reset = true;
+                    return first;
+                }
+                if delta.reset && advanced {
+                    s.awaiting_reset = false;
                 }
                 true
             }) as Arc<dyn Fn(OrderBookDeltaUpdate) -> bool + Send + Sync>
@@ -1140,19 +1153,18 @@ impl OrderbookService {
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
                             s.available = snapshot.available;
+                            s.awaiting_reset = false;
                             !snapshot.available && s.last_view_unavailable && buffered.is_empty()
                         };
                         // The snapshot and the deltas buffered behind it are one
                         // book state, so they yield one view: a view per delta
-                        // would queue stale copies of it.
-                        let mut applied_all = true;
+                        // would queue stale copies of it. A buffered update that
+                        // does not continue the snapshot leaves that view
+                        // unavailable until a reset, which may be buffered too.
                         for delta in buffered {
-                            if !apply_one(delta) {
-                                applied_all = false;
-                                break;
-                            }
+                            apply_one(delta);
                         }
-                        if applied_all && !repeated {
+                        if !repeated {
                             emit();
                         }
                         recheck_unavailable_snapshot(snapshot.available);
@@ -1163,9 +1175,7 @@ impl OrderbookService {
                 let handle_delta = handle_delta.clone();
                 Arc::new(move |deltas: Vec<OrderBookDeltaUpdate>| {
                     for delta in deltas {
-                        if !handle_delta(delta) {
-                            break;
-                        }
+                        handle_delta(delta);
                     }
                 })
             },
@@ -1198,8 +1208,12 @@ struct BookState {
     bids: crate::orderbook::BookSide,
     asks: crate::orderbook::BookSide,
     book_seq: u64,
-    /// Whether the book is current; see [`OrderbookData::available`].
+    /// Whether the last snapshot was current; see
+    /// [`OrderbookData::available`].
     available: bool,
+    /// An update did not continue the book: it is out of sync until the next
+    /// reset or snapshot.
+    awaiting_reset: bool,
     /// Whether the last view emitted reported the book unavailable.
     last_view_unavailable: bool,
     /// A request for an unavailable snapshot is scheduled.
