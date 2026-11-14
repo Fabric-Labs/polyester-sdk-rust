@@ -1118,6 +1118,154 @@ impl ::buffa::Enumeration for MemoRequirement {
         &[Self::MEMO_UNSPECIFIED, Self::REQUIRED, Self::OPTIONAL, Self::NOT_SUPPORTED]
     }
 }
+/// RouteStatus says whether a chain route accepts new deposits or new
+/// withdrawals.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum RouteStatus {
+    /// Availability is not known yet. Do not treat the route as available.
+    STATUS_UNSPECIFIED = 0i32,
+    /// The route accepts new requests.
+    NORMAL = 1i32,
+    /// The route does not accept new requests. Requests created before the
+    /// suspension continue to process.
+    SUSPENDED = 2i32,
+}
+impl RouteStatus {
+    ///Idiomatic alias for [`Self::STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatusUnspecified: Self = Self::STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::NORMAL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Normal: Self = Self::NORMAL;
+    ///Idiomatic alias for [`Self::SUSPENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Suspended: Self = Self::SUSPENDED;
+}
+impl ::core::default::Default for RouteStatus {
+    fn default() -> Self {
+        Self::STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for RouteStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for RouteStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = RouteStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(RouteStatus)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<RouteStatus, E> {
+                <RouteStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<RouteStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <RouteStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<RouteStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <RouteStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<RouteStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RouteStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for RouteStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::NORMAL),
+            2i32 => ::core::option::Option::Some(Self::SUSPENDED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::STATUS_UNSPECIFIED => "STATUS_UNSPECIFIED",
+            Self::NORMAL => "NORMAL",
+            Self::SUSPENDED => "SUSPENDED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::STATUS_UNSPECIFIED)
+            }
+            "NORMAL" => ::core::option::Option::Some(Self::NORMAL),
+            "SUSPENDED" => ::core::option::Option::Some(Self::SUSPENDED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::STATUS_UNSPECIFIED, Self::NORMAL, Self::SUSPENDED]
+    }
+}
 /// ChainConfig describes one supported external chain for deposit and withdraw.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -1739,6 +1887,28 @@ pub struct AssetChainVariant {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub supply_q: u64,
+    /// Whether this route currently accepts new deposits. Funds sent to a
+    /// deposit address while deposits are suspended are delayed, not lost: they
+    /// can be processed only after deposits resume.
+    ///
+    /// Field 13: `deposit_status`
+    #[serde(
+        rename = "depositStatus",
+        alias = "deposit_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub deposit_status: ::buffa::EnumValue<RouteStatus>,
+    /// Whether this route currently accepts new withdrawals.
+    ///
+    /// Field 14: `withdrawal_status`
+    #[serde(
+        rename = "withdrawalStatus",
+        alias = "withdrawal_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub withdrawal_status: ::buffa::EnumValue<RouteStatus>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1757,6 +1927,8 @@ impl ::core::fmt::Debug for AssetChainVariant {
             .field("deposit_min_amount", &self.deposit_min_amount)
             .field("withdraw_min_amount", &self.withdraw_min_amount)
             .field("supply_q", &self.supply_q)
+            .field("deposit_status", &self.deposit_status)
+            .field("withdrawal_status", &self.withdrawal_status)
             .finish()
     }
 }
@@ -1834,6 +2006,18 @@ impl ::buffa::Message for AssetChainVariant {
         if self.supply_q != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.supply_q) as u32;
         }
+        {
+            let val = self.deposit_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.withdrawal_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1876,6 +2060,18 @@ impl ::buffa::Message for AssetChainVariant {
         }
         if self.supply_q != 0u64 {
             ::buffa::types::put_uint64_field(12u32, self.supply_q, buf);
+        }
+        {
+            let val = self.deposit_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
+        {
+            let val = self.withdrawal_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(14u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1967,6 +2163,24 @@ impl ::buffa::Message for AssetChainVariant {
                 )?;
                 self.supply_q = ::buffa::types::decode_uint64(buf)?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.deposit_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.withdrawal_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1986,6 +2200,8 @@ impl ::buffa::Message for AssetChainVariant {
         self.deposit_min_amount.clear();
         self.withdraw_min_amount.clear();
         self.supply_q = 0u64;
+        self.deposit_status = ::buffa::EnumValue::from(0);
+        self.withdrawal_status = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4356,6 +4572,16 @@ pub mod __buffa {
             ///
             /// Field 12: `supply_q`
             pub supply_q: u64,
+            /// Whether this route currently accepts new deposits. Funds sent to a
+            /// deposit address while deposits are suspended are delayed, not lost: they
+            /// can be processed only after deposits resume.
+            ///
+            /// Field 13: `deposit_status`
+            pub deposit_status: ::buffa::EnumValue<super::super::RouteStatus>,
+            /// Whether this route currently accepts new withdrawals.
+            ///
+            /// Field 14: `withdrawal_status`
+            pub withdrawal_status: ::buffa::EnumValue<super::super::RouteStatus>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetChainVariantView<'a> {
@@ -4466,6 +4692,24 @@ pub mod __buffa {
                         )?;
                         view.supply_q = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.deposit_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.withdrawal_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4506,6 +4750,8 @@ pub mod __buffa {
                     deposit_min_amount: self.deposit_min_amount.to_string(),
                     withdraw_min_amount: self.withdraw_min_amount.to_string(),
                     supply_q: self.supply_q,
+                    deposit_status: self.deposit_status,
+                    withdrawal_status: self.withdrawal_status,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4583,6 +4829,18 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint64_encoded_len(self.supply_q) as u32;
                 }
+                {
+                    let val = self.deposit_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.withdrawal_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -4634,6 +4892,18 @@ pub mod __buffa {
                 }
                 if self.supply_q != 0u64 {
                     ::buffa::types::put_uint64_field(12u32, self.supply_q, buf);
+                }
+                {
+                    let val = self.deposit_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(13u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.withdrawal_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(14u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -4713,6 +4983,16 @@ pub mod __buffa {
                             "supplyQ",
                             &::buffa::json_helpers::ProtoJson(&self.supply_q),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.deposit_status,
+                ) {
+                    __map.serialize_entry("depositStatus", &self.deposit_status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.withdrawal_status,
+                ) {
+                    __map.serialize_entry("withdrawalStatus", &self.withdrawal_status)?;
                 }
                 __map.end()
             }
@@ -4888,6 +5168,26 @@ pub mod __buffa {
             #[must_use]
             pub fn supply_q(&self) -> u64 {
                 self.0.reborrow().supply_q
+            }
+            /// Whether this route currently accepts new deposits. Funds sent to a
+            /// deposit address while deposits are suspended are delayed, not lost: they
+            /// can be processed only after deposits resume.
+            ///
+            /// Field 13: `deposit_status`
+            #[must_use]
+            pub fn deposit_status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::RouteStatus> {
+                self.0.reborrow().deposit_status
+            }
+            /// Whether this route currently accepts new withdrawals.
+            ///
+            /// Field 14: `withdrawal_status`
+            #[must_use]
+            pub fn withdrawal_status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::RouteStatus> {
+                self.0.reborrow().withdrawal_status
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetChainVariantView<'static>>>

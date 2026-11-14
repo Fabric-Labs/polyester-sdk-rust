@@ -881,7 +881,8 @@ impl ::buffa::Enumeration for ChangeAvailability {
         &[Self::AVAILABILITY_UNSPECIFIED, Self::AHEAD, Self::PENDING, Self::UNAVAILABLE]
     }
 }
-/// SortDirection orders changes by post publication time.
+/// SortDirection orders changes by post publication time. Posts published at
+/// the same time keep the ListPosts order, reversed for ascending.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum SortDirection {
@@ -2874,7 +2875,7 @@ pub struct ListPostsRequest {
     )]
     pub limit: u32,
     /// Opaque, keyset-backed, exclusive cursor from a previous response.
-    /// Bound to publication time and slug.
+    /// Bound to publication time, release version and slug.
     ///
     /// Field 2: `page_token`
     #[serde(
@@ -3017,7 +3018,9 @@ pub const __LIST_POSTS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListPostsResponse {
-    /// Post summaries ordered by publication time descending, then slug descending.
+    /// Post summaries ordered by publication time descending. Posts published
+    /// at the same time list release posts first, by release version descending
+    /// (0.92.10 before 0.92.9), then the other posts by slug descending.
     ///
     /// Field 1: `posts`
     #[serde(
@@ -9248,7 +9251,7 @@ pub mod __buffa {
             /// Field 1: `limit`
             pub limit: u32,
             /// Opaque, keyset-backed, exclusive cursor from a previous response.
-            /// Bound to publication time and slug.
+            /// Bound to publication time, release version and slug.
             ///
             /// Field 2: `page_token`
             pub page_token: &'a str,
@@ -9505,7 +9508,7 @@ pub mod __buffa {
                 self.0.reborrow().limit
             }
             /// Opaque, keyset-backed, exclusive cursor from a previous response.
-            /// Bound to publication time and slug.
+            /// Bound to publication time, release version and slug.
             ///
             /// Field 2: `page_token`
             #[must_use]
@@ -9546,7 +9549,9 @@ pub mod __buffa {
         /// ListPostsResponse returns post summaries, newest first.
         #[derive(Clone, Debug, Default)]
         pub struct ListPostsResponseView<'a> {
-            /// Post summaries ordered by publication time descending, then slug descending.
+            /// Post summaries ordered by publication time descending. Posts published
+            /// at the same time list release posts first, by release version descending
+            /// (0.92.10 before 0.92.9), then the other posts by slug descending.
             ///
             /// Field 1: `posts`
             pub posts: ::buffa::RepeatedView<
@@ -9820,7 +9825,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Post summaries ordered by publication time descending, then slug descending.
+            /// Post summaries ordered by publication time descending. Posts published
+            /// at the same time list release posts first, by release version descending
+            /// (0.92.10 before 0.92.9), then the other posts by slug descending.
             ///
             /// Field 1: `posts`
             #[must_use]
