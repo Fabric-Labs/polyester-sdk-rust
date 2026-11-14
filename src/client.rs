@@ -16,8 +16,8 @@ use crate::services::{
     ChainAnalyticsService, ChangelogService, DepositService, FeeService, GuardSignerService,
     HeatmapService, InternalTransfersService, LifecycleService, MarketDataService,
     MarketOverviewService, OrderbookService, OrdersService, PoliciesService, RateLimitService,
-    ServiceContext, SocialVerificationService, SubAccountsService, TradesService, TransfersService,
-    TriggersService, VipService, WithdrawService, ZipperService,
+    ServiceContext, SocialVerificationService, StatementsService, SubAccountsService,
+    TradesService, TransfersService, TriggersService, VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -156,6 +156,9 @@ pub struct Client {
     pub rate_limits: RateLimitService,
     /// Public product changelog; needs no credentials.
     pub changelog: ChangelogService,
+    /// Account statement exports (CSV); signed like the other ledger reads.
+    /// An API key needs `READ_STATEMENTS` on its policy.
+    pub statements: StatementsService,
     pub withdraw: WithdrawService,
     /// Price alerts of the root account. Devnet only: not yet available on
     /// testnet. An API key needs `READ_PRICE_ALERTS` to list and
@@ -287,6 +290,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            statements: StatementsService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
@@ -400,6 +404,7 @@ impl Client {
             fees: FeeService::new(ctx.clone()),
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
+            statements: StatementsService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
