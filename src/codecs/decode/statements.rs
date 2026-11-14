@@ -11,17 +11,21 @@ const REQUIRED_COLUMNS: [&str; 9] = [
 ];
 
 fn invalid(message: impl std::fmt::Display) -> Error {
-    Error::validation(format!("statement csv: {message}"))
+    Error::response_contract("ExportStatement", format!("statement csv: {message}"))
 }
 
 /// Split RFC 4180 text into records: fields separated by commas, records by
 /// CRLF (a bare LF is accepted too), and quoted fields that may hold commas,
-/// line breaks and doubled quotes. Blank lines are skipped.
+/// line breaks and doubled quotes. Blank lines are skipped. A closing quote
+/// must end its field: anything but a comma or a line break after it, or a
+/// quoted field still open at the end, is refused.
 fn csv_records(text: &str) -> Result<Vec<Vec<String>>> {
     let mut records = Vec::new();
     let mut record = Vec::new();
     let mut field = String::new();
     let mut quoted = false;
+    // A quoted field just closed: only a delimiter may follow.
+    let mut closed = false;
     let mut chars = text.chars().peekable();
     let mut end_record = |record: &mut Vec<String>, field: &mut String| {
         record.push(std::mem::take(field));
@@ -38,11 +42,23 @@ fn csv_records(text: &str) -> Result<Vec<Vec<String>>> {
                     field.push('"');
                 } else {
                     quoted = false;
+                    closed = true;
                 }
             } else {
                 field.push(c);
             }
             continue;
+        }
+        if closed {
+            closed = false;
+            let delimiter = match c {
+                ',' | '\n' => true,
+                '\r' => chars.peek() == Some(&'\n'),
+                _ => false,
+            };
+            if !delimiter {
+                return Err(invalid(format!("{c:?} after the closing quote of a field")));
+            }
         }
         match c {
             '"' if field.is_empty() => quoted = true,
@@ -80,9 +96,10 @@ fn parse_time(value: &str, line: usize) -> Result<Timestamp> {
 /// or with columns appended by a later release, reads the same; columns this
 /// SDK does not know are ignored. `flow_id` is empty when the statement has
 /// no such column. Text without a header row, a header missing any other
-/// column, a row with another number of fields than the header, an
-/// unterminated quote or a `time` that is not RFC 3339 is an
-/// [`Error::Validation`]. Amounts stay exact decimal strings.
+/// column, a row with another number of fields than the header, content after
+/// a closing quote, an unterminated quoted field or a `time` that is not
+/// RFC 3339 is an [`Error::ResponseContract`]. Amounts stay exact decimal
+/// strings.
 pub fn parse_statement_csv(csv: &str) -> Result<Vec<StatementRow>> {
     let mut records = csv_records(csv)?.into_iter();
     let header = records.next().ok_or_else(|| invalid("no header row"))?;
@@ -205,6 +222,48 @@ mod tests {
         assert_eq!(row.link_id, "");
     }
 
+    /// A closing quote ends its field: `"100"0` is refused, never read as
+    /// 1000, and so is a quoted field left open. A doubled quote still reads
+    /// as one quote.
+    #[test]
+    fn statement_csv_quoting_is_strict() {
+        const HEADER: &str = "time,entry_id,type,account,asset,amount,fee,balance,link_id\r\n";
+        for (row, want) in [
+            (
+                "2026-10-03T08:12:45Z,1,trade,trading,BTC,\"100\"0,0,1.1,77\r\n",
+                "after the closing quote",
+            ),
+            (
+                "2026-10-03T08:12:45Z,1,trade,trading,BTC,\"100\" ,0,1.1,77\r\n",
+                "after the closing quote",
+            ),
+            (
+                "2026-10-03T08:12:45Z,1,trade,trading,BTC,0.1,0,1.1,\"77\"\rx\r\n",
+                "after the closing quote",
+            ),
+            (
+                "2026-10-03T08:12:45Z,1,trade,trading,BTC,\"0.1,0,1.1,77\r\n",
+                "unterminated quoted field",
+            ),
+        ] {
+            let err = parse_statement_csv(&format!("{HEADER}{row}")).unwrap_err();
+            assert!(
+                matches!(err, Error::ResponseContract { .. }),
+                "{row:?}: {err:?}"
+            );
+            assert!(err.to_string().contains(want), "{row:?}: {err}");
+        }
+        let rows = parse_statement_csv(&format!(
+            "{HEADER}2026-10-03T08:12:45Z,1,trade,trading,\"B\"\"TC\",0.1,0,\"1,1\",\"77\"\r\n\
+             2026-10-03T08:12:46Z,2,trade,trading,BTC,0.1,0,1.2,\"\""
+        ))
+        .unwrap();
+        assert_eq!(rows[0].asset, "B\"TC");
+        assert_eq!(rows[0].balance, "1,1");
+        assert_eq!(rows[0].link_id, "77");
+        assert_eq!(rows[1].link_id, "");
+    }
+
     #[test]
     fn statement_header_alone_is_an_empty_statement() {
         let rows = parse_statement_csv(
@@ -236,7 +295,7 @@ mod tests {
             ),
         ] {
             let err = parse_statement_csv(csv).unwrap_err();
-            assert!(matches!(err, Error::Validation(_)), "{err:?}");
+            assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
             assert!(err.to_string().contains(want), "{csv:?}: {err}");
         }
     }
