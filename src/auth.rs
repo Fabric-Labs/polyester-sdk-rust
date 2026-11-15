@@ -138,6 +138,9 @@ pub struct Credentials {
     pub key_id: String,
     signing_key: SigningKey,
     timestamp_allocator: Arc<SigningTimestampAllocator>,
+    /// The private key, as given and as its seed, redacted while these
+    /// credentials or a clone of them live.
+    _secrets: Arc<crate::transport::SecretRegistration>,
 }
 
 impl std::fmt::Debug for Credentials {
@@ -157,14 +160,17 @@ impl Credentials {
         }
         let seed = normalize_private_key(private_key_hex)?;
         // The private key never reaches an error's text (see redact_text).
-        crate::transport::register_secret(private_key_hex.trim());
-        crate::transport::register_secret(&hex::encode(seed));
+        let secrets = Arc::new(crate::transport::SecretRegistration::new([
+            private_key_hex.trim().to_owned(),
+            hex::encode(seed),
+        ]));
         let signing_key = SigningKey::from_bytes(&seed);
         let timestamp_allocator = allocator_for_key(&key_id);
         Ok(Self {
             key_id,
             signing_key,
             timestamp_allocator,
+            _secrets: secrets,
         })
     }
 

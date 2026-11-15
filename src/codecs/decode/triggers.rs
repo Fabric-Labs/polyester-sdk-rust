@@ -1,6 +1,6 @@
 //! Trigger response decoders.
 
-use super::common::paired_ts_ns;
+use super::common::{paired_ts_ns, require_id};
 use super::enums::{enum_value_self_trade_prevention_mode, enum_value_side};
 use super::money::{attach_qty_scale, decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
@@ -523,13 +523,15 @@ pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> Option<Trigger> {
 }
 
 fn trigger_mutation(
+    operation: &str,
     trigger_id: u64,
     status: buffa::EnumValue<TriggerStatus>,
 ) -> crate::errors::Result<TriggerMutationResult> {
+    require_id(operation, "trigger_id", trigger_id)?;
     let status = enum_value_trigger_status(status);
-    if trigger_id == 0 || status.is_empty() {
+    if status.is_empty() {
         return Err(crate::Error::transport(
-            "invalid trigger mutation response: missing trigger_id or status",
+            "invalid trigger mutation response: missing status",
         ));
     }
     Ok(TriggerMutationResult {
@@ -544,9 +546,10 @@ fn trigger_mutation(
 pub fn trigger_mutation_from_create(
     msg: &CreateTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
-    if msg.trigger_id == 0 || msg.client_trigger_id.trim().is_empty() {
+    require_id("CreateTrigger", "trigger_id", msg.trigger_id)?;
+    if msg.client_trigger_id.trim().is_empty() {
         return Err(crate::Error::transport(
-            "invalid CreateTrigger response: missing trigger_id or client_trigger_id",
+            "invalid CreateTrigger response: missing client_trigger_id",
         ));
     }
     Ok(TriggerMutationResult {
@@ -559,37 +562,44 @@ pub fn trigger_mutation_from_create(
 pub fn trigger_mutation_from_cancel(
     msg: &CancelTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
-    trigger_mutation(msg.trigger_id, msg.status)
+    trigger_mutation("CancelTrigger", msg.trigger_id, msg.status)
 }
 
 pub fn trigger_mutation_from_pause(
     msg: &PauseTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
-    trigger_mutation(msg.trigger_id, msg.status)
+    trigger_mutation("PauseTrigger", msg.trigger_id, msg.status)
 }
 
 pub fn trigger_mutation_from_resume(
     msg: &ResumeTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
-    trigger_mutation(msg.trigger_id, msg.status)
+    trigger_mutation("ResumeTrigger", msg.trigger_id, msg.status)
 }
 
 pub fn trigger_mutation_from_modify(
     msg: &ModifyTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
-    trigger_mutation(msg.trigger_id, msg.status)
+    trigger_mutation("ModifyTrigger", msg.trigger_id, msg.status)
 }
 
 /// `CreateOcoResponse` acknowledges the OCO and both legs; an answer missing
 /// any of their IDs or the echoed client OCO ID is refused.
 pub fn create_oco_from_proto(msg: &CreateOcoResponse) -> crate::errors::Result<CreateOcoResult> {
-    if msg.order_list_id == 0
-        || msg.take_profit_trigger_id == 0
-        || msg.stop_loss_trigger_id == 0
-        || msg.client_list_id.is_empty()
-    {
+    require_id("CreateOco", "order_list_id", msg.order_list_id)?;
+    require_id(
+        "CreateOco",
+        "take_profit_trigger_id",
+        msg.take_profit_trigger_id,
+    )?;
+    require_id(
+        "CreateOco",
+        "stop_loss_trigger_id",
+        msg.stop_loss_trigger_id,
+    )?;
+    if msg.client_list_id.is_empty() {
         return Err(crate::Error::transport(
-            "invalid CreateOco response: missing order_list_id, client_list_id or a leg trigger_id",
+            "invalid CreateOco response: missing client_list_id",
         ));
     }
     Ok(CreateOcoResult {
@@ -602,10 +612,11 @@ pub fn create_oco_from_proto(msg: &CreateOcoResponse) -> crate::errors::Result<C
 }
 
 pub fn cancel_oco_from_proto(msg: &CancelOcoResponse) -> crate::errors::Result<CancelOcoResult> {
+    require_id("CancelOco", "order_list_id", msg.order_list_id)?;
     let status = enum_value_trigger_status(msg.status);
-    if msg.order_list_id == 0 || status.is_empty() {
+    if status.is_empty() {
         return Err(crate::Error::transport(
-            "invalid CancelOco response: missing order_list_id or status",
+            "invalid CancelOco response: missing status",
         ));
     }
     Ok(CancelOcoResult {
@@ -646,14 +657,11 @@ pub fn batch_cancel_triggers_from_proto(
             "rejected" => rejected += 1,
             _ => unreachable!("known batch cancel status"),
         }
+        // Each item echoes the trigger ID it was asked to cancel.
+        require_id("BatchCancelTriggers", "trigger_id", item.trigger_id)?;
         results.push(BatchCancelTriggersResultItem {
             status: status.to_owned(),
-            // Zero is no trigger: it stays empty instead of reading as an ID.
-            trigger_id: if item.trigger_id == 0 {
-                String::new()
-            } else {
-                format_uint64_id(item.trigger_id)
-            },
+            trigger_id: format_uint64_id(item.trigger_id),
             code: item.code.clone(),
             rate_limit: item.error.as_option().and_then(|err| {
                 err.rate_limit

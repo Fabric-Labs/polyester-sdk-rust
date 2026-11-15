@@ -4,6 +4,19 @@ use crate::models::ApiData;
 use buffa_types::google::protobuf::Timestamp;
 use serde::Serialize;
 
+/// Refuse a reply whose required public ID is 0, the proto default of an
+/// absent field: it breaks the response contract, and the call may have
+/// applied, so the caller must not keep `"0"` as the ID of what it changed.
+pub(crate) fn require_id(operation: &str, field: &str, id: u64) -> crate::errors::Result<()> {
+    if id == 0 {
+        return Err(crate::errors::Error::response_contract(
+            operation,
+            format!("missing {field}"),
+        ));
+    }
+    Ok(())
+}
+
 pub fn api_data_from_proto<T: Serialize>(msg: &T) -> ApiData {
     match serde_json::to_value(msg) {
         Ok(raw) => ApiData { raw },

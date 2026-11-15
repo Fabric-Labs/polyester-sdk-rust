@@ -586,7 +586,7 @@ fn labelled_reads() -> Vec<(&'static str, bool, Probe)> {
         ("triggers.get_by_id", false, |c, _| {
             Box::pin(async move {
                 c.triggers
-                    .get_by_id("1", SubAccountScope::Default)
+                    .get_by_id("2", SubAccountScope::Default)
                     .await
                     .map(drop)
             })

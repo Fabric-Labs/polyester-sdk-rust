@@ -21,6 +21,8 @@ mod orders;
 mod policies;
 mod ratelimit;
 mod realtime;
+#[cfg(test)]
+mod required_reply_ids_tests;
 mod statements;
 mod sub_accounts;
 mod system;

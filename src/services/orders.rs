@@ -2295,7 +2295,7 @@ mod tests {
     fn modify_params(new_price: Option<Price>, new_qty: Option<Quantity>) -> ModifyOrderParams {
         ModifyOrderParams {
             symbol: "BTC-USDT".into(),
-            key: OrderKey::OrderId("1".into()),
+            key: OrderKey::OrderId("2".into()),
             subaccount_id: SubAccountScope::Default,
             request_id: Some("modify-equivalence".into()),
             new_price,

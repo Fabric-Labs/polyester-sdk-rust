@@ -156,7 +156,7 @@ impl TradesServer {
 async fn wait_trades(client: &Client, timeout: Duration) -> polyester::Result<GetOrderResult> {
     client
         .orders
-        .wait_for_order_trades_complete(OrderKey::OrderId("1".into()), timeout)
+        .wait_for_order_trades_complete(OrderKey::OrderId("2".into()), timeout)
         .await
 }
 

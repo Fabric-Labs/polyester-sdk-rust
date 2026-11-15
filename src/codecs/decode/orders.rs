@@ -1,6 +1,6 @@
 //! Orders read/mutation decoders.
 
-use super::common::paired_ts_ns;
+use super::common::{paired_ts_ns, require_id};
 use super::enums::{
     enum_value_fee_asset, enum_value_order_status, enum_value_order_type,
     enum_value_self_trade_prevention_mode, enum_value_side, enum_value_time_in_force,
@@ -702,11 +702,14 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         cancelled_orders: msg
             .cancelled_orders
             .iter()
-            .map(|order| CancelledOrder {
-                order_id: format_uint64_id(order.order_id),
-                client_order_id: order.client_order_id.clone(),
+            .map(|order| {
+                require_id("CancelAllOrders", "order_id", order.order_id)?;
+                Ok(CancelledOrder {
+                    order_id: format_uint64_id(order.order_id),
+                    client_order_id: order.client_order_id.clone(),
+                })
             })
-            .collect(),
+            .collect::<Result<_>>()?,
         total_cancelled: msg.total_cancelled,
         truncated: msg.truncated,
         listing_status: cancel_all_listing_status_name(&msg.listing_status),
@@ -768,6 +771,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
             match item.outcome.as_ref() {
                 Some(batch_create_result_item::Outcome::Accepted(value)) => {
                     accepted += 1;
+                    require_id("BatchCreateOrders", "order_id", value.order_id)?;
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
                     // Unscaled: the service attaches the item's pair scale.

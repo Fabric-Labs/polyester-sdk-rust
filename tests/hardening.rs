@@ -67,6 +67,10 @@ mod trigger_oco_and_batch_cancel;
 mod trigger_reads_and_filters;
 #[path = "url_userinfo/mod.rs"]
 mod url_userinfo;
+#[path = "ws_url_query/mod.rs"]
+mod ws_url_query;
+#[path = "zero_public_ids/mod.rs"]
+mod zero_public_ids;
 #[path = "zipper_supply/mod.rs"]
 mod zipper_supply;
 
@@ -681,7 +685,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(trigger_error, Error::Transport(_)));
+    assert!(matches!(trigger_error, Error::ResponseContract { .. }));
 
     let amount = AssetAmount::from_scaled(1, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
     let withdraw_error = client
@@ -2650,7 +2654,7 @@ async fn l2_wait_for_order_trades_complete_polls_get_order_until_trade_sum_match
     let result = client
         .orders
         .wait_for_order_trades_complete(
-            polyester::models::OrderKey::OrderId("1".into()),
+            polyester::models::OrderKey::OrderId("2".into()),
             Duration::from_secs(2),
         )
         .await
@@ -2706,7 +2710,7 @@ async fn l2_wait_for_order_trades_complete_enforces_overall_deadline() {
     let err = client
         .orders
         .wait_for_order_trades_complete(
-            polyester::models::OrderKey::OrderId("1".into()),
+            polyester::models::OrderKey::OrderId("2".into()),
             helper_timeout,
         )
         .await
@@ -4335,12 +4339,12 @@ async fn l2_trigger_modify_and_resume_send_without_a_symbol() {
 
     let _ = client
         .triggers
-        .resume_by_id("1", None, SubAccountScope::Default)
+        .resume_by_id("2", None, SubAccountScope::Default)
         .await;
     let _ = client
         .triggers
         .modify(ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             subaccount_id: SubAccountScope::Default,
             symbol: None,
             symbol_id: None,
@@ -5001,7 +5005,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     let err = api_key_client(&http)
         .orders
         .wait_batch_replace(
-            "1",
+            "2",
             SubAccountScope::Default,
             Some(Duration::from_millis(300)),
         )
@@ -5024,7 +5028,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     let err = api_key_client(&http)
         .orders
         .wait_batch_replace(
-            "1",
+            "2",
             SubAccountScope::Default,
             Some(Duration::from_millis(300)),
         )
@@ -5046,7 +5050,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     .await;
     let err = api_key_client(&http)
         .orders
-        .wait_batch_replace("1", SubAccountScope::Default, None)
+        .wait_batch_replace("2", SubAccountScope::Default, None)
         .await
         .expect_err("denied");
     assert!(!matches!(err, Error::Transport(_)), "{err:?}");
@@ -5127,7 +5131,7 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
     // One read shows the failure really is the network, not an answer.
     let direct = client
         .orders
-        .get_batch_replace_status("1", SubAccountScope::Default)
+        .get_batch_replace_status("2", SubAccountScope::Default)
         .await
         .expect_err("nothing listens");
     assert!(
@@ -5139,7 +5143,7 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
     let err = client
         .orders
         .wait_batch_replace(
-            "1",
+            "2",
             SubAccountScope::Default,
             Some(Duration::from_millis(300)),
         )
@@ -10475,7 +10479,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let cancel = |n: usize| {
         (0..n)
             .map(|i| BatchCancelItem {
-                key: OrderKey::OrderId((i + 1).to_string()),
+                key: OrderKey::OrderId((i + 2).to_string()),
                 symbol_id: None,
             })
             .collect::<Vec<_>>()
@@ -10483,7 +10487,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let replace = |n: usize| {
         (0..n)
             .map(|i| BatchReplaceItem {
-                key: OrderKey::OrderId((i + 1).to_string()),
+                key: OrderKey::OrderId((i + 2).to_string()),
                 new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,

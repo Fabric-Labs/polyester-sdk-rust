@@ -1,5 +1,6 @@
 //! Address book decoders.
 
+use crate::codecs::decode::common::require_id;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
 use crate::errors::{Error, Result};
@@ -109,25 +110,40 @@ pub fn list_entries_from_proto(msg: &ListAddressBookEntriesResponse) -> AddressB
     }
 }
 
+/// The entry a create, update or copy returns: refused when it is missing or
+/// has no ID.
+fn required_entry(
+    operation: &str,
+    entry: Option<&ProtoAddressBookEntry>,
+) -> Result<AddressBookEntry> {
+    let entry = entry
+        .ok_or_else(|| Error::transport(format!("invalid {operation} response: missing entry")))?;
+    require_id(
+        operation,
+        "address_book_entry_id",
+        entry.address_book_entry_id,
+    )?;
+    Ok(entry_from_proto(entry))
+}
+
+/// The tag a create or update returns: refused when it is missing or has no ID.
+fn required_tag(operation: &str, tag: Option<&ProtoAddressBookTag>) -> Result<AddressBookTag> {
+    let tag =
+        tag.ok_or_else(|| Error::transport(format!("invalid {operation} response: missing tag")))?;
+    require_id(operation, "tag_id", tag.tag_id)?;
+    Ok(tag_from_proto(tag))
+}
+
 pub fn entry_from_create_proto(msg: &CreateAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid CreateAddressBookEntry response: missing entry"))
+    required_entry("CreateAddressBookEntry", msg.entry.as_option())
 }
 
 pub fn entry_from_update_proto(msg: &UpdateAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid UpdateAddressBookEntry response: missing entry"))
+    required_entry("UpdateAddressBookEntry", msg.entry.as_option())
 }
 
 pub fn entry_from_copy_proto(msg: &CopyAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid CopyAddressBookEntry response: missing entry"))
+    required_entry("CopyAddressBookEntry", msg.entry.as_option())
 }
 
 fn tag_from_proto(msg: &ProtoAddressBookTag) -> AddressBookTag {
@@ -142,17 +158,11 @@ fn tag_from_proto(msg: &ProtoAddressBookTag) -> AddressBookTag {
 }
 
 pub fn tag_from_create_proto(msg: &CreateAddressBookTagResponse) -> Result<AddressBookTag> {
-    msg.tag
-        .as_option()
-        .map(tag_from_proto)
-        .ok_or_else(|| Error::transport("invalid CreateAddressBookTag response: missing tag"))
+    required_tag("CreateAddressBookTag", msg.tag.as_option())
 }
 
 pub fn tag_from_update_proto(msg: &UpdateAddressBookTagResponse) -> Result<AddressBookTag> {
-    msg.tag
-        .as_option()
-        .map(tag_from_proto)
-        .ok_or_else(|| Error::transport("invalid UpdateAddressBookTag response: missing tag"))
+    required_tag("UpdateAddressBookTag", msg.tag.as_option())
 }
 
 fn counterparty_from_proto(msg: &ProtoTransferCounterparty) -> TransferCounterparty {
