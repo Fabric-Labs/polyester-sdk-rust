@@ -1253,7 +1253,11 @@ trailing leg whose working exit order a cancel-all cancels ends, and with
 `stop_all_trading` pages through the live
 triggers (`created`, `armed`, `running`, `paused`), cancels each, then cancels
 all open orders, so an order a trigger places before its cancel is still
-canceled. Triggers it could not cancel are listed in `trigger_failures`.
+canceled. The two legs of an OCO are canceled once, together, by their
+`order_list_id`. A trigger or OCO that has ended since the listing (its cancel
+is refused `ERROR_CODE_TRIGGER_STATUS_INVALID` or
+`ERROR_CODE_TRIGGER_NOT_FOUND`) is stopped, not failed. Triggers it could not
+cancel for any other reason are listed in `trigger_failures`.
 
 `triggers.get` / `get_by_id` and `triggers.list` / `list_with` read your own
 writes: once a create, modify, pause or resume has answered, they return the

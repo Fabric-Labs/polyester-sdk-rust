@@ -1045,13 +1045,18 @@ pub struct StopAllTradingFailure {
     pub error: crate::Error,
 }
 
-/// What [`crate::Client::stop_all_trading`] canceled.
+/// What [`crate::Client::stop_all_trading`] canceled. A listed trigger that
+/// had already ended when its cancel arrived is in neither list: it is
+/// stopped.
 #[derive(Debug, Clone)]
 pub struct StopAllTradingResult {
-    /// Live triggers canceled, in the order they were canceled.
+    /// Live triggers canceled, in the order they were canceled, both legs of
+    /// a canceled OCO included.
     pub canceled_trigger_ids: Vec<String>,
-    /// Live triggers whose cancel failed. The open orders were still canceled
-    /// after them; cancel these triggers again, then the orders.
+    /// Live triggers whose cancel failed, each listed leg of an OCO whose
+    /// cancel failed included. They may still be live. The open orders were
+    /// still canceled after them; cancel these triggers again, then the
+    /// orders.
     pub trigger_failures: Vec<StopAllTradingFailure>,
     /// The final cancel-all of the open orders, those triggers placed included.
     pub orders: CancelAllOrdersResult,

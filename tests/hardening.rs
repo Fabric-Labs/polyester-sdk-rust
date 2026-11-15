@@ -5326,9 +5326,9 @@ async fn l2_stop_all_trading_cancels_live_triggers_before_the_orders() {
                 let req = CancelTriggerRequest::decode_from_slice(&request.body).unwrap();
                 if req.trigger_id == 12 {
                     return json_body(
-                        400,
+                        403,
                         "application/json",
-                        r#"{"code":"failed_precondition","message":"trigger already ended"}"#,
+                        r#"{"code":"permission_denied","message":"permission denied"}"#,
                     );
                 }
                 connect_proto_ok(&CancelTriggerResponse {
@@ -5461,6 +5461,270 @@ async fn l2_stop_all_trading_refuses_a_page_token_cycle_before_canceling() {
             "{name}: a cancel began, or the cycle was read past its first repeat"
         );
     }
+}
+
+/// A scripted refusal of a trigger or OCO cancel.
+#[derive(Clone, Copy)]
+enum StopAllRefusal {
+    /// A ConnectRPC refusal carrying this `orders.v1.ErrorDetail` code.
+    Coded(&'static str),
+    PermissionDenied,
+}
+
+fn stop_all_refusal(refusal: StopAllRefusal) -> hardening_support::HttpScript {
+    use base64::Engine as _;
+    use polyester::proto::orders::v1::{ErrorCode, ErrorDetail};
+    match refusal {
+        StopAllRefusal::Coded(code) => {
+            let detail = ErrorDetail {
+                code: buffa::Enumeration::from_proto_name(code)
+                    .map(|c: ErrorCode| c.into())
+                    .unwrap(),
+                ..Default::default()
+            };
+            let value =
+                base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec());
+            let body = json!({
+                "code": "failed_precondition",
+                "message": "refused",
+                "details": [{"type": "orders.v1.ErrorDetail", "value": value}],
+            });
+            json_body(400, "application/json", &body.to_string())
+        }
+        StopAllRefusal::PermissionDenied => json_body(
+            403,
+            "application/json",
+            r#"{"code":"permission_denied","message":"permission denied"}"#,
+        ),
+    }
+}
+
+/// A trigger server for stop_all_trading listing one page of live triggers,
+/// `(trigger ID, OCO ID or 0)`. As on the server, canceling one leg of an
+/// OCO ends both, and a cancel of a trigger or OCO that has ended is refused
+/// as already ended. `ended` names triggers that ended after the listing;
+/// `refusals` scripts a refusal per trigger ID and `oco_refusals` per OCO
+/// ID. Returns the server and the cancels it received, in order.
+async fn stop_all_oco_server(
+    live: Vec<(u64, u64)>,
+    ended: Vec<u64>,
+    refusals: Vec<(u64, StopAllRefusal)>,
+    oco_refusals: Vec<(u64, StopAllRefusal)>,
+) -> (MockHttpServer, Arc<std::sync::Mutex<Vec<String>>>) {
+    use polyester::proto::orders::v1::CancelAllOrdersResponse;
+    use polyester::proto::triggers::v1::{
+        CancelOcoRequest, CancelOcoResponse, CancelTriggerRequest, CancelTriggerResponse,
+        ListTriggersResponse, Trigger, TriggerStatus,
+    };
+
+    let calls = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let seen = calls.clone();
+    let ended = std::sync::Mutex::new(ended.into_iter().collect::<std::collections::HashSet<_>>());
+    // Ends a trigger and its OCO sibling; false when both had ended.
+    let end = {
+        let live = live.clone();
+        move |ended: &mut std::collections::HashSet<u64>, trigger_id: u64, oco: u64| {
+            let mut was_live = false;
+            for &(id, list) in &live {
+                if (id == trigger_id || (oco != 0 && list == oco)) && ended.insert(id) {
+                    was_live = true;
+                }
+            }
+            was_live
+        }
+    };
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        LIST_TRIGGERS_PATH => connect_proto_ok(&ListTriggersResponse {
+            triggers: live
+                .iter()
+                .map(|&(id, oco)| Trigger {
+                    trigger_id: id,
+                    status: TriggerStatus::STATUS_ARMED.into(),
+                    order_list_id: (oco != 0).then_some(oco),
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }),
+        "/triggers.v1.TriggersService/CancelTrigger" => {
+            let req = CancelTriggerRequest::decode_from_slice(&request.body).unwrap();
+            seen.lock()
+                .unwrap()
+                .push(format!("cancel_trigger:{}", req.trigger_id));
+            if let Some(&(_, refusal)) = refusals.iter().find(|(id, _)| *id == req.trigger_id) {
+                return stop_all_refusal(refusal);
+            }
+            let oco = live
+                .iter()
+                .find(|(id, _)| *id == req.trigger_id)
+                .map_or(0, |&(_, oco)| oco);
+            if !end(&mut ended.lock().unwrap(), req.trigger_id, oco) {
+                return stop_all_refusal(StopAllRefusal::Coded(
+                    "ERROR_CODE_TRIGGER_STATUS_INVALID",
+                ));
+            }
+            connect_proto_ok(&CancelTriggerResponse {
+                trigger_id: req.trigger_id,
+                status: TriggerStatus::STATUS_CANCELED.into(),
+                ..Default::default()
+            })
+        }
+        "/triggers.v1.TriggersService/CancelOco" => {
+            let req = CancelOcoRequest::decode_from_slice(&request.body).unwrap();
+            seen.lock()
+                .unwrap()
+                .push(format!("cancel_oco:{}", req.order_list_id));
+            if let Some(&(_, refusal)) =
+                oco_refusals.iter().find(|(id, _)| *id == req.order_list_id)
+            {
+                return stop_all_refusal(refusal);
+            }
+            if !end(&mut ended.lock().unwrap(), 0, req.order_list_id) {
+                return stop_all_refusal(StopAllRefusal::Coded(
+                    "ERROR_CODE_TRIGGER_STATUS_INVALID",
+                ));
+            }
+            connect_proto_ok(&CancelOcoResponse {
+                order_list_id: req.order_list_id,
+                status: TriggerStatus::STATUS_CANCELED.into(),
+                ..Default::default()
+            })
+        }
+        "/orders.v1.OrdersService/CancelAllOrders" => {
+            seen.lock().unwrap().push("cancel_all".into());
+            connect_proto_ok(&CancelAllOrdersResponse {
+                status: polyester::proto::orders::v1::cancel_all_orders_response::Status::SUBMITTED
+                    .into(),
+                ..Default::default()
+            })
+        }
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    (http, calls)
+}
+
+// An OCO is canceled once, by its OCO ID: its second leg, which that cancel
+// ended, is never canceled on its own, so a stop with an OCO active reports
+// no failure. The plain trigger is canceled as before.
+#[tokio::test]
+async fn l2_stop_all_trading_cancels_an_oco_once_by_its_oco_id() {
+    use polyester::models::StopAllTradingScope;
+
+    let (http, calls) =
+        stop_all_oco_server(vec![(21, 90), (11, 0), (22, 90)], vec![], vec![], vec![]).await;
+    let result = api_key_client(&http)
+        .stop_all_trading(StopAllTradingScope::default())
+        .await
+        .expect("stop all trading");
+
+    let id = polyester::codecs::format_uint64_id;
+    assert!(
+        result.trigger_failures.is_empty(),
+        "{:?}",
+        result.trigger_failures
+    );
+    assert_eq!(result.canceled_trigger_ids, vec![id(21), id(22), id(11)]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        ["cancel_oco:90", "cancel_trigger:11", "cancel_all"]
+    );
+}
+
+// A trigger or OCO listed as live that has ended by its cancel (refused as
+// already ended or not found) is stopped, not failed: it is in neither list.
+#[tokio::test]
+async fn l2_stop_all_trading_counts_already_ended_triggers_as_stopped() {
+    use polyester::models::StopAllTradingScope;
+
+    let not_found = StopAllRefusal::Coded("ERROR_CODE_TRIGGER_NOT_FOUND");
+    // 12 and OCO 90 ended (filled or expired) after the listing; 13 and OCO
+    // 91 are refused not found.
+    let (http, calls) = stop_all_oco_server(
+        vec![
+            (11, 0),
+            (12, 0),
+            (13, 0),
+            (21, 90),
+            (22, 90),
+            (31, 91),
+            (32, 91),
+        ],
+        vec![12, 21, 22],
+        vec![(13, not_found)],
+        vec![(91, not_found)],
+    )
+    .await;
+    let result = api_key_client(&http)
+        .stop_all_trading(StopAllTradingScope::default())
+        .await
+        .expect("stop all trading");
+
+    assert!(
+        result.trigger_failures.is_empty(),
+        "{:?}",
+        result.trigger_failures
+    );
+    assert_eq!(
+        result.canceled_trigger_ids,
+        vec![polyester::codecs::format_uint64_id(11)]
+    );
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [
+            "cancel_trigger:11",
+            "cancel_trigger:12",
+            "cancel_trigger:13",
+            "cancel_oco:90",
+            "cancel_oco:91",
+            "cancel_all"
+        ]
+    );
+}
+
+// A real refusal, here a permission refusal, is still a failure: a refused
+// OCO cancel is reported for each listed leg, a refused trigger cancel for
+// the trigger, and the other cancels and the cancel-all still run.
+#[tokio::test]
+async fn l2_stop_all_trading_reports_refused_trigger_and_oco_cancels() {
+    use polyester::models::StopAllTradingScope;
+
+    let (http, calls) = stop_all_oco_server(
+        vec![(21, 90), (22, 90), (11, 0), (12, 0)],
+        vec![],
+        vec![(12, StopAllRefusal::PermissionDenied)],
+        vec![(90, StopAllRefusal::PermissionDenied)],
+    )
+    .await;
+    let result = api_key_client(&http)
+        .stop_all_trading(StopAllTradingScope::default())
+        .await
+        .expect("stop all trading");
+
+    let id = polyester::codecs::format_uint64_id;
+    let failed: Vec<&str> = result
+        .trigger_failures
+        .iter()
+        .map(|f| f.trigger_id.as_str())
+        .collect();
+    assert_eq!(failed, [id(21), id(22), id(12)]);
+    for failure in &result.trigger_failures {
+        assert!(
+            matches!(failure.error, Error::Auth(_)) && !failure.error.is_trigger_already_ended(),
+            "{:?}",
+            failure.error
+        );
+    }
+    assert_eq!(result.canceled_trigger_ids, vec![id(11)]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        [
+            "cancel_oco:90",
+            "cancel_trigger:11",
+            "cancel_trigger:12",
+            "cancel_all"
+        ]
+    );
 }
 
 // A JSON-wire response naming an enum value newer than this SDK reads it as
