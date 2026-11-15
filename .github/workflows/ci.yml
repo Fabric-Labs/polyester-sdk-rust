@@ -78,3 +78,8 @@ jobs:
       # Credentialed staging tests remain a separate fail-closed release job.
       - name: Test unit and local L2
         run: cargo test --all-features --lib --test ui --test hardening --test a7_strict_live --test price_fixtures --test read_preservation --test server_unsubscribe
+
+      # Compiles every Rust example in README.md (and the crate's doc examples),
+      # so README drift from the API fails the build.
+      - name: Doc tests (README examples)
+        run: cargo test --all-features --doc

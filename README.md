@@ -169,6 +169,7 @@ policy constrains the subaccount, but does not grant permissions to the key.
 
 ```rust,no_run
 use polyester::{Client, Config, Result};
+use polyester::models::SubAccountScope;
 use polyester::services::ListMarketOverviewOptions;
 
 #[tokio::main]
@@ -194,7 +195,7 @@ async fn main() -> Result<()> {
         println!("{} {:?} {:?}", market.symbol, last, index);
     }
 
-    let open_orders = client.orders.list_open(None).await?;
+    let open_orders = client.orders.list_open(SubAccountScope::Default).await?;
     println!("{} open orders", open_orders.orders.len());
     Ok(())
 }
@@ -255,6 +256,7 @@ line.
 **Recommended: explicit config**
 
 ```rust,no_run
+# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
 use polyester::{Client, Config};
 
 let client = Client::new(Config {
@@ -263,12 +265,15 @@ let client = Client::new(Config {
     default_account_id: Some("YOUR_ACCOUNT_ID".into()),
     ..Default::default()
 })?;
+# Ok(())
+# }
 ```
 
 **If your deployment stores secrets in environment variables**, read them in your
 application and pass them to `Client::new`:
 
 ```rust,no_run
+# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
 use std::env;
 use polyester::{Client, Config};
 
@@ -278,6 +283,8 @@ let client = Client::new(Config {
     default_account_id: env::var("POLYESTER_ACCOUNT_ID").ok(),
     ..Default::default()
 })?;
+# Ok(())
+# }
 ```
 
 `Client::new` never implicitly reads the process environment.
@@ -288,7 +295,10 @@ let client = Client::new(Config {
 convenience helper, not the primary integration pattern.
 
 ```rust,no_run
+# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
 let client = polyester::Client::from_env()?;
+# Ok(())
+# }
 ```
 
 `api_url` / `POLYESTER_API_URL` must be an HTTP(S) base URL without a query
@@ -311,10 +321,13 @@ field of its params:
 | `SubAccountScope::Id(id)`, or `id.into()` | that sub-account; 0 is refused with `Error::Validation` before sending |
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::SubAccountScope;
 
 let main_orders = client.orders.list_open(SubAccountScope::Main).await?;
 let sub_orders = client.orders.list_open(42.into()).await?;
+# Ok(())
+# }
 ```
 
 Methods that take a raw request (such as `balances.list(GetBalancesRequest)`)
@@ -400,8 +413,11 @@ wait too and leave the labels empty when hydration failed. With
 whether hydration failed, or to hydrate again after a failure:
 
 ```rust,no_run
+# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
 let client = polyester::Client::from_env()?;
 client.wait_for_catalogs().await?;
+# Ok(())
+# }
 ```
 
 The hydrated zipper config also seeds each variant's supply, read with
@@ -447,7 +463,8 @@ received (including millisecond-shaped values if a producer emits them).
 ## Create and cancel orders
 
 ```rust,no_run
-use polyester::models::{CreateOrderType, CreateSide, CreateTimeInForce};
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::{CreateOrderType, CreateSide, CreateTimeInForce, SubAccountScope};
 use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
 
@@ -469,8 +486,10 @@ println!("{} {}", result.status, result.order_id);
 
 client
     .orders
-    .cancel_by_client_order_id("my-bot-001", Some("BTC-USDT"), None)
+    .cancel_by_client_order_id("my-bot-001", Some("BTC-USDT"), SubAccountScope::Default)
     .await?;
+# Ok(())
+# }
 ```
 
 `client_order_id` is **optional** (matches the API). Pass `None` for one-shot
@@ -496,6 +515,9 @@ worth"). Construct the quote amounts with `Quantity::from_quote_decimal_str` /
 domain and scale against `Catalogs::quote_quantity_scale_for_symbol`.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# use polyester::types::Quantity;
+# let mut params = polyester::models::CreateOrderParams::new("BTC-USDT", polyester::models::CreateSide::Buy, polyester::models::CreateOrderType::Market);
 let quote_scale = client
     .catalogs
     .quote_quantity_scale_for_symbol("BTC-USDT")
@@ -507,6 +529,8 @@ params.max_quote_debit_scaled = Some(Quantity::from_quote_decimal_str(
     Some("BTC-USDT".into()),
     client.catalogs.symbol_id_for_symbol("BTC-USDT"),
 )?);
+# Ok(())
+# }
 ```
 
 Use `OrdersService::preview(PreviewOrderParams::new(...))` to check whether an
@@ -536,6 +560,9 @@ result and accepted batch items echo it as `submitted_quote_proceeds_scaled`
 proceeds received before fees.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
+# use polyester::types::Quantity;
 let quote_scale = client
     .catalogs
     .quote_quantity_scale_for_symbol("BTC-USDT")
@@ -548,6 +575,8 @@ sell.quote_proceeds_scaled = Some(Quantity::from_quote_decimal_str(
     client.catalogs.symbol_id_for_symbol("BTC-USDT"),
 )?);
 client.orders.create(sell).await?;
+# Ok(())
+# }
 ```
 
 A limit GTC or GTD order can be an iceberg order: `display_quantity` (base
@@ -630,6 +659,7 @@ breaking change. Build them with their constructors and set optional fields
 afterwards:
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::{
     AttachedRisk, CreateOrderParams, CreateOrderType, CreateSide, RiskLeg, TrailingDistance,
     TrailingStop,
@@ -649,6 +679,8 @@ params.attached_risk = Some(AttachedRisk {
     ..Default::default()
 });
 let result = client.orders.create(params).await?;
+# Ok(())
+# }
 ```
 
 To name the market by its Connect ID instead, such as a `symbol_id` from a
@@ -659,6 +691,7 @@ supplies the pair's scales, and an unknown ID, a zero ID or a contradicting
 symbol is refused before sending.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide};
 use polyester::types::{Price, Quantity};
 
@@ -666,6 +699,8 @@ let mut params = CreateOrderParams::for_symbol_id(1, CreateSide::Buy, CreateOrde
 params.quantity = Some(Quantity::from_decimal_str("0.01", 8, None, None)?);
 params.price = Some(Price::from_decimal_str("90000", None)?);
 let result = client.orders.create(params).await?;
+# Ok(())
+# }
 ```
 
 The SDK checks the trailing stop's maximum before sending and refuses a
@@ -757,7 +792,14 @@ ends `filled` once it spent its amount, and `canceled` with
 or its price limit stopped it first.
 
 ```rust,no_run
-let read = client.orders.get(OrderKey::OrderId(order_id), None).await?;
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let order_id = String::new();
+use polyester::models::{OrderKey, SubAccountScope};
+
+let read = client
+    .orders
+    .get(OrderKey::OrderId(order_id), SubAccountScope::Default)
+    .await?;
 if let Some(order) = read.order {
     let base = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id);
     let quote = client.catalogs.quote_quantity_scale_for_symbol_id(order.symbol_id);
@@ -767,6 +809,8 @@ if let Some(order) = read.order {
         println!("unspent {:?}", order.quote_unspent(base, quote));
     }
 }
+# Ok(())
+# }
 ```
 
 ### Waiting for an order's trades
@@ -784,11 +828,17 @@ recorded so far on an order that is still working, read it with `orders.get`
 and compare its trades to `cum_qty`.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# use polyester::models::OrderKey;
+# use std::time::Duration;
+# let order_id = String::new();
 let detail = client
     .orders
     .wait_for_order_trades_complete(OrderKey::OrderId(order_id), Duration::from_secs(20))
     .await?;
 println!("{:?} {} trades", detail.order.map(|o| o.status), detail.trades.len());
+# Ok(())
+# }
 ```
 
 A replacement order reports `Order.inherited_cum_qty`, the filled quantity it
@@ -834,10 +884,13 @@ market order trades only to the limit and the rest is canceled with
 close estimate.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 client.wait_for_catalogs().await?;
 if let Some(limits) = client.catalogs.pair_order_limits_for_symbol("BTC-USDT") {
     println!("max notional {:?}", limits.max_order_notional_quote);
 }
+# Ok(())
+# }
 ```
 
 Use **decimal strings** or `Decimal` for human-facing `qty` / `price` inputs.
@@ -849,6 +902,7 @@ Do **not** pass floats. Price ticks are Polyester protocol price units (fixed
 Stay in integer space; no string round-trip:
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::{CreateOrderType, CreateSide};
 use polyester::services::OrdersService;
 use polyester::types::{Price, Quantity};
@@ -864,6 +918,8 @@ let params = OrdersService::create_params(
 let _ = client.orders.create(params).await?;
 // Reads expose the same types: order.price.as_ticks(), order.orig_qty.as_scaled()
 // orig_qty is the current accepted total and changes after a successful modify.
+# Ok(())
+# }
 ```
 
 Compatible values from fills/books can be passed back into writes when the
@@ -875,7 +931,7 @@ balance (see below).
 
 ## User trade fees
 
-`trades.list(subaccount_id, limit)` remains. Use
+`trades.list(scope, limit)` (a `SubAccountScope`) remains. Use
 `trades.list_with(ListUserTradesOpts { ... })` for symbol filters, `page_token`,
 and `after_match_id`. When `after_match_id` is set, a resolved non-zero
 `symbol_id` is required (display `symbol` or numeric id).
@@ -921,11 +977,16 @@ is a lower bound. `policy_class` uses full protobuf enum names
 (`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`).
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::SubAccountScope;
+
 let tiers = client.vip.list_vip_tiers().await?;
 let status = client.vip.get_vip_status().await?;
-let fees = client.fees.get_spot_fee_rates(None, vec![]).await?;
+let fees = client.fees.get_spot_fee_rates(SubAccountScope::Default, vec![]).await?;
 let catalog = client.rate_limits.get_rate_limit_config().await?;
-let limits = client.rate_limits.get_trading_rate_limits(None).await?;
+let limits = client.rate_limits.get_trading_rate_limits(SubAccountScope::Default).await?;
+# Ok(())
+# }
 ```
 
 ## Product changelog
@@ -991,6 +1052,7 @@ the change's public base58 id. The service returns `Unavailable`
 (`Error::Server`) while it is starting.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use futures_util::TryStreamExt;
 use polyester::services::{ListChangelogChangesOptions, ListChangelogPostsOptions};
 use std::time::{Duration, UNIX_EPOCH};
@@ -1020,6 +1082,8 @@ let api_changes = client
         ..Default::default()
     })
     .await?;
+# Ok(())
+# }
 ```
 
 `examples/changelog.rs` runs these calls against devnet.
@@ -1036,7 +1100,8 @@ and/or to your linked Telegram account. Alerts belong to the main account:
 use an API key scoped to the main account. A key scoped to a sub-account is
 refused with `Error::PermissionDenied` and code `SUBACCOUNT_KEY_REFUSED`.
 
-```rust,ignore
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::{AlertChannel, AlertDirection, CreateAlertParams, ListAlertsOptions, UpdateAlertParams};
 use polyester::types::Price;
 
@@ -1056,6 +1121,8 @@ let moved = client.alerts.update(
         .with_idempotency_key("bot-7:alert-1:move-1"),
 ).await?;
 client.alerts.cancel(&alert.alert_id).await?;
+# Ok(())
+# }
 ```
 
 An alert watches the market's last traded price or its index price
@@ -1115,6 +1182,7 @@ old. With no `states` the server returns current and upcoming events
 (`"scheduled"` and `"in_progress"`); the SDK does not expand the default.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::services::ListStatusEventsOptions;
 
 let page = client
@@ -1126,6 +1194,8 @@ let page = client
 for event in &page.events {
     println!("{} {} {} {:?}", event.id, event.state, event.title, event.services);
 }
+# Ok(())
+# }
 ```
 
 Each `StatusEvent` has a base58 `id`, a `kind` (`"maintenance"` or
@@ -1155,7 +1225,7 @@ Unknown values return a validation error (they do not silently return an empty
 list). Response `status` uses the same labels, with `canceled` spelled as
 trigger events and order statuses spell it.
 
-`orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: None, include_attached_risk_state: false })`
+`orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: SubAccountScope::Default, include_attached_risk_state: false })`
 returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
 Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
 Set `include_attached_risk_state: true` to populate each decoded leg's optional
@@ -1216,11 +1286,14 @@ a count of the pair's tick size. On BTC-USDT, a distance of 50 USDT is
 of `1` trails by 0.000000001 USDT. Convert a decimal distance with `Price`:
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::TrailingDistance;
 use polyester::types::Price;
 
 let ticks = Price::from_decimal_str("0.5", None)?.as_ticks(); // 500_000_000
 let distance = TrailingDistance::Ticks(ticks);
+# Ok(())
+# }
 ```
 
 Trigger reads decode the distance back to quote units
@@ -1368,7 +1441,7 @@ SDK notes:
   without creating a withdraw (create RPCs remain authoritative). An API key
   needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
   opens it.
-- **Smart account wallet:** `client.withdraw.get_wallet_balances(None).await?`
+- **Smart account wallet:** `client.withdraw.get_wallet_balances(SubAccountScope::Default).await?`
   lists the zTokens the account's smart account wallet holds on Polyester
   Chain, such as the refund of a withdrawal Zipper rejected (the amount less
   the fee Zipper kept), with each balance in 18-decimal units (`amount_e18`)
@@ -1380,6 +1453,7 @@ SDK notes:
   transfer ID is session-only and not wrapped.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use alloy_primitives::U256;
 use polyester::chain::{
     POLYESTER_DEVNET_ENVIRONMENT, PolyesterSmartAccount, encode_trading_gateway_deposit,
@@ -1395,6 +1469,8 @@ let call = encode_trading_gateway_deposit(
     U256::from(10u64).pow(U256::from(18u64)),
 )?;
 let result = account.send_calls(&[call], true, Duration::from_secs(60)).await?;
+# Ok(())
+# }
 ```
 
 Realtime queues fail with `Error::QueueOverflow` instead of silently dropping;
@@ -1414,12 +1490,15 @@ directly, or format smaller integers with `polyester::codecs::format_ledger_u64`
 when you already have a `u64` quantity.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 
 let balances = client.balances.list(GetBalancesRequest::default()).await?;
 for bal in balances.balances {
     println!("{} funding={} trading={}", bal.asset_id, bal.funding, bal.trading);
 }
+# Ok(())
+# }
 ```
 
 A sub-account read can include the API keys scoped to the sub-account: set
@@ -1442,6 +1521,8 @@ attached. An API key without `READ_SUBACCOUNT_MEMBERS` or
 `READ_SUBACCOUNT_INVITES` gets the view without them rather than an error.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let subaccount_id = "1";
 use polyester::services::GetSubaccountOpts;
 
 let view = client
@@ -1466,6 +1547,8 @@ for invite in &view.invites {
 if let Some(policy) = &view.policy {
     println!("{} {:?}", policy.name, policy.actions);
 }
+# Ok(())
+# }
 ```
 
 A sub-account read can include the sub-account's balances in the same shape:
@@ -1479,6 +1562,8 @@ balances. When balances cannot be read right now the read fails with the
 retryable `AUTH_TEMPORARILY_UNAVAILABLE`.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let subaccount_id = "1";
 use polyester::services::GetSubaccountOpts;
 
 let view = client
@@ -1494,6 +1579,8 @@ let view = client
 for bal in view.balances.map(|list| list.balances).unwrap_or_default() {
     println!("{} available={}", bal.asset_id, bal.available);
 }
+# Ok(())
+# }
 ```
 
 Each `sub_accounts.subscribe` update carries the caller's `role` on the
@@ -1510,10 +1597,11 @@ order it arrives rather than by revision.
 CSV (`ledger.read.v1.LedgerReadService/ExportStatement`), for reconciliation
 and tax reporting: one account (the main account or one sub-account),
 optionally one asset, for a period of at most 366 days. It is signed like the
-other ledger reads, and an unset `subaccount_id` takes the configured default
-sub-account. `start_time` (inclusive) and `end_time` (exclusive) are required.
+other ledger reads: `subaccount_id` is a `SubAccountScope`, and
+`SubAccountScope::Default` takes the configured default sub-account. `start_time` (inclusive) and `end_time` (exclusive) are required.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::services::ExportStatementOptions;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -1529,6 +1617,8 @@ std::fs::write("statement.csv", &statement.csv)?;
 for row in statement.rows()? {
     println!("{} {} {} {} fee {}", row.kind, row.account, row.asset, row.amount, row.fee);
 }
+# Ok(())
+# }
 ```
 
 `export` follows `next_page_token` with the same fields and concatenates the
@@ -1668,14 +1758,18 @@ terminal `Error::Api`, and `Error::is_wallet_already_linked()` reports it. Log
 in with the account address the wallet already uses.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::SubAccountScope;
 use polyester::proto::auth::v1::AuthErrorCode;
 
-match client.orders.list_open(None).await {
+match client.orders.list_open(SubAccountScope::Default).await {
     Err(err) if err.auth_code() == Some(AuthErrorCode::AUTH_IP_NOT_ALLOWED) => {
         eprintln!("call from an address on the key's allowlist");
     }
     other => { other?; }
 }
+# Ok(())
+# }
 ```
 
 Session-only methods (a wallet trading withdraw, the auto-withdraw rule writes,
@@ -1840,11 +1934,14 @@ each once per logical withdrawal, persist both with the signed payload, and reus
 request after an ambiguous timeout:
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::{new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce};
 
 let idempotency_key = new_trading_withdraw_idempotency_key()?;
 let nonce = new_trading_withdraw_nonce()?;
 // Persist both before signing CreateTradingWithdrawParams.
+# Ok(())
+# }
 ```
 
 Never generate either value inside a retry loop.
@@ -1855,6 +1952,7 @@ Public endpoints do not require an API key. Authenticated endpoints use the
 credentials above.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 let candles = client
     .market_data
     .get_candles("BTC-USDT", "1m", Some(50))
@@ -1889,6 +1987,8 @@ if let Some(trade) = sub.recv_result().await? {
         trade.qty.as_ref().map(|q| q.as_scaled())
     );
 }
+# Ok(())
+# }
 ```
 
 `orderbook.get` returns `OrderbookData`. Its `available` is true when the
@@ -1916,6 +2016,7 @@ unknown: hide them.
 Merged market overview stream (snapshot + live updates):
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::services::MarketOverviewCreateSubscriptionOptions;
 
 let mut sub = client
@@ -1929,6 +2030,8 @@ sub.set_on_error(|error| eprintln!("managed overview failed: {error}"));
 if let Some(markets) = sub.updates().recv().await {
     println!("{} rows", markets.len());
 }
+# Ok(())
+# }
 ```
 
 ## Realtime
@@ -1988,6 +2091,7 @@ as `Error(error)` and subscribes again with backoff. Several `orders.subscribe` 
 one server subscription.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use polyester::models::{OrderUnitEvent, PrivateOrdersEvent};
 use polyester::services::CreateSubscriptionOptions;
 
@@ -2032,6 +2136,8 @@ book.set_on_error(|error| eprintln!("managed order book failed: {error}"));
 if let Some(snapshot) = book.updates().recv().await {
     println!("{} {}", snapshot.book_seq, snapshot.bids.len());
 }
+# Ok(())
+# }
 ```
 
 `orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
@@ -2080,9 +2186,16 @@ none. Poll it, and treat an age far above 30 s, such as 90 s, as a stall: call
 `refresh_snapshot()`, or close and subscribe again.
 
 ```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let mut book = client.orderbook.create_subscription(polyester::services::CreateSubscriptionOptions {
+#     symbol: "BTC-USDT".into(),
+#     ..Default::default()
+# }).await?;
 if book.since_last_publication() > std::time::Duration::from_secs(90) {
     book.refresh_snapshot().await?;
 }
+# Ok(())
+# }
 ```
 
 Streamed orders carry scaled quantity integers but may not carry the
@@ -2223,7 +2336,9 @@ or `recipient`. For a transfer, the counterparty is `destination_address` when t
 and `source_address` (with `owner_account_id`) when it received it. `ListFlowsRequest::participation`
 narrows the list to one side; the server refuses it without an account.
 
-```rust,ignore
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let account_id: u64 = 0;
 use polyester::proto::chain::lifecycle::v1::__buffa::oneof::list_flows_request::AccountSelector;
 use polyester::proto::chain::lifecycle::v1::{FlowParticipation, ListFlowsRequest};
 
@@ -2236,6 +2351,8 @@ let page = client
         ..Default::default()
     })
     .await?;
+# Ok(())
+# }
 ```
 
 A page token is bound to the request it was returned for: continue with the same account,
@@ -2246,7 +2363,11 @@ participation, scope and order; only `limit` may change.
 One chain transaction can reference multiple lifecycle flows when operations
 are bundled. Transaction lookups therefore return a page, not one flow:
 
-```rust
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let tx_hash = "0x...";
+use polyester::proto::chain::lifecycle::v1::{ListFlowsByTxRequest, TxLookupKind};
+
 let mut request = ListFlowsByTxRequest {
     tx_hash: tx_hash.to_owned(),
     lookup_kind: TxLookupKind::TX_ANY.into(),
@@ -2255,17 +2376,19 @@ let mut request = ListFlowsByTxRequest {
 };
 let mut flow_ids = Vec::new();
 loop {
-    let page = client.list_flows_by_tx(request.clone()).await?;
+    let page = client.lifecycle.list_flows_by_tx(request.clone()).await?;
     flow_ids.extend(page.flows.into_iter().map(|flow| flow.intent_id));
     if page.next_page_token.is_empty() {
         break;
     }
     request.page_token = page.next_page_token;
 }
+# Ok(())
+# }
 ```
 
-`Client::get_flow_by_tx` also returns the complete requested page. Use
-`Client::list_flows_by_tx` when following pagination.
+`client.lifecycle.get_flow_by_tx` also returns the complete requested page. Use
+`client.lifecycle.list_flows_by_tx` when following pagination.
 
 ## Changelog
 
