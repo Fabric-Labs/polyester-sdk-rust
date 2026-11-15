@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The README examples match the 0.29.0 API: the quickstart and the open-order, cancel, order read, fee and rate-limit examples pass a `SubAccountScope` where they passed `None`, the order read options and the smart account wallet balances name `SubAccountScope::Default`, and the flow lookups by transaction are `client.lifecycle.list_flows_by_tx` and `client.lifecycle.get_flow_by_tx`. The trigger prose names `status` `failed` and `failure_reason` `trigger_would_trigger_immediately` as typed reads return them, and the order read, trigger list and trigger modify options are complete examples instead of inline struct literals. Every Rust example in the README is now compiled as a doctest (`cargo test --doc`) in CI, so an example that no longer matches the API fails the build. No API change. Affected: `README.md` (documentation only).
+
 ## 0.29.0
 
 Package version: `0.29.0`. Git tag: `v0.29.0`. Released 2026-11-15. Built on public contract `ebbbeac`.

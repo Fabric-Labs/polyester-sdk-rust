@@ -84,3 +84,9 @@ pub use types::{
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub mod problem;
+
+/// Compiles every Rust example in `README.md` as a doctest so README drift
+/// fails `cargo test --doc`.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+pub struct ReadmeDoctests;
