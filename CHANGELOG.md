@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.31.0
+
+Package version: `0.31.0`. Git tag: `v0.31.0`. Released 2026-11-16. Built on public contract `1945423`.
 
 Devnet only until the exchange release 0.93.3 reaches testnet.
 
