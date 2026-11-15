@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `triggers.create` and `orders.cancel_all_after` refuse values the published contract refuses with `Error::Validation` before sending, where the server refused them after a round trip: a TWAP's `twap_duration_ms` below 1000 and `twap_slice_interval_ms` below 100 (both were only required to be positive), a ladder's `ladder_levels` outside 2 to 100 (it was only required to be positive), and a `timeout_sec` other than 0 or 10 to 120. A slice interval longer than the duration is refused as before, now naming `twap_slice_interval_ms`. Affected: `TriggersService::create`, `OrdersService::cancel_all_after`.
+- A trading withdraw's `idempotency_key` of spaces only is signed as given instead of refused: the contract only requires a non-empty key, so only `""` is refused. The key is never trimmed, as before. Affected: `WithdrawService` prepare and create methods.
 
 ## 0.29.1
 

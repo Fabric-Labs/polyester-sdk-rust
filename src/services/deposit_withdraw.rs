@@ -209,7 +209,9 @@ impl WithdrawService {
     }
 
     fn encode_payload(opts: EncodeWithdrawPayload<'_>) -> Result<TradingWithdrawIntentPayload> {
-        if opts.idempotency_key.trim().is_empty() {
+        // Signed exactly as given, never trimmed: the contract only requires
+        // a non-empty key (`min_len: 1`).
+        if opts.idempotency_key.is_empty() {
             return Err(Error::validation("idempotency_key is required"));
         }
         if opts.deadline_ts_sec == 0 {
@@ -694,23 +696,32 @@ mod tests {
         assert!(err.to_string().contains("payload_signature"));
     }
 
-    #[test]
-    fn withdraw_rejects_empty_idempotency_key() {
+    fn encode_with_key(key: &str) -> Result<TradingWithdrawIntentPayload> {
         let amount =
             AssetAmount::from_scaled(100, Some(18), QuantityDomain::LedgerE18, Some(7)).unwrap();
-        let err = WithdrawService::encode_payload(EncodeWithdrawPayload {
+        WithdrawService::encode_payload(EncodeWithdrawPayload {
             action: TradingWithdrawAction::ToFunding,
             asset_id: 7,
             amount: &amount,
             amount_scale: Some(18),
-            idempotency_key: "  ".into(),
+            idempotency_key: key.into(),
             destination_chain_id: 0,
             destination_address: String::new(),
             deadline_ts_sec: 1_800_000_000,
             nonce: 42,
         })
-        .unwrap_err();
+    }
+
+    /// The contract's only rule on the key is `min_len: 1`: an empty key is
+    /// refused, and any other key is signed exactly as given, never trimmed.
+    #[test]
+    fn withdraw_rejects_empty_idempotency_key() {
+        let err = encode_with_key("").unwrap_err();
         assert!(err.to_string().contains("idempotency_key"));
+        for key in [" wd-x ", "wd-x", "  ", "\t", "é"] {
+            let payload = encode_with_key(key).unwrap_or_else(|e| panic!("{key:?}: {e}"));
+            assert_eq!(payload.idempotency_key, key);
+        }
     }
 
     #[test]
