@@ -6,6 +6,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{CreateOcoParams, CreateSide, ListTriggersOpts, OcoLegParams, Trigger};
 use polyester::proto::orders::v1::{
     ErrorDetail, FieldViolation, Side, TriggerPriceSource, risk_execution,
@@ -364,7 +365,7 @@ async fn cancel_oco_sends_the_oco_id() {
             let canceled = s
                 .client
                 .triggers
-                .cancel_oco_by_id(&raw, Some(3))
+                .cancel_oco_by_id(&raw, SubAccountScope::Id(3))
                 .await
                 .expect("cancel");
             assert_eq!(canceled.order_list_id, id(70), "{wire:?} {raw}");
@@ -378,7 +379,7 @@ async fn cancel_oco_sends_the_oco_id() {
             let err = s
                 .client
                 .triggers
-                .cancel_oco_by_id(bad, None)
+                .cancel_oco_by_id(bad, SubAccountScope::Default)
                 .await
                 .expect_err("invalid OCO ID");
             assert!(
@@ -408,7 +409,11 @@ async fn batch_cancel_returns_each_triggers_result() {
         let result = s
             .client
             .triggers
-            .batch_cancel(ids.clone(), None, Some("cancel-run-1".into()))
+            .batch_cancel(
+                ids.clone(),
+                SubAccountScope::Default,
+                Some("cancel-run-1".into()),
+            )
             .await
             .expect("batch cancel");
         assert_eq!((result.accepted_count, result.rejected_count), (1, 1));
@@ -432,7 +437,7 @@ async fn batch_cancel_returns_each_triggers_result() {
 
         s.client
             .triggers
-            .batch_cancel(ids, None, Some("cancel-run-1".into()))
+            .batch_cancel(ids, SubAccountScope::Default, Some("cancel-run-1".into()))
             .await
             .expect("retry");
         let batches = s.batches.lock().unwrap().clone();
@@ -462,7 +467,7 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
             let err = s
                 .client
                 .triggers
-                .batch_cancel(ids, None, None)
+                .batch_cancel(ids, SubAccountScope::Default, None)
                 .await
                 .expect_err("refused");
             assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
@@ -472,17 +477,29 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
     }
 }
 
-/// Which way round the legs must be for the side, and which price sources a
-/// market supports, are the server's to refuse: a BUY OCO with a sell OCO's
-/// legs, and `mark` legs, are sent as given.
+/// Which way round the legs must be for the side, and whether a market has
+/// an index price, are the server's to refuse: a BUY OCO with a sell OCO's
+/// legs, and `index` legs, are sent as given. The contract does not support
+/// `mark` on an OCO, so a `mark` leg is refused before anything is sent.
 #[tokio::test]
 async fn create_oco_sends_leg_order_and_sources_for_the_server_to_judge() {
     for wire in WIRES {
         let s = server(wire).await;
+        let mut marked = sell_oco();
+        marked.stop_loss.trigger_price_source = Some("mark".into());
+        let err = s
+            .client
+            .triggers
+            .create_oco(marked)
+            .await
+            .expect_err("mark is refused");
+        assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
+        assert_eq!(s.sent(), 0, "{wire:?}: a refused OCO must send nothing");
+
         let mut params = sell_oco();
         params.side = CreateSide::Buy;
-        params.take_profit.trigger_price_source = Some("mark".into());
-        params.stop_loss.trigger_price_source = Some("mark".into());
+        params.take_profit.trigger_price_source = Some("index".into());
+        params.stop_loss.trigger_price_source = Some("index".into());
         s.client
             .triggers
             .create_oco(params)
@@ -498,8 +515,8 @@ async fn create_oco_sends_leg_order_and_sources_for_the_server_to_judge() {
             tp.trigger_price_ticks > sl.trigger_price_ticks,
             "{wire:?}: legs sent as given"
         );
-        assert_eq!(tp.trigger_price_source, TriggerPriceSource::MarkPrice);
-        assert_eq!(sl.trigger_price_source, TriggerPriceSource::MarkPrice);
+        assert_eq!(tp.trigger_price_source, TriggerPriceSource::IndexPrice);
+        assert_eq!(sl.trigger_price_source, TriggerPriceSource::IndexPrice);
     }
 }
 
@@ -513,7 +530,7 @@ async fn trigger_reads_report_the_oco_of_each_leg() {
         let got = s
             .client
             .triggers
-            .get_by_id(&id(71), None)
+            .get_by_id(&id(71), SubAccountScope::Default)
             .await
             .expect("get")
             .expect("trigger");

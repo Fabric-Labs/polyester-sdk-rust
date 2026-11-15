@@ -5,6 +5,7 @@ mod alerts;
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::{Client, Config};
 use std::sync::{Arc, Mutex};
 
@@ -105,7 +106,11 @@ async fn get_wallet_balances_maps_ztokens_at_18_decimals() {
     .await;
     let client = keyed_client(&server);
 
-    let root = client.withdraw.get_wallet_balances(None).await.unwrap();
+    let root = client
+        .withdraw
+        .get_wallet_balances(SubAccountScope::Default)
+        .await
+        .unwrap();
     assert_eq!(root.smart_account_address, "0x1111");
     assert_eq!(root.balances.len(), 1);
     let balance = &root.balances[0];
@@ -116,7 +121,11 @@ async fn get_wallet_balances_maps_ztokens_at_18_decimals() {
     assert_eq!(balance.amount_e18, "18446744073709551617");
     assert_eq!(balance.amount, "18.446744073709551617");
 
-    client.withdraw.get_wallet_balances(Some(42)).await.unwrap();
+    client
+        .withdraw
+        .get_wallet_balances(SubAccountScope::Id(42))
+        .await
+        .unwrap();
     assert_eq!(*seen.lock().unwrap(), [0, 42]);
 }
 
@@ -139,7 +148,7 @@ async fn get_wallet_balances_refuses_a_balance_without_amount() {
     .await;
     let err = keyed_client(&server)
         .withdraw
-        .get_wallet_balances(None)
+        .get_wallet_balances(SubAccountScope::Default)
         .await
         .unwrap_err();
     assert!(

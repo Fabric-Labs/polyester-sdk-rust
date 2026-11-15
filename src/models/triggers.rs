@@ -1,6 +1,7 @@
 //! Trigger SDK models (Go `models` parity).
 
 use super::{CreateOrderType, CreateSide, CreateTimeInForce, FeeAsset};
+use crate::models::SubAccountScope;
 use crate::types::{Price, Quantity};
 use buffa_types::google::protobuf::Timestamp;
 
@@ -38,7 +39,7 @@ pub struct CreateTriggerParams {
     /// ladder triggers.
     pub trigger_price_source: Option<String>,
     pub time_in_force: Option<CreateTimeInForce>,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Stable identity for this logical trigger. Persist and reuse it on retries.
     pub client_trigger_id: String,
     pub post_only: bool,
@@ -97,7 +98,7 @@ impl CreateTriggerParams {
             limit_price: None,
             trigger_price_source: None,
             time_in_force: None,
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             client_trigger_id: String::new(),
             post_only: false,
             activation_price: None,
@@ -120,7 +121,7 @@ impl CreateTriggerParams {
 #[derive(Debug, Clone)]
 pub struct ModifyTriggerParams {
     pub trigger_id: String,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
     /// Optional: leave both out to target the trigger's own market. An API
     /// key restricted to some markets must name it.
@@ -147,7 +148,7 @@ pub struct ModifyTriggerParams {
 #[derive(Debug, Clone)]
 pub struct ResumeTriggerParams {
     pub trigger_id: String,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Display symbol; resolved to Connect `symbol_id`. Mutually exclusive with [`Self::symbol_id`].
     /// Optional: leave both out to target the trigger's own market. An API
     /// key restricted to some markets must name it.
@@ -174,11 +175,12 @@ pub struct OcoLegParams {
     /// Limit price of a limit leg's order. Required for a limit leg; must be
     /// `None` for a market leg.
     pub limit_price: Option<Price>,
-    /// Price the leg watches, with the labels trigger reads use: `last`,
-    /// `index` or `mark`. `None` or empty watches the last trade price. The
-    /// server decides which sources a market supports: on a market without an
-    /// index price, an `index` OCO is rejected on both legs, and `mark` is not
-    /// supported. Another label is refused before sending.
+    /// Price the leg watches, with the labels trigger reads use: `last` or
+    /// `index`, in any case. `None` or empty watches the last trade price. On
+    /// a market without an index price, an `index` OCO is rejected on both
+    /// legs by the server. The contract does not support `mark` on an OCO, so
+    /// it is refused with [`crate::Error::Validation`] before sending, as is
+    /// any other label.
     pub trigger_price_source: Option<String>,
 }
 
@@ -242,11 +244,11 @@ pub struct CreateOcoParams {
     pub take_profit: OcoLegParams,
     /// The stop-loss leg.
     pub stop_loss: OcoLegParams,
-    pub subaccount_id: Option<u64>,
-    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, in any
-    /// case; `None` uses the server default, `expire_maker`. Another label is
-    /// refused with [`crate::Error::Validation`] before sending. The server
-    /// judges whether an OCO takes `decrement`.
+    pub subaccount_id: SubAccountScope,
+    /// `expire_taker`, `expire_maker` or `expire_both`, in any case; `None`
+    /// uses the server default, `expire_maker`. The contract does not support
+    /// `decrement` on an OCO, so it is refused with
+    /// [`crate::Error::Validation`] before sending, as is any other label.
     pub self_trade_prevention_mode: Option<String>,
 }
 
@@ -267,7 +269,7 @@ impl CreateOcoParams {
             client_list_id: String::new(),
             take_profit,
             stop_loss,
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             self_trade_prevention_mode: None,
         }
     }
@@ -295,7 +297,7 @@ pub struct ListTriggersOpts {
     /// Omitted or `Some(0)` uses the server default.
     pub limit: Option<u32>,
     pub page_token: Option<String>,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Only triggers of this type (the contract's `trigger_type` filter).
     /// `None` lists every type.
     pub trigger_type: Option<CreateTriggerType>,
@@ -323,9 +325,8 @@ pub struct ListTriggersOpts {
 /// Typed options for [`crate::services::TriggersService::list_events_by_id`].
 #[derive(Debug, Clone, Default)]
 pub struct ListTriggerEventsOpts {
-    /// The sub-account the trigger belongs to; `None` uses the configured
-    /// default sub-account, and with none the main account.
-    pub subaccount_id: Option<u64>,
+    /// The sub-account the trigger belongs to (see [`crate::models::SubAccountScope`]).
+    pub subaccount_id: SubAccountScope,
     /// Omitted or `Some(0)` uses the server default.
     pub limit: Option<u32>,
     /// Only events of this type: `fired`, `canceled`, `updated`, `failed`,

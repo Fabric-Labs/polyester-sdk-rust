@@ -2,6 +2,7 @@ use crate::support::{
     call_optional, call_required, is_internal_order_error, require_live_client, smoke_symbol,
 };
 use polyester::Result;
+use polyester::models::SubAccountScope;
 
 async fn soft_list_rpc<T, F, Fut>(label: &str, f: F) -> Option<T>
 where
@@ -30,7 +31,7 @@ async fn orders_get_accepts_execution_history_flags() {
             key: polyester::models::OrderKey::OrderId(
                 polyester::codecs::scalars::format_uint64_id(1),
             ),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(false),
@@ -57,7 +58,7 @@ async fn orders_get_accepts_execution_history_flags() {
             key: polyester::models::OrderKey::OrderId(
                 polyester::codecs::scalars::format_uint64_id(1),
             ),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(true),
@@ -110,12 +111,20 @@ async fn orders_list_open_and_history() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = soft_list_rpc("orders.list_open", || client.orders.list_open(None)).await;
-    let _ = soft_list_rpc("orders.list_history", || {
-        client.orders.list_history(None, Some(10))
+    let _ = soft_list_rpc("orders.list_open", || {
+        client.orders.list_open(SubAccountScope::Default)
     })
     .await;
-    let _ = call_optional("trades.list", || client.trades.list(None, Some(10))).await;
+    let _ = soft_list_rpc("orders.list_history", || {
+        client
+            .orders
+            .list_history(SubAccountScope::Default, Some(10))
+    })
+    .await;
+    let _ = call_optional("trades.list", || {
+        client.trades.list(SubAccountScope::Default, Some(10))
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -123,7 +132,10 @@ async fn orders_get_round_trip_when_open_exists() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let Some(listed) = call_optional("orders.list_open", || client.orders.list_open(None)).await
+    let Some(listed) = call_optional("orders.list_open", || {
+        client.orders.list_open(SubAccountScope::Default)
+    })
+    .await
     else {
         return;
     };
@@ -135,7 +147,7 @@ async fn orders_get_round_trip_when_open_exists() {
     let by_id = call_required("orders.get", || {
         client.orders.get(
             polyester::models::OrderKey::OrderId(sample.order_id.clone()),
-            None,
+            SubAccountScope::Default,
         )
     })
     .await;
@@ -145,7 +157,7 @@ async fn orders_get_round_trip_when_open_exists() {
         let by_cid = call_required("orders.get", || {
             client.orders.get(
                 polyester::models::OrderKey::ClientOrderId(sample.client_order_id.clone()),
-                None,
+                SubAccountScope::Default,
             )
         })
         .await;
@@ -170,7 +182,9 @@ async fn orders_cancel_all_dry_run_optional() {
     };
     let symbol = smoke_symbol(&spot);
     let _ = call_optional("orders.cancel_all dry_run", || {
-        client.orders.cancel_all(Some(&symbol), true, None)
+        client
+            .orders
+            .cancel_all(Some(&symbol), true, SubAccountScope::Default)
     })
     .await;
 }
@@ -181,7 +195,9 @@ async fn orders_get_state_only_and_execution_history() {
         return;
     };
     let Some(listed) = call_optional("orders.list_history", || {
-        client.orders.list_history(None, Some(10))
+        client
+            .orders
+            .list_history(SubAccountScope::Default, Some(10))
     })
     .await
     else {
@@ -195,7 +211,7 @@ async fn orders_get_state_only_and_execution_history() {
     let state_only = call_required("orders.get_state_only", || {
         client.orders.get_with(polyester::models::GetOrderOpts {
             key: polyester::models::OrderKey::OrderId(sample.order_id.clone()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(false),
@@ -213,7 +229,7 @@ async fn orders_get_state_only_and_execution_history() {
     let with_history = call_required("orders.get_history", || {
         client.orders.get_with(polyester::models::GetOrderOpts {
             key: polyester::models::OrderKey::OrderId(sample.order_id.clone()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(true),

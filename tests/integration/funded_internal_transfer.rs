@@ -5,6 +5,7 @@ use crate::support::{
     trading_balance_raw, unique_client_order_id,
 };
 use polyester::models::CreateInternalTransferParams;
+use polyester::models::SubAccountScope;
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::types::{AssetAmount, QuantityDomain};
 
@@ -90,7 +91,7 @@ async fn internal_transfer_tiny() {
         asset_id,
         quantity: amount,
         idempotency_key: unique_client_order_id("e2e-xfer"),
-        subaccount_id: None,
+        subaccount_id: SubAccountScope::Default,
         destination_account_id: Some(dest),
         destination_subaccount_id: None,
         destination_smart_account_address: None,

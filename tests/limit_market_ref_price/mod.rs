@@ -5,6 +5,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, PreviewOrderParams,
 };
@@ -106,7 +107,7 @@ async fn limit_orders_refuse_market_client_ref_price_before_sending() {
                     "preview" => client.orders.preview(preview(&params)).await.map(drop),
                     _ => client
                         .orders
-                        .batch_create(vec![params], None, None)
+                        .batch_create(vec![params], SubAccountScope::Default, None)
                         .await
                         .map(drop),
                 };

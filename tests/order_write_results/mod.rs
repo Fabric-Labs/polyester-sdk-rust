@@ -8,6 +8,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer};
 use buffa_types::google::protobuf::Timestamp;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     BatchReplaceItem, CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce,
     ModifyOrderParams, OrderKey,
@@ -210,7 +211,7 @@ async fn batch_create_items_carry_the_resolved_quantity(wire: WireFormat) {
                 limit_buy("LTC-USDT", 2, 5),
                 limit_buy("BTC-USDT", 1, 8),
             ],
-            None,
+            SubAccountScope::Default,
             None,
         )
         .await
@@ -262,10 +263,11 @@ async fn batch_replace_keeps_the_acceptance_time_and_existing_order() {
                     ),
                     new_qty: None,
                     new_attached_risk: None,
+                    clear_attached_risk: false,
                     new_client_order_id: Some("held".into()),
                 }],
                 "BTC-USDT",
-                None,
+                SubAccountScope::Default,
                 None,
             )
             .await
@@ -286,11 +288,12 @@ async fn modify(client: &Client) -> polyester::models::ModifyOrderResult {
         .modify(ModifyOrderParams {
             symbol: "BTC-USDT".into(),
             key: OrderKey::OrderId(polyester::codecs::format_uint64_id(42)),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             request_id: None,
             new_price: Some(Price::from_decimal_str("101", Some("BTC-USDT".into())).unwrap()),
             new_qty: None,
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: None,
             new_client_order_id: None,
         })

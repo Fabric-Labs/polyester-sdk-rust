@@ -6,6 +6,7 @@ use crate::support::{
 };
 use polyester::Error;
 use polyester::codecs::scalars::id_to_u64;
+use polyester::models::SubAccountScope;
 use polyester::proto::auth::v1::{
     AddressBookTagInput, CreateAddressBookEntryRequest, DeleteAddressBookEntryRequest,
     ExternalWithdrawAddress, ListAddressBooksRequest, ListSubaccountsRequest,
@@ -17,7 +18,10 @@ async fn api_keys_list() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = call_optional("api_keys.list", || client.api_keys.list(None)).await;
+    let _ = call_optional("api_keys.list", || {
+        client.api_keys.list(SubAccountScope::Default)
+    })
+    .await;
 }
 
 #[tokio::test]

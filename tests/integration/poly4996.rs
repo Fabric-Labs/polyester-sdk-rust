@@ -8,6 +8,7 @@ use crate::support::{
 use polyester::codecs::scalars::LEDGER_SCALE;
 use polyester::codecs::scalars::parse_price_ticks_str;
 use polyester::errors::Error;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     CancelAllOpts, CreateApiKeyTradingWithdrawParams, CreateInternalTransferParams,
     CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType, TriggerDetails,
@@ -327,7 +328,7 @@ async fn create_ladder_decodes_executed_fields() {
                     Err(err) => {
                         let _ = client
                             .triggers
-                            .cancel_by_id(&created.trigger_id, None)
+                            .cancel_by_id(&created.trigger_id, SubAccountScope::Default)
                             .await;
                         panic!("triggers.get: {err}");
                     }
@@ -335,7 +336,7 @@ async fn create_ladder_decodes_executed_fields() {
             let Some(TriggerDetails::Ladder(ladder)) = &trigger.details else {
                 let _ = client
                     .triggers
-                    .cancel_by_id(&created.trigger_id, None)
+                    .cancel_by_id(&created.trigger_id, SubAccountScope::Default)
                     .await;
                 panic!("expected ladder details, got {:?}", trigger.details);
             };
@@ -349,7 +350,7 @@ async fn create_ladder_decodes_executed_fields() {
             }
             let _ = client
                 .triggers
-                .cancel_by_id(&created.trigger_id, None)
+                .cancel_by_id(&created.trigger_id, SubAccountScope::Default)
                 .await;
         }
         Err(err) => {
@@ -443,7 +444,7 @@ async fn twap_market_ioc_accepts_slippage() {
                 assert_eq!(created.status, "accepted");
                 let _ = client
                     .triggers
-                    .cancel_by_id(&created.trigger_id, None)
+                    .cancel_by_id(&created.trigger_id, SubAccountScope::Default)
                     .await;
             }
             Err(err) => {
@@ -567,7 +568,7 @@ async fn transfer_error_detail_from_unknown_destination() {
             asset_id,
             quantity,
             idempotency_key: unique_client_order_id("poly4996-xfer"),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             destination_account_id: None,
             destination_subaccount_id: None,
             destination_smart_account_address: Some(DEAD_SMART_ACCOUNT.to_string()),

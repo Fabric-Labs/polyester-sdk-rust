@@ -8,6 +8,7 @@ use super::hardening_support::{HttpScript, MockHttpServer};
 use buffa::Message as _;
 use buffa_types::google::protobuf::Timestamp;
 use polyester::codecs::decode::{api_key_from_bytes, orders_unit_from_proto};
+use polyester::models::SubAccountScope;
 use polyester::models::{ApiKeySummary, Order, OrderKey};
 use polyester::proto::auth::v1::{
     AddressBookEntriesView, ApiKey as ProtoApiKey, ApiKeyStatus, ExternalAddressBookEntry,
@@ -199,7 +200,11 @@ async fn api_key_reads_keep_policy_subaccount_allowlist_and_expiry() {
                 .expect("key");
             assert_populated(&format!("{label} get"), &got, policy, &expires);
 
-            let listed = client.api_keys.list(None).await.expect("list");
+            let listed = client
+                .api_keys
+                .list(SubAccountScope::Default)
+                .await
+                .expect("list");
             assert_eq!(listed.keys.len(), 2, "{label}: listed keys");
             assert_populated(&format!("{label} list"), &listed.keys[0], policy, &expires);
             assert_absent(&format!("{label} list"), &listed.keys[1]);
@@ -262,17 +267,21 @@ async fn order_reads_keep_batch_request_id() {
             .await;
             let got = client
                 .orders
-                .get(OrderKey::OrderId("901".into()), None)
+                .get(OrderKey::OrderId("901".into()), SubAccountScope::Default)
                 .await
                 .expect("get")
                 .order
                 .expect("order");
             assert_batch(&format!("{label} get"), &got, want);
-            let open = client.orders.list_open(None).await.expect("list_open");
+            let open = client
+                .orders
+                .list_open(SubAccountScope::Default)
+                .await
+                .expect("list_open");
             assert_batch(&format!("{label} list_open"), &open.orders[0], want);
             let history = client
                 .orders
-                .list_history(None, None)
+                .list_history(SubAccountScope::Default, None)
                 .await
                 .expect("list_history");
             assert_batch(&format!("{label} list_history"), &history.orders[0], want);
@@ -299,7 +308,7 @@ async fn ended_orders_keep_batch_request_id() {
             .await;
             let history = client
                 .orders
-                .list_history(None, None)
+                .list_history(SubAccountScope::Default, None)
                 .await
                 .expect("list_history");
             assert_batch(

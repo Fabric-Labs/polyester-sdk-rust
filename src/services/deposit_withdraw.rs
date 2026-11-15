@@ -12,6 +12,7 @@ use crate::connect::chain::deposit::v1::DepositAddressServiceClient;
 use crate::connect::chain::withdraw::v1::WithdrawServiceClient;
 use crate::connect::chain::zipper::v1::ZipperServiceClient;
 use crate::errors::{Error, Result};
+use crate::models::SubAccountScope;
 use crate::models::ZippedAssetSupplyBatch;
 use crate::models::{
     CreateApiKeyTradingWithdrawParams, CreateTradingWithdrawParams,
@@ -137,14 +138,22 @@ impl DepositService {
         Self { ctx }
     }
 
-    /// List the account's deposit addresses. An API key needs
-    /// `READ_DEPOSIT_ADDRESSES` on its API-key policy.
-    pub async fn list_addresses(&self) -> Result<DepositAddressesList> {
+    /// List the deposit addresses of the configured default sub-account, as
+    /// [`Self::create_address`] creates them there, or of the main account
+    /// when none is configured. An API key needs `READ_DEPOSIT_ADDRESSES` on
+    /// its API-key policy.
+    pub async fn list_addresses(
+        &self,
+        subaccount_id: SubAccountScope,
+    ) -> Result<DepositAddressesList> {
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),
             self.ctx.factory.connect_config(),
         );
-        let req = ListDepositAddressesRequest::default();
+        let req = ListDepositAddressesRequest {
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?.unwrap_or(0),
+            ..Default::default()
+        };
         let resp = unary::await_auth(
             &self.ctx.factory,
             "/chain.deposit.v1.DepositAddressService/ListDepositAddresses",
@@ -350,9 +359,12 @@ impl WithdrawService {
     /// failed chain read is a retryable `unavailable`; an account without a
     /// wallet is refused with `failed_precondition`
     /// (`SOURCE_SMART_ACCOUNT_UNAVAILABLE`).
-    pub async fn get_wallet_balances(&self, subaccount_id: Option<u64>) -> Result<WalletBalances> {
+    pub async fn get_wallet_balances(
+        &self,
+        subaccount_id: SubAccountScope,
+    ) -> Result<WalletBalances> {
         let req = GetWalletBalancesRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?.unwrap_or(0),
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?.unwrap_or(0),
             ..Default::default()
         };
         let client = self.connect_client();
@@ -531,8 +543,7 @@ impl WithdrawService {
         let mut req = CreateWalletTradingWithdrawRequest {
             signer_wallet: params.signer_wallet,
             payload_signature: params.payload_signature,
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?
-                .unwrap_or(0),
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?.unwrap_or(0),
             ..Default::default()
         };
         *req.payload.get_or_insert_default() = payload;
@@ -863,7 +874,7 @@ mod tests {
                 signer_wallet: "0x1".into(),
                 destination_chain_id: 0,
                 destination_address: String::new(),
-                subaccount_id: None,
+                subaccount_id: SubAccountScope::Default,
                 amount_scale: Some(18),
                 deadline_ts_sec: Some(1_800_000_000),
                 nonce: 42,

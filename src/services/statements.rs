@@ -4,6 +4,7 @@ use super::changelog::timestamp_field;
 use super::{ServiceContext, scope, unary};
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::{Error, Result};
+use crate::models::SubAccountScope;
 use crate::models::{Statement, StatementPage};
 use crate::proto::ledger::read::v1::ExportStatementRequest;
 use crate::transport::SharedTransport;
@@ -17,11 +18,11 @@ const EXPORT_STATEMENT: &str = "/ledger.read.v1.LedgerReadService/ExportStatemen
 /// days. The statement is CSV; there is no other format.
 #[derive(Debug, Clone, Default)]
 pub struct ExportStatementOptions {
-    /// Public sub-account ID, decoded. `None` takes the configured default
-    /// sub-account, as the other ledger reads do; with no default, a key
-    /// scoped to a sub-account reads that sub-account and other callers
-    /// their main account. `Some(0)` is refused.
-    pub subaccount_id: Option<u64>,
+    /// The account to export (see [`SubAccountScope`]). With
+    /// [`SubAccountScope::Default`] and no default configured, a key scoped to a
+    /// sub-account reads that sub-account and other callers their main
+    /// account. [`SubAccountScope::Id`] 0 is refused.
+    pub subaccount_id: SubAccountScope,
     /// Start of the period (UTC), inclusive. Required.
     pub start_time: Option<SystemTime>,
     /// End of the period (UTC), exclusive. Required. A period that has not
@@ -59,7 +60,7 @@ impl StatementsService {
                 .ok_or_else(|| Error::validation(format!("export_statement {field} is required")))
         };
         Ok(ExportStatementRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             start_time: timestamp_field(required(opts.start_time, "start_time")?),
             end_time: timestamp_field(required(opts.end_time, "end_time")?),
             asset_id: opts.asset_id.unwrap_or(0),

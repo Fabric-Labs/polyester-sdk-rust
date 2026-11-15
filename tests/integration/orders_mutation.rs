@@ -1,3 +1,4 @@
+use polyester::models::SubAccountScope;
 use std::time::{Duration, SystemTime};
 
 use crate::support::{
@@ -100,7 +101,10 @@ async fn order_round_trip_mutation() {
             eprintln!(
                 "skip: devnet order create accepted but orders read APIs never indexed the order"
             );
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         }
         Err(err) => panic!("wait open: {err}"),
@@ -110,7 +114,7 @@ async fn order_round_trip_mutation() {
     let detail = call_required("orders.get", || {
         client.orders.get(
             polyester::models::OrderKey::ClientOrderId(client_order_id.clone()),
-            None,
+            SubAccountScope::Default,
         )
     })
     .await;
@@ -128,7 +132,7 @@ async fn order_round_trip_mutation() {
     // Cancel by client id first (Go parity); cancel_all is cleanup only.
     match client
         .orders
-        .cancel_by_client_order_id(&client_order_id, Some(&symbol), None)
+        .cancel_by_client_order_id(&client_order_id, Some(&symbol), SubAccountScope::Default)
         .await
     {
         Ok(cancelled) => {
@@ -140,18 +144,27 @@ async fn order_round_trip_mutation() {
         }
         Err(err) if is_not_found(&err) => {
             eprintln!("skip: cancel not_found (order already gone / not indexed): {err}");
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         }
         Err(err) => {
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             panic!("cancel: {err}");
         }
     }
     if let Err(err) = wait_for_no_open_order(&client, &client_order_id, Duration::ZERO).await {
         eprintln!("skip: wait gone: {err}");
     }
-    let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+    let _ = client
+        .orders
+        .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+        .await;
 }
 
 async fn wait_listed_open(
@@ -160,7 +173,7 @@ async fn wait_listed_open(
 ) -> std::result::Result<polyester::models::Order, Box<dyn std::error::Error + Send + Sync>> {
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while std::time::Instant::now() < deadline {
-        if let Ok(listed) = client.orders.list_open(None).await
+        if let Ok(listed) = client.orders.list_open(SubAccountScope::Default).await
             && let Some(order) = listed
                 .orders
                 .into_iter()
@@ -262,11 +275,11 @@ async fn order_modify_advances_lineage() {
     let cleanup = || async {
         let _ = client
             .orders
-            .cancel_by_client_order_id(&replacement_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&replacement_cid, Some(&symbol), SubAccountScope::Default)
             .await;
         let _ = client
             .orders
-            .cancel_by_client_order_id(&original_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&original_cid, Some(&symbol), SubAccountScope::Default)
             .await;
     };
 
@@ -283,7 +296,7 @@ async fn order_modify_advances_lineage() {
         .orders
         .get_with(GetOrderOpts {
             key: OrderKey::ClientOrderId(original_cid.clone()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(false),
@@ -327,7 +340,7 @@ async fn order_modify_advances_lineage() {
         .modify(ModifyOrderParams {
             symbol: symbol.clone(),
             key: OrderKey::ClientOrderId(original_cid.clone()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             request_id: None,
             new_price: Some(
                 match Price::from_decimal_str(&new_price, Some(symbol.clone())) {
@@ -340,6 +353,7 @@ async fn order_modify_advances_lineage() {
             ),
             new_qty: None,
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: Some("replace_only".into()),
             new_client_order_id: Some(replacement_cid.clone()),
         })
@@ -373,7 +387,7 @@ async fn order_modify_advances_lineage() {
         .orders
         .get_with(GetOrderOpts {
             key: OrderKey::OrderId(modified.final_order_id.clone()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(false),
@@ -492,7 +506,10 @@ async fn gtd_limit_order_round_trip() {
         Ok(o) => o,
         Err(err) if err.downcast_ref::<DevnetOrderNotIndexedError>().is_some() => {
             eprintln!("skip: GTD order accepted but not indexed");
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         }
         Err(err) => panic!("wait open: {err}"),
@@ -509,7 +526,7 @@ async fn gtd_limit_order_round_trip() {
     let detail = call_required("orders.get", || {
         client.orders.get(
             polyester::models::OrderKey::ClientOrderId(client_order_id.clone()),
-            None,
+            SubAccountScope::Default,
         )
     })
     .await;
@@ -519,8 +536,11 @@ async fn gtd_limit_order_round_trip() {
 
     let _ = client
         .orders
-        .cancel_by_client_order_id(&client_order_id, Some(&symbol), None)
+        .cancel_by_client_order_id(&client_order_id, Some(&symbol), SubAccountScope::Default)
         .await;
     let _ = wait_for_no_open_order(&client, &client_order_id, Duration::ZERO).await;
-    let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+    let _ = client
+        .orders
+        .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+        .await;
 }

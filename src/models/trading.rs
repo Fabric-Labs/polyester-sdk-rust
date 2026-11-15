@@ -1,5 +1,6 @@
 //! Trading read/write models (Go `models/trading.go` parity).
 
+use crate::models::SubAccountScope;
 use crate::types::{AssetAmount, Price, Quantity};
 use buffa_types::google::protobuf::Timestamp;
 use rust_decimal::Decimal;
@@ -519,7 +520,13 @@ pub struct BatchReplaceItem {
     /// given: the request does not carry the order's side, so the server
     /// applies the side rule (a maximum only when the order sells) and
     /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
+    /// `None` leaves the order's legs unchanged; an empty `AttachedRisk` is
+    /// refused.
     pub new_attached_risk: Option<AttachedRisk>,
+    /// Remove the order's attached take-profit, stop-loss and trailing stop,
+    /// alone or with a new price or quantity: sends an empty risk policy.
+    /// Refused with [`crate::Error::Validation`] with `new_attached_risk`.
+    pub clear_attached_risk: bool,
     pub new_client_order_id: Option<String>,
 }
 
@@ -528,7 +535,7 @@ pub struct BatchReplaceItem {
 pub struct ModifyOrderParams {
     pub symbol: String,
     pub key: OrderKey,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Optional mutation request id (API-required on the wire).
     ///
     /// When omitted or blank, the SDK generates a unique id (TypeScript/Go/Python parity).
@@ -542,7 +549,13 @@ pub struct ModifyOrderParams {
     /// given: the request does not carry the order's side, so the server
     /// applies the side rule (a maximum only when the order sells) and
     /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
+    /// `None` leaves the order's legs unchanged; an empty `AttachedRisk` is
+    /// refused.
     pub new_attached_risk: Option<AttachedRisk>,
+    /// Remove the order's attached take-profit, stop-loss and trailing stop,
+    /// alone or with a new price or quantity: sends an empty risk policy.
+    /// Refused with [`crate::Error::Validation`] with `new_attached_risk`.
+    pub clear_attached_risk: bool,
     pub behavior: Option<String>,
     pub new_client_order_id: Option<String>,
 }
@@ -740,7 +753,7 @@ pub struct CreateInternalTransferParams {
     pub asset_id: u32,
     pub quantity: AssetAmount,
     pub idempotency_key: String,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub destination_account_id: Option<String>,
     pub destination_subaccount_id: Option<String>,
     pub destination_smart_account_address: Option<String>,
@@ -797,7 +810,7 @@ pub struct CreateWalletTradingWithdrawParams {
     pub signer_wallet: String,
     pub destination_chain_id: u64,
     pub destination_address: String,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     /// Input amount scale when `amount` does not carry one. Wire `amount_e18`
     /// is always rescaled exactly to 18 decimals.
     pub amount_scale: Option<u32>,
@@ -942,7 +955,7 @@ pub struct DeadManSwitchScope {
 /// Options for [`crate::services::OrdersService::list_open_with`].
 #[derive(Debug, Clone, Default)]
 pub struct ListOpenOrdersOpts {
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub page_token: Option<String>,
     pub limit: Option<u32>,
     pub include_attached_risk: bool,
@@ -954,7 +967,7 @@ pub struct ListOpenOrdersOpts {
 /// Options for [`crate::services::OrdersService::list_history_with`].
 #[derive(Debug, Clone, Default)]
 pub struct ListOrderHistoryOpts {
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     pub page_token: Option<String>,
@@ -972,7 +985,7 @@ pub struct ListOrderHistoryOpts {
 /// symbol filter stays optional.
 #[derive(Debug, Clone, Default)]
 pub struct ListUserTradesOpts {
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     pub after_match_id: Option<u64>,
@@ -988,7 +1001,7 @@ pub struct ListUserTradesOpts {
 #[derive(Debug, Clone)]
 pub struct GetOrderOpts {
     pub key: OrderKey,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
     /// `None` omits the field so the server default (enabled) applies.
@@ -1003,7 +1016,7 @@ pub struct CancelOrderParams {
     pub key: OrderKey,
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
 }
 
 /// Options for [`crate::services::OrdersService::cancel_all_with`].
@@ -1014,7 +1027,7 @@ pub struct CancelAllOpts {
     pub symbol_id: Option<u32>,
     pub symbol_ids: Vec<u32>,
     pub dry_run: bool,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub side: Option<String>,
     /// Optional mutation request id (API-required on the wire).
     ///
@@ -1029,8 +1042,8 @@ pub struct CancelAllOpts {
 /// and optionally one market.
 #[derive(Debug, Clone, Default)]
 pub struct StopAllTradingScope {
-    /// Sub-account to stop; `None` uses the client's default scope.
-    pub subaccount_id: Option<u64>,
+    /// Sub-account to stop (see [`SubAccountScope`]).
+    pub subaccount_id: SubAccountScope,
     /// Market to stop, such as `BTC-USDT`; `None` stops every market.
     pub symbol: Option<String>,
     /// Request id of the final cancel-all; generated when omitted. Reuse it
@@ -1140,7 +1153,7 @@ pub struct CreateOrderParams {
     /// creating again; a second create with the same id is a conflict if the
     /// first attempt admitted. Omit (`None`) for one-shot creates.
     pub client_order_id: Option<String>,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub post_only: Option<bool>,
     /// Client reference price for MARKET order reservation (price ticks domain).
     /// Rejected on limit orders.
@@ -1176,7 +1189,7 @@ impl CreateOrderParams {
             peg: None,
             time_in_force: None,
             client_order_id: None,
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             post_only: None,
             market_client_ref_price: None,
             fee_asset: None,
@@ -1287,7 +1300,7 @@ pub struct PreviewOrderParams {
     /// Optional client order id. Accepted for shape parity with create; preview
     /// does not claim it.
     pub client_order_id: Option<String>,
-    pub subaccount_id: Option<u64>,
+    pub subaccount_id: SubAccountScope,
     pub post_only: Option<bool>,
     pub market_client_ref_price: Option<Price>,
     pub fee_asset: Option<FeeAsset>,
@@ -1319,7 +1332,7 @@ impl PreviewOrderParams {
             peg: None,
             time_in_force: None,
             client_order_id: None,
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             post_only: None,
             market_client_ref_price: None,
             fee_asset: None,

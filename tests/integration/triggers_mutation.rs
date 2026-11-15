@@ -1,3 +1,4 @@
+use polyester::models::SubAccountScope;
 use std::time::Duration;
 
 use crate::support::{
@@ -163,7 +164,7 @@ async fn trigger_pause_resume_cancel() {
 
     let resumed = match client
         .triggers
-        .resume_by_id(&trigger_id, Some(&symbol), None)
+        .resume_by_id(&trigger_id, Some(&symbol), SubAccountScope::Default)
         .await
     {
         Ok(r) => r,

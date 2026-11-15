@@ -16,6 +16,8 @@ mod catalog_startup_recovery;
 mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
+#[path = "clear_attached_risk/mod.rs"]
+mod clear_attached_risk;
 #[path = "contract_74af7f3/mod.rs"]
 mod contract_74af7f3;
 #[path = "contract_e339360/mod.rs"]
@@ -57,6 +59,8 @@ mod request_size_rate_limit;
 mod signed_redirects;
 #[path = "subaccount_get_expansions/mod.rs"]
 mod subaccount_get_expansions;
+#[path = "subaccount_selector/mod.rs"]
+mod subaccount_selector;
 #[path = "trigger_oco_and_batch_cancel/mod.rs"]
 mod trigger_oco_and_batch_cancel;
 #[path = "trigger_reads_and_filters/mod.rs"]
@@ -77,6 +81,7 @@ use polyester::Error;
 use polyester::auth::Credentials;
 use polyester::chain::JsonRpcClient;
 use polyester::codecs::{MAX_PROTOCOL_SCALE, format_ledger_u128, format_qty_scaled};
+use polyester::models::SubAccountScope;
 use polyester::realtime::Client as RealtimeClient;
 use polyester::realtime::{
     MAX_REALTIME_MESSAGE_BYTES, SnapshotThenStream, SnapshotThenStreamConfig,
@@ -652,7 +657,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             p.price = Some(price.clone());
             p.time_in_force = Some(CreateTimeInForce::Gtc);
             p.client_order_id = Some("fault-order".into());
-            p.subaccount_id = Some(4);
+            p.subaccount_id = SubAccountScope::Id(4);
             p
         })
         .await
@@ -670,7 +675,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
                 quantity,
             );
             p.trigger_price = Some(price);
-            p.subaccount_id = Some(4);
+            p.subaccount_id = SubAccountScope::Id(4);
             p.client_trigger_id = "fault-trigger".into();
             p
         })
@@ -701,7 +706,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
             asset_id: 7,
             quantity: amount,
             idempotency_key: "fault-transfer".into(),
-            subaccount_id: Some(4),
+            subaccount_id: SubAccountScope::Id(4),
             destination_account_id: Some("2".into()),
             destination_subaccount_id: None,
             destination_smart_account_address: None,
@@ -2893,7 +2898,7 @@ async fn l2_batch_cancel_rejects_inconsistent_server_counts_through_public_servi
                 key: polyester::models::OrderKey::OrderId("9".into()),
                 symbol_id: None,
             }],
-            None,
+            SubAccountScope::Default,
             Some("count-mismatch".into()),
         )
         .await
@@ -2934,7 +2939,7 @@ async fn l2_cancel_all_rejects_empty_and_unknown_status_through_public_service()
 
         let err = client
             .orders
-            .cancel_all(None, false, None)
+            .cancel_all(None, false, SubAccountScope::Default)
             .await
             .expect_err("empty/unknown cancel-all status must fail closed");
         assert!(err.to_string().contains("unknown status"), "{err}");
@@ -2973,7 +2978,7 @@ async fn l2_cancel_all_after_rejects_empty_and_unknown_status_through_public_ser
 
         let err = client
             .orders
-            .cancel_all_after(15, None, None, None)
+            .cancel_all_after(15, None, SubAccountScope::Default, None)
             .await
             .expect_err("empty/unknown cancel-all-after status must fail closed");
         assert!(err.to_string().contains("unknown status"), "{err}");
@@ -3033,10 +3038,11 @@ async fn l2_batch_replace_rejects_inconsistent_server_counts_through_public_serv
                 new_price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 new_client_order_id: None,
             }],
             "BTC-USDT",
-            None,
+            SubAccountScope::Default,
             Some("replace-count-mismatch".into()),
         )
         .await
@@ -3420,7 +3426,7 @@ async fn precomputed_withdraw_fields_and_unknown_wallet_actions_fail_closed() {
             signer_wallet: "0x1".into(),
             destination_chain_id: 0,
             destination_address: String::new(),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             amount_scale: Some(18),
             deadline_ts_sec: Some(1_800_000_000),
             nonce: 42,
@@ -4268,12 +4274,15 @@ async fn l2_trigger_modify_and_resume_send_without_a_symbol() {
     .await;
     let client = api_key_client(&http);
 
-    let _ = client.triggers.resume_by_id("1", None, None).await;
+    let _ = client
+        .triggers
+        .resume_by_id("1", None, SubAccountScope::Default)
+        .await;
     let _ = client
         .triggers
         .modify(ModifyTriggerParams {
             trigger_id: "1".into(),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             symbol: None,
             symbol_id: None,
             trigger_price: None,
@@ -4907,7 +4916,11 @@ async fn l2_wait_batch_replace_polls_until_no_item_is_admitted() {
         .await;
         let status = api_key_client(&http)
             .orders
-            .wait_batch_replace(&polyester::codecs::format_uint64_id(4242), None, None)
+            .wait_batch_replace(
+                &polyester::codecs::format_uint64_id(4242),
+                SubAccountScope::Default,
+                None,
+            )
             .await
             .expect("settled");
         assert_eq!(calls.load(Ordering::SeqCst), 4);
@@ -4928,7 +4941,11 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     let http = MockHttpServer::spawn(|_| batch_status(BatchReplacePhase::Admitted, "")).await;
     let err = api_key_client(&http)
         .orders
-        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .wait_batch_replace(
+            "1",
+            SubAccountScope::Default,
+            Some(Duration::from_millis(300)),
+        )
         .await
         .expect_err("still admitted");
     assert!(
@@ -4947,7 +4964,11 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     .await;
     let err = api_key_client(&http)
         .orders
-        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .wait_batch_replace(
+            "1",
+            SubAccountScope::Default,
+            Some(Duration::from_millis(300)),
+        )
         .await
         .expect_err("never found");
     assert!(
@@ -4966,7 +4987,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
     .await;
     let err = api_key_client(&http)
         .orders
-        .wait_batch_replace("1", None, None)
+        .wait_batch_replace("1", SubAccountScope::Default, None)
         .await
         .expect_err("denied");
     assert!(!matches!(err, Error::Transport(_)), "{err:?}");
@@ -5047,7 +5068,7 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
     // One read shows the failure really is the network, not an answer.
     let direct = client
         .orders
-        .get_batch_replace_status("1", None)
+        .get_batch_replace_status("1", SubAccountScope::Default)
         .await
         .expect_err("nothing listens");
     assert!(
@@ -5058,7 +5079,11 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
     let started = Instant::now();
     let err = client
         .orders
-        .wait_batch_replace("1", None, Some(Duration::from_millis(300)))
+        .wait_batch_replace(
+            "1",
+            SubAccountScope::Default,
+            Some(Duration::from_millis(300)),
+        )
         .await
         .expect_err("nothing listens");
     assert!(
@@ -5201,7 +5226,7 @@ async fn l2_api_key_refusal_reasons_read_the_same_on_connect_and_rest() {
             let http = MockHttpServer::spawn(move |_| json_body(401, content_type, &body)).await;
             let err = api_key_client(&http)
                 .orders
-                .list_open(None)
+                .list_open(SubAccountScope::Default)
                 .await
                 .expect_err("refused");
             assert_eq!(err.auth_code(), Some(code), "{content_type}: {err:?}");
@@ -5236,7 +5261,7 @@ async fn l2_api_key_refusal_reasons_read_the_same_on_connect_and_rest() {
     .await;
     let err = api_key_client(&http)
         .orders
-        .list_open(None)
+        .list_open(SubAccountScope::Default)
         .await
         .expect_err("refused");
     assert_eq!(
@@ -5266,7 +5291,7 @@ async fn l2_session_only_refusal_is_session_required_on_connect_and_rest() {
         let http = MockHttpServer::spawn(move |_| json_body(403, content_type, &body)).await;
         let err = api_key_client(&http)
             .orders
-            .list_open(None)
+            .list_open(SubAccountScope::Default)
             .await
             .expect_err("refused");
         assert!(
@@ -7761,7 +7786,13 @@ async fn l2_snapshot_refresh_retries_gateway_504() {
         decode: Arc::new(|_b| Ok(1u8)),
         fetch_snapshot: Arc::new(move || {
             let client = client.clone();
-            async move { client.orders.get_batch_replace_status("4242", None).await }.boxed()
+            async move {
+                client
+                    .orders
+                    .get_batch_replace_status("4242", SubAccountScope::Default)
+                    .await
+            }
+            .boxed()
         }),
         read_publication: Arc::new(|p| vec![p]),
         apply_snapshot: Arc::new(|_s, _p| {}),
@@ -7994,7 +8025,11 @@ async fn l2_retry_contract_read_recovery() {
                 "wait" => {
                     client
                         .orders
-                        .wait_batch_replace("4242", None, Some(Duration::from_secs(2)))
+                        .wait_batch_replace(
+                            "4242",
+                            SubAccountScope::Default,
+                            Some(Duration::from_secs(2)),
+                        )
                         .await
                         .unwrap();
                 }
@@ -8005,7 +8040,13 @@ async fn l2_retry_contract_read_recovery() {
                         decode: Arc::new(|_| Ok(1u8)),
                         fetch_snapshot: Arc::new(move || {
                             let client = client.clone();
-                            async move {client.orders.get_batch_replace_status("4242",None).await}.boxed()
+                            async move {
+                                client
+                                    .orders
+                                    .get_batch_replace_status("4242", SubAccountScope::Default)
+                                    .await
+                            }
+                            .boxed()
                         }),
                         read_publication: Arc::new(|p| vec![p]),
                         apply_snapshot: Arc::new(|_, _| {}),
@@ -8812,7 +8853,11 @@ async fn batch_create_refuses_item_subaccount_instead_of_using_default() {
         let before = seen.lock().unwrap().len();
         client
             .orders
-            .batch_create(vec![item(None)], top, None)
+            .batch_create(
+                vec![item(SubAccountScope::Default)],
+                top.map_or(SubAccountScope::Default, SubAccountScope::Id),
+                None,
+            )
             .await
             .unwrap();
         let requests = seen.lock().unwrap();
@@ -8828,7 +8873,14 @@ async fn batch_create_refuses_item_subaccount_instead_of_using_default() {
             let before = seen.lock().unwrap().len();
             let result = client
                 .orders
-                .batch_create(vec![item(None), item(Some(sub))], top, None)
+                .batch_create(
+                    vec![
+                        item(SubAccountScope::Default),
+                        item(SubAccountScope::Id(sub)),
+                    ],
+                    top.map_or(SubAccountScope::Default, SubAccountScope::Id),
+                    None,
+                )
                 .await;
             assert!(
                 matches!(result, Err(Error::Validation(ref message)) if message.contains("batch-level subaccount_id")),
@@ -8961,11 +9013,12 @@ async fn order_writes_check_quantity_scale_against_the_resolved_market() {
         ModifyOrderParams {
             symbol: symbol.into(),
             key: OrderKey::OrderId(polyester::codecs::scalars::format_id(9)),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             request_id: None,
             new_price: None,
             new_qty: Some(quantity),
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: None,
             new_client_order_id: None,
         }
@@ -8996,7 +9049,7 @@ async fn order_writes_check_quantity_scale_against_the_resolved_market() {
                 .orders
                 .batch_create(
                     vec![order("BTC-USDT", good), order(symbol, quantity)],
-                    None,
+                    SubAccountScope::Default,
                     None,
                 )
                 .await
@@ -9117,6 +9170,11 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
             // Plain `u64` fields: zero is what an unset field sends.
             "CreateDepositAddress" => plain(
                 deposit::CreateDepositAddressRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListDepositAddresses" => plain(
+                deposit::ListDepositAddressesRequest::decode_from_slice(body)
                     .unwrap()
                     .subaccount_id,
             ),
@@ -9264,7 +9322,7 @@ fn scope_order(subaccount_id: Option<u64>) -> polyester::models::CreateOrderPara
     let mut params = CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
     params.quantity = Some(scope_quantity());
     params.price = Some(scope_price());
-    params.subaccount_id = subaccount_id;
+    params.subaccount_id = subaccount_id.map_or(SubAccountScope::Default, SubAccountScope::Id);
     params
 }
 
@@ -9311,16 +9369,18 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                     PreviewOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
                 params.quantity = Some(scope_quantity());
                 params.price = Some(scope_price());
-                params.subaccount_id = sub;
+                params.subaccount_id = sub.map_or(SubAccountScope::Default, SubAccountScope::Id);
                 params
             })
         );
         captures!(
             "orders.batch_create",
             ["BatchCreateOrders"],
-            client
-                .orders
-                .batch_create(vec![scope_order(None)], sub, None)
+            client.orders.batch_create(
+                vec![scope_order(None)],
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
+                None
+            )
         );
         captures!(
             "orders.batch_cancel",
@@ -9330,7 +9390,7 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                     key: id(),
                     symbol_id: None
                 }],
-                sub,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 None
             )
         );
@@ -9343,10 +9403,11 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                     new_price: Some(scope_price()),
                     new_qty: None,
                     new_attached_risk: None,
+                    clear_attached_risk: false,
                     new_client_order_id: None,
                 }],
                 "BTC-USDT",
-                sub,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 None
             )
         );
@@ -9356,11 +9417,12 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
             client.orders.modify(ModifyOrderParams {
                 symbol: "BTC-USDT".into(),
                 key: id(),
-                subaccount_id: sub,
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 request_id: None,
                 new_price: Some(scope_price()),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 behavior: None,
                 new_client_order_id: None,
             })
@@ -9372,38 +9434,52 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                 key: id(),
                 symbol: None,
                 symbol_id: None,
-                subaccount_id: sub
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
             })
         );
         captures!(
             "orders.cancel_by_order_id",
             ["CancelOrder"],
-            client.orders.cancel_by_order_id("9", sub)
+            client.orders.cancel_by_order_id(
+                "9",
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "orders.cancel_by_client_order_id",
             ["CancelOrder"],
-            client
-                .orders
-                .cancel_by_client_order_id("client-9", None, sub)
+            client.orders.cancel_by_client_order_id(
+                "client-9",
+                None,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "orders.cancel_all",
             ["CancelAllOrders"],
-            client.orders.cancel_all(None, false, sub)
+            client.orders.cancel_all(
+                None,
+                false,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "orders.cancel_all_with",
             ["CancelAllOrders"],
             client.orders.cancel_all_with(CancelAllOpts {
-                subaccount_id: sub,
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 ..Default::default()
             })
         );
         captures!(
             "orders.cancel_all_after",
             ["CancelAllAfter"],
-            client.orders.cancel_all_after(15, None, sub, None)
+            client.orders.cancel_all_after(
+                15,
+                None,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
+                None
+            )
         );
         captures!(
             "triggers.create",
@@ -9417,7 +9493,7 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                     scope_quantity(),
                 );
                 params.trigger_price = Some(scope_price());
-                params.subaccount_id = sub;
+                params.subaccount_id = sub.map_or(SubAccountScope::Default, SubAccountScope::Id);
                 params.client_trigger_id = "scope-trigger".into();
                 params
             })
@@ -9427,7 +9503,7 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
             ["ModifyTrigger"],
             client.triggers.modify(ModifyTriggerParams {
                 trigger_id: "9".into(),
-                subaccount_id: sub,
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 symbol: None,
                 symbol_id: None,
                 trigger_price: None,
@@ -9441,24 +9517,34 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
         captures!(
             "triggers.cancel_by_id",
             ["CancelTrigger"],
-            client.triggers.cancel_by_id("9", sub)
+            client.triggers.cancel_by_id(
+                "9",
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "triggers.pause_by_id",
             ["PauseTrigger"],
-            client.triggers.pause_by_id("9", sub)
+            client.triggers.pause_by_id(
+                "9",
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "triggers.resume_by_id",
             ["ResumeTrigger"],
-            client.triggers.resume_by_id("9", None, sub)
+            client.triggers.resume_by_id(
+                "9",
+                None,
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "triggers.resume_with",
             ["ResumeTrigger"],
             client.triggers.resume_with(ResumeTriggerParams {
                 trigger_id: "9".into(),
-                subaccount_id: sub,
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 symbol: None,
                 symbol_id: None,
             })
@@ -9466,15 +9552,38 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
         captures!(
             "triggers.get_by_id",
             ["GetTrigger"],
-            client.triggers.get_by_id("9", sub)
+            client.triggers.get_by_id(
+                "9",
+                sub.map_or(SubAccountScope::Default, SubAccountScope::Id)
+            )
         );
         captures!(
             "stop_all_trading",
             ["ListTriggers", "CancelTrigger", "CancelAllOrders"],
             client.stop_all_trading(StopAllTradingScope {
-                subaccount_id: sub,
+                subaccount_id: sub.map_or(SubAccountScope::Default, SubAccountScope::Id),
                 ..Default::default()
             })
+        );
+    }
+}
+
+// `deposit.list_addresses()` lists the configured default sub-account's
+// addresses, as `deposit.create_address` creates them there; with no default
+// it lists the main account's.
+#[tokio::test]
+async fn deposit_list_addresses_uses_the_default_subaccount() {
+    for (default, want) in [(Some(42), Some(42)), (None, None)] {
+        let (_server, client, seen) = scope_capture_client(default).await;
+        let _ = client
+            .deposit
+            .list_addresses(polyester::models::SubAccountScope::Default)
+            .await;
+        let got = std::mem::take(&mut *seen.lock().unwrap());
+        assert_eq!(
+            got,
+            vec![("ListDepositAddresses".to_owned(), want)],
+            "default={default:?}"
         );
     }
 }
@@ -9868,7 +9977,7 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
         .list_events_by_id(
             &TRIGGER.to_string(),
             ListTriggerEventsOpts {
-                subaccount_id: Some(44),
+                subaccount_id: SubAccountScope::Id(44),
                 limit: Some(25),
                 event_type: Some("fired".into()),
                 page_token: Some("next".into()),
@@ -10319,20 +10428,24 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
                 new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 new_client_order_id: None,
             })
             .collect::<Vec<_>>()
     };
     for n in [20, 21, 50] {
-        let _ = client.orders.batch_cancel(cancel(n), None, None).await;
         let _ = client
             .orders
-            .batch_replace(replace(n), "BTC-USDT", None, None)
+            .batch_cancel(cancel(n), SubAccountScope::Default, None)
+            .await;
+        let _ = client
+            .orders
+            .batch_replace(replace(n), "BTC-USDT", SubAccountScope::Default, None)
             .await;
     }
     let err = client
         .orders
-        .batch_cancel(cancel(51), None, None)
+        .batch_cancel(cancel(51), SubAccountScope::Default, None)
         .await
         .expect_err("51 cancel items exceed the contract");
     assert!(
@@ -10342,7 +10455,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     );
     let err = client
         .orders
-        .batch_replace(replace(51), "BTC-USDT", None, None)
+        .batch_replace(replace(51), "BTC-USDT", SubAccountScope::Default, None)
         .await
         .expect_err("51 replace items exceed the contract");
     assert!(
@@ -10415,10 +10528,11 @@ async fn l2_batch_replace_sends_new_attached_risk() {
                     stop_loss: Some(RiskLeg::market(stop)),
                     ..Default::default()
                 }),
+                clear_attached_risk: false,
                 new_client_order_id: None,
             }],
             "BTC-USDT",
-            None,
+            SubAccountScope::Default,
             None,
         )
         .await;
@@ -10493,7 +10607,7 @@ async fn explicit_subaccount_zero_is_refused_before_sending() {
         p.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).unwrap());
         p.time_in_force = Some(CreateTimeInForce::Gtc);
         p.client_order_id = Some("zero-scope".into());
-        p.subaccount_id = subaccount_id;
+        p.subaccount_id = subaccount_id.map_or(SubAccountScope::Default, SubAccountScope::Id);
         p
     };
 
@@ -10504,8 +10618,16 @@ async fn explicit_subaccount_zero_is_refused_before_sending() {
 
     let refused = [
         client.orders.create(order(Some(0))).await.map(|_| ()),
-        client.orders.list_open(Some(0)).await.map(|_| ()),
-        client.api_keys.list(Some(0)).await.map(|_| ()),
+        client
+            .orders
+            .list_open(SubAccountScope::Id(0))
+            .await
+            .map(|_| ()),
+        client
+            .api_keys
+            .list(SubAccountScope::Id(0))
+            .await
+            .map(|_| ()),
         client
             .sub_accounts
             .get("1", GetSubaccountOpts::default())
@@ -10743,17 +10865,25 @@ async fn zero_default_subaccount_is_refused_before_sending() {
             ),
             (
                 "orders.list_open",
-                client.orders.list_open(None).await.map(drop),
+                client
+                    .orders
+                    .list_open(SubAccountScope::Default)
+                    .await
+                    .map(drop),
             ),
             (
                 "orders.list_history",
-                client.orders.list_history(None, None).await.map(drop),
+                client
+                    .orders
+                    .list_history(SubAccountScope::Default, None)
+                    .await
+                    .map(drop),
             ),
             (
                 "orders.get_batch_replace_status",
                 client
                     .orders
-                    .get_batch_replace_status(id, None)
+                    .get_batch_replace_status(id, SubAccountScope::Default)
                     .await
                     .map(drop),
             ),
@@ -10761,7 +10891,7 @@ async fn zero_default_subaccount_is_refused_before_sending() {
                 "orders.cancel_all_after",
                 client
                     .orders
-                    .cancel_all_after(10, None, None, None)
+                    .cancel_all_after(10, None, SubAccountScope::Default, None)
                     .await
                     .map(drop),
             ),
@@ -10785,13 +10915,20 @@ async fn zero_default_subaccount_is_refused_before_sending() {
                             key: OrderKey::OrderId(id.into()),
                             symbol_id: Some(1),
                         }],
-                        None,
+                        SubAccountScope::Default,
                         None,
                     )
                     .await
                     .map(drop),
             ),
-            ("api_keys.list", client.api_keys.list(None).await.map(drop)),
+            (
+                "api_keys.list",
+                client
+                    .api_keys
+                    .list(SubAccountScope::Default)
+                    .await
+                    .map(drop),
+            ),
             (
                 "triggers.list_with",
                 client
@@ -10802,21 +10939,33 @@ async fn zero_default_subaccount_is_refused_before_sending() {
             ),
             (
                 "triggers.get_by_id",
-                client.triggers.get_by_id(id, None).await.map(drop),
+                client
+                    .triggers
+                    .get_by_id(id, SubAccountScope::Default)
+                    .await
+                    .map(drop),
             ),
             (
                 "triggers.cancel_by_id",
-                client.triggers.cancel_by_id(id, None).await.map(drop),
+                client
+                    .triggers
+                    .cancel_by_id(id, SubAccountScope::Default)
+                    .await
+                    .map(drop),
             ),
             (
                 "triggers.pause_by_id",
-                client.triggers.pause_by_id(id, None).await.map(drop),
+                client
+                    .triggers
+                    .pause_by_id(id, SubAccountScope::Default)
+                    .await
+                    .map(drop),
             ),
             (
                 "fees.get_spot_fee_rates",
                 client
                     .fees
-                    .get_spot_fee_rates(None, Vec::new())
+                    .get_spot_fee_rates(SubAccountScope::Default, Vec::new())
                     .await
                     .map(drop),
             ),
@@ -10824,7 +10973,7 @@ async fn zero_default_subaccount_is_refused_before_sending() {
                 "rate_limits.get_trading_rate_limits",
                 client
                     .rate_limits
-                    .get_trading_rate_limits(None)
+                    .get_trading_rate_limits(SubAccountScope::Default)
                     .await
                     .map(drop),
             ),
@@ -10846,7 +10995,7 @@ async fn zero_default_subaccount_is_refused_before_sending() {
 async fn omitted_and_non_zero_default_subaccounts_still_send() {
     for default in [None, Some(""), Some("j")] {
         let (client, server) = zero_id_client(default, None).await;
-        let result = client.orders.list_open(None).await;
+        let result = client.orders.list_open(SubAccountScope::Default).await;
         assert!(
             !matches!(result, Err(Error::Validation(_))),
             "{default:?}: {result:?}"
@@ -10991,7 +11140,7 @@ async fn zero_internal_transfer_destination_is_refused_before_sending() {
                     asset_id: 7,
                     quantity: amount.clone(),
                     idempotency_key: "zero-destination".into(),
-                    subaccount_id: None,
+                    subaccount_id: SubAccountScope::Default,
                     destination_account_id: account,
                     destination_subaccount_id: sub,
                     destination_smart_account_address: None,
@@ -11102,7 +11251,7 @@ async fn l2_refusal_code_is_the_same_over_rest_and_connect() {
             let http = MockHttpServer::spawn(move |_| json_body(400, content_type, &body)).await;
             let err = api_key_client(&http)
                 .orders
-                .list_open(None)
+                .list_open(SubAccountScope::Default)
                 .await
                 .expect_err("refused");
             match &err {
@@ -11125,7 +11274,7 @@ async fn l2_rest_code_the_auth_service_also_names_stays_as_sent() {
         MockHttpServer::spawn(move |_| json_body(400, "application/problem+json", &rest)).await;
     let err = api_key_client(&http)
         .orders
-        .list_open(None)
+        .list_open(SubAccountScope::Default)
         .await
         .expect_err("refused");
     assert!(

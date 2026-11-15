@@ -5,6 +5,7 @@
 
 use futures_util::future::join_all;
 use polyester::Client;
+use polyester::models::SubAccountScope;
 use std::env;
 use std::time::{Duration, Instant};
 
@@ -38,7 +39,7 @@ async fn main() {
 
     let futs = (0..32).map(|_| {
         let orders = client.orders.clone();
-        async move { orders.list_open(None).await }
+        async move { orders.list_open(SubAccountScope::Default).await }
     });
     let results = join_all(futs).await;
     let failures: Vec<_> = results.iter().filter(|r| r.is_err()).collect();

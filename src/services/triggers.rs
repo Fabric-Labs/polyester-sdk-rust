@@ -11,6 +11,7 @@ use crate::codecs::decode::{
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
+use crate::models::SubAccountScope;
 use crate::models::{
     BatchCancelTriggersResult, CancelOcoResult, CreateOcoParams, CreateOcoResult, CreateOrderType,
     CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType, FeeAsset,
@@ -225,6 +226,13 @@ impl TriggersService {
     /// the last error.
     pub async fn list(&self, mut req: ListTriggersRequest) -> Result<TriggersList> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.list_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn list_scoped(&self, req: ListTriggersRequest) -> Result<TriggersList> {
         // Triggers are labelled with their symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -264,7 +272,7 @@ impl TriggersService {
         if let Some(token) = opts.page_token {
             req.page_token = token;
         }
-        req.subaccount_id = scope::optional_subaccount(&self.ctx, opts.subaccount_id)?;
+        req.subaccount_id = scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?;
         for label in &opts.status {
             let status = trigger_status_from_label(label).map_err(Error::validation)?;
             req.status.push(status.into());
@@ -298,7 +306,7 @@ impl TriggersService {
         if let Some(key) = opts.client_list_id.as_deref() {
             req.client_list_id = Some(require_client_list_id(key, "client_list_id")?);
         }
-        self.list(req).await
+        self.list_scoped(req).await
     }
 
     /// Read one trigger.
@@ -308,6 +316,13 @@ impl TriggersService {
     /// request, as [`Self::list`] does, and never falls back to a cached copy.
     pub async fn get(&self, mut req: GetTriggerRequest) -> Result<Option<Trigger>> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.get_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn get_scoped(&self, req: GetTriggerRequest) -> Result<Option<Trigger>> {
         // The trigger is labelled with its symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -345,11 +360,11 @@ impl TriggersService {
     pub async fn get_by_id(
         &self,
         trigger_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<Option<Trigger>> {
-        self.get(GetTriggerRequest {
+        self.get_scoped(GetTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
@@ -624,7 +639,7 @@ impl TriggersService {
             }
         });
         let mut req = CreateTriggerRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
         };
         *req.trigger.get_or_insert_default() = intent;
@@ -760,12 +775,19 @@ impl TriggersService {
             ..Default::default()
         };
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
-            oco.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
+            let mode = Self::stp_mode(mode)?;
+            // The contract does not support DECREMENT on an OCO.
+            if mode == SelfTradePreventionMode::Decrement {
+                return Err(Error::validation(
+                    "self_trade_prevention_mode of an OCO must be expire_taker, expire_maker or expire_both; decrement is not supported on an OCO",
+                ));
+            }
+            oco.self_trade_prevention_mode = mode.into();
         }
         *oco.take_profit.get_or_insert_default() = take_profit;
         *oco.stop_loss.get_or_insert_default() = stop_loss;
         let mut req = CreateOcoRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
         };
         *req.oco.get_or_insert_default() = oco;
@@ -800,8 +822,8 @@ impl TriggersService {
                 )));
             }
         };
-        // The labels trigger reads use, `mark` included: the server says which
-        // sources a market supports. Empty sends nothing (last trade price).
+        // The labels trigger reads use. The contract does not support
+        // MARK_PRICE on an OCO leg. Empty sends nothing (last trade price).
         let trigger_price_source = match leg
             .trigger_price_source
             .as_deref()
@@ -811,10 +833,14 @@ impl TriggersService {
             None | Some("") => TriggerPriceSource::TriggerPriceSourceUnspecified,
             Some("last") => TriggerPriceSource::LastPrice,
             Some("index") => TriggerPriceSource::IndexPrice,
-            Some("mark") => TriggerPriceSource::MarkPrice,
+            Some("mark") => {
+                return Err(Error::validation(format!(
+                    "{field} trigger_price_source mark is not supported on an OCO: spot markets have no mark price; use last or index"
+                )));
+            }
             Some(_) => {
                 return Err(Error::validation(format!(
-                    "{field} trigger_price_source must be last, index or mark"
+                    "{field} trigger_price_source must be last or index"
                 )));
             }
         };
@@ -833,7 +859,7 @@ impl TriggersService {
     fn encode_batch_cancel(
         &self,
         trigger_ids: &[String],
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<BatchCancelTriggersRequest> {
         if trigger_ids.is_empty() {
@@ -863,7 +889,7 @@ impl TriggersService {
             ids.push(id);
         }
         Ok(BatchCancelTriggersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             request_id: super::orders::OrdersService::coalesce_request_id(
                 request_id,
                 "batch-cancel-triggers",
@@ -887,7 +913,7 @@ impl TriggersService {
         }
         let mut req = ModifyTriggerRequest {
             trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             symbol_id: self
                 .ctx
                 .catalogs
@@ -1013,6 +1039,13 @@ impl TriggersService {
     /// A trigger that has already ended is refused as for [`Self::cancel_by_id`].
     pub async fn cancel(&self, mut req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.cancel_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn cancel_scoped(&self, req: CancelTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1038,11 +1071,11 @@ impl TriggersService {
     pub async fn cancel_by_id(
         &self,
         trigger_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<TriggerMutationResult> {
-        self.cancel(CancelTriggerRequest {
+        self.cancel_scoped(CancelTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
@@ -1080,6 +1113,13 @@ impl TriggersService {
     /// the typed helpers do; a sub-account set on `req` is sent unchanged.
     pub async fn cancel_oco(&self, mut req: CancelOcoRequest) -> Result<CancelOcoResult> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.cancel_oco_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn cancel_oco_scoped(&self, req: CancelOcoRequest) -> Result<CancelOcoResult> {
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1100,15 +1140,15 @@ impl TriggersService {
     pub async fn cancel_oco_by_id(
         &self,
         order_list_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<CancelOcoResult> {
         let order_list_id = id_to_u64(order_list_id, "order_list_id")?;
         if order_list_id == 0 {
             return Err(Error::validation("order_list_id must be a non-zero OCO ID"));
         }
-        self.cancel_oco(CancelOcoRequest {
+        self.cancel_oco_scoped(CancelOcoRequest {
             order_list_id,
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
@@ -1128,7 +1168,7 @@ impl TriggersService {
     pub async fn batch_cancel(
         &self,
         trigger_ids: Vec<String>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<BatchCancelTriggersResult> {
         let req = self.encode_batch_cancel(&trigger_ids, subaccount_id, request_id)?;
@@ -1149,6 +1189,13 @@ impl TriggersService {
     /// A trigger that has already ended is refused as for [`Self::pause_by_id`].
     pub async fn pause(&self, mut req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.pause_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn pause_scoped(&self, req: PauseTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1174,11 +1221,11 @@ impl TriggersService {
     pub async fn pause_by_id(
         &self,
         trigger_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<TriggerMutationResult> {
-        self.pause(PauseTriggerRequest {
+        self.pause_scoped(PauseTriggerRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         })
         .await
@@ -1189,6 +1236,13 @@ impl TriggersService {
     /// A trigger that has already ended is refused as for [`Self::resume_by_id`].
     pub async fn resume(&self, mut req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.resume_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn resume_scoped(&self, req: ResumeTriggerRequest) -> Result<TriggerMutationResult> {
         let client = self.client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1215,7 +1269,7 @@ impl TriggersService {
         &self,
         trigger_id: &str,
         symbol: Option<&str>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<TriggerMutationResult> {
         self.resume_with(ResumeTriggerParams {
             trigger_id: trigger_id.to_owned(),
@@ -1235,9 +1289,9 @@ impl TriggersService {
         if params.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
-        self.resume(ResumeTriggerRequest {
+        self.resume_scoped(ResumeTriggerRequest {
             trigger_id: id_to_u64(&params.trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             symbol_id: self
                 .ctx
                 .catalogs
@@ -1288,6 +1342,13 @@ impl TriggersService {
         mut req: ListTriggerEventsRequest,
     ) -> Result<TriggerEventsList> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.list_events_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn list_events_scoped(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -1314,7 +1375,7 @@ impl TriggersService {
         use crate::codecs::decode::trigger_event_type_from_label;
         let mut req = ListTriggerEventsRequest {
             trigger_id: id_to_u64(trigger_id, "trigger_id")?,
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             // Proto u32: 0 means omit / server default.
             limit: opts.limit.unwrap_or(0),
             page_token: opts.page_token.unwrap_or_default(),
@@ -1325,7 +1386,7 @@ impl TriggersService {
                 .map_err(Error::validation)?
                 .into();
         }
-        self.list_events(req).await
+        self.list_events_scoped(req).await
     }
 
     /// Subscribe to private trigger updates (requires `realtime` feature).
@@ -1412,7 +1473,7 @@ mod tests {
             limit_price: Some(limit_price),
             trigger_price_source: None,
             time_in_force: None,
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             client_trigger_id: "trigger-equivalence".into(),
             post_only: false,
             activation_price: None,
@@ -1431,11 +1492,12 @@ mod tests {
         }
     }
 
-    /// `decrement` self-trade prevention is valid on trigger creates and is
-    /// sent on an OCO too, in any case; another label is refused before
-    /// sending with a message that lists the modes.
+    /// `decrement` self-trade prevention is valid on trigger creates, in any
+    /// case; another label is refused before sending with a message that
+    /// lists the modes. An OCO refuses it (see
+    /// `oco_create_refuses_mark_and_decrement_before_sending`).
     #[test]
-    fn trigger_and_oco_creates_send_decrement_self_trade_prevention() {
+    fn trigger_creates_send_decrement_self_trade_prevention() {
         let client = client();
         let mut params = create_params(
             crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
@@ -1456,14 +1518,6 @@ mod tests {
         assert!(
             matches!(&err, Error::Validation(message) if message.contains("expire_both, or decrement")),
             "{err:?}"
-        );
-
-        let mut oco = sell_oco();
-        oco.self_trade_prevention_mode = Some("decrement".into());
-        let wire = client.triggers.encode_create_oco_params(&oco).unwrap();
-        assert_eq!(
-            wire.oco.as_option().unwrap().self_trade_prevention_mode,
-            SelfTradePreventionMode::Decrement
         );
     }
 
@@ -1908,7 +1962,7 @@ mod tests {
         let client = client();
         let params = ModifyTriggerParams {
             trigger_id: "1".into(),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
             trigger_price: None,
@@ -2252,7 +2306,7 @@ mod tests {
     ) -> ModifyTriggerParams {
         ModifyTriggerParams {
             trigger_id: "1".into(),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
             trigger_price,
@@ -2606,6 +2660,69 @@ mod tests {
             .and_then(|child| child.execution.as_ref())
     }
 
+    /// The contract does not support a mark price source on an OCO leg or
+    /// decrement self-trade prevention on an OCO: both are refused before
+    /// sending with `Error::Validation`, as a single trigger create refuses
+    /// `mark`. `last`, `index` and the expire modes are sent.
+    #[test]
+    fn oco_create_refuses_mark_and_decrement_before_sending() {
+        let client = client();
+        for label in ["mark", "MARK"] {
+            let mut tp = sell_oco();
+            tp.take_profit.trigger_price_source = Some(label.into());
+            let mut sl = sell_oco();
+            sl.stop_loss.trigger_price_source = Some(label.into());
+            for params in [tp, sl] {
+                let err = client
+                    .triggers
+                    .encode_create_oco_params(&params)
+                    .unwrap_err();
+                assert!(
+                    matches!(&err, Error::Validation(m) if m.contains("mark is not supported")),
+                    "{label}: {err:?}"
+                );
+            }
+        }
+        for label in ["decrement", "Decrement"] {
+            let mut params = sell_oco();
+            params.self_trade_prevention_mode = Some(label.into());
+            let err = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_err();
+            assert!(
+                matches!(&err, Error::Validation(m) if m.contains("decrement is not supported on an OCO")),
+                "{label}: {err:?}"
+            );
+        }
+        for (label, source) in [
+            ("last", TriggerPriceSource::LastPrice),
+            ("index", TriggerPriceSource::IndexPrice),
+        ] {
+            let mut params = sell_oco();
+            params.take_profit.trigger_price_source = Some(label.into());
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            let oco = wire.oco.as_option().unwrap();
+            assert_eq!(
+                oco.take_profit.as_option().unwrap().trigger_price_source,
+                source
+            );
+        }
+        for (label, mode) in [
+            ("expire_taker", SelfTradePreventionMode::ExpireTaker),
+            ("expire_maker", SelfTradePreventionMode::ExpireMaker),
+            ("expire_both", SelfTradePreventionMode::ExpireBoth),
+        ] {
+            let mut params = sell_oco();
+            params.self_trade_prevention_mode = Some(label.into());
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            assert_eq!(
+                wire.oco.as_option().unwrap().self_trade_prevention_mode,
+                mode
+            );
+        }
+    }
+
     #[test]
     fn oco_create_encodes_the_intent_and_both_legs() {
         let client = client();
@@ -2613,7 +2730,7 @@ mod tests {
         params.client_list_id = " oco-1 ".into();
         params.stop_loss.trigger_price_source = Some("index".into());
         params.self_trade_prevention_mode = Some("expire_taker".into());
-        params.subaccount_id = Some(12);
+        params.subaccount_id = SubAccountScope::Id(12);
         let wire = client.triggers.encode_create_oco_params(&params).unwrap();
         assert_eq!(wire.subaccount_id, Some(12));
         let oco = wire.oco.as_option().expect("oco intent");
@@ -2716,8 +2833,10 @@ mod tests {
         assert_eq!(oco.side, Side::Buy);
     }
 
-    /// Which way round the legs must be for the side, and which price source
-    /// a market supports, are the server's to refuse: the SDK sends them.
+    /// Which way round the legs must be for the side, and whether a market
+    /// has an index price, are the server's to refuse: the SDK sends them.
+    /// `mark` is refused before sending (see
+    /// `oco_create_refuses_mark_and_decrement_before_sending`).
     #[test]
     fn oco_create_leaves_leg_order_and_supported_sources_to_the_server() {
         let client = client();
@@ -2746,8 +2865,7 @@ mod tests {
         for (label, want) in [
             ("last", TriggerPriceSource::LastPrice),
             ("index", TriggerPriceSource::IndexPrice),
-            ("mark", TriggerPriceSource::MarkPrice),
-            (" MARK ", TriggerPriceSource::MarkPrice),
+            (" INDEX ", TriggerPriceSource::IndexPrice),
             ("", TriggerPriceSource::TriggerPriceSourceUnspecified),
         ] {
             let mut params = sell_oco();
@@ -2826,10 +2944,7 @@ mod tests {
 
         let mut p = sell_oco();
         p.take_profit.trigger_price_source = Some("oracle".into());
-        refused(
-            p,
-            "take_profit trigger_price_source must be last, index or mark",
-        );
+        refused(p, "take_profit trigger_price_source must be last or index");
         let mut p = sell_oco();
         p.self_trade_prevention_mode = Some("decrease".into());
         refused(p, "self_trade_prevention_mode");
@@ -2853,7 +2968,7 @@ mod tests {
             .triggers
             .encode_batch_cancel(
                 &[base58.clone(), "40".into()],
-                Some(5),
+                SubAccountScope::Id(5),
                 Some(" retry-1 ".into()),
             )
             .unwrap();
@@ -2863,7 +2978,7 @@ mod tests {
 
         let generated = client
             .triggers
-            .encode_batch_cancel(&["43".into()], None, None)
+            .encode_batch_cancel(&["43".into()], SubAccountScope::Default, None)
             .unwrap();
         assert!(
             generated.request_id.starts_with("batch-cancel-triggers-"),
@@ -2876,7 +2991,7 @@ mod tests {
         assert_eq!(
             client
                 .triggers
-                .encode_batch_cancel(&fifty, None, None)
+                .encode_batch_cancel(&fifty, SubAccountScope::Default, None)
                 .unwrap()
                 .trigger_ids
                 .len(),
@@ -2890,7 +3005,11 @@ mod tests {
         let refused = |ids: Vec<String>, request_id: Option<&str>, want: &str| {
             let err = client
                 .triggers
-                .encode_batch_cancel(&ids, None, request_id.map(str::to_owned))
+                .encode_batch_cancel(
+                    &ids,
+                    SubAccountScope::Default,
+                    request_id.map(str::to_owned),
+                )
                 .unwrap_err();
             assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
             assert!(err.to_string().contains(want), "{want}: {err}");

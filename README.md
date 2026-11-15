@@ -298,6 +298,31 @@ unless `Config::allow_insecure_http` is set, or `from_env` sees
 `POLYESTER_ALLOW_INSECURE_HTTP=1`. Loopback plaintext stays allowed for local
 tests.
 
+### Choosing the account
+
+Every typed helper that acts on an account takes a `SubAccountScope`
+(`polyester::models::SubAccountScope`), as an argument or as the `subaccount_id`
+field of its params:
+
+| `SubAccountScope` | Account the call acts on |
+| --- | --- |
+| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when none is set |
+| `SubAccountScope::Main` | always the main account, whatever default is set |
+| `SubAccountScope::Id(id)`, or `id.into()` | that sub-account; 0 is refused with `Error::Validation` before sending |
+
+```rust,no_run
+use polyester::models::SubAccountScope;
+
+let main_orders = client.orders.list_open(SubAccountScope::Main).await?;
+let sub_orders = client.orders.list_open(42.into()).await?;
+```
+
+Methods that take a raw request (such as `balances.list(GetBalancesRequest)`)
+send the sub-account the request names; an unset one (`None`, or 0 for a plain
+`u64` field) takes the default. A request cannot name the main account while a
+default is set, because 0 on the wire means unset: use a typed helper with
+`SubAccountScope::Main`, or a client with no default, for that.
+
 ## Catalog readiness
 
 `Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio
@@ -565,7 +590,10 @@ that keeps a quantity keeps its place in the queue, and an incoming one goes on
 matching. A fill-or-kill order that would meet such an order is rejected
 `FOK_INSUFFICIENT_LIQUIDITY`. The incoming order's mode decides, so a resting
 order of any mode can be reduced or canceled this way. Trigger creates take
-`decrement` too (`CreateTriggerParams.self_trade_prevention_mode`). An attached exit never trades with the
+`decrement` too (`CreateTriggerParams.self_trade_prevention_mode`); an OCO
+does not (`CreateOcoParams.self_trade_prevention_mode` takes `expire_taker`,
+`expire_maker` or `expire_both`, and `triggers.create_oco` refuses
+`decrement`, which the contract does not support on an OCO, before sending). An attached exit never trades with the
 order it protects: when it fires while that order still rests, the order's
 unfilled rest is canceled first (fills before stand) and the order ends
 `canceled` with `cancel_reason` `attached_exit_fired`.
@@ -650,6 +678,13 @@ price, `ERROR_CODE_BAD_PRICE` / `buy_at_least_activation`. A modify or batch
 replace sends the maximum as given: it does not carry the order's side, so the
 server applies the side rule and answers `ERROR_CODE_BAD_PRICE` with no
 violation.
+
+`ModifyOrderParams.new_attached_risk` and `BatchReplaceItem.new_attached_risk`
+replace the order's legs; `None` leaves them unchanged, and an empty
+`AttachedRisk` is refused. To remove the take-profit, stop-loss and trailing
+stop, set `clear_attached_risk: true`, alone or with a new price or quantity:
+it sends an empty risk policy. With a `new_attached_risk` it is refused with
+`Error::Validation` before sending.
 
 Stop-loss, take-profit and trailing-stop triggers, and attached take-profit,
 stop-loss and trailing-stop legs, can watch the index price instead of the
