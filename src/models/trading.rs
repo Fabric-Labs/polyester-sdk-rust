@@ -24,7 +24,9 @@ pub struct Order {
     pub leaves_qty: Option<Quantity>,
     /// Iceberg display quantity the order was placed with, at the pair's base
     /// quantity scale: the most of the order the order book shows at once.
-    /// Zero for a plain order. A replace keeps it.
+    /// Zero for a plain order. A replace keeps it while the new quantity is
+    /// above it; a replace to the display or below it is a plain order, zero
+    /// here.
     pub display_qty: Option<Quantity>,
     /// Part of `leaves_qty` an iceberg order keeps hidden from the order
     /// book, at the pair's base quantity scale: the book shows `leaves_qty`
@@ -1141,8 +1143,11 @@ pub struct CreateOrderParams {
     /// (`ICEBERG_DISPLAY_INVALID`, `ICEBERG_DISPLAY_TOO_SMALL`), at least
     /// `quantity` / 100 rounded up, so at most 100 parts
     /// (`ICEBERG_DISPLAY_TOO_SMALL`), and no attached risk
-    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified; a replace
-    /// keeps it.
+    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified. Lowering the
+    /// order's quantity in place to the display or below keeps its queue
+    /// priority and shows all of its remaining quantity. A replace keeps the
+    /// display while the new quantity is above it; otherwise the new order is
+    /// a plain, fully visible order with no display, and stays plain.
     pub display_quantity: Option<Quantity>,
     /// Hard all-in quote debit limit of a BUY. The [`Quantity`] must use
     /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
@@ -1292,8 +1297,11 @@ pub struct PreviewOrderParams {
     /// (`ICEBERG_DISPLAY_INVALID`, `ICEBERG_DISPLAY_TOO_SMALL`), at least
     /// `quantity` / 100 rounded up, so at most 100 parts
     /// (`ICEBERG_DISPLAY_TOO_SMALL`), and no attached risk
-    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified; a replace
-    /// keeps it.
+    /// (`ICEBERG_NOT_ALLOWED`). The display cannot be modified. Lowering the
+    /// order's quantity in place to the display or below keeps its queue
+    /// priority and shows all of its remaining quantity. A replace keeps the
+    /// display while the new quantity is above it; otherwise the new order is
+    /// a plain, fully visible order with no display, and stays plain.
     pub display_quantity: Option<Quantity>,
     /// Hard all-in quote debit limit of a BUY. The [`Quantity`] must use
     /// [`crate::types::QuantityDomain::OrderQuote`] and carry the pair's
