@@ -9,6 +9,7 @@ use crate::support::{
     require_live_client, require_mutation, require_trading_quote_balance, strict_live_enabled,
     trade_symbol, unique_client_order_id, wait_for_open_order, wait_until_no_open_client_ids,
 };
+use polyester::models::SubAccountScope;
 use polyester::models::{
     BatchReplaceItem, BatchReplaceOrdersResult, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce,
@@ -128,7 +129,10 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 Ok(q) => Some(q),
                 Err(err) => {
                     eprintln!("skip: qty: {err}");
-                    let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                    let _ = client
+                        .orders
+                        .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                        .await;
                     return;
                 }
             };
@@ -150,7 +154,10 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                     } else {
                         eprintln!("skip: create not indexed: {err}");
                     }
-                    let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                    let _ = client
+                        .orders
+                        .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                        .await;
                     return;
                 }
             },
@@ -158,11 +165,17 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 if is_internal_order_error(&err) || crate::support::devnet_unavailable(&err) =>
             {
                 eprintln!("skip: create unavailable: {err}");
-                let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                let _ = client
+                    .orders
+                    .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                    .await;
                 return;
             }
             Err(err) => {
-                let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                let _ = client
+                    .orders
+                    .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                    .await;
                 panic!("create: {err}");
             }
         }
@@ -176,7 +189,10 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
         )
         .ok() else {
             eprintln!("skip: cannot bump price");
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         };
         let new_cids: Vec<String> = (0..BATCH_SIZE)
@@ -202,7 +218,7 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
         for _ in 0..20 {
             let before_open = client
                 .orders
-                .list_open(None)
+                .list_open(SubAccountScope::Default)
                 .await
                 .expect("list_open before batch_replace");
             before_count = before_open
@@ -220,19 +236,30 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 "skip: round {round}: only {before_count}/{BATCH_SIZE} test orders still open \
                  (book activity drained resting post-only bids)"
             );
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         }
 
         let result = match client
             .orders
-            .batch_replace(items.clone(), &symbol, None, Some(request_id.clone()))
+            .batch_replace(
+                items.clone(),
+                &symbol,
+                SubAccountScope::Default,
+                Some(request_id.clone()),
+            )
             .await
         {
             Ok(r) => r,
             Err(err) if crate::support::devnet_unavailable(&err) => {
                 eprintln!("skip: batch_replace unavailable: {err}");
-                let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                let _ = client
+                    .orders
+                    .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                    .await;
                 return;
             }
             Err(err) => {
@@ -240,7 +267,7 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 eprintln!("batch_replace round {round} err (retrying once): {err}");
                 let after_open = client
                     .orders
-                    .list_open(None)
+                    .list_open(SubAccountScope::Default)
                     .await
                     .expect("list_open reconcile");
                 let after_count = after_open
@@ -255,12 +282,20 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 tokio::time::sleep(Duration::from_millis(200)).await;
                 match client
                     .orders
-                    .batch_replace(items.clone(), &symbol, None, Some(request_id.clone()))
+                    .batch_replace(
+                        items.clone(),
+                        &symbol,
+                        SubAccountScope::Default,
+                        Some(request_id.clone()),
+                    )
                     .await
                 {
                     Ok(r) => r,
                     Err(retry_err) => {
-                        let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                        let _ = client
+                            .orders
+                            .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                            .await;
                         panic!("batch_replace round {round}: {retry_err}");
                     }
                 }
@@ -269,14 +304,17 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
 
         if !assert_complete_batch_result(&result, round) {
             eprintln!("skip: batch_replace returned all INTERNAL_ERROR (OMS)");
-            let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+            let _ = client
+                .orders
+                .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                .await;
             return;
         }
         let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
         loop {
             match client
                 .orders
-                .get_batch_replace_status(&result.batch_request_id, None)
+                .get_batch_replace_status(&result.batch_request_id, SubAccountScope::Default)
                 .await
             {
                 Ok(status) => {
@@ -315,7 +353,7 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
         // contract is safe only if no second mutation is applied.
         let retry = client
             .orders
-            .batch_replace(items, &symbol, None, Some(request_id))
+            .batch_replace(items, &symbol, SubAccountScope::Default, Some(request_id))
             .await
             .unwrap_or_else(|err| panic!("idempotent retry round {round}: {err}"));
         assert_eq!(
@@ -342,7 +380,10 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
             {
                 old_cid.clone()
             } else {
-                let _ = client.orders.cancel_all(Some(&symbol), false, None).await;
+                let _ = client
+                    .orders
+                    .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+                    .await;
                 panic!("round {round}: neither {old_cid} nor {new_cid} open after modify");
             };
             next_cids.push(chosen);
@@ -350,7 +391,11 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
         client_order_ids = next_cids;
     }
 
-    match client.orders.cancel_all(Some(&symbol), false, None).await {
+    match client
+        .orders
+        .cancel_all(Some(&symbol), false, SubAccountScope::Default)
+        .await
+    {
         Ok(_) => {}
         Err(err) => {
             if strict_live_enabled() {

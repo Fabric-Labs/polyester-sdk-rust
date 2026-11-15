@@ -8,6 +8,7 @@
 mod hardening_support;
 
 use hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
+use polyester::models::SubAccountScope;
 use polyester::models::{
     AttachedRisk, CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce,
     CreateTriggerParams, CreateTriggerType, GetCandlesOpts, GetOrderOpts, ModifyOrderParams,
@@ -295,7 +296,7 @@ async fn order_modify_sends_q9_new_price() {
         .modify(ModifyOrderParams {
             symbol: "SOL-USDT".into(),
             key: OrderKey::ClientOrderId("q9-modify".into()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             request_id: Some("q9-modify-req".into()),
             new_price: Some(Price::from_decimal_str("185.25", Some("SOL-USDT".into())).unwrap()),
             new_qty: None,
@@ -504,7 +505,11 @@ async fn user_and_public_trade_prices_decode_from_q9() {
     })
     .await;
 
-    let user = client.trades.list(None, None).await.unwrap();
+    let user = client
+        .trades
+        .list(SubAccountScope::Default, None)
+        .await
+        .unwrap();
     let price = user.trades[0].price.as_ref().unwrap();
     assert_eq!(price.format(), "2420");
     assert_eq!(price.as_decimal(), Decimal::from(2420));
@@ -676,7 +681,7 @@ async fn order_read_price_decodes_from_q9() {
         .orders
         .get_with(GetOrderOpts {
             key: OrderKey::OrderId("A".into()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             include_attached_risk: false,
             include_attached_risk_state: false,
             include_execution_history: Some(false),

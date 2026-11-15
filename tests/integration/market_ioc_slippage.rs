@@ -1,3 +1,4 @@
+use polyester::models::SubAccountScope;
 use std::time::Duration;
 
 use crate::support::{
@@ -205,7 +206,7 @@ async fn create_market_ioc_with_slippage_bps() {
     );
     let _ = client
         .orders
-        .cancel_by_client_order_id(&client_order_id, Some(&symbol), None)
+        .cancel_by_client_order_id(&client_order_id, Some(&symbol), SubAccountScope::Default)
         .await;
     let status = created.status.to_ascii_lowercase();
     if is_terminal_status(&status) || status == "accepted" {

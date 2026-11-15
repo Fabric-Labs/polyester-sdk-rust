@@ -2,6 +2,7 @@
 
 use super::call::is_not_found;
 use super::trade::reserved_balance_raw;
+use polyester::models::SubAccountScope;
 use polyester::models::{Order, Trigger, TriggerEventsList};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::proto::triggers::v1::{GetTriggerRequest, ListTriggerEventsRequest};
@@ -61,7 +62,7 @@ pub async fn wait_for_open_order(
             .orders
             .get(
                 polyester::models::OrderKey::ClientOrderId(client_order_id.to_owned()),
-                None,
+                SubAccountScope::Default,
             )
             .await
         {
@@ -85,7 +86,7 @@ pub async fn wait_for_open_order(
             Err(err) if is_not_found(&err) => {}
             Err(_) => {}
         }
-        if let Ok(listed) = client.orders.list_open(None).await {
+        if let Ok(listed) = client.orders.list_open(SubAccountScope::Default).await {
             for order in &listed.orders {
                 if order.client_order_id == client_order_id {
                     return Ok(order.clone());
@@ -126,7 +127,7 @@ pub async fn wait_until_no_open_client_ids(
     let wanted: std::collections::HashSet<&str> = client_order_ids.iter().copied().collect();
     let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
-        let listed = client.orders.list_open(None).await?;
+        let listed = client.orders.list_open(SubAccountScope::Default).await?;
         let remaining: Vec<&str> = listed
             .orders
             .iter()
@@ -160,7 +161,7 @@ pub async fn wait_for_terminal_order(
             .orders
             .get(
                 polyester::models::OrderKey::ClientOrderId(client_order_id.to_owned()),
-                None,
+                SubAccountScope::Default,
             )
             .await
         {

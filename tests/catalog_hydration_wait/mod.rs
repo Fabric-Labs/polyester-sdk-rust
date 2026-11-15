@@ -10,6 +10,7 @@
 use super::hardening_support::RefusedPort;
 use buffa::Message as _;
 use futures_util::future::BoxFuture;
+use polyester::models::SubAccountScope;
 use polyester::models::{GetCandlesOpts, GetTradesOpts, ListOrderHistoryOpts, ListTriggersOpts};
 use polyester::proto::chain::zipper::v1::{
     AssetConfig as ZipperAsset, GetDepositWithdrawConfigResponse,
@@ -567,7 +568,12 @@ fn labelled_reads() -> Vec<(&'static str, bool, Probe)> {
             Box::pin(async move { c.market_overview.subscribe().await.map(drop) })
         }),
         ("fees.get_spot_fee_rates", false, |c, _| {
-            Box::pin(async move { c.fees.get_spot_fee_rates(None, Vec::new()).await.map(drop) })
+            Box::pin(async move {
+                c.fees
+                    .get_spot_fee_rates(SubAccountScope::Default, Vec::new())
+                    .await
+                    .map(drop)
+            })
         }),
         ("triggers.list", false, |c, _| {
             Box::pin(async move {
@@ -578,7 +584,12 @@ fn labelled_reads() -> Vec<(&'static str, bool, Probe)> {
             })
         }),
         ("triggers.get_by_id", false, |c, _| {
-            Box::pin(async move { c.triggers.get_by_id("1", None).await.map(drop) })
+            Box::pin(async move {
+                c.triggers
+                    .get_by_id("1", SubAccountScope::Default)
+                    .await
+                    .map(drop)
+            })
         }),
     ]
 }

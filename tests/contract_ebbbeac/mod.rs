@@ -5,6 +5,7 @@
 use super::hardening_support::{MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
 use futures_util::TryStreamExt;
+use polyester::models::SubAccountScope;
 use polyester::proto::ledger::read::v1::{ExportStatementRequest, ExportStatementResponse};
 use polyester::proto::marketdata::v1::{
     AssetEditorialInfo, AssetInfo, ListAssetInfoRequest, ListAssetInfoResponse,
@@ -111,7 +112,7 @@ async fn statement_export_is_signed_and_concatenates_its_pages() {
     let page = client
         .statements
         .export_page(ExportStatementOptions {
-            subaccount_id: Some(77),
+            subaccount_id: SubAccountScope::Id(77),
             asset_id: None,
             ..statement_options()
         })
@@ -148,7 +149,7 @@ async fn statement_export_refuses_a_missing_period_or_key_without_sending() {
             ..statement_options()
         },
         ExportStatementOptions {
-            subaccount_id: Some(0),
+            subaccount_id: SubAccountScope::Id(0),
             ..statement_options()
         },
     ] {

@@ -3,6 +3,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, PreviewOrderParams,
 };
@@ -103,7 +104,10 @@ async fn create_preview_and_batch_create_send_the_market_id_given() {
         .expect("create by market ID");
     // The canned answers are minimal: only what was sent is checked.
     let _ = client.orders.preview(preview_by_id(2)).await;
-    let _ = client.orders.batch_create(vec![by_id(2)], None, None).await;
+    let _ = client
+        .orders
+        .batch_create(vec![by_id(2)], SubAccountScope::Default, None)
+        .await;
 
     // The name and the ID together, when they agree, are the same order.
     let mut both = by_id(2);

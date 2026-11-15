@@ -298,6 +298,31 @@ unless `Config::allow_insecure_http` is set, or `from_env` sees
 `POLYESTER_ALLOW_INSECURE_HTTP=1`. Loopback plaintext stays allowed for local
 tests.
 
+### Choosing the account
+
+Every typed helper that acts on an account takes a `SubAccountScope`
+(`polyester::models::SubAccountScope`), as an argument or as the `subaccount_id`
+field of its params:
+
+| `SubAccountScope` | Account the call acts on |
+| --- | --- |
+| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when none is set |
+| `SubAccountScope::Main` | always the main account, whatever default is set |
+| `SubAccountScope::Id(id)`, or `id.into()` | that sub-account; 0 is refused with `Error::Validation` before sending |
+
+```rust,no_run
+use polyester::models::SubAccountScope;
+
+let main_orders = client.orders.list_open(SubAccountScope::Main).await?;
+let sub_orders = client.orders.list_open(42.into()).await?;
+```
+
+Methods that take a raw request (such as `balances.list(GetBalancesRequest)`)
+send the sub-account the request names; an unset one (`None`, or 0 for a plain
+`u64` field) takes the default. A request cannot name the main account while a
+default is set, because 0 on the wire means unset: use a typed helper with
+`SubAccountScope::Main`, or a client with no default, for that.
+
 ## Catalog readiness
 
 `Config::hydrate_catalogs` defaults to `true`. When constructed inside a Tokio

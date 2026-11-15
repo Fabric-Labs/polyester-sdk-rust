@@ -5,7 +5,12 @@ async fn deposit_list_addresses_optional() {
     let Some(client) = require_live_client() else {
         return;
     };
-    let _ = call_optional("deposit.list_addresses", || client.deposit.list_addresses()).await;
+    let _ = call_optional("deposit.list_addresses", || {
+        client
+            .deposit
+            .list_addresses(polyester::models::SubAccountScope::Default)
+    })
+    .await;
 }
 
 #[tokio::test]

@@ -1,3 +1,4 @@
+use polyester::models::SubAccountScope;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -139,7 +140,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
     if wait_listed_open(&maker, &maker_cid).await.is_err() {
         let _ = maker
             .orders
-            .cancel_by_client_order_id(&maker_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&maker_cid, Some(&symbol), SubAccountScope::Default)
             .await;
         eprintln!("skip: maker sell was not visible as open");
         return;
@@ -174,21 +175,21 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
     let cleanup = || async {
         let _ = client
             .orders
-            .cancel_by_client_order_id(&replacement_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&replacement_cid, Some(&symbol), SubAccountScope::Default)
             .await;
         let _ = client
             .orders
-            .cancel_by_client_order_id(&original_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&original_cid, Some(&symbol), SubAccountScope::Default)
             .await;
         if !created.order_id.is_empty() {
             let _ = client
                 .orders
-                .cancel_by_order_id(&created.order_id, None)
+                .cancel_by_order_id(&created.order_id, SubAccountScope::Default)
                 .await;
         }
         let _ = maker
             .orders
-            .cancel_by_client_order_id(&maker_cid, Some(&symbol), None)
+            .cancel_by_client_order_id(&maker_cid, Some(&symbol), SubAccountScope::Default)
             .await;
     };
 
@@ -262,7 +263,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
             .modify(ModifyOrderParams {
                 symbol: symbol.clone(),
                 key,
-                subaccount_id: None,
+                subaccount_id: SubAccountScope::Default,
                 request_id: None,
                 new_price: Some(new_price.clone()),
                 new_qty: None,
@@ -318,7 +319,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
                 .orders
                 .get_with(GetOrderOpts {
                     key: OrderKey::OrderId(modified.final_order_id.clone()),
-                    subaccount_id: None,
+                    subaccount_id: SubAccountScope::Default,
                     include_attached_risk: false,
                     include_attached_risk_state: false,
                     include_execution_history: Some(false),
@@ -535,7 +536,7 @@ async fn wait_listed_open(
 ) -> std::result::Result<polyester::models::Order, ()> {
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     while std::time::Instant::now() < deadline {
-        if let Ok(listed) = client.orders.list_open(None).await
+        if let Ok(listed) = client.orders.list_open(SubAccountScope::Default).await
             && let Some(order) = listed
                 .orders
                 .into_iter()
@@ -560,7 +561,7 @@ async fn get_history(
             .orders
             .get_with(GetOrderOpts {
                 key: key.clone(),
-                subaccount_id: None,
+                subaccount_id: SubAccountScope::Default,
                 include_attached_risk: false,
                 include_attached_risk_state: false,
                 include_execution_history: Some(true),
@@ -592,7 +593,7 @@ async fn wait_partial_fill(
             .orders
             .get_with(GetOrderOpts {
                 key: OrderKey::ClientOrderId(client_order_id.to_string()),
-                subaccount_id: None,
+                subaccount_id: SubAccountScope::Default,
                 include_attached_risk: false,
                 include_attached_risk_state: false,
                 include_execution_history: Some(false),

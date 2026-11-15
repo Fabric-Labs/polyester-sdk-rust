@@ -6,6 +6,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{CreateOcoParams, CreateSide, ListTriggersOpts, OcoLegParams, Trigger};
 use polyester::proto::orders::v1::{
     ErrorDetail, FieldViolation, Side, TriggerPriceSource, risk_execution,
@@ -364,7 +365,7 @@ async fn cancel_oco_sends_the_oco_id() {
             let canceled = s
                 .client
                 .triggers
-                .cancel_oco_by_id(&raw, Some(3))
+                .cancel_oco_by_id(&raw, SubAccountScope::Id(3))
                 .await
                 .expect("cancel");
             assert_eq!(canceled.order_list_id, id(70), "{wire:?} {raw}");
@@ -378,7 +379,7 @@ async fn cancel_oco_sends_the_oco_id() {
             let err = s
                 .client
                 .triggers
-                .cancel_oco_by_id(bad, None)
+                .cancel_oco_by_id(bad, SubAccountScope::Default)
                 .await
                 .expect_err("invalid OCO ID");
             assert!(
@@ -408,7 +409,11 @@ async fn batch_cancel_returns_each_triggers_result() {
         let result = s
             .client
             .triggers
-            .batch_cancel(ids.clone(), None, Some("cancel-run-1".into()))
+            .batch_cancel(
+                ids.clone(),
+                SubAccountScope::Default,
+                Some("cancel-run-1".into()),
+            )
             .await
             .expect("batch cancel");
         assert_eq!((result.accepted_count, result.rejected_count), (1, 1));
@@ -432,7 +437,7 @@ async fn batch_cancel_returns_each_triggers_result() {
 
         s.client
             .triggers
-            .batch_cancel(ids, None, Some("cancel-run-1".into()))
+            .batch_cancel(ids, SubAccountScope::Default, Some("cancel-run-1".into()))
             .await
             .expect("retry");
         let batches = s.batches.lock().unwrap().clone();
@@ -462,7 +467,7 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
             let err = s
                 .client
                 .triggers
-                .batch_cancel(ids, None, None)
+                .batch_cancel(ids, SubAccountScope::Default, None)
                 .await
                 .expect_err("refused");
             assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
@@ -525,7 +530,7 @@ async fn trigger_reads_report_the_oco_of_each_leg() {
         let got = s
             .client
             .triggers
-            .get_by_id(&id(71), None)
+            .get_by_id(&id(71), SubAccountScope::Default)
             .await
             .expect("get")
             .expect("trigger");

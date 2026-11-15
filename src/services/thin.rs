@@ -1,6 +1,7 @@
 //! Thin service shells that expose generated Connect clients for full surface parity.
 
 use super::ServiceContext;
+use crate::models::SubAccountScope;
 
 macro_rules! thin_service {
     ($name:ident, $client:ty) => {
@@ -293,8 +294,7 @@ impl InternalTransfersService {
         let mut req = CreateInternalTransferRequest {
             asset_id: params.asset_id,
             idempotency_key: params.idempotency_key,
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?
-                .unwrap_or(0),
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?.unwrap_or(0),
             ..Default::default()
         };
         *req.amount_e18.get_or_insert_default() = amount_e18;
@@ -1518,7 +1518,7 @@ impl VipService {
 impl FeeService {
     pub async fn get_spot_fee_rates(
         &self,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         symbol_id: Vec<u32>,
     ) -> crate::errors::Result<crate::models::SpotFeeRatesList> {
         use super::scope;
@@ -1526,7 +1526,7 @@ impl FeeService {
         use crate::codecs::decode::spot_fee_rates_list_from_proto;
         use crate::proto::fees::v1::GetSpotFeeRatesRequest;
         let req = GetSpotFeeRatesRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             symbol_id,
             ..Default::default()
         };
@@ -1569,14 +1569,14 @@ impl RateLimitService {
 
     pub async fn get_trading_rate_limits(
         &self,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> crate::errors::Result<crate::models::TradingRateLimits> {
         use super::scope;
         use super::unary;
         use crate::codecs::decode::trading_rate_limits_from_proto;
         use crate::proto::ratelimit::v1::GetTradingRateLimitsRequest;
         let req = GetTradingRateLimitsRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         };
         let client = self.connect_client();
@@ -1764,7 +1764,7 @@ mod tests {
             quantity: AssetAmount::from_scaled(100, Some(18), QuantityDomain::LedgerE18, Some(7))
                 .unwrap(),
             idempotency_key: "missing-destination".into(),
-            subaccount_id: None,
+            subaccount_id: crate::models::SubAccountScope::Default,
             destination_account_id: None,
             destination_subaccount_id: None,
             destination_smart_account_address: None,

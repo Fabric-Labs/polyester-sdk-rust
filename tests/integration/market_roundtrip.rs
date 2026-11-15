@@ -12,6 +12,7 @@ use crate::support::{
     trading_balance_raw, unique_client_order_id, wait_for_terminal_order,
     wait_until_no_open_client_ids, wait_until_reserved_reconciles,
 };
+use polyester::models::SubAccountScope;
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::types::{Price, Quantity, QuantityDomain};
@@ -25,7 +26,7 @@ async fn cancel_test_order(
 ) {
     if let Err(err) = client
         .orders
-        .cancel_by_client_order_id(client_order_id, Some(symbol), None)
+        .cancel_by_client_order_id(client_order_id, Some(symbol), SubAccountScope::Default)
         .await
     {
         eprintln!("cleanup {label} targeted cancel warning: {err}");
@@ -349,7 +350,7 @@ async fn market_buy_sell_roundtrip_carries_filled_qty() {
 
     let open = client
         .orders
-        .list_open(None)
+        .list_open(SubAccountScope::Default)
         .await
         .expect("list_open after roundtrip");
     for order in &open.orders {

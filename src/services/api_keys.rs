@@ -7,6 +7,7 @@ use crate::auth;
 use crate::codecs::decode::{api_key_from_get_proto, api_keys_list_from_proto};
 use crate::connect::auth::v1::ApiKeyServiceClient;
 use crate::errors::Result;
+use crate::models::SubAccountScope;
 use crate::models::{ApiKeySummary, ApiKeysList, Ed25519Keypair};
 use crate::proto::auth::v1::{GetApiKeyRequest, ListApiKeysRequest};
 
@@ -31,9 +32,9 @@ impl ApiKeysService {
     /// scoped to the main account reads the main account's keys and those of
     /// its sub-accounts, a key scoped to a sub-account only that
     /// sub-account's keys.
-    pub async fn list(&self, subaccount_id: Option<u64>) -> Result<ApiKeysList> {
+    pub async fn list(&self, subaccount_id: SubAccountScope) -> Result<ApiKeysList> {
         let req = ListApiKeysRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             ..Default::default()
         };
         let client = self.connect_client();
