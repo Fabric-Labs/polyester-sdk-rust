@@ -46,7 +46,7 @@ impl ApiKeysService {
         )
         .await?
         .into_owned();
-        Ok(api_keys_list_from_proto(&resp))
+        api_keys_list_from_proto(&resp)
     }
 
     /// Read one API key. An API key needs `READ_API_KEYS` on its policy; a
@@ -64,7 +64,7 @@ impl ApiKeysService {
         )
         .await?
         .into_owned();
-        Ok(api_key_from_get_proto(&resp))
+        api_key_from_get_proto(&resp)
     }
 
     /// Generate a local Ed25519 keypair for API key creation (secret never sent to API).

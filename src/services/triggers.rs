@@ -257,7 +257,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        let mut list = triggers_list_from_proto(&resp);
+        let mut list = triggers_list_from_proto(&resp)?;
         for trigger in &mut list.triggers {
             self.label_from_catalogs(trigger);
         }
@@ -347,7 +347,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(get_trigger_from_proto(&resp).map(|mut trigger| {
+        Ok(get_trigger_from_proto(&resp)?.map(|mut trigger| {
             self.label_from_catalogs(&mut trigger);
             trigger
         }))
@@ -1986,7 +1986,7 @@ mod tests {
     fn trigger_modify_requires_a_patch() {
         let client = client();
         let params = ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             subaccount_id: SubAccountScope::Default,
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
@@ -2131,7 +2131,7 @@ mod tests {
         // POLY-9426: a modify takes 10000 (a buy stop-loss or take-profit
         // market child's cap) and leaves the side check to the server.
         let modify_full = ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             symbol: Some("BTC-USDT".into()),
             max_slippage_bps: Some(10_000),
             ..modify_params(None, None)
@@ -2239,7 +2239,7 @@ mod tests {
         }
 
         let base = ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             symbol: Some("BTC-USDT".into()),
             ..modify_params(None, None)
         };
@@ -2291,7 +2291,7 @@ mod tests {
         }
 
         let base = ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             symbol: Some("BTC-USDT".into()),
             ..modify_params(None, None)
         };
@@ -2330,7 +2330,7 @@ mod tests {
         activation_price: Option<crate::Price>,
     ) -> ModifyTriggerParams {
         ModifyTriggerParams {
-            trigger_id: "1".into(),
+            trigger_id: "2".into(),
             subaccount_id: SubAccountScope::Default,
             symbol: Some("BTC-USDT".into()),
             symbol_id: None,
@@ -3160,7 +3160,7 @@ mod tests {
         // a decimal ID from reading as base58).
         let base58 = bs58::encode(40_u64.to_be_bytes()).into_string();
         refused(vec![base58, "40".into()], None, "duplicate trigger_id");
-        refused(vec!["0".into()], None, "non-zero trigger ID");
+        refused(vec!["0".into()], None, "non-zero ID");
         refused(vec!["not an id".into()], None, "trigger_id");
         refused(vec!["42".into()], Some("has space"), "request_id");
         refused(

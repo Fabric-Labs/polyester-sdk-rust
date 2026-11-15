@@ -1,6 +1,8 @@
 //! Policy decoders.
 
+use crate::codecs::decode::common::require_id;
 use crate::codecs::scalars::format_uint64_id;
+use crate::errors::{Error, Result};
 use crate::models::{
     ApiPoliciesList, ApiPolicy, SpotMarketRule, SubaccountPoliciesList, SubaccountPolicy,
 };
@@ -58,34 +60,45 @@ pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPol
     }
 }
 
+/// A sub-account policy read or written, refused with `Error::ResponseContract`
+/// when the reply has none or it has no ID.
+fn required_subaccount_policy(
+    operation: &str,
+    policy: Option<&SubaccountPolicyView>,
+) -> Result<SubaccountPolicy> {
+    let policy = policy.ok_or_else(|| Error::response_contract(operation, "missing policy"))?;
+    require_id(operation, "policy id", policy.id)?;
+    Ok(subaccount_policy_from_proto(policy))
+}
+
 pub fn subaccount_policies_list_from_proto(
     msg: &ListSubaccountPoliciesResponse,
-) -> SubaccountPoliciesList {
-    SubaccountPoliciesList {
+) -> Result<SubaccountPoliciesList> {
+    Ok(SubaccountPoliciesList {
         policies: msg
             .policies
             .iter()
-            .map(subaccount_policy_from_proto)
-            .collect(),
-    }
+            .map(|policy| required_subaccount_policy("ListSubaccountPolicies", Some(policy)))
+            .collect::<Result<_>>()?,
+    })
 }
 
 pub fn get_subaccount_policy_from_proto(
     msg: &GetSubaccountPolicyResponse,
-) -> Option<SubaccountPolicy> {
-    msg.policy.as_option().map(subaccount_policy_from_proto)
+) -> Result<SubaccountPolicy> {
+    required_subaccount_policy("GetSubaccountPolicy", msg.policy.as_option())
 }
 
 pub fn create_subaccount_policy_from_proto(
     msg: &CreateSubaccountPolicyResponse,
-) -> Option<SubaccountPolicy> {
-    msg.policy.as_option().map(subaccount_policy_from_proto)
+) -> Result<SubaccountPolicy> {
+    required_subaccount_policy("CreateSubaccountPolicy", msg.policy.as_option())
 }
 
 pub fn update_subaccount_policy_from_proto(
     msg: &UpdateSubaccountPolicyResponse,
-) -> Option<SubaccountPolicy> {
-    msg.policy.as_option().map(subaccount_policy_from_proto)
+) -> Result<SubaccountPolicy> {
+    required_subaccount_policy("UpdateSubaccountPolicy", msg.policy.as_option())
 }
 
 pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
@@ -104,22 +117,34 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
     }
 }
 
-pub fn api_policies_list_from_proto(msg: &ListApiPoliciesResponse) -> ApiPoliciesList {
-    ApiPoliciesList {
-        policies: msg.policies.iter().map(api_policy_from_proto).collect(),
-    }
+/// An API policy read or written, refused with `Error::ResponseContract` when
+/// the reply has none or it has no ID.
+fn required_api_policy(operation: &str, policy: Option<&ApiPolicyView>) -> Result<ApiPolicy> {
+    let policy = policy.ok_or_else(|| Error::response_contract(operation, "missing policy"))?;
+    require_id(operation, "policy id", policy.id)?;
+    Ok(api_policy_from_proto(policy))
 }
 
-pub fn get_api_policy_from_proto(msg: &GetApiPolicyResponse) -> Option<ApiPolicy> {
-    msg.policy.as_option().map(api_policy_from_proto)
+pub fn api_policies_list_from_proto(msg: &ListApiPoliciesResponse) -> Result<ApiPoliciesList> {
+    Ok(ApiPoliciesList {
+        policies: msg
+            .policies
+            .iter()
+            .map(|policy| required_api_policy("ListApiPolicies", Some(policy)))
+            .collect::<Result<_>>()?,
+    })
 }
 
-pub fn create_api_policy_from_proto(msg: &CreateApiPolicyResponse) -> Option<ApiPolicy> {
-    msg.policy.as_option().map(api_policy_from_proto)
+pub fn get_api_policy_from_proto(msg: &GetApiPolicyResponse) -> Result<ApiPolicy> {
+    required_api_policy("GetApiPolicy", msg.policy.as_option())
 }
 
-pub fn update_api_policy_from_proto(msg: &UpdateApiPolicyResponse) -> Option<ApiPolicy> {
-    msg.policy.as_option().map(api_policy_from_proto)
+pub fn create_api_policy_from_proto(msg: &CreateApiPolicyResponse) -> Result<ApiPolicy> {
+    required_api_policy("CreateApiPolicy", msg.policy.as_option())
+}
+
+pub fn update_api_policy_from_proto(msg: &UpdateApiPolicyResponse) -> Result<ApiPolicy> {
+    required_api_policy("UpdateApiPolicy", msg.policy.as_option())
 }
 
 #[cfg(test)]
@@ -138,7 +163,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = subaccount_policies_list_from_proto(&msg);
+        let result = subaccount_policies_list_from_proto(&msg).unwrap();
         assert_eq!(result.policies.len(), 1);
         assert_eq!(result.policies[0].policy_id, format_uint64_id(42));
         assert_eq!(result.policies[0].name, "default");
@@ -161,7 +186,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = api_policies_list_from_proto(&msg);
+        let result = api_policies_list_from_proto(&msg).unwrap();
         assert_eq!(result.policies.len(), 1);
         assert_eq!(result.policies[0].policy_id, format_uint64_id(7));
         assert_eq!(result.policies[0].revision, 2);

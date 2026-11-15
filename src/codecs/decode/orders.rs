@@ -1,6 +1,6 @@
 //! Orders read/mutation decoders.
 
-use super::common::paired_ts_ns;
+use super::common::{paired_ts_ns, require_id};
 use super::enums::{
     enum_value_fee_asset, enum_value_order_status, enum_value_order_type,
     enum_value_self_trade_prevention_mode, enum_value_side, enum_value_time_in_force,
@@ -413,19 +413,45 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Result<Option<AttachedRi
     }))
 }
 
+/// A read order or trade's lineage, when present, must carry its ID.
+fn require_lineage(operation: &str, lineage: Option<&ProtoOrderLineage>) -> Result<()> {
+    lineage.map_or(Ok(()), |lineage| {
+        require_id(operation, "lineage.id", lineage.id)
+    })
+}
+
+/// A read order, refused with `Error::ResponseContract` without its order ID
+/// or with a lineage without its ID.
+fn required_order(operation: &str, msg: &ProtoOrder) -> Result<Order> {
+    require_id(operation, "order_id", msg.order_id)?;
+    require_lineage(operation, msg.lineage.as_option())?;
+    order_from_proto(msg)
+}
+
+/// A read trade, refused with `Error::ResponseContract` with a lineage without
+/// its ID.
+fn required_trade(operation: &str, msg: &ProtoUserTrade) -> Result<UserTrade> {
+    require_lineage(operation, msg.lineage.as_option())?;
+    user_trade_from_proto(msg)
+}
+
 pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> Result<OrdersList> {
-    orders_list(&msg.orders, &msg.next_page_token)
+    orders_list("GetOpenOrders", &msg.orders, &msg.next_page_token)
 }
 
 pub fn orders_list_from_history(msg: &GetOrderHistoryResponse) -> Result<OrdersList> {
-    orders_list(&msg.orders, &msg.next_page_token)
+    orders_list("GetOrderHistory", &msg.orders, &msg.next_page_token)
 }
 
-fn orders_list(orders: &[ProtoOrder], next_page_token: &str) -> Result<OrdersList> {
+fn orders_list(
+    operation: &str,
+    orders: &[ProtoOrder],
+    next_page_token: &str,
+) -> Result<OrdersList> {
     Ok(OrdersList {
         orders: orders
             .iter()
-            .map(order_from_proto)
+            .map(|order| required_order(operation, order))
             .collect::<Result<Vec<_>>>()?,
         next_page_token: next_page_token.to_owned(),
     })
@@ -471,7 +497,7 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
         trades: msg
             .trades
             .iter()
-            .map(user_trade_from_proto)
+            .map(|trade| required_trade("GetUserTrades", trade))
             .collect::<Result<Vec<_>>>()?,
         transfers: msg
             .transfers
@@ -483,11 +509,18 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
 }
 
 pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
-    let order = msg.order.as_option().map(order_from_proto).transpose()?;
+    // An order that does not exist is refused by the API with its own error,
+    // never answered with an empty success.
+    let order = Some(required_order(
+        "GetOrder",
+        msg.order
+            .as_option()
+            .ok_or_else(|| Error::response_contract("GetOrder", "missing order"))?,
+    )?);
     let trades = msg
         .trades
         .iter()
-        .map(user_trade_from_proto)
+        .map(|trade| required_trade("GetOrder", trade))
         .collect::<Result<Vec<_>>>()?;
     let transfers = msg
         .transfers
@@ -702,11 +735,14 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         cancelled_orders: msg
             .cancelled_orders
             .iter()
-            .map(|order| CancelledOrder {
-                order_id: format_uint64_id(order.order_id),
-                client_order_id: order.client_order_id.clone(),
+            .map(|order| {
+                require_id("CancelAllOrders", "order_id", order.order_id)?;
+                Ok(CancelledOrder {
+                    order_id: format_uint64_id(order.order_id),
+                    client_order_id: order.client_order_id.clone(),
+                })
             })
-            .collect(),
+            .collect::<Result<_>>()?,
         total_cancelled: msg.total_cancelled,
         truncated: msg.truncated,
         listing_status: cancel_all_listing_status_name(&msg.listing_status),
@@ -768,6 +804,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
             match item.outcome.as_ref() {
                 Some(batch_create_result_item::Outcome::Accepted(value)) => {
                     accepted += 1;
+                    require_id("BatchCreateOrders", "order_id", value.order_id)?;
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
                     // Unscaled: the service attaches the item's pair scale.
@@ -2417,9 +2454,21 @@ mod tests {
 
     #[test]
     fn get_order_reports_whether_executions_are_complete() {
-        let recording = get_order_from_proto(&GetOrderResponse::default()).unwrap();
+        let order = || -> buffa::MessageField<ProtoOrder> {
+            ProtoOrder {
+                order_id: 7,
+                ..Default::default()
+            }
+            .into()
+        };
+        let recording = get_order_from_proto(&GetOrderResponse {
+            order: order(),
+            ..Default::default()
+        })
+        .unwrap();
         assert!(!recording.executions_complete);
         let complete = get_order_from_proto(&GetOrderResponse {
+            order: order(),
             executions_complete: true,
             ..Default::default()
         })

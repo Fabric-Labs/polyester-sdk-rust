@@ -1,10 +1,12 @@
 //! Sub-account decoders.
 
-use crate::codecs::decode::admin::api_key_from_proto;
+use crate::codecs::decode::admin::required_api_key;
 use crate::codecs::decode::balances::balances_list_from_proto;
+use crate::codecs::decode::common::require_id;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::decode::policies::subaccount_policy_from_proto;
 use crate::codecs::scalars::format_uint64_id;
+use crate::errors::Result as SdkResult;
 use crate::models::{
     CreateSubaccountResult, GetSubaccountResult, SubAccount, SubAccountActivityEvent,
     SubAccountActivityList, SubAccountInvite, SubAccountInvitesList, SubAccountMember,
@@ -73,48 +75,97 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
     }
 }
 
-pub fn subaccounts_list_from_proto(msg: &ListSubaccountsResponse) -> SubAccountsList {
-    SubAccountsList {
-        subaccounts: msg.subaccounts.iter().map(subaccount_from_proto).collect(),
-    }
+/// A read sub-account, refused with `Error::ResponseContract` without its ID.
+fn required_subaccount(operation: &str, msg: &Subaccount) -> SdkResult<SubAccount> {
+    require_id(operation, "id", msg.id)?;
+    Ok(subaccount_from_proto(msg))
+}
+
+pub fn subaccounts_list_from_proto(msg: &ListSubaccountsResponse) -> SdkResult<SubAccountsList> {
+    Ok(SubAccountsList {
+        subaccounts: msg
+            .subaccounts
+            .iter()
+            .map(|subaccount| required_subaccount("ListSubaccounts", subaccount))
+            .collect::<SdkResult<_>>()?,
+    })
 }
 
 /// Decode a `GetSubaccount` answer. `members`, `invites` and `policy` read as
 /// the members list, the invites list and the sub-account policy stream read
 /// them; `balances` is the balances list when the answer carries it, `None`
 /// otherwise.
-pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> GetSubaccountResult {
-    GetSubaccountResult {
-        subaccount: msg.subaccount.as_option().map(subaccount_from_proto),
-        api_keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
-        members: msg.members.iter().map(member_from_proto).collect(),
-        invites: msg.invites.iter().map(invite_from_proto).collect(),
+pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> SdkResult<GetSubaccountResult> {
+    const OPERATION: &str = "GetSubaccount";
+    Ok(GetSubaccountResult {
+        // A sub-account that does not exist is refused by the API with its own
+        // error, never answered with an empty success.
+        subaccount: Some(required_subaccount(
+            OPERATION,
+            msg.subaccount
+                .as_option()
+                .ok_or_else(|| crate::Error::response_contract(OPERATION, "missing subaccount"))?,
+        )?),
+        api_keys: msg
+            .api_keys
+            .iter()
+            .map(|key| required_api_key(OPERATION, key))
+            .collect::<SdkResult<_>>()?,
+        members: msg
+            .members
+            .iter()
+            .map(|member| member_from_proto(OPERATION, member))
+            .collect::<SdkResult<_>>()?,
+        invites: msg
+            .invites
+            .iter()
+            .map(|invite| required_invite(OPERATION, invite))
+            .collect::<SdkResult<_>>()?,
         // `None` when no policy is attached: the server leaves it unset.
-        policy: msg.policy.as_option().map(subaccount_policy_from_proto),
+        policy: msg
+            .policy
+            .as_option()
+            .map(|policy| {
+                require_id(OPERATION, "policy.id", policy.id)?;
+                Ok(subaccount_policy_from_proto(policy))
+            })
+            .transpose()?,
         balances: msg.balances.as_option().map(balances_list_from_proto),
-    }
+    })
 }
 
-pub fn create_subaccount_from_proto(msg: &CreateSubaccountResponse) -> CreateSubaccountResult {
-    CreateSubaccountResult {
+/// Decode a `CreateSubaccount` answer, refused with `Error::ResponseContract`
+/// without the new sub-account's ID.
+pub fn create_subaccount_from_proto(
+    msg: &CreateSubaccountResponse,
+) -> SdkResult<CreateSubaccountResult> {
+    require_id("CreateSubaccount", "subaccount_id", msg.subaccount_id)?;
+    Ok(CreateSubaccountResult {
         subaccount_id: format_uint64_id(msg.subaccount_id),
         revision: msg.revision,
-    }
+    })
 }
 
-fn member_from_proto(msg: &SubaccountMemberView) -> SubAccountMember {
-    SubAccountMember {
+/// A sub-account member, refused with `Error::ResponseContract` without its
+/// account ID.
+fn member_from_proto(operation: &str, msg: &SubaccountMemberView) -> SdkResult<SubAccountMember> {
+    require_id(operation, "member account_id", msg.account_id)?;
+    Ok(SubAccountMember {
         grantee_account_id: format_uint64_id(msg.account_id),
         role: enum_proto_name(&msg.role),
-    }
+    })
 }
 
 pub fn subaccount_members_list_from_proto(
     msg: &ListSubaccountMembersResponse,
-) -> SubAccountMembersList {
-    SubAccountMembersList {
-        members: msg.members.iter().map(member_from_proto).collect(),
-    }
+) -> SdkResult<SubAccountMembersList> {
+    Ok(SubAccountMembersList {
+        members: msg
+            .members
+            .iter()
+            .map(|member| member_from_proto("ListSubaccountMembers", member))
+            .collect::<SdkResult<_>>()?,
+    })
 }
 
 fn invite_from_proto(msg: &SubaccountInvite) -> SubAccountInvite {
@@ -126,24 +177,46 @@ fn invite_from_proto(msg: &SubaccountInvite) -> SubAccountInvite {
     }
 }
 
-pub fn invite_subaccount_member_from_proto(
-    msg: &InviteSubaccountMemberResponse,
-) -> Option<SubAccountInvite> {
-    msg.invite.as_option().map(invite_from_proto)
+/// A read invite, refused with `Error::ResponseContract` without its ID or
+/// its sub-account ID.
+fn required_invite(operation: &str, msg: &SubaccountInvite) -> SdkResult<SubAccountInvite> {
+    require_id(operation, "id", msg.id)?;
+    require_id(operation, "subaccount_id", msg.subaccount_id)?;
+    Ok(invite_from_proto(msg))
 }
 
+/// Decode an `InviteSubaccountMember` answer, refused with
+/// `Error::ResponseContract` without its invite or the invite's IDs.
+pub fn invite_subaccount_member_from_proto(
+    msg: &InviteSubaccountMemberResponse,
+) -> SdkResult<SubAccountInvite> {
+    let invite = msg.invite.as_option().ok_or_else(|| {
+        crate::Error::response_contract("InviteSubaccountMember", "missing invite")
+    })?;
+    required_invite("InviteSubaccountMember", invite)
+}
+
+/// Decode a `RespondSubaccountInvite` answer, refused with
+/// `Error::ResponseContract` without its invite or the invite's IDs.
 pub fn respond_subaccount_invite_from_proto(
     msg: &RespondSubaccountInviteResponse,
-) -> Option<SubAccountInvite> {
-    msg.invite.as_option().map(invite_from_proto)
+) -> SdkResult<SubAccountInvite> {
+    let invite = msg.invite.as_option().ok_or_else(|| {
+        crate::Error::response_contract("RespondSubaccountInvite", "missing invite")
+    })?;
+    required_invite("RespondSubaccountInvite", invite)
 }
 
 pub fn subaccount_invites_list_from_proto(
     msg: &ListSubaccountInvitesResponse,
-) -> SubAccountInvitesList {
-    SubAccountInvitesList {
-        invites: msg.invites.iter().map(invite_from_proto).collect(),
-    }
+) -> SdkResult<SubAccountInvitesList> {
+    Ok(SubAccountInvitesList {
+        invites: msg
+            .invites
+            .iter()
+            .map(|invite| required_invite("ListSubaccountInvites", invite))
+            .collect::<SdkResult<_>>()?,
+    })
 }
 
 pub fn subaccount_activity_list_from_proto(
@@ -191,7 +264,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = subaccounts_list_from_proto(&msg);
+        let result = subaccounts_list_from_proto(&msg).unwrap();
         assert_eq!(result.subaccounts.len(), 1);
         assert_eq!(result.subaccounts[0].subaccount_id, format_uint64_id(12));
         assert_eq!(result.subaccounts[0].smart_account_address, "0xabc");
@@ -278,7 +351,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = subaccount_members_list_from_proto(&msg);
+        let result = subaccount_members_list_from_proto(&msg).unwrap();
         assert_eq!(result.members.len(), 1);
         assert_eq!(result.members[0].grantee_account_id, format_uint64_id(99));
         assert!(!result.members[0].role.is_empty());
@@ -306,7 +379,8 @@ mod tests {
             subaccount_id: 42,
             revision: 1,
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(result.subaccount_id, format_uint64_id(42));
         assert_eq!(result.revision, 1);
     }

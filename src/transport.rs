@@ -174,29 +174,55 @@ pub(crate) fn redact_text(text: &str) -> String {
 /// A client-held secret shorter than this is too common to replace in text.
 const MIN_SECRET_LENGTH: usize = 4;
 
-static KNOWN_SECRETS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+/// Client-held secrets, each with the number of live registrations holding
+/// it: a secret two clients share stays redacted until both are dropped.
+static KNOWN_SECRETS: std::sync::Mutex<std::collections::BTreeMap<String, usize>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
 
-/// Remember a client-held secret, such as an API private key, so
-/// [`redact_text`] removes it wherever it appears.
-pub(crate) fn register_secret(secret: &str) {
-    if secret.len() < MIN_SECRET_LENGTH {
-        return;
-    }
-    let mut known = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS);
-    if !known.iter().any(|item| item == secret) {
-        known.push(secret.to_owned());
+/// Client-held secrets, such as an API private key, that [`redact_text`]
+/// removes wherever they appear while this registration lives. Dropping it
+/// forgets each secret no other registration holds.
+pub(crate) struct SecretRegistration {
+    secrets: Vec<String>,
+}
+
+impl SecretRegistration {
+    pub(crate) fn new(secrets: impl IntoIterator<Item = String>) -> Self {
+        let secrets: Vec<String> = secrets
+            .into_iter()
+            .filter(|secret| secret.len() >= MIN_SECRET_LENGTH)
+            .collect();
+        let mut known = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS);
+        for secret in &secrets {
+            *known.entry(secret.clone()).or_insert(0) += 1;
+        }
+        Self { secrets }
     }
 }
 
-/// Remember the userinfo of a URL the client holds, and its password, raw and
-/// decoded.
-pub(crate) fn register_url_secrets(raw: &str) {
-    for part in userinfo_parts(raw) {
-        register_secret(&part);
-        if let Ok(decoded) = urlencoding_decode(&part) {
-            register_secret(&decoded);
+impl Drop for SecretRegistration {
+    fn drop(&mut self) {
+        let mut known = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS);
+        for secret in &self.secrets {
+            if let Some(count) = known.get_mut(secret) {
+                *count -= 1;
+                if *count == 0 {
+                    known.remove(secret);
+                }
+            }
         }
     }
+}
+
+/// The userinfo of a URL the client holds, and its password, raw and decoded.
+pub(crate) fn url_secrets(raw: &str) -> Vec<String> {
+    userinfo_parts(raw)
+        .into_iter()
+        .flat_map(|part| {
+            let decoded = urlencoding_decode(&part).ok();
+            std::iter::once(part).chain(decoded)
+        })
+        .collect()
 }
 
 fn urlencoding_decode(text: &str) -> std::result::Result<String, ()> {
@@ -239,7 +265,10 @@ fn userinfo_parts(raw: &str) -> Vec<String> {
 /// The registered secrets and the userinfo of the proxies the environment
 /// sets, longest first.
 fn secrets_in_effect() -> Vec<String> {
-    let mut secrets = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS).clone();
+    let mut secrets: Vec<String> = crate::realtime::lock_unpoisoned(&KNOWN_SECRETS)
+        .keys()
+        .cloned()
+        .collect();
     for name in PROXY_ENV {
         if let Ok(proxy) = std::env::var(name) {
             secrets.extend(proxy_secrets(proxy.trim()));
@@ -250,14 +279,10 @@ fn secrets_in_effect() -> Vec<String> {
 }
 
 /// The userinfo and password of a proxy URL from the environment, raw and
-/// decoded, as [`register_url_secrets`] keeps them.
+/// decoded, as [`url_secrets`] returns them.
 fn proxy_secrets(proxy: &str) -> Vec<String> {
-    userinfo_parts(proxy)
+    url_secrets(proxy)
         .into_iter()
-        .flat_map(|part| {
-            let decoded = urlencoding_decode(&part).ok();
-            std::iter::once(part).chain(decoded)
-        })
         .filter(|part| part.len() >= MIN_SECRET_LENGTH)
         .collect()
 }
@@ -885,21 +910,34 @@ pub struct Factory {
     pub credentials: Option<Credentials>,
     transport: SharedTransport,
     connect_config: ClientConfig,
+    /// The userinfo of the API and WebSocket URLs, redacted while the factory
+    /// or a clone of it lives.
+    _url_secrets: Arc<SecretRegistration>,
 }
 
 impl Factory {
     pub fn new(config: Config, credentials: Option<Credentials>) -> Result<Self> {
         auth::validate_recv_window_ms(config.recv_window_ms)?;
         // Client-held secrets never reach an error's text (see redact_text).
-        register_url_secrets(&config.api_url);
-        register_url_secrets(&config.ws_url);
+        let url_secrets = Arc::new(SecretRegistration::new(
+            url_secrets(&config.api_url)
+                .into_iter()
+                .chain(url_secrets(&config.ws_url)),
+        ));
         let parsed = validate_http_url(&config.api_url, config.allow_insecure_http)?;
         if parsed.query().is_some() || parsed.fragment().is_some() {
             return Err(Error::validation(
                 "api_url must not contain a query string or fragment",
             ));
         }
-        validate_ws_url(&config.ws_url, config.allow_insecure_http)?;
+        // The same rule for ws_url: the realtime client sends it as configured
+        // on every connect and reconnect, outside any signature.
+        let ws = validate_ws_url(&config.ws_url, config.allow_insecure_http)?;
+        if ws.query().is_some() || ws.fragment().is_some() {
+            return Err(Error::validation(
+                "ws_url must not contain a query string or fragment",
+            ));
+        }
         let uri: Uri = config
             .api_url
             .parse()
@@ -923,6 +961,7 @@ impl Factory {
             credentials,
             transport,
             connect_config,
+            _url_secrets: url_secrets,
         })
     }
 

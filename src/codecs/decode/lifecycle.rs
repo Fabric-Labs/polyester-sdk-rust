@@ -1,5 +1,6 @@
 //! Lifecycle flow decoders.
 
+use crate::codecs::decode::common::require_str_id;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
@@ -130,11 +131,22 @@ pub fn flow_summary_message_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSu
     flow_summary_from_proto(msg)
 }
 
-pub fn flows_list_from_proto(msg: &ListFlowsResponse) -> LifecycleFlowsList {
-    LifecycleFlowsList {
-        flows: msg.flows.iter().map(flow_summary_from_proto).collect(),
+/// A read flow summary, refused with `Error::ResponseContract` without its
+/// flow ID.
+fn required_flow_summary(operation: &str, msg: &FlowSummaryView) -> Result<LifecycleFlowSummary> {
+    require_str_id(operation, "flow_id", &msg.flow_id)?;
+    Ok(flow_summary_from_proto(msg))
+}
+
+pub fn flows_list_from_proto(msg: &ListFlowsResponse) -> Result<LifecycleFlowsList> {
+    Ok(LifecycleFlowsList {
+        flows: msg
+            .flows
+            .iter()
+            .map(|flow| required_flow_summary("ListFlows", flow))
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
@@ -157,30 +169,37 @@ fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
     }
 }
 
-pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> LifecycleFlowsList {
-    LifecycleFlowsList {
-        flows: msg.matches.iter().map(flow_tx_match_from_proto).collect(),
+pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> Result<LifecycleFlowsList> {
+    Ok(LifecycleFlowsList {
+        flows: msg
+            .matches
+            .iter()
+            .map(|flow| {
+                require_str_id("ListFlowsByTx", "flow_id", &flow.flow_id)?;
+                Ok(flow_tx_match_from_proto(flow))
+            })
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 pub fn flow_from_get_response(msg: &GetFlowResponse) -> Result<LifecycleFlowSummary> {
     let detail = msg
         .flow
         .as_option()
-        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow"))?;
-    detail
+        .ok_or_else(|| Error::response_contract("GetFlowById", "missing flow"))?;
+    let summary = detail
         .summary
         .as_option()
-        .map(flow_summary_from_proto)
-        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow summary"))
+        .ok_or_else(|| Error::response_contract("GetFlowById", "missing flow summary"))?;
+    required_flow_summary("GetFlowById", summary)
 }
 
 /// Decode every match from a transaction lookup response.
 ///
 /// The legacy helper name is retained for compatibility, but transaction
 /// lookups are one-to-many and must not silently discard bundled flows.
-pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> LifecycleFlowsList {
+pub fn flow_from_get_by_tx_response(msg: &ListFlowsByTxResponse) -> Result<LifecycleFlowsList> {
     flows_by_tx_list_from_proto(msg)
 }
 
@@ -348,7 +367,7 @@ mod tests {
             next_page_token: "next".into(),
             ..Default::default()
         };
-        let result = flows_list_from_proto(&msg);
+        let result = flows_list_from_proto(&msg).unwrap();
         assert_eq!(result.flows.len(), 2);
         assert_eq!(result.next_page_token, "next");
         assert_eq!(result.flows[0].lifecycle_reason, "unspecified");
@@ -372,7 +391,7 @@ mod tests {
             next_page_token: "next".into(),
             ..Default::default()
         };
-        let result = flow_from_get_by_tx_response(&msg);
+        let result = flow_from_get_by_tx_response(&msg).unwrap();
         assert_eq!(result.flows.len(), 2);
         assert_eq!(result.flows[0].owner_account_id, format_uint64_id(99));
         assert_eq!(result.flows[0].smart_account_address, "0xsmart");

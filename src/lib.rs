@@ -44,12 +44,16 @@ pub mod auth;
 mod catalog_startup;
 pub mod catalogs;
 pub mod client;
+#[cfg(test)]
+mod client_secret_release_tests;
 pub mod codecs;
 pub mod environment;
 pub mod errors;
 pub mod marketoverview;
 pub mod models;
 pub mod orderbook;
+#[cfg(test)]
+mod reply_id_inventory_tests;
 pub mod services;
 pub mod transport;
 pub mod types;

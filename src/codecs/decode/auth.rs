@@ -1,6 +1,8 @@
 //! Auth response decoders.
 
+use crate::codecs::decode::common::{require_id, require_str_id};
 use crate::codecs::scalars::{format_id, format_uint64_id};
+use crate::errors::Result;
 use crate::models::{
     AccountIdentity, MeResult, UserProfile, UsernameHistoryEntry, UsernameHistoryList,
 };
@@ -13,8 +15,14 @@ fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option
     ts.map(|t| t.seconds.saturating_mul(1000) + (t.nanos as i64) / 1_000_000)
 }
 
-pub fn me_from_proto(msg: &MeResponse) -> MeResult {
-    MeResult {
+/// Decode a `Me` answer, refused with `Error::ResponseContract` without its
+/// account ID or with a session without its ID.
+pub fn me_from_proto(msg: &MeResponse) -> Result<MeResult> {
+    require_id("Me", "account_id", msg.account_id)?;
+    if let Some(session) = msg.session.as_option() {
+        require_str_id("Me", "session.session_id", &session.session_id)?;
+    }
+    Ok(MeResult {
         account_id: format_uint64_id(msg.account_id),
         api_key_id: msg
             .api_key_id
@@ -32,7 +40,7 @@ pub fn me_from_proto(msg: &MeResponse) -> MeResult {
         } else {
             Some(msg.root_smart_account_address.clone())
         },
-    }
+    })
 }
 
 pub fn profile_from_proto(msg: &ProtoUserProfile) -> UserProfile {
@@ -89,7 +97,7 @@ mod tests {
             root_smart_account_address: "0xabc".into(),
             ..Default::default()
         };
-        let me = me_from_proto(&msg);
+        let me = me_from_proto(&msg).unwrap();
         assert_eq!(me.account_id, format_uint64_id(42));
         assert_eq!(
             me.api_key_id.as_deref(),

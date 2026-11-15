@@ -1,5 +1,6 @@
 //! Address book decoders.
 
+use crate::codecs::decode::common::require_id;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
 use crate::errors::{Error, Result};
@@ -81,13 +82,20 @@ pub fn list_books_from_proto(msg: &ListAddressBooksResponse) -> AddressBooksList
     }
 }
 
-fn entry_from_proto(msg: &ProtoAddressBookEntry) -> AddressBookEntry {
+/// An address-book entry, refused with `Error::ResponseContract` without its
+/// ID or with a tag without its ID.
+fn entry_from_proto(operation: &str, msg: &ProtoAddressBookEntry) -> Result<AddressBookEntry> {
+    require_id(
+        operation,
+        "address_book_entry_id",
+        msg.address_book_entry_id,
+    )?;
     let (external, internal) = match &msg.entry {
         Some(Entry::External(external)) => (Some(external_from_proto(external)), None),
         Some(Entry::Internal(internal)) => (None, Some(internal_from_proto(internal))),
         None => (None, None),
     };
-    AddressBookEntry {
+    Ok(AddressBookEntry {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         scope: scope_from_proto(&msg.scope),
         kind: enum_proto_name(&msg.kind),
@@ -97,71 +105,89 @@ fn entry_from_proto(msg: &ProtoAddressBookEntry) -> AddressBookEntry {
         updated_at: time(&msg.updated_at),
         external,
         internal,
-        tags: msg.tags.iter().map(tag_from_proto).collect(),
+        tags: msg
+            .tags
+            .iter()
+            .map(|tag| tag_from_proto(operation, tag))
+            .collect::<Result<_>>()?,
         revision: msg.revision,
-    }
+    })
 }
 
-pub fn list_entries_from_proto(msg: &ListAddressBookEntriesResponse) -> AddressBookEntriesList {
-    AddressBookEntriesList {
-        entries: msg.entries.iter().map(entry_from_proto).collect(),
+pub fn list_entries_from_proto(
+    msg: &ListAddressBookEntriesResponse,
+) -> Result<AddressBookEntriesList> {
+    Ok(AddressBookEntriesList {
+        entries: msg
+            .entries
+            .iter()
+            .map(|entry| entry_from_proto("ListAddressBookEntries", entry))
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
+}
+
+/// The entry a create, update or copy returns: refused when it is missing or
+/// has no ID.
+fn required_entry(
+    operation: &str,
+    entry: Option<&ProtoAddressBookEntry>,
+) -> Result<AddressBookEntry> {
+    let entry = entry.ok_or_else(|| Error::response_contract(operation, "missing entry"))?;
+    entry_from_proto(operation, entry)
+}
+
+/// The tag a create or update returns: refused when it is missing or has no ID.
+fn required_tag(operation: &str, tag: Option<&ProtoAddressBookTag>) -> Result<AddressBookTag> {
+    let tag = tag.ok_or_else(|| Error::response_contract(operation, "missing tag"))?;
+    tag_from_proto(operation, tag)
 }
 
 pub fn entry_from_create_proto(msg: &CreateAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid CreateAddressBookEntry response: missing entry"))
+    required_entry("CreateAddressBookEntry", msg.entry.as_option())
 }
 
 pub fn entry_from_update_proto(msg: &UpdateAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid UpdateAddressBookEntry response: missing entry"))
+    required_entry("UpdateAddressBookEntry", msg.entry.as_option())
 }
 
 pub fn entry_from_copy_proto(msg: &CopyAddressBookEntryResponse) -> Result<AddressBookEntry> {
-    msg.entry
-        .as_option()
-        .map(entry_from_proto)
-        .ok_or_else(|| Error::transport("invalid CopyAddressBookEntry response: missing entry"))
+    required_entry("CopyAddressBookEntry", msg.entry.as_option())
 }
 
-fn tag_from_proto(msg: &ProtoAddressBookTag) -> AddressBookTag {
-    AddressBookTag {
+/// An address-book tag, refused with `Error::ResponseContract` without its ID.
+fn tag_from_proto(operation: &str, msg: &ProtoAddressBookTag) -> Result<AddressBookTag> {
+    require_id(operation, "tag_id", msg.tag_id)?;
+    Ok(AddressBookTag {
         tag_id: format_uint64_id(msg.tag_id),
         scope: scope_from_proto(&msg.scope),
         name: msg.name.clone(),
         color: msg.color.clone(),
         created_at: time(&msg.created_at),
         updated_at: time(&msg.updated_at),
-    }
+    })
 }
 
 pub fn tag_from_create_proto(msg: &CreateAddressBookTagResponse) -> Result<AddressBookTag> {
-    msg.tag
-        .as_option()
-        .map(tag_from_proto)
-        .ok_or_else(|| Error::transport("invalid CreateAddressBookTag response: missing tag"))
+    required_tag("CreateAddressBookTag", msg.tag.as_option())
 }
 
 pub fn tag_from_update_proto(msg: &UpdateAddressBookTagResponse) -> Result<AddressBookTag> {
-    msg.tag
-        .as_option()
-        .map(tag_from_proto)
-        .ok_or_else(|| Error::transport("invalid UpdateAddressBookTag response: missing tag"))
+    required_tag("UpdateAddressBookTag", msg.tag.as_option())
 }
 
-fn counterparty_from_proto(msg: &ProtoTransferCounterparty) -> TransferCounterparty {
+fn counterparty_from_proto(msg: &ProtoTransferCounterparty) -> Result<TransferCounterparty> {
+    require_id(
+        "ListTransferCounterparties",
+        "counterparty_id",
+        msg.counterparty_id,
+    )?;
     let (external, internal) = match &msg.counterparty {
         Some(Counterparty::External(external)) => (Some(external_from_proto(external)), None),
         Some(Counterparty::Internal(internal)) => (None, Some(internal_from_proto(internal))),
         None => (None, None),
     };
-    TransferCounterparty {
+    Ok(TransferCounterparty {
         counterparty_id: format_uint64_id(msg.counterparty_id),
         scope: scope_from_proto(&msg.scope),
         direction: enum_proto_name(&msg.direction),
@@ -173,58 +199,69 @@ fn counterparty_from_proto(msg: &ProtoTransferCounterparty) -> TransferCounterpa
         last_seen_at: time(&msg.last_seen_at),
         external,
         internal,
-    }
+    })
 }
 
 pub fn list_counterparties_from_proto(
     msg: &ListTransferCounterpartiesResponse,
-) -> TransferCounterpartiesList {
-    TransferCounterpartiesList {
+) -> Result<TransferCounterpartiesList> {
+    Ok(TransferCounterpartiesList {
         counterparties: msg
             .counterparties
             .iter()
             .map(counterparty_from_proto)
-            .collect(),
+            .collect::<Result<_>>()?,
         truncated: msg.truncated,
-    }
+    })
 }
 
-fn destination_from_proto(msg: &ProtoTransferDestination) -> AddressBookTransferDestination {
+fn destination_from_proto(
+    msg: &ProtoTransferDestination,
+) -> Result<AddressBookTransferDestination> {
     let (external, internal) = match &msg.destination {
         Some(Destination::External(external)) => (Some(external_from_proto(external)), None),
         Some(Destination::Internal(internal)) => (None, Some(internal_from_proto(internal))),
         None => (None, None),
     };
-    AddressBookTransferDestination {
+    Ok(AddressBookTransferDestination {
         scope: scope_from_proto(&msg.scope),
         kind: enum_proto_name(&msg.kind),
         saved: msg.saved,
         whitelisted: msg.whitelisted,
         whitelist_status: enum_proto_name(&msg.whitelist_status),
-        address_book_entry: msg.address_book_entry.as_option().map(entry_from_proto),
+        address_book_entry: msg
+            .address_book_entry
+            .as_option()
+            .map(|entry| entry_from_proto("ListTransferDestinations", entry))
+            .transpose()?,
         external,
         internal,
         whitelist_updated_at: time(&msg.whitelist_updated_at),
-    }
+    })
 }
 
 pub fn list_destinations_from_proto(
     msg: &ListTransferDestinationsResponse,
-) -> AddressBookTransferDestinationsList {
-    AddressBookTransferDestinationsList {
+) -> Result<AddressBookTransferDestinationsList> {
+    Ok(AddressBookTransferDestinationsList {
         destinations: msg
             .destinations
             .iter()
             .map(destination_from_proto)
-            .collect(),
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 fn internal_whitelist_entry_from_proto(
     msg: &ProtoInternalWhitelistEntry,
-) -> InternalTransferWhitelistEntry {
-    InternalTransferWhitelistEntry {
+) -> Result<InternalTransferWhitelistEntry> {
+    require_id(
+        "ListInternalTransferWhitelistEntries",
+        "entry_id",
+        msg.entry_id,
+    )?;
+    Ok(InternalTransferWhitelistEntry {
         entry_id: format_uint64_id(msg.entry_id),
         scope: scope_from_proto(&msg.scope),
         root_account_id: nonzero_id(msg.root_account_id),
@@ -236,20 +273,20 @@ fn internal_whitelist_entry_from_proto(
         created_at: time(&msg.created_at),
         updated_at: time(&msg.updated_at),
         resolution_status: enum_proto_name(&msg.resolution_status),
-    }
+    })
 }
 
 pub fn list_internal_whitelist_from_proto(
     msg: &ListInternalTransferWhitelistEntriesResponse,
-) -> InternalTransferWhitelistEntriesList {
-    InternalTransferWhitelistEntriesList {
+) -> Result<InternalTransferWhitelistEntriesList> {
+    Ok(InternalTransferWhitelistEntriesList {
         entries: msg
             .entries
             .iter()
             .map(internal_whitelist_entry_from_proto)
-            .collect(),
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 fn whitelist_view_from_proto(msg: &ProtoWithdrawWhitelistView) -> WithdrawWhitelistView {
@@ -277,8 +314,15 @@ pub fn withdraw_whitelist_view_from_proto(
     msg.view.as_option().map(whitelist_view_from_proto)
 }
 
-fn external_entry_view_from_proto(msg: &ProtoExternalEntryView) -> ExternalAddressBookEntryView {
-    ExternalAddressBookEntryView {
+fn external_entry_view_from_proto(
+    msg: &ProtoExternalEntryView,
+) -> Result<ExternalAddressBookEntryView> {
+    require_id(
+        "GetAddressBookView",
+        "address_book_entry_id",
+        msg.address_book_entry_id,
+    )?;
+    Ok(ExternalAddressBookEntryView {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         scope: scope_from_proto(&msg.scope),
         label: msg.label.clone(),
@@ -290,11 +334,18 @@ fn external_entry_view_from_proto(msg: &ProtoExternalEntryView) -> ExternalAddre
         created_at: time(&msg.created_at),
         updated_at: time(&msg.updated_at),
         revision: msg.revision,
-    }
+    })
 }
 
-fn internal_entry_view_from_proto(msg: &ProtoInternalEntryView) -> InternalAddressBookEntryView {
-    InternalAddressBookEntryView {
+fn internal_entry_view_from_proto(
+    msg: &ProtoInternalEntryView,
+) -> Result<InternalAddressBookEntryView> {
+    require_id(
+        "GetAddressBookView",
+        "address_book_entry_id",
+        msg.address_book_entry_id,
+    )?;
+    Ok(InternalAddressBookEntryView {
         address_book_entry_id: format_uint64_id(msg.address_book_entry_id),
         scope: scope_from_proto(&msg.scope),
         label: msg.label.clone(),
@@ -310,28 +361,31 @@ fn internal_entry_view_from_proto(msg: &ProtoInternalEntryView) -> InternalAddre
         created_at: time(&msg.created_at),
         updated_at: time(&msg.updated_at),
         revision: msg.revision,
-    }
+    })
 }
 
 /// The composed address-book view, with the public IDs the other reads use.
-pub fn address_book_view_from_proto(msg: &GetAddressBookViewResponse) -> AddressBookView {
-    AddressBookView {
+pub fn address_book_view_from_proto(msg: &GetAddressBookViewResponse) -> Result<AddressBookView> {
+    Ok(AddressBookView {
         books: msg.books.iter().map(summary_from_proto).collect(),
         entries: msg
             .entries
             .as_option()
-            .map(|entries| AddressBookEntriesView {
-                external: entries
-                    .external
-                    .iter()
-                    .map(external_entry_view_from_proto)
-                    .collect(),
-                internal: entries
-                    .internal
-                    .iter()
-                    .map(internal_entry_view_from_proto)
-                    .collect(),
-            }),
+            .map(|entries| {
+                Ok::<_, Error>(AddressBookEntriesView {
+                    external: entries
+                        .external
+                        .iter()
+                        .map(external_entry_view_from_proto)
+                        .collect::<Result<_>>()?,
+                    internal: entries
+                        .internal
+                        .iter()
+                        .map(internal_entry_view_from_proto)
+                        .collect::<Result<_>>()?,
+                })
+            })
+            .transpose()?,
         recent_destinations: msg.recent_destinations.as_option().map(|recent| {
             AddressBookRecentDestinationsView {
                 external: recent
@@ -371,19 +425,22 @@ pub fn address_book_view_from_proto(msg: &GetAddressBookViewResponse) -> Address
         tags: msg
             .tags
             .iter()
-            .map(|tag| AddressBookTagSummary {
-                tag_id: format_uint64_id(tag.tag_id),
-                name: tag.name.clone(),
-                color: tag.color.clone(),
+            .map(|tag| {
+                require_id("GetAddressBookView", "tag_id", tag.tag_id)?;
+                Ok(AddressBookTagSummary {
+                    tag_id: format_uint64_id(tag.tag_id),
+                    name: tag.name.clone(),
+                    color: tag.color.clone(),
+                })
             })
-            .collect(),
+            .collect::<Result<_>>()?,
         withdraw_whitelist: msg
             .withdraw_whitelist
             .as_option()
             .map(whitelist_view_from_proto),
         recent_destinations_truncated: msg.recent_destinations_truncated,
         view_revision: msg.view_revision,
-    }
+    })
 }
 
 pub fn address_book_invalidation_from_proto(
@@ -556,7 +613,8 @@ mod tests {
         let listed = list_entries_from_proto(&ListAddressBookEntriesResponse {
             entries: vec![internal_entry()],
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(listed.entries, vec![want.clone()]);
         let created = entry_from_create_proto(&CreateAddressBookEntryResponse {
             entry: internal_entry().into(),
@@ -593,7 +651,8 @@ mod tests {
                 ..Default::default()
             }],
             ..Default::default()
-        });
+        })
+        .unwrap();
         let entry = &external.entries[0];
         assert_eq!(
             entry.external,
@@ -620,7 +679,8 @@ mod tests {
         let listed = list_entries_from_proto(&ListAddressBookEntriesResponse {
             entries: vec![internal_entry()],
             ..Default::default()
-        });
+        })
+        .unwrap();
         let view = address_book_view_from_proto(&GetAddressBookViewResponse {
             books: vec![AddressBook {
                 scope: root_scope().into(),
@@ -685,7 +745,8 @@ mod tests {
             recent_destinations_truncated: true,
             view_revision: 1_004_932_554_200,
             ..Default::default()
-        });
+        })
+        .unwrap();
         let entries = view.entries.as_ref().expect("entries");
         let internal = &entries.internal[0];
         assert_eq!(internal.address_book_entry_id, public(ENTRY_ID));
@@ -741,7 +802,8 @@ mod tests {
             }],
             truncated: true,
             ..Default::default()
-        });
+        })
+        .unwrap();
         let row = &counterparties.counterparties[0];
         assert_eq!(row.counterparty_id, public(COUNTERPARTY_ID));
         assert_eq!(row.address_book_entry_id, public(ENTRY_ID));
@@ -762,7 +824,8 @@ mod tests {
             }],
             next_page_token: "n".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let row = &destinations.destinations[0];
         assert_eq!(row.address_book_entry, Some(listed.entries[0].clone()));
         assert_eq!(row.internal, Some(public_internal_account()));
@@ -779,7 +842,8 @@ mod tests {
                     ..Default::default()
                 }],
                 ..Default::default()
-            });
+            })
+            .unwrap();
         assert_eq!(whitelist.entries[0].entry_id, public(ENTRY_ID));
         assert_eq!(
             whitelist.entries[0].root_account_id,
@@ -821,7 +885,7 @@ mod tests {
             next_page_token: "t".into(),
             ..Default::default()
         };
-        let result = list_entries_from_proto(&msg);
+        let result = list_entries_from_proto(&msg).unwrap();
         assert_eq!(result.entries.len(), 1);
         assert_eq!(result.entries[0].address_book_entry_id, format_uint64_id(7));
         assert_eq!(result.entries[0].label, "vault");

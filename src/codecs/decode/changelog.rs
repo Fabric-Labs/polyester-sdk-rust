@@ -1,5 +1,6 @@
 //! Decode changelog.v1 responses into public SDK models.
 
+use crate::codecs::decode::common::require_id;
 use crate::codecs::scalars::format_id;
 use crate::errors::{Error, Result};
 use crate::models::{
@@ -54,6 +55,12 @@ fn change_from_proto(msg: &Change) -> ChangelogChange {
     }
 }
 
+/// A read change, refused with `Error::ResponseContract` without its ID.
+fn required_change(operation: &str, msg: &Change) -> Result<ChangelogChange> {
+    require_id(operation, "change.id", msg.id)?;
+    Ok(change_from_proto(msg))
+}
+
 fn change_exception_from_proto(msg: &ChangeException) -> ChangelogChangeException {
     ChangelogChangeException {
         environment: changelog_enum_label(&msg.environment),
@@ -69,13 +76,17 @@ fn environment_status_from_proto(msg: &EnvironmentStatus) -> ChangelogEnvironmen
     }
 }
 
-fn section_from_proto(msg: &Section) -> ChangelogSection {
-    ChangelogSection {
+fn section_from_proto(msg: &Section) -> Result<ChangelogSection> {
+    Ok(ChangelogSection {
         heading: msg.heading.clone(),
         summary: msg.summary.clone(),
-        changes: msg.changes.iter().map(change_from_proto).collect(),
+        changes: msg
+            .changes
+            .iter()
+            .map(|change| required_change("GetPost", change))
+            .collect::<Result<_>>()?,
         surface: changelog_enum_label(&msg.surface),
-    }
+    })
 }
 
 fn post_summary_from_proto(msg: &PostSummary) -> ChangelogPostSummary {
@@ -103,17 +114,18 @@ fn post_summary_from_proto(msg: &PostSummary) -> ChangelogPostSummary {
     }
 }
 
-fn change_entry_from_proto(msg: &ChangeEntry) -> ChangelogChangeEntry {
-    ChangelogChangeEntry {
-        change: msg
-            .change
-            .as_option()
-            .map(change_from_proto)
-            .unwrap_or_default(),
+fn change_entry_from_proto(msg: &ChangeEntry) -> Result<ChangelogChangeEntry> {
+    Ok(ChangelogChangeEntry {
+        change: required_change(
+            "ListChanges",
+            msg.change
+                .as_option()
+                .ok_or_else(|| Error::response_contract("ListChanges", "missing change"))?,
+        )?,
         post_slug: msg.post_slug.clone(),
         published_at: clone_timestamp(msg.published_at.as_option()),
         section_heading: msg.section_heading.clone(),
-    }
+    })
 }
 
 pub fn changelog_posts_page_from_proto(msg: &ListPostsResponse) -> ChangelogPostsPage {
@@ -123,28 +135,38 @@ pub fn changelog_posts_page_from_proto(msg: &ListPostsResponse) -> ChangelogPost
     }
 }
 
-/// Decode `GetPostResponse`; a response without a post is a contract
-/// violation.
+/// Decode `GetPostResponse`; a response without a post or its summary is a
+/// contract violation.
 pub fn changelog_post_from_proto(msg: &GetPostResponse) -> Result<ChangelogPost> {
     let post = msg
         .post
         .as_option()
-        .ok_or_else(|| Error::transport("invalid GetPost response: missing post"))?;
+        .ok_or_else(|| Error::response_contract("GetPost", "missing post"))?;
     Ok(ChangelogPost {
-        summary: post
-            .summary
-            .as_option()
-            .map(post_summary_from_proto)
-            .unwrap_or_default(),
-        sections: post.sections.iter().map(section_from_proto).collect(),
+        summary: post_summary_from_proto(
+            post.summary
+                .as_option()
+                .ok_or_else(|| Error::response_contract("GetPost", "missing post summary"))?,
+        ),
+        sections: post
+            .sections
+            .iter()
+            .map(section_from_proto)
+            .collect::<Result<_>>()?,
     })
 }
 
-pub fn changelog_changes_page_from_proto(msg: &ListChangesResponse) -> ChangelogChangesPage {
-    ChangelogChangesPage {
-        changes: msg.changes.iter().map(change_entry_from_proto).collect(),
+pub fn changelog_changes_page_from_proto(
+    msg: &ListChangesResponse,
+) -> Result<ChangelogChangesPage> {
+    Ok(ChangelogChangesPage {
+        changes: msg
+            .changes
+            .iter()
+            .map(change_entry_from_proto)
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 fn deployment_group_post_from_proto(msg: &DeploymentGroupPost) -> ChangelogDeploymentGroupPost {
@@ -196,26 +218,29 @@ pub fn changelog_deployment_group_from_proto(
     msg: &GetDeploymentGroupResponse,
 ) -> Result<ChangelogDeploymentGroup> {
     let group = msg.group.as_option().ok_or_else(|| {
-        Error::transport("invalid GetDeploymentGroup response: missing deployment group")
+        Error::response_contract("GetDeploymentGroup", "missing deployment group")
     })?;
     let summary = group.summary.as_option().ok_or_else(|| {
-        Error::transport("invalid GetDeploymentGroup response: missing deployment group summary")
+        Error::response_contract("GetDeploymentGroup", "missing deployment group summary")
     })?;
     Ok(ChangelogDeploymentGroup {
         summary: deployment_group_summary_from_proto(summary),
         attention: group
             .attention
             .iter()
-            .map(|item| ChangelogDeploymentGroupAttention {
-                post_slug: item.post_slug.clone(),
-                release_version: item.release_version.clone(),
-                change: item
-                    .change
-                    .as_option()
-                    .map(change_from_proto)
-                    .unwrap_or_default(),
+            .map(|item| {
+                Ok(ChangelogDeploymentGroupAttention {
+                    post_slug: item.post_slug.clone(),
+                    release_version: item.release_version.clone(),
+                    change: required_change(
+                        "GetDeploymentGroup",
+                        item.change.as_option().ok_or_else(|| {
+                            Error::response_contract("GetDeploymentGroup", "missing change")
+                        })?,
+                    )?,
+                })
             })
-            .collect(),
+            .collect::<Result<_>>()?,
         highlights: group
             .highlights
             .iter()
@@ -268,6 +293,7 @@ mod tests {
                 surface,
                 ..Default::default()
             })
+            .unwrap()
         };
         assert_eq!(section(Surface::MARKET_DATA.into()).surface, "market_data");
         assert_eq!(section(Surface::QUICKSWAP.into()).surface, "quickswap");
@@ -299,7 +325,8 @@ mod tests {
             heading: "AI assistant".into(),
             surface: Surface::ASSISTANT.into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(section.surface, "assistant");
     }
 

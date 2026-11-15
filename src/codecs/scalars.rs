@@ -324,12 +324,26 @@ fn base58_to_u64(value: &str, label: &str) -> Result<u64> {
     Ok(u64::from_be_bytes(buf))
 }
 
-/// Parse a public id that may be base58 or decimal.
+/// Parse a public id that may be base58 or decimal, refusing one that decodes
+/// to 0.
+///
+/// On the wire 0 is unset and names nothing, so `"1"` (`format_id(0)`), `"0"`
+/// or `"00"` would send a request for an ID the caller did not mean.
 ///
 /// All-digit strings are ambiguous: `format_id(4)` is `"5"`, which is also a
 /// valid decimal. Prefer the canonical base58 decode when `format_id(b) == input`;
 /// otherwise treat the value as decimal.
 pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
+    let id = parse_id(value, label)?;
+    if id == 0 {
+        return Err(Error::validation(format!(
+            "{label} must be a non-zero ID, not 0"
+        )));
+    }
+    Ok(id)
+}
+
+fn parse_id(value: &str, label: &str) -> Result<u64> {
     let value = value.trim();
     if value.is_empty() {
         return Err(Error::validation(format!(
@@ -350,20 +364,14 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
     base58_to_u64(value, label)
 }
 
-/// Parse an account or sub-account ID as [`id_to_u64`] does, refusing 0.
+/// Parse an account or sub-account ID as [`id_to_u64`] does, which refuses 0.
 ///
 /// On the wire 0 is unset: sub-account 0 is the main account, and account 0
 /// names no account. So `"1"` (`format_id(0)`), `"0"` or `"00"` would address
 /// another account than the one named. Omit a sub-account ID to address the
 /// main account.
 pub fn parse_account_id(value: &str, label: &str) -> Result<u64> {
-    let id = id_to_u64(value, label)?;
-    if id == 0 {
-        return Err(Error::validation(format!(
-            "{label} must be a non-zero ID, not 0"
-        )));
-    }
-    Ok(id)
+    id_to_u64(value, label)
 }
 
 pub fn format_id(id: u64) -> String {
@@ -538,7 +546,8 @@ mod tests {
         assert_eq!(format_id(0), "1");
         assert_eq!(format_id(1), "2");
         assert_ne!(format_id(0), format_id(1));
-        for id in 0u64..200 {
+        // From 1: id_to_u64 refuses 0, whose encoding is "1".
+        for id in 1u64..200 {
             let encoded = format_id(id);
             assert_eq!(
                 id_to_u64(&encoded, "id").unwrap(),
@@ -560,6 +569,20 @@ mod tests {
         assert_ne!(format_id(10), "10");
         assert_eq!(id_to_u64("10", "order_id").unwrap(), 10);
         assert_eq!(id_to_u64("100", "order_id").unwrap(), 100);
+    }
+
+    #[test]
+    fn id_to_u64_refuses_ids_that_decode_to_zero() {
+        for raw in ["1", "0", "00", " 1 "] {
+            let err = id_to_u64(raw, "trigger_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(err.to_string().contains("trigger_id must be a non-zero ID"));
+        }
+        assert_eq!(id_to_u64("2", "trigger_id").unwrap(), 1);
+        assert_eq!(
+            id_to_u64(&format_id(1 << 63), "trigger_id").unwrap(),
+            1 << 63
+        );
     }
 
     #[test]

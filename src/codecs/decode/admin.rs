@@ -1,7 +1,9 @@
 //! API key and resolve-account decoders.
 
+use crate::codecs::decode::common::{require_id, require_str_id};
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_optional_uint64_id, format_uint64_id};
+use crate::errors::{Error, Result};
 use crate::models::{ApiKeySummary, ApiKeysList, ResolvedAccount, ResolvedAccountsList};
 use crate::proto::auth::v1::{
     ApiKey as ProtoApiKey, CreateApiKeyResponse, GetApiKeyResponse, ListApiKeysResponse,
@@ -34,22 +36,50 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
     }
 }
 
-pub fn api_keys_list_from_proto(msg: &ListApiKeysResponse) -> ApiKeysList {
-    ApiKeysList {
-        keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
-    }
+/// A read API key, refused with `Error::ResponseContract` without its key ID.
+pub(crate) fn required_api_key(operation: &str, msg: &ProtoApiKey) -> Result<ApiKeySummary> {
+    require_str_id(operation, "key_id", &msg.key_id)?;
+    Ok(api_key_from_proto(msg))
 }
 
-pub fn api_key_from_get_proto(msg: &GetApiKeyResponse) -> Option<ApiKeySummary> {
-    msg.api_key.as_option().map(api_key_from_proto)
+pub fn api_keys_list_from_proto(msg: &ListApiKeysResponse) -> Result<ApiKeysList> {
+    Ok(ApiKeysList {
+        keys: msg
+            .api_keys
+            .iter()
+            .map(|key| required_api_key("ListApiKeys", key))
+            .collect::<Result<_>>()?,
+    })
 }
 
-pub fn api_key_from_create_proto(msg: &CreateApiKeyResponse) -> Option<ApiKeySummary> {
-    msg.api_key.as_option().map(api_key_from_proto)
+/// Decode a `GetApiKey` answer. A reply without its key, or a key without its
+/// ID, is refused with `Error::ResponseContract`; the result is never `None`.
+pub fn api_key_from_get_proto(msg: &GetApiKeyResponse) -> Result<Option<ApiKeySummary>> {
+    let key = msg
+        .api_key
+        .as_option()
+        .ok_or_else(|| Error::response_contract("GetApiKey", "missing api_key"))?;
+    required_api_key("GetApiKey", key).map(Some)
 }
 
-pub fn api_key_from_update_proto(msg: &UpdateApiKeyResponse) -> Option<ApiKeySummary> {
-    msg.api_key.as_option().map(api_key_from_proto)
+/// Decode a `CreateApiKey` answer, refused with `Error::ResponseContract`
+/// without its key or the key's ID.
+pub fn api_key_from_create_proto(msg: &CreateApiKeyResponse) -> Result<ApiKeySummary> {
+    let key = msg
+        .api_key
+        .as_option()
+        .ok_or_else(|| Error::response_contract("CreateApiKey", "missing api_key"))?;
+    required_api_key("CreateApiKey", key)
+}
+
+/// Decode an `UpdateApiKey` answer, refused with `Error::ResponseContract`
+/// without its key or the key's ID.
+pub fn api_key_from_update_proto(msg: &UpdateApiKeyResponse) -> Result<ApiKeySummary> {
+    let key = msg
+        .api_key
+        .as_option()
+        .ok_or_else(|| Error::response_contract("UpdateApiKey", "missing api_key"))?;
+    required_api_key("UpdateApiKey", key)
 }
 
 pub fn resolved_account_from_proto(msg: &ProtoResolvedAccount) -> ResolvedAccount {
@@ -65,14 +95,19 @@ pub fn resolved_account_from_proto(msg: &ProtoResolvedAccount) -> ResolvedAccoun
     }
 }
 
-pub fn resolved_accounts_from_proto(msg: &ResolveAccountResponse) -> ResolvedAccountsList {
-    ResolvedAccountsList {
+/// Decode a `ResolveAccount` answer, refused with `Error::ResponseContract`
+/// when a match has no account ID.
+pub fn resolved_accounts_from_proto(msg: &ResolveAccountResponse) -> Result<ResolvedAccountsList> {
+    Ok(ResolvedAccountsList {
         accounts: msg
             .matches
             .iter()
-            .map(resolved_account_from_proto)
-            .collect(),
-    }
+            .map(|item| {
+                require_id("ResolveAccount", "account_id", item.account_id)?;
+                Ok(resolved_account_from_proto(item))
+            })
+            .collect::<Result<_>>()?,
+    })
 }
 
 #[cfg(test)]
@@ -129,6 +164,7 @@ mod tests {
             api_key: key.into(),
             ..Default::default()
         })
+        .unwrap()
         .unwrap();
         assert_eq!(updated, read);
         assert_eq!(updated.policy_id, format_uint64_id(42));
@@ -169,7 +205,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = api_keys_list_from_proto(&msg);
+        let result = api_keys_list_from_proto(&msg).unwrap();
         assert_eq!(result.keys.len(), 1);
         assert_eq!(result.keys[0].key_id, "key-1");
         assert_eq!(result.keys[0].status, "ACTIVE");
@@ -193,7 +229,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = resolved_accounts_from_proto(&msg);
+        let result = resolved_accounts_from_proto(&msg).unwrap();
         assert_eq!(result.accounts.len(), 1);
         assert_eq!(result.accounts[0].account_id, format_uint64_id(99));
         assert_eq!(result.accounts[0].smart_account_address, "0x123");

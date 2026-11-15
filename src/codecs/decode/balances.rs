@@ -1,6 +1,8 @@
 //! Ledger balance / transfer decoders.
 
+use crate::codecs::decode::common::require_str_id;
 use crate::codecs::scalars::{format_uint64_id, u128_to_str};
+use crate::errors::Result;
 use crate::models::{
     AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, LedgerTransfer, TransferSide,
     TransfersList,
@@ -168,11 +170,20 @@ pub fn transfer_row_from_proto(msg: &TransferRow) -> LedgerTransfer {
     }
 }
 
-pub fn transfers_list_from_proto(msg: &ListTransfersResponse) -> TransfersList {
-    TransfersList {
-        transfers: msg.transfers.iter().map(transfer_row_from_proto).collect(),
+/// Decode a `ListTransfers` answer, refused with `Error::ResponseContract`
+/// when a row has no transfer ID.
+pub fn transfers_list_from_proto(msg: &ListTransfersResponse) -> Result<TransfersList> {
+    Ok(TransfersList {
+        transfers: msg
+            .transfers
+            .iter()
+            .map(|row| {
+                require_str_id("ListTransfers", "transfer_id", &row.transfer_id)?;
+                Ok(transfer_row_from_proto(row))
+            })
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -396,6 +407,7 @@ mod tests {
             transfers: vec![row],
             ..Default::default()
         })
+        .unwrap()
         .transfers
         .remove(0);
         for (path, transfer) in [("list", listed), ("stream", streamed)] {
@@ -488,11 +500,13 @@ mod tests {
         let list = transfers_list_from_proto(&ListTransfersResponse {
             transfers: vec![TransferRow {
                 asset_id: 1,
+                transfer_id: "7".into(),
                 ..Default::default()
             }],
             next_page_token: "12345".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(list.transfers.len(), 1);
         assert_eq!(list.next_page_token, "12345");
     }

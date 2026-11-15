@@ -227,7 +227,8 @@ async fn sub_accounts_get_returns_api_keys_when_asked() {
         let listed = api_keys_list_from_proto(&ListApiKeysResponse {
             api_keys: display_keys(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(with_keys.api_keys, listed.keys, "{wire:?}: same as list");
     }
 }
