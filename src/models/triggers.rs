@@ -57,10 +57,13 @@ pub struct CreateTriggerParams {
     /// for a stop-loss / take-profit limit child.
     pub max_slippage_ticks: Option<i64>,
     pub max_slippage_bps: Option<i32>,
+    /// Required for a TWAP: at least 1000.
     pub twap_duration_ms: Option<i64>,
+    /// Required for a TWAP: at least 100, and no longer than the duration.
     pub twap_slice_interval_ms: Option<i64>,
     pub ladder_price_min: Option<Price>,
     pub ladder_price_max: Option<Price>,
+    /// Required for a ladder: 2 to 100.
     pub ladder_levels: Option<i32>,
     pub ladder_distribution: Option<String>,
     /// Fee asset. `base` is valid only for BUY child orders.

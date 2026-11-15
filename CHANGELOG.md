@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `triggers.create` and `orders.cancel_all_after` refuse values the published contract refuses with `Error::Validation` before sending, where the server refused them after a round trip: a TWAP's `twap_duration_ms` below 1000 and `twap_slice_interval_ms` below 100 (both were only required to be positive), a ladder's `ladder_levels` outside 2 to 100 (it was only required to be positive), and a `timeout_sec` other than 0 or 10 to 120. A slice interval longer than the duration is refused as before, now naming `twap_slice_interval_ms`. Affected: `TriggersService::create`, `OrdersService::cancel_all_after`.
+
 ## 0.29.1
 
 Package version: `0.29.1`. Git tag: `v0.29.1`. Released 2026-11-15. Built on public contract `ebbbeac`.
