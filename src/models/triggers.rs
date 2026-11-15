@@ -237,9 +237,11 @@ pub struct CreateOcoParams {
     /// and for 60 seconds after both legs ended, a create with the identical
     /// params and the same ID returns the same OCO, and different params with
     /// the same ID are refused with `CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID`.
-    /// Any 1 to 36 bytes of UTF-8, sent exactly as given (never trimmed), so
-    /// [`ListTriggersOpts::client_list_id`] finds the OCO with the same
-    /// string; another length is refused with [`crate::Error::Validation`]
+    /// 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/` or `-`, the client
+    /// order ID rule (`^[A-Za-z0-9._:/-]{1,36}$`), sent exactly as given
+    /// (never trimmed), so [`ListTriggersOpts::client_list_id`] finds the
+    /// OCO with the same string. Any other ID, including one with spaces or
+    /// non-ASCII characters, is refused with [`crate::Error::Validation`]
     /// before sending.
     pub client_list_id: String,
     /// The take-profit leg. The server requires its trigger price to be above
@@ -319,9 +321,10 @@ pub struct ListTriggersOpts {
     /// Only the take-profit and stop-loss of the OCO created with this
     /// `client_list_id` (the contract's `client_list_id` filter), sent exactly
     /// as given, never trimmed: pass the key the create used. Use it to learn
-    /// whether a create whose outcome is unknown made the OCO. 1 to 36 bytes
-    /// of UTF-8; another length is refused with [`crate::Error::Validation`]
-    /// before sending. `None` lists every trigger.
+    /// whether a create whose outcome is unknown made the OCO. It follows
+    /// the rule of [`CreateOcoParams::client_list_id`]; any other ID is
+    /// refused with [`crate::Error::Validation`] before sending. `None` lists
+    /// every trigger.
     pub client_list_id: Option<String>,
 }
 

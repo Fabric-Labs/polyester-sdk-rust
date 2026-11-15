@@ -368,7 +368,9 @@ async fn flow_rows_carry_participation_and_the_filter_is_sent() {
     let page = client
         .lifecycle
         .list_flows(ListFlowsRequest {
-            account_selector: Some(AccountSelector::OwnerAccountId(8)),
+            account_selector: Some(AccountSelector::SmartAccountAddress(
+                "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed".into(),
+            )),
             participation: FlowParticipation::PARTICIPATION_RECIPIENT.into(),
             ..Default::default()
         })

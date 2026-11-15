@@ -18,6 +18,8 @@ mod centrifugo;
 mod changelog_revisions;
 #[path = "clear_attached_risk/mod.rs"]
 mod clear_attached_risk;
+#[path = "contract_1945423c/mod.rs"]
+mod contract_1945423c;
 #[path = "contract_74af7f3/mod.rs"]
 mod contract_74af7f3;
 #[path = "contract_e339360/mod.rs"]

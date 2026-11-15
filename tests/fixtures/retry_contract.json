@@ -1,8 +1,14 @@
 {
-  "source": "Fabric-Labs/polyester-proto develop 74af7f312c344bd89066183e42e966d8ddf7f16d docs/errors.json",
+  "source": "Fabric-Labs/polyester-proto develop 1945423c895670e2ee184a2f3caa217c039c84e9 docs/errors.json",
   "bad_requests": [
     {"catalog": "core:generic","code": "INVALID_ARGUMENT","status": 400,"retryable": false},
     {"catalog": "internal-transfer-api:transfererrors","code": "DESTINATION_INACTIVE","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_BALANCE_CHANGED","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_CONVERSION_FAILED","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_NOT_ELIGIBLE","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_PRICE_MOVED","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_QUOTE_EXPIRED","status": 400,"retryable": false},
+    {"catalog": "internal-transfer-api:transfererrors","code": "DUST_TARGET_UNAVAILABLE","status": 400,"retryable": false},
     {"catalog": "internal-transfer-api:transfererrors","code": "FAILED_PRECONDITION","status": 400,"retryable": false},
     {"catalog": "internal-transfer-api:transfererrors","code": "INSUFFICIENT_FUNDS","status": 400,"retryable": false},
     {"catalog": "internal-transfer-api:transfererrors","code": "INVALID_AMOUNT","status": 400,"retryable": false},
@@ -199,6 +205,7 @@
     {"catalog": "withdraw-api:withdrawerrors","code": "INVALID_REQUEST","status": 400,"retryable": false},
     {"catalog": "withdraw-api:withdrawerrors","code": "INVALID_SUBACCOUNT_ID","status": 400,"retryable": false},
     {"catalog": "withdraw-api:withdrawerrors","code": "MIN_AMOUNT_BELOW_FLOOR","status": 400,"retryable": false},
+    {"catalog": "withdraw-api:withdrawerrors","code": "ROUTE_SUSPENDED","status": 400,"retryable": false},
     {"catalog": "withdraw-api:withdrawerrors","code": "ROUTE_UNSUPPORTED","status": 400,"retryable": false},
     {"catalog": "withdraw-api:withdrawerrors","code": "SIGNATURE_REQUIRED","status": 400,"retryable": false},
     {"catalog": "withdraw-api:withdrawerrors","code": "SIGNATURE_SCHEME_UNSUPPORTED","status": 400,"retryable": false},

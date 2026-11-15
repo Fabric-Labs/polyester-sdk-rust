@@ -32,23 +32,33 @@ pub struct LifecycleFlowSummary {
     /// ETA; it still completes normally once progress resumes. Always false
     /// for terminal flows and for transaction lookups, which do not report it.
     pub is_delayed: bool,
-    pub owner_account_id: String,
+    /// Smart account address of the account the flow belongs to: the
+    /// account's public identity on Polyester Chain, and the value of the
+    /// `list_flows` account selector.
     pub smart_account_address: String,
     /// Product-facing reason label (`unspecified`, snake catalog labels, or
-    /// `unknown_reason_<n>` for open-enum forward compatibility).
+    /// `unknown_reason_<n>` for open-enum forward compatibility). Every
+    /// reason marks a flow that did not complete normally except
+    /// `zipper_deposit_delivered_to_wallet`, the one completed flow that
+    /// carries a reason: the deposit's zTokens were delivered to the
+    /// account's own Polyester Chain wallet (`smart_account_address`) because
+    /// the destination did not accept the credit, for example while deposits
+    /// into it were paused. Show it as completed to the wallet ("Delivered to
+    /// wallet; Funding was not credited"), not as a failure and not as
+    /// credited to Funding or Trading.
     pub lifecycle_reason: String,
     pub zipper_reason: Option<ZipperReasonDetails>,
     /// How the selected account takes part in the flow, on a `list_flows` row
-    /// of a list that selects an account: `owner` (its deposit, withdrawal or
+    /// of a list that selects an account and on every `list_account_flows`
+    /// row and `get_account_flow` reply: `owner` (its deposit, withdrawal or
     /// a transfer it sent, including a move between its own balances) or
     /// `recipient` (a transfer another account sent to it). `unspecified` on
-    /// an unscoped list, a flow detail and a realtime update; empty on a
-    /// transaction lookup. A value newer than this SDK reads
+    /// an unscoped list, a public flow detail and a realtime update; empty on
+    /// a transaction lookup. A value newer than this SDK reads
     /// `unknown_participation_<n>`.
     pub participation: String,
     /// For a transfer, the counterparty is `destination_address` when the
-    /// account sent it and `source_address` (with `owner_account_id`) when it
-    /// received it.
+    /// account sent it and `source_address` when it received it.
     pub source_address: String,
     pub destination_address: String,
 }

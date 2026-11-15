@@ -57,9 +57,11 @@ pub struct ApiPolicy {
     /// `READ_DAILY_CLAIMS`, `CLAIM_DAILY_REWARD`, `READ_CHECKPOINTS`,
     /// `READ_REWARDS`, `CREATE_DEPOSIT_ADDRESS`, `READ_DEPOSIT_ADDRESSES`,
     /// `READ_SUBACCOUNTS`, `READ_SUBACCOUNT_ACTIVITY`,
-    /// `READ_SUBACCOUNT_MEMBERS`, `READ_SUBACCOUNT_INVITES` and
-    /// `READ_GUARD_SIGNER_STATUS`. Tell them apart by name, not by number:
-    /// `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
+    /// `READ_SUBACCOUNT_MEMBERS`, `READ_SUBACCOUNT_INVITES`,
+    /// `READ_GUARD_SIGNER_STATUS`, `READ_STATEMENTS`, `CONVERT_DUST` (quote
+    /// and convert dust, read conversions) and `READ_FUNDING_FLOWS` (the
+    /// account's own lifecycle flows). Tell them apart by name, not by
+    /// number: `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
     pub actions: Vec<String>,
 }
 

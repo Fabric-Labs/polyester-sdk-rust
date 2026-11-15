@@ -2,12 +2,12 @@
 
 use crate::codecs::decode::common::require_str_id;
 use crate::codecs::decode::enums::enum_proto_name;
-use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{LifecycleFlowSummary, LifecycleFlowsList, ZipperReasonDetails};
 use crate::proto::chain::lifecycle::v1::{
     FlowKind as FlowKindEnum, FlowParticipation, FlowStep, FlowSummaryView, FlowTxMatchView,
-    GetFlowResponse, LifecycleReason, ListFlowsByTxResponse, ListFlowsResponse,
+    GetAccountFlowResponse, GetFlowResponse, LifecycleReason, ListAccountFlowsResponse,
+    ListFlowsByTxResponse, ListFlowsResponse,
 };
 use crate::proto::chain::zipper::v1::ZipperReasonDetails as ProtoZipperReasonDetails;
 
@@ -51,6 +51,9 @@ fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
         }
         Some(LifecycleReason::ZIPPER_COMPLIANCE_TRANSFERRED) => {
             "zipper_compliance_transferred".to_owned()
+        }
+        Some(LifecycleReason::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET) => {
+            "zipper_deposit_delivered_to_wallet".to_owned()
         }
         None => format!("unknown_reason_{}", value.to_i32()),
     }
@@ -117,7 +120,6 @@ fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
         is_open: msg.is_open,
         is_terminal: msg.is_terminal,
         is_delayed: msg.is_delayed,
-        owner_account_id: format_uint64_id(msg.owner_account_id),
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
         zipper_reason: msg.zipper_reason.as_option().map(zipper_reason_from_proto),
@@ -158,7 +160,6 @@ fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
         is_terminal: msg.is_terminal,
         // Transaction lookups do not report delay.
         is_delayed: false,
-        owner_account_id: format_uint64_id(msg.owner_account_id),
         smart_account_address: msg.smart_account_address.clone(),
         lifecycle_reason: lifecycle_reason_label(&msg.lifecycle_reason),
         zipper_reason: msg.zipper_reason.as_option().map(zipper_reason_from_proto),
@@ -181,6 +182,36 @@ pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> Result<Lifecy
             .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
     })
+}
+
+/// One page of the account's own flows, from `ListAccountFlows`: every row
+/// needs its flow ID, as on `ListFlows`.
+pub fn account_flows_list_from_proto(msg: &ListAccountFlowsResponse) -> Result<LifecycleFlowsList> {
+    Ok(LifecycleFlowsList {
+        flows: msg
+            .flows
+            .iter()
+            .map(|flow| required_flow_summary("ListAccountFlows", flow))
+            .collect::<Result<_>>()?,
+        next_page_token: msg.next_page_token.clone(),
+    })
+}
+
+/// One of the account's flows, from `GetAccountFlow`. A reply without the
+/// flow, its summary or the summary's flow ID is an
+/// [`Error::ResponseContract`].
+pub fn account_flow_from_get_response(
+    msg: &GetAccountFlowResponse,
+) -> Result<LifecycleFlowSummary> {
+    let detail = msg
+        .flow
+        .as_option()
+        .ok_or_else(|| Error::response_contract("GetAccountFlow", "missing flow"))?;
+    let summary = detail
+        .summary
+        .as_option()
+        .ok_or_else(|| Error::response_contract("GetAccountFlow", "missing flow summary"))?;
+    required_flow_summary("GetAccountFlow", summary)
 }
 
 pub fn flow_from_get_response(msg: &GetFlowResponse) -> Result<LifecycleFlowSummary> {
@@ -217,7 +248,6 @@ mod tests {
             current_step: FlowStep::Settlement.into(),
             is_open: false,
             is_terminal: true,
-            owner_account_id: 99,
             smart_account_address: "0xabc".into(),
             source_address: "0xsource".into(),
             lifecycle_reason: LifecycleReason::LedgerMirrorTransferExceedsCredits.into(),
@@ -236,7 +266,6 @@ mod tests {
         assert_eq!(flow.flow_kind, "deposit");
         assert_eq!(flow.latest_step, "settlement");
         assert_eq!(flow.smart_account_address, "0xabc");
-        assert_eq!(flow.owner_account_id, format_uint64_id(99));
         assert_eq!(
             flow.lifecycle_reason,
             "ledger_mirror_transfer_exceeds_credits"
@@ -329,6 +358,85 @@ mod tests {
         assert_eq!(flow.lifecycle_reason, "zipper_compliance_transferred");
     }
 
+    /// A deposit delivered to the account's wallet ends completed with
+    /// reason 106, read by name.
+    #[test]
+    fn wallet_delivered_deposit_reason_has_its_label() {
+        let msg = FlowSummaryView {
+            flow_id: "flow-wallet".into(),
+            flow_kind: FlowKindEnum::KIND_DEPOSIT.into(),
+            current_step: FlowStep::FLOW_STEP_TRANSFER.into(),
+            is_terminal: true,
+            lifecycle_reason: LifecycleReason::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET.into(),
+            ..Default::default()
+        };
+        let flow = flow_summary_message_from_proto(&msg);
+        assert_eq!(flow.lifecycle_reason, "zipper_deposit_delivered_to_wallet");
+        assert!(flow.is_terminal && !flow.is_open);
+        assert_eq!(flow.latest_step, "transfer");
+        let by_number = flow_summary_message_from_proto(&FlowSummaryView {
+            flow_id: "flow-wallet".into(),
+            lifecycle_reason: buffa::EnumValue::from(106),
+            ..Default::default()
+        });
+        assert_eq!(
+            by_number.lifecycle_reason,
+            "zipper_deposit_delivered_to_wallet"
+        );
+    }
+
+    #[test]
+    fn account_flow_replies_require_the_flow_and_its_id() {
+        use crate::proto::chain::lifecycle::v1::FlowDetailView;
+        let list = account_flows_list_from_proto(&ListAccountFlowsResponse {
+            flows: vec![FlowSummaryView {
+                flow_id: "flow_a".into(),
+                participation: FlowParticipation::PARTICIPATION_RECIPIENT.into(),
+                ..Default::default()
+            }],
+            next_page_token: "next".into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(list.flows[0].participation, "recipient");
+        assert_eq!(list.next_page_token, "next");
+        assert!(matches!(
+            account_flows_list_from_proto(&ListAccountFlowsResponse {
+                flows: vec![FlowSummaryView::default()],
+                ..Default::default()
+            }),
+            Err(Error::ResponseContract { .. })
+        ));
+        let get = |summary: Option<FlowSummaryView>| GetAccountFlowResponse {
+            flow: FlowDetailView {
+                summary: summary.map_or_else(Default::default, Into::into),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let flow = account_flow_from_get_response(&get(Some(FlowSummaryView {
+            flow_id: "flow_b".into(),
+            participation: FlowParticipation::PARTICIPATION_OWNER.into(),
+            ..Default::default()
+        })))
+        .unwrap();
+        assert_eq!(
+            (flow.intent_id.as_str(), flow.participation.as_str()),
+            ("flow_b", "owner")
+        );
+        for reply in [
+            GetAccountFlowResponse::default(),
+            get(None),
+            get(Some(FlowSummaryView::default())),
+        ] {
+            assert!(matches!(
+                account_flow_from_get_response(&reply),
+                Err(Error::ResponseContract { .. })
+            ));
+        }
+    }
+
     #[test]
     fn open_deposit_reports_delay_and_unconfirmed_source() {
         let msg = FlowSummaryView {
@@ -374,12 +482,11 @@ mod tests {
     }
 
     #[test]
-    fn flow_by_tx_response_preserves_all_matches_and_owner_identity() {
+    fn flow_by_tx_response_preserves_all_matches_and_smart_account() {
         let msg = ListFlowsByTxResponse {
             matches: vec![
                 FlowTxMatchView {
                     flow_id: "flow-a".into(),
-                    owner_account_id: 99,
                     smart_account_address: "0xsmart".into(),
                     ..Default::default()
                 },
@@ -393,7 +500,6 @@ mod tests {
         };
         let result = flow_from_get_by_tx_response(&msg).unwrap();
         assert_eq!(result.flows.len(), 2);
-        assert_eq!(result.flows[0].owner_account_id, format_uint64_id(99));
         assert_eq!(result.flows[0].smart_account_address, "0xsmart");
         assert_eq!(result.flows[1].intent_id, "flow-b");
         assert_eq!(result.next_page_token, "next");

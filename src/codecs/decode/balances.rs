@@ -1,8 +1,9 @@
 //! Ledger balance / transfer decoders.
 
 use crate::codecs::decode::common::require_str_id;
-use crate::codecs::scalars::{format_uint64_id, u128_to_str};
-use crate::errors::Result;
+use crate::codecs::decode::money::decode_asset_amount_u128;
+use crate::codecs::scalars::{LEDGER_SCALE, format_uint64_id, u128_to_str};
+use crate::errors::{Error, Result};
 use crate::models::{
     AssetBalance, BalanceHistory, BalanceHistorySeries, BalancesList, LedgerTransfer, TransferSide,
     TransfersList,
@@ -13,6 +14,7 @@ use crate::proto::ledger::read::v1::{
     TransferSideKind,
 };
 use crate::proto::polyester::r#type::v1::U128;
+use crate::types::QuantityDomain;
 
 fn u128_field(msg: Option<&U128>) -> String {
     match msg {
@@ -52,23 +54,65 @@ pub fn balances_list_from_proto(msg: &GetBalancesResponse) -> BalancesList {
     }
 }
 
-pub fn balance_history_from_proto(msg: &GetBalanceHistoryResponse) -> BalanceHistory {
-    BalanceHistory {
+/// Decode a balance history. Each series' `balance` is decoded exactly from
+/// its `U128` values at the 18-decimal ledger scale.
+///
+/// A series with another number of balances than the response's `points`,
+/// or a balance above the largest amount this SDK represents (2^127 - 1 at
+/// 10^-18), is an [`Error::ResponseContract`]: the contract aligns one
+/// balance with each point. A server on the previous contract sends its
+/// balances in a field this SDK no longer reads, so its series arrive empty
+/// and are refused here instead of reading as no balances.
+pub fn balance_history_from_proto(msg: &GetBalanceHistoryResponse) -> Result<BalanceHistory> {
+    let points = usize::try_from(msg.points).unwrap_or(usize::MAX);
+    let series = msg
+        .series
+        .iter()
+        .map(|s| {
+            if s.balance.len() != points {
+                return Err(Error::response_contract(
+                    "GetBalanceHistory",
+                    format!(
+                        "series of asset {} has {} balances for {} points",
+                        s.asset_id,
+                        s.balance.len(),
+                        msg.points
+                    ),
+                ));
+            }
+            let mut balance = Vec::with_capacity(points);
+            for value in &s.balance {
+                balance.push(
+                    decode_asset_amount_u128(
+                        value.hi,
+                        value.lo,
+                        Some(LEDGER_SCALE),
+                        QuantityDomain::LedgerE18,
+                        Some(s.asset_id),
+                    )
+                    .ok_or_else(|| {
+                        Error::response_contract(
+                            "GetBalanceHistory",
+                            format!("balance of asset {} is out of range", s.asset_id),
+                        )
+                    })?,
+                );
+            }
+            Ok(BalanceHistorySeries {
+                asset_id: s.asset_id,
+                account_code: s.account_code.to_i32(),
+                balance,
+            })
+        })
+        .collect::<Result<_>>()?;
+    Ok(BalanceHistory {
         range: balance_range_label(msg.range),
         bucket: msg.bucket.clone(),
         start_ts_sec: msg.start_ts_sec as i64,
         end_ts_sec: msg.end_ts_sec as i64,
         points: msg.points,
-        series: msg
-            .series
-            .iter()
-            .map(|s| BalanceHistorySeries {
-                asset_id: s.asset_id,
-                account_code: s.account_code.to_i32(),
-                balance_q: s.balance_q.clone(),
-            })
-            .collect(),
-    }
+        series,
+    })
 }
 
 pub fn equity_history_from_proto(
@@ -237,6 +281,14 @@ mod tests {
         assert_eq!(list.balances[0].trading, "1000000000000000000");
     }
 
+    fn u128(value: u128) -> U128 {
+        U128 {
+            hi: (value >> 64) as u64,
+            lo: value as u64,
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn balance_history_maps_range_and_series() {
         let msg = GetBalanceHistoryResponse {
@@ -247,38 +299,88 @@ mod tests {
             points: 2,
             series: vec![BalanceSeries {
                 asset_id: 1,
-                balance_q: vec![100, 200],
+                balance: vec![u128(100), u128(1_500_000_000_000_000_000)],
                 ..Default::default()
             }],
             ..Default::default()
         };
-        let result = balance_history_from_proto(&msg);
+        let result = balance_history_from_proto(&msg).unwrap();
         assert_eq!(result.range, "7d");
         assert_eq!(result.bucket, "1h");
         assert_eq!(result.series.len(), 1);
-        assert_eq!(result.series[0].balance_q, vec![100, 200]);
+        let balance = &result.series[0].balance;
+        assert_eq!(
+            balance.iter().map(|b| b.as_scaled()).collect::<Vec<_>>(),
+            vec![100, 1_500_000_000_000_000_000]
+        );
+        assert!(balance.iter().all(|b| b.scale() == Some(18)
+            && b.domain() == QuantityDomain::LedgerE18
+            && b.asset_id() == Some(1)));
     }
 
+    /// A balance above the previous 7-decimal field's limit
+    /// (1,844,674,407,370.9551615 units) decodes exactly, digit for digit.
     #[test]
-    fn balance_history_preserves_full_u64_range() {
+    fn balance_history_decodes_exact_u128_balances() {
         use crate::proto::ledger::read::v1::BalanceSeries;
 
+        let big = 1_844_674_407_370_955_161_549_999_999_999_999u128;
         let msg = GetBalanceHistoryResponse {
+            points: 2,
             series: vec![BalanceSeries {
                 asset_id: 1,
                 account_code: buffa::EnumValue::from(-7),
-                balance_q: vec![i64::MAX as u64 + 1, u64::MAX],
+                balance: vec![u128(big), u128(i128::MAX as u128)],
                 ..Default::default()
             }],
             ..Default::default()
         };
 
-        let result = balance_history_from_proto(&msg);
-        assert_eq!(
-            result.series[0].balance_q,
-            vec![i64::MAX as u64 + 1, u64::MAX]
-        );
+        let result = balance_history_from_proto(&msg).unwrap();
+        assert_eq!(result.series[0].balance[0].as_scaled(), big as i128);
+        assert_eq!(result.series[0].balance[1].as_scaled(), i128::MAX);
         assert_eq!(result.series[0].account_code, -7);
+    }
+
+    /// One balance per point: a series of another length, such as the empty
+    /// series a server on the previous contract yields, is refused, as is a
+    /// balance this SDK cannot represent.
+    #[test]
+    fn balance_history_refuses_misaligned_or_unrepresentable_series() {
+        use crate::proto::ledger::read::v1::BalanceSeries;
+
+        for (points, balance) in [
+            (2, vec![]),
+            (2, vec![u128(1)]),
+            (1, vec![u128(1), u128(2)]),
+            (1, vec![u128(i128::MAX as u128 + 1)]),
+            (1, vec![u128(u128::MAX)]),
+        ] {
+            let msg = GetBalanceHistoryResponse {
+                points,
+                series: vec![BalanceSeries {
+                    asset_id: 3,
+                    balance: balance.clone(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            let err = balance_history_from_proto(&msg).unwrap_err();
+            assert!(
+                matches!(err, Error::ResponseContract { .. }),
+                "{points}/{balance:?}: {err:?}"
+            );
+        }
+        let empty = GetBalanceHistoryResponse {
+            points: 0,
+            series: vec![BalanceSeries::default()],
+            ..Default::default()
+        };
+        assert!(
+            balance_history_from_proto(&empty).unwrap().series[0]
+                .balance
+                .is_empty()
+        );
     }
 
     #[test]
@@ -359,7 +461,8 @@ mod tests {
         let balance = balance_history_from_proto(&GetBalanceHistoryResponse {
             points: u32::MAX,
             ..Default::default()
-        });
+        })
+        .unwrap();
         let equity = equity_history_from_proto(&GetEquityHistorySeriesResponse {
             points: u32::MAX,
             ..Default::default()

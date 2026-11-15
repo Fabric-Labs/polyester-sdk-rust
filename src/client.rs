@@ -13,11 +13,12 @@ use crate::models::{
 };
 use crate::services::{
     AddressBookService, AlertsService, ApiKeysService, AuthService, BalancesService,
-    ChainAnalyticsService, ChangelogService, DepositService, FeeService, GuardSignerService,
-    HeatmapService, InternalTransfersService, LifecycleService, MarketDataService,
-    MarketOverviewService, OrderbookService, OrdersService, PoliciesService, RateLimitService,
-    ServiceContext, SocialVerificationService, StatementsService, SubAccountsService,
-    TradesService, TransfersService, TriggersService, VipService, WithdrawService, ZipperService,
+    ChainAnalyticsService, ChangelogService, DepositService, DustConversionService, FeeService,
+    GuardSignerService, HeatmapService, InternalTransfersService, LifecycleService,
+    MarketDataService, MarketOverviewService, OrderbookService, OrdersService, PoliciesService,
+    RateLimitService, ServiceContext, SocialVerificationService, StatementsService,
+    SubAccountsService, TradesService, TransfersService, TriggersService, VipService,
+    WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -144,6 +145,10 @@ pub struct Client {
     pub triggers: TriggersService,
     pub transfers: TransfersService,
     pub internal_transfers: InternalTransfersService,
+    /// Dust conversion: turn Trading balances too small to trade into one
+    /// target asset. Signed; an API key needs `CONVERT_DUST` (quotes,
+    /// conversions) and `READ_BALANCES` (balances) on its policy.
+    pub dust: DustConversionService,
     pub deposit: DepositService,
     pub api_keys: ApiKeysService,
     pub policies: PoliciesService,
@@ -279,6 +284,7 @@ impl Client {
             triggers: TriggersService::new(ctx.clone()),
             transfers: TransfersService::new(ctx.clone()),
             internal_transfers: InternalTransfersService::new(ctx.clone()),
+            dust: DustConversionService::new(ctx.clone()),
             deposit: DepositService::new(ctx.clone()),
             api_keys: ApiKeysService::new(ctx.clone()),
             policies: PoliciesService::new(ctx.clone()),
@@ -393,6 +399,7 @@ impl Client {
             triggers: TriggersService::new(ctx.clone()),
             transfers: TransfersService::new(ctx.clone()),
             internal_transfers: InternalTransfersService::new(ctx.clone()),
+            dust: DustConversionService::new(ctx.clone()),
             deposit: DepositService::new(ctx.clone()),
             api_keys: ApiKeysService::new(ctx.clone()),
             policies: PoliciesService::new(ctx.clone()),

@@ -24,6 +24,28 @@ pub type OwnedListFlowsByTxRequestView = ::buffa::view::OwnedView<
 pub type OwnedListFlowsByTxResponseView = ::buffa::view::OwnedView<
     crate::proto::chain::lifecycle::v1::__buffa::view::ListFlowsByTxResponseView<'static>,
 >;
+///Shorthand for `OwnedView<ListAccountFlowsRequestView<'static>>`.
+pub type OwnedListAccountFlowsRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListAccountFlowsResponseView<'static>>`.
+pub type OwnedListAccountFlowsResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetAccountFlowRequestView<'static>>`.
+pub type OwnedGetAccountFlowRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetAccountFlowResponseView<'static>>`.
+pub type OwnedGetAccountFlowResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::chain::lifecycle::v1::GetFlowResponse>
 for crate::proto::chain::lifecycle::v1::__buffa::view::GetFlowResponseView<'_> {
     fn encode(
@@ -84,6 +106,54 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::chain::lifecycle::v1::ListAccountFlowsResponse,
+>
+for crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::chain::lifecycle::v1::ListAccountFlowsResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::chain::lifecycle::v1::GetAccountFlowResponse>
+for crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::chain::lifecycle::v1::GetAccountFlowResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const LIFECYCLE_READ_SERVICE_SERVICE_NAME: &str = "chain.lifecycle.v1.LifecycleReadService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetFlowById` RPC.
@@ -110,6 +180,24 @@ pub const LIFECYCLE_READ_SERVICE_LIST_FLOWS_SPEC: ::connectrpc::Spec = ::connect
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const LIFECYCLE_READ_SERVICE_LIST_FLOWS_BY_TX_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListAccountFlows` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const LIFECYCLE_READ_SERVICE_LIST_ACCOUNT_FLOWS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.lifecycle.v1.LifecycleReadService/ListAccountFlows",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetAccountFlow` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const LIFECYCLE_READ_SERVICE_GET_ACCOUNT_FLOW_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.lifecycle.v1.LifecycleReadService/GetAccountFlow",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -164,7 +252,11 @@ pub const LIFECYCLE_READ_SERVICE_LIST_FLOWS_BY_TX_SPEC: ::connectrpc::Spec = ::c
 /// example` doc.
 #[allow(clippy::type_complexity)]
 pub trait LifecycleReadService: Send + Sync + 'static {
-    /// GetFlowById retrieves one lifecycle flow by public flow id.
+    /// GetFlowById retrieves one lifecycle flow by public flow id. It finds only
+    /// flows a chain transaction started, which carry `source_tx_hash`; a flow
+    /// settled without one, such as a transfer between Trading accounts or a
+    /// Trading withdrawal not yet sent to a chain, is not found. Its account
+    /// reads it with GetAccountFlow.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -188,7 +280,9 @@ pub trait LifecycleReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// ListFlows lists lifecycle flows with optional filters and keyset
-    /// pagination.
+    /// pagination. It lists only flows a chain transaction started, which carry
+    /// `source_tx_hash`, and identifies accounts by smart account address. An
+    /// account lists all of its own flows with ListAccountFlows.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -211,7 +305,8 @@ pub trait LifecycleReadService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListFlowsByTx lists lifecycle flows that reference a transaction hash.
+    /// ListFlowsByTx lists lifecycle flows that reference a transaction hash. It
+    /// finds only flows a chain transaction started.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -231,6 +326,58 @@ pub trait LifecycleReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::chain::lifecycle::v1::ListFlowsByTxResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// ListAccountFlows lists the authenticated account's lifecycle flows with
+    /// optional filters and keyset pagination: the flows it owns and the
+    /// transfers it receives, including those no chain transaction started. API
+    /// keys need the READ_FUNDING_FLOWS policy action.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_account_flows<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::chain::lifecycle::v1::ListAccountFlowsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetAccountFlow retrieves one lifecycle flow the authenticated account owns
+    /// or receives, including one no chain transaction started. A flow the
+    /// account takes no part in is not found. API keys need the
+    /// READ_FUNDING_FLOWS policy action.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_account_flow<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::chain::lifecycle::v1::GetAccountFlowResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -353,6 +500,64 @@ impl<S: LifecycleReadService> LifecycleReadServiceExt for S {
                 },
             )
             .with_spec(LIFECYCLE_READ_SERVICE_LIST_FLOWS_BY_TX_SPEC)
+            .route_view(
+                LIFECYCLE_READ_SERVICE_SERVICE_NAME,
+                "ListAccountFlows",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_account_flows(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::chain::lifecycle::v1::ListAccountFlowsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(LIFECYCLE_READ_SERVICE_LIST_ACCOUNT_FLOWS_SPEC)
+            .route_view(
+                LIFECYCLE_READ_SERVICE_SERVICE_NAME,
+                "GetAccountFlow",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_account_flow(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::chain::lifecycle::v1::GetAccountFlowResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(LIFECYCLE_READ_SERVICE_GET_ACCOUNT_FLOW_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -426,6 +631,18 @@ for LifecycleReadServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(LIFECYCLE_READ_SERVICE_LIST_FLOWS_BY_TX_SPEC),
+                )
+            }
+            "ListAccountFlows" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(LIFECYCLE_READ_SERVICE_LIST_ACCOUNT_FLOWS_SPEC),
+                )
+            }
+            "GetAccountFlow" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(LIFECYCLE_READ_SERVICE_GET_ACCOUNT_FLOW_SPEC),
                 )
             }
             _ => None,
@@ -504,6 +721,48 @@ for LifecycleReadServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::chain::lifecycle::v1::ListFlowsByTxResponse,
+                        >(format)
+                })
+            }
+            "ListAccountFlows" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_account_flows(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::chain::lifecycle::v1::ListAccountFlowsResponse,
+                        >(format)
+                })
+            }
+            "GetAccountFlow" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_account_flow(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::chain::lifecycle::v1::GetAccountFlowResponse,
                         >(format)
                 })
             }
@@ -742,6 +1001,96 @@ where
                 &self.config,
                 LIFECYCLE_READ_SERVICE_SERVICE_NAME,
                 "ListFlowsByTx",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListAccountFlows RPC. Sends a request to /chain.lifecycle.v1.LifecycleReadService/ListAccountFlows.
+    pub async fn list_account_flows(
+        &self,
+        request: crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_account_flows_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListAccountFlows RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_account_flows_with_options(
+        &self,
+        request: crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::lifecycle::v1::__buffa::view::ListAccountFlowsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                LIFECYCLE_READ_SERVICE_SERVICE_NAME,
+                "ListAccountFlows",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetAccountFlow RPC. Sends a request to /chain.lifecycle.v1.LifecycleReadService/GetAccountFlow.
+    pub async fn get_account_flow(
+        &self,
+        request: crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_account_flow_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetAccountFlow RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_account_flow_with_options(
+        &self,
+        request: crate::proto::chain::lifecycle::v1::GetAccountFlowRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::lifecycle::v1::__buffa::view::GetAccountFlowResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                LIFECYCLE_READ_SERVICE_SERVICE_NAME,
+                "GetAccountFlow",
                 request,
                 options,
             )
