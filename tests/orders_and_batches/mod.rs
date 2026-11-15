@@ -315,6 +315,7 @@ async fn batch_cancel_and_replace_keep_each_rejections_field_violations() {
         new_price: Some(Price::from_decimal_str("101", Some("BTC-USDT".into())).unwrap()),
         new_qty: None,
         new_attached_risk: None,
+        clear_attached_risk: false,
         new_client_order_id: None,
     };
     let replaced = client

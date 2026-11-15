@@ -1063,13 +1063,37 @@ impl OrdersService {
         }
     }
 
+    /// The `new_attached_risk` of a modify or a batch replace item. With
+    /// `clear` it is an empty [`RiskPolicy`], which removes the order's
+    /// take-profit, stop-loss and trailing stop; `clear` with a new risk is
+    /// refused. Otherwise `None` leaves the legs unchanged.
+    fn encode_replacement_risk(
+        &self,
+        new_risk: Option<&AttachedRisk>,
+        clear: bool,
+        symbol: &str,
+        risk_field: &str,
+    ) -> Result<Option<RiskPolicy>> {
+        match (new_risk, clear) {
+            (Some(_), true) => Err(Error::validation(format!(
+                "set {risk_field} or clear_attached_risk, not both"
+            ))),
+            (None, true) => Ok(Some(RiskPolicy::default())),
+            (Some(risk), false) => self
+                .encode_attached_risk(risk, Some(symbol), None, risk_field)
+                .map(Some),
+            (None, false) => Ok(None),
+        }
+    }
+
     fn encode_modify_params(&self, params: ModifyOrderParams) -> Result<ModifyOrderRequest> {
         if params.new_price.is_none()
             && params.new_qty.is_none()
             && params.new_attached_risk.is_none()
+            && !params.clear_attached_risk
         {
             return Err(Error::validation(
-                "modify requires new_price, new_qty, and/or new_attached_risk",
+                "modify requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk",
             ));
         }
         let market = self.ctx.catalogs.require_market(&params.symbol)?;
@@ -1092,9 +1116,13 @@ impl OrdersService {
                 Some(market.symbol_id),
             )?);
         }
-        if let Some(risk) = params.new_attached_risk.as_ref() {
-            *req.new_attached_risk.get_or_insert_default() =
-                self.encode_attached_risk(risk, Some(symbol), None, "new_attached_risk")?;
+        if let Some(risk) = self.encode_replacement_risk(
+            params.new_attached_risk.as_ref(),
+            params.clear_attached_risk,
+            symbol,
+            "new_attached_risk",
+        )? {
+            *req.new_attached_risk.get_or_insert_default() = risk;
         }
         if let Some(behavior) = params.behavior.as_deref() {
             req.behavior = Self::modify_behavior(behavior)?.into();
@@ -1340,9 +1368,10 @@ impl OrdersService {
             if item.new_price.is_none()
                 && item.new_qty.is_none()
                 && item.new_attached_risk.is_none()
+                && !item.clear_attached_risk
             {
                 return Err(Error::validation(
-                    "each batch item requires new_price, new_qty, and/or new_attached_risk",
+                    "each batch item requires new_price, new_qty, new_attached_risk, and/or clear_attached_risk",
                 ));
             }
             let mut proto = ProtoBatchReplaceOrderItem {
@@ -1360,13 +1389,13 @@ impl OrdersService {
                     Some(symbol_id),
                 )?);
             }
-            if let Some(risk) = item.new_attached_risk.as_ref() {
-                *proto.new_attached_risk.get_or_insert_default() = self.encode_attached_risk(
-                    risk,
-                    Some(symbol),
-                    None,
-                    &format!("items[{index}].new_attached_risk"),
-                )?;
+            if let Some(risk) = self.encode_replacement_risk(
+                item.new_attached_risk.as_ref(),
+                item.clear_attached_risk,
+                symbol,
+                &format!("items[{index}].new_attached_risk"),
+            )? {
+                *proto.new_attached_risk.get_or_insert_default() = risk;
             }
             if let Some(ncid) = optional_client_order_id(item.new_client_order_id.as_deref())? {
                 proto.new_client_order_id = ncid;
@@ -2216,6 +2245,7 @@ mod tests {
             new_price,
             new_qty,
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: Some("amend_or_replace".into()),
             new_client_order_id: None,
         }

@@ -174,11 +174,12 @@ pub struct OcoLegParams {
     /// Limit price of a limit leg's order. Required for a limit leg; must be
     /// `None` for a market leg.
     pub limit_price: Option<Price>,
-    /// Price the leg watches, with the labels trigger reads use: `last`,
-    /// `index` or `mark`. `None` or empty watches the last trade price. The
-    /// server decides which sources a market supports: on a market without an
-    /// index price, an `index` OCO is rejected on both legs, and `mark` is not
-    /// supported. Another label is refused before sending.
+    /// Price the leg watches, with the labels trigger reads use: `last` or
+    /// `index`, in any case. `None` or empty watches the last trade price. On
+    /// a market without an index price, an `index` OCO is rejected on both
+    /// legs by the server. The contract does not support `mark` on an OCO, so
+    /// it is refused with [`crate::Error::Validation`] before sending, as is
+    /// any other label.
     pub trigger_price_source: Option<String>,
 }
 
@@ -243,10 +244,10 @@ pub struct CreateOcoParams {
     /// The stop-loss leg.
     pub stop_loss: OcoLegParams,
     pub subaccount_id: Option<u64>,
-    /// `expire_taker`, `expire_maker`, `expire_both` or `decrement`, in any
-    /// case; `None` uses the server default, `expire_maker`. Another label is
-    /// refused with [`crate::Error::Validation`] before sending. The server
-    /// judges whether an OCO takes `decrement`.
+    /// `expire_taker`, `expire_maker` or `expire_both`, in any case; `None`
+    /// uses the server default, `expire_maker`. The contract does not support
+    /// `decrement` on an OCO, so it is refused with
+    /// [`crate::Error::Validation`] before sending, as is any other label.
     pub self_trade_prevention_mode: Option<String>,
 }
 

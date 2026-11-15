@@ -191,6 +191,7 @@ async fn batch_replace_five_rounds_of_twenty_with_safe_same_id_retry() {
                 new_price: Some(new_price.clone()),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 new_client_order_id: Some(new_cid.clone()),
             })
             .collect();

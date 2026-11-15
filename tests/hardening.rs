@@ -16,6 +16,8 @@ mod catalog_startup_recovery;
 mod centrifugo;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
+#[path = "clear_attached_risk/mod.rs"]
+mod clear_attached_risk;
 #[path = "contract_74af7f3/mod.rs"]
 mod contract_74af7f3;
 #[path = "contract_e339360/mod.rs"]
@@ -3031,6 +3033,7 @@ async fn l2_batch_replace_rejects_inconsistent_server_counts_through_public_serv
                 new_price: Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 new_client_order_id: None,
             }],
             "BTC-USDT",
@@ -8700,6 +8703,7 @@ async fn order_writes_check_quantity_scale_against_the_resolved_market() {
             new_price: None,
             new_qty: Some(quantity),
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: None,
             new_client_order_id: None,
         }
@@ -8851,6 +8855,11 @@ async fn scope_capture_client(default: Option<u64>) -> (MockHttpServer, Client, 
             // Plain `u64` fields: zero is what an unset field sends.
             "CreateDepositAddress" => plain(
                 deposit::CreateDepositAddressRequest::decode_from_slice(body)
+                    .unwrap()
+                    .subaccount_id,
+            ),
+            "ListDepositAddresses" => plain(
+                deposit::ListDepositAddressesRequest::decode_from_slice(body)
                     .unwrap()
                     .subaccount_id,
             ),
@@ -9077,6 +9086,7 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                     new_price: Some(scope_price()),
                     new_qty: None,
                     new_attached_risk: None,
+                    clear_attached_risk: false,
                     new_client_order_id: None,
                 }],
                 "BTC-USDT",
@@ -9095,6 +9105,7 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                 new_price: Some(scope_price()),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 behavior: None,
                 new_client_order_id: None,
             })
@@ -9209,6 +9220,23 @@ async fn order_and_trigger_writes_send_the_resolved_subaccount() {
                 subaccount_id: sub,
                 ..Default::default()
             })
+        );
+    }
+}
+
+// `deposit.list_addresses()` lists the configured default sub-account's
+// addresses, as `deposit.create_address` creates them there; with no default
+// it lists the main account's.
+#[tokio::test]
+async fn deposit_list_addresses_uses_the_default_subaccount() {
+    for (default, want) in [(Some(42), Some(42)), (None, None)] {
+        let (_server, client, seen) = scope_capture_client(default).await;
+        let _ = client.deposit.list_addresses().await;
+        let got = std::mem::take(&mut *seen.lock().unwrap());
+        assert_eq!(
+            got,
+            vec![("ListDepositAddresses".to_owned(), want)],
+            "default={default:?}"
         );
     }
 }
@@ -10053,6 +10081,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
                 new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 new_client_order_id: None,
             })
             .collect::<Vec<_>>()
@@ -10149,6 +10178,7 @@ async fn l2_batch_replace_sends_new_attached_risk() {
                     stop_loss: Some(RiskLeg::market(stop)),
                     ..Default::default()
                 }),
+                clear_attached_risk: false,
                 new_client_order_id: None,
             }],
             "BTC-USDT",

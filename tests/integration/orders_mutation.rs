@@ -340,6 +340,7 @@ async fn order_modify_advances_lineage() {
             ),
             new_qty: None,
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: Some("replace_only".into()),
             new_client_order_id: Some(replacement_cid.clone()),
         })

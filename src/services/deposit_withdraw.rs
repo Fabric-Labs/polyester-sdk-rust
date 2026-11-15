@@ -137,14 +137,19 @@ impl DepositService {
         Self { ctx }
     }
 
-    /// List the account's deposit addresses. An API key needs
-    /// `READ_DEPOSIT_ADDRESSES` on its API-key policy.
+    /// List the deposit addresses of the configured default sub-account, as
+    /// [`Self::create_address`] creates them there, or of the main account
+    /// when none is configured. An API key needs `READ_DEPOSIT_ADDRESSES` on
+    /// its API-key policy.
     pub async fn list_addresses(&self) -> Result<DepositAddressesList> {
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),
             self.ctx.factory.connect_config(),
         );
-        let req = ListDepositAddressesRequest::default();
+        let req = ListDepositAddressesRequest {
+            subaccount_id: scope::plain_subaccount(&self.ctx, 0)?,
+            ..Default::default()
+        };
         let resp = unary::await_auth(
             &self.ctx.factory,
             "/chain.deposit.v1.DepositAddressService/ListDepositAddresses",

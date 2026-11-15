@@ -502,7 +502,13 @@ pub struct BatchReplaceItem {
     /// given: the request does not carry the order's side, so the server
     /// applies the side rule (a maximum only when the order sells) and
     /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
+    /// `None` leaves the order's legs unchanged; an empty `AttachedRisk` is
+    /// refused.
     pub new_attached_risk: Option<AttachedRisk>,
+    /// Remove the order's attached take-profit, stop-loss and trailing stop,
+    /// alone or with a new price or quantity: sends an empty risk policy.
+    /// Refused with [`crate::Error::Validation`] with `new_attached_risk`.
+    pub clear_attached_risk: bool,
     pub new_client_order_id: Option<String>,
 }
 
@@ -525,7 +531,13 @@ pub struct ModifyOrderParams {
     /// given: the request does not carry the order's side, so the server
     /// applies the side rule (a maximum only when the order sells) and
     /// answers `ERROR_CODE_BAD_PRICE` with no violation when it is broken.
+    /// `None` leaves the order's legs unchanged; an empty `AttachedRisk` is
+    /// refused.
     pub new_attached_risk: Option<AttachedRisk>,
+    /// Remove the order's attached take-profit, stop-loss and trailing stop,
+    /// alone or with a new price or quantity: sends an empty risk policy.
+    /// Refused with [`crate::Error::Validation`] with `new_attached_risk`.
+    pub clear_attached_risk: bool,
     pub behavior: Option<String>,
     pub new_client_order_id: Option<String>,
 }

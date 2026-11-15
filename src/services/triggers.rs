@@ -760,7 +760,14 @@ impl TriggersService {
             ..Default::default()
         };
         if let Some(mode) = params.self_trade_prevention_mode.as_deref() {
-            oco.self_trade_prevention_mode = Self::stp_mode(mode)?.into();
+            let mode = Self::stp_mode(mode)?;
+            // The contract does not support DECREMENT on an OCO.
+            if mode == SelfTradePreventionMode::Decrement {
+                return Err(Error::validation(
+                    "self_trade_prevention_mode of an OCO must be expire_taker, expire_maker or expire_both; decrement is not supported on an OCO",
+                ));
+            }
+            oco.self_trade_prevention_mode = mode.into();
         }
         *oco.take_profit.get_or_insert_default() = take_profit;
         *oco.stop_loss.get_or_insert_default() = stop_loss;
@@ -800,8 +807,8 @@ impl TriggersService {
                 )));
             }
         };
-        // The labels trigger reads use, `mark` included: the server says which
-        // sources a market supports. Empty sends nothing (last trade price).
+        // The labels trigger reads use. The contract does not support
+        // MARK_PRICE on an OCO leg. Empty sends nothing (last trade price).
         let trigger_price_source = match leg
             .trigger_price_source
             .as_deref()
@@ -811,10 +818,14 @@ impl TriggersService {
             None | Some("") => TriggerPriceSource::TriggerPriceSourceUnspecified,
             Some("last") => TriggerPriceSource::LastPrice,
             Some("index") => TriggerPriceSource::IndexPrice,
-            Some("mark") => TriggerPriceSource::MarkPrice,
+            Some("mark") => {
+                return Err(Error::validation(format!(
+                    "{field} trigger_price_source mark is not supported on an OCO: spot markets have no mark price; use last or index"
+                )));
+            }
             Some(_) => {
                 return Err(Error::validation(format!(
-                    "{field} trigger_price_source must be last, index or mark"
+                    "{field} trigger_price_source must be last or index"
                 )));
             }
         };
@@ -1431,11 +1442,12 @@ mod tests {
         }
     }
 
-    /// `decrement` self-trade prevention is valid on trigger creates and is
-    /// sent on an OCO too, in any case; another label is refused before
-    /// sending with a message that lists the modes.
+    /// `decrement` self-trade prevention is valid on trigger creates, in any
+    /// case; another label is refused before sending with a message that
+    /// lists the modes. An OCO refuses it (see
+    /// `oco_create_refuses_mark_and_decrement_before_sending`).
     #[test]
-    fn trigger_and_oco_creates_send_decrement_self_trade_prevention() {
+    fn trigger_creates_send_decrement_self_trade_prevention() {
         let client = client();
         let mut params = create_params(
             crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7)).unwrap(),
@@ -1456,14 +1468,6 @@ mod tests {
         assert!(
             matches!(&err, Error::Validation(message) if message.contains("expire_both, or decrement")),
             "{err:?}"
-        );
-
-        let mut oco = sell_oco();
-        oco.self_trade_prevention_mode = Some("decrement".into());
-        let wire = client.triggers.encode_create_oco_params(&oco).unwrap();
-        assert_eq!(
-            wire.oco.as_option().unwrap().self_trade_prevention_mode,
-            SelfTradePreventionMode::Decrement
         );
     }
 
@@ -2606,6 +2610,69 @@ mod tests {
             .and_then(|child| child.execution.as_ref())
     }
 
+    /// The contract does not support a mark price source on an OCO leg or
+    /// decrement self-trade prevention on an OCO: both are refused before
+    /// sending with `Error::Validation`, as a single trigger create refuses
+    /// `mark`. `last`, `index` and the expire modes are sent.
+    #[test]
+    fn oco_create_refuses_mark_and_decrement_before_sending() {
+        let client = client();
+        for label in ["mark", "MARK"] {
+            let mut tp = sell_oco();
+            tp.take_profit.trigger_price_source = Some(label.into());
+            let mut sl = sell_oco();
+            sl.stop_loss.trigger_price_source = Some(label.into());
+            for params in [tp, sl] {
+                let err = client
+                    .triggers
+                    .encode_create_oco_params(&params)
+                    .unwrap_err();
+                assert!(
+                    matches!(&err, Error::Validation(m) if m.contains("mark is not supported")),
+                    "{label}: {err:?}"
+                );
+            }
+        }
+        for label in ["decrement", "Decrement"] {
+            let mut params = sell_oco();
+            params.self_trade_prevention_mode = Some(label.into());
+            let err = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_err();
+            assert!(
+                matches!(&err, Error::Validation(m) if m.contains("decrement is not supported on an OCO")),
+                "{label}: {err:?}"
+            );
+        }
+        for (label, source) in [
+            ("last", TriggerPriceSource::LastPrice),
+            ("index", TriggerPriceSource::IndexPrice),
+        ] {
+            let mut params = sell_oco();
+            params.take_profit.trigger_price_source = Some(label.into());
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            let oco = wire.oco.as_option().unwrap();
+            assert_eq!(
+                oco.take_profit.as_option().unwrap().trigger_price_source,
+                source
+            );
+        }
+        for (label, mode) in [
+            ("expire_taker", SelfTradePreventionMode::ExpireTaker),
+            ("expire_maker", SelfTradePreventionMode::ExpireMaker),
+            ("expire_both", SelfTradePreventionMode::ExpireBoth),
+        ] {
+            let mut params = sell_oco();
+            params.self_trade_prevention_mode = Some(label.into());
+            let wire = client.triggers.encode_create_oco_params(&params).unwrap();
+            assert_eq!(
+                wire.oco.as_option().unwrap().self_trade_prevention_mode,
+                mode
+            );
+        }
+    }
+
     #[test]
     fn oco_create_encodes_the_intent_and_both_legs() {
         let client = client();
@@ -2716,8 +2783,10 @@ mod tests {
         assert_eq!(oco.side, Side::Buy);
     }
 
-    /// Which way round the legs must be for the side, and which price source
-    /// a market supports, are the server's to refuse: the SDK sends them.
+    /// Which way round the legs must be for the side, and whether a market
+    /// has an index price, are the server's to refuse: the SDK sends them.
+    /// `mark` is refused before sending (see
+    /// `oco_create_refuses_mark_and_decrement_before_sending`).
     #[test]
     fn oco_create_leaves_leg_order_and_supported_sources_to_the_server() {
         let client = client();
@@ -2746,8 +2815,7 @@ mod tests {
         for (label, want) in [
             ("last", TriggerPriceSource::LastPrice),
             ("index", TriggerPriceSource::IndexPrice),
-            ("mark", TriggerPriceSource::MarkPrice),
-            (" MARK ", TriggerPriceSource::MarkPrice),
+            (" INDEX ", TriggerPriceSource::IndexPrice),
             ("", TriggerPriceSource::TriggerPriceSourceUnspecified),
         ] {
             let mut params = sell_oco();
@@ -2826,10 +2894,7 @@ mod tests {
 
         let mut p = sell_oco();
         p.take_profit.trigger_price_source = Some("oracle".into());
-        refused(
-            p,
-            "take_profit trigger_price_source must be last, index or mark",
-        );
+        refused(p, "take_profit trigger_price_source must be last or index");
         let mut p = sell_oco();
         p.self_trade_prevention_mode = Some("decrease".into());
         refused(p, "self_trade_prevention_mode");

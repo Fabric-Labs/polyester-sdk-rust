@@ -267,6 +267,7 @@ async fn partial_fill_modify_keeps_predecessor_execution_history() {
                 new_price: Some(new_price.clone()),
                 new_qty: None,
                 new_attached_risk: None,
+                clear_attached_risk: false,
                 behavior: Some("replace_only".into()),
                 new_client_order_id: Some(replacement_cid.clone()),
             })

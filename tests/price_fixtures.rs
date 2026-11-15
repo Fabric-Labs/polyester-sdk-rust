@@ -300,6 +300,7 @@ async fn order_modify_sends_q9_new_price() {
             new_price: Some(Price::from_decimal_str("185.25", Some("SOL-USDT".into())).unwrap()),
             new_qty: None,
             new_attached_risk: None,
+            clear_attached_risk: false,
             behavior: None,
             new_client_order_id: None,
         })

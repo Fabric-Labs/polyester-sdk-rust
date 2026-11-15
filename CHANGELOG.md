@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `deposit.list_addresses()` lists the configured default sub-account's deposit addresses, as `deposit.create_address` creates them there and every other read applies `Config.default_sub_account_id`. It sent no sub-account and listed the main account's addresses, so a client configured for a sub-account could show an address of another account. With no default it lists the main account's, as before. Every other method that sends a sub-account already applied the default. Affected: `DepositService::list_addresses`.
+- New `ModifyOrderParams.clear_attached_risk` and `BatchReplaceItem.clear_attached_risk` remove an order's attached take-profit, stop-loss and trailing stop, alone or with a new price or quantity, as the TypeScript SDK's `clearRisk` does: they send an empty `new_attached_risk`. With a `new_attached_risk` they are refused with `Error::Validation` before sending; an empty `AttachedRisk` is still refused. Affected: `orders.modify`, `orders.batch_replace`.
+- **Breaking:** `ModifyOrderParams` and `BatchReplaceItem` gain the public field `clear_attached_risk`. Migration: add `clear_attached_risk: false` to struct literals of either.
+- **Breaking:** `triggers.create_oco` refuses what the contract does not allow on an OCO with `Error::Validation` before sending: a leg's `trigger_price_source` `mark`, and `self_trade_prevention_mode` `decrement`. Both were sent and refused by the server, while a single trigger create already refused `mark` before sending. `last`, `index` and the `expire_*` modes are unchanged, and `OcoLegParams.trigger_price_source` and `CreateOcoParams.self_trade_prevention_mode` now document the accepted values. Affected: `triggers.create_oco`, `OcoLegParams`, `CreateOcoParams`. Migration: use `last` or `index`, and `expire_taker`, `expire_maker` or `expire_both`.
+
 ## 0.28.0
 
 Package version: `0.28.0`. Git tag: `v0.28.0`. Released 2026-11-14. Built on public contract `ebbbeac`.
