@@ -2,6 +2,7 @@
 
 use buffa::{Enumeration, Message};
 
+use super::enums::order_error_code_label;
 use super::{
     account_identity_from_proto, address_book_invalidation_from_proto, api_key_from_proto,
     api_policy_from_proto, asset_balance_from_proto, candle_point_from_proto,
@@ -268,7 +269,7 @@ fn order_unit_event_from_proto(kind: &unit_event::Kind) -> OrderUnitEvent {
             client_order_id: outcome.client_order_id.clone(),
             reason: match outcome.reason.as_known() {
                 Some(OrderErrorCode::ERROR_CODE_UNSPECIFIED) => String::new(),
-                Some(code) => code.proto_name().to_owned(),
+                Some(code) => order_error_code_label(code),
                 None => format!("UNKNOWN({})", outcome.reason.to_i32()),
             },
         }),
@@ -425,7 +426,7 @@ mod tests {
                     order_id: Some(format_uint64_id(8)),
                     new_order_id: None,
                     client_order_id: "late".into(),
-                    reason: "ERROR_CODE_ORDER_UNKNOWN".into(),
+                    reason: "order_unknown".into(),
                 }),
             ]
         );
@@ -528,31 +529,15 @@ mod tests {
             .collect();
         let some = |value: &str| Some(value.to_owned());
         let want = vec![
-            (
-                "rejected".to_owned(),
-                some("ERROR_CODE_POST_ONLY_CROSS"),
-                None,
-            ),
+            ("rejected".to_owned(), some("post_only_cross"), None),
             ("rejected".to_owned(), some("UNKNOWN_ERROR_CODE(997)"), None),
-            (
-                "canceled".to_owned(),
-                None,
-                some("CANCEL_REASON_USER_REQUEST"),
-            ),
-            ("replaced".to_owned(), None, some("CANCEL_REASON_REPLACED")),
+            ("canceled".to_owned(), None, some("user_request")),
+            ("replaced".to_owned(), None, some("replaced")),
             ("replaced".to_owned(), None, None),
             ("accepted".to_owned(), None, None),
             ("canceled".to_owned(), None, some("UNKNOWN(999)")),
-            (
-                "canceled".to_owned(),
-                None,
-                some("CANCEL_REASON_MARKET_HALTED"),
-            ),
-            (
-                "canceled".to_owned(),
-                None,
-                some("CANCEL_REASON_ATTACHED_EXIT_FIRED"),
-            ),
+            ("canceled".to_owned(), None, some("market_halted")),
+            ("canceled".to_owned(), None, some("attached_exit_fired")),
         ];
         assert_eq!(reasons, want);
     }

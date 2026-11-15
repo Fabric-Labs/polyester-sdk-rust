@@ -107,20 +107,39 @@ pub fn enum_value_self_trade_prevention_mode(
 }
 
 /// An order's or order event's `reject_reason`: the `orders.v1.ErrorCode`
-/// proto name, formatted exactly like [`crate::Error::Api`]'s `code` for the
-/// same refusal (`UNKNOWN_ERROR_CODE(<number>)` for a code this SDK does not
-/// know). `None` when unset.
+/// name as a short lowercase label, without its `ERROR_CODE_` prefix (for
+/// example `post_only_cross`), as every Polyester SDK spells it;
+/// `UNKNOWN_ERROR_CODE(<number>)` for a code this SDK does not know. `None`
+/// when unset.
 pub fn order_reject_reason(value: buffa::EnumValue<ErrorCode>) -> Option<String> {
-    (value.to_i32() != 0).then(|| {
-        crate::errors::known_or_unknown_code(
-            value.as_known().map(|known| known.proto_name()),
-            value.to_i32(),
-        )
+    (value.to_i32() != 0).then(|| match value.as_known() {
+        Some(known) => order_error_code_label(known),
+        None => crate::errors::known_or_unknown_code(None, value.to_i32()),
     })
 }
 
+/// An `orders.v1.ErrorCode` as a reason label: lowercase, without the
+/// `ERROR_CODE_` prefix (`ERROR_CODE_POST_ONLY_CROSS` is `post_only_cross`).
+pub(crate) fn order_error_code_label(code: ErrorCode) -> String {
+    let name = code.proto_name();
+    name.strip_prefix("ERROR_CODE_")
+        .unwrap_or(name)
+        .to_ascii_lowercase()
+}
+
 /// An order's or order event's `cancel_reason`: the `orders.v1.CancelReason`
-/// proto name, or `UNKNOWN(<number>)`. `None` when unset.
+/// name as a short lowercase label, without its `CANCEL_REASON_` prefix (for
+/// example `user_request` or `stp_decrement`), as every Polyester SDK spells
+/// it; `UNKNOWN(<number>)` for a reason this SDK does not know. `None` when
+/// unset.
 pub fn order_cancel_reason(value: buffa::EnumValue<CancelReason>) -> Option<String> {
-    (value.to_i32() != 0).then(|| enum_proto_name(&value))
+    (value.to_i32() != 0).then(|| match value.as_known() {
+        Some(known) => {
+            let name = known.proto_name();
+            name.strip_prefix("CANCEL_REASON_")
+                .unwrap_or(name)
+                .to_ascii_lowercase()
+        }
+        None => enum_proto_name(&value),
+    })
 }

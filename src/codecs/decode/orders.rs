@@ -1,5 +1,6 @@
 //! Orders read/mutation decoders.
 
+use super::common::paired_ts_ns;
 use super::enums::{
     enum_value_fee_asset, enum_value_order_status, enum_value_order_type,
     enum_value_self_trade_prevention_mode, enum_value_side, enum_value_time_in_force,
@@ -510,6 +511,7 @@ pub fn order_mutation_from_create(msg: &CreateOrderResponse) -> Result<OrderMuta
         return Err(Error::response_contract("CreateOrder", "missing order_id"));
     }
     let mut result = order_mutation("accepted", msg.order_id, &msg.client_order_id);
+    result.accepted_ts_ns = paired_ts_ns(msg.accepted_at_ts_ns, msg.accepted_at.as_option());
     result.resolved_base_qty = decode_qty_scaled(msg.resolved_base_qty_scaled, None, None, None);
     result.submitted_max_quote_debit_scaled = msg.submitted_max_quote_debit_scaled;
     result.submitted_quote_proceeds_scaled = msg.submitted_quote_proceeds_scaled;
@@ -545,6 +547,7 @@ fn order_mutation(status: &str, order_id: u64, client_order_id: &str) -> OrderMu
         status: status.to_owned(),
         order_id: format_uint64_id(order_id),
         client_order_id: client_order_id.to_owned(),
+        accepted_ts_ns: 0,
         resolved_base_qty: None,
         submitted_max_quote_debit_scaled: None,
         submitted_quote_proceeds_scaled: None,
@@ -644,6 +647,7 @@ pub fn modify_order_from_proto(msg: &ModifyOrderResponse) -> Result<ModifyOrderR
         take_profit_trigger_id: leg_trigger_id(msg.take_profit_trigger_id),
         stop_loss_trigger_id: leg_trigger_id(msg.stop_loss_trigger_id),
         trailing_stop_trigger_id: leg_trigger_id(msg.trailing_stop_trigger_id),
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -753,6 +757,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                 code: String::new(),
                 rate_limit: None,
                 existing_order_id: None,
+                resolved_base_qty: None,
                 submitted_max_quote_debit_scaled: None,
                 submitted_quote_proceeds_scaled: None,
                 take_profit_trigger_id: None,
@@ -765,6 +770,9 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
                     accepted += 1;
                     out.status = "accepted".to_owned();
                     out.order_id = format_uint64_id(value.order_id);
+                    // Unscaled: the service attaches the item's pair scale.
+                    out.resolved_base_qty =
+                        decode_qty_scaled(value.resolved_base_qty_scaled, None, None, None);
                     out.submitted_max_quote_debit_scaled = value.submitted_max_quote_debit_scaled;
                     out.submitted_quote_proceeds_scaled = value.submitted_quote_proceeds_scaled;
                     out.take_profit_trigger_id = leg_trigger_id(value.take_profit_trigger_id);
@@ -827,6 +835,7 @@ pub fn batch_create_from_proto(msg: &BatchCreateOrdersResponse) -> Result<BatchC
         results,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
 
@@ -926,6 +935,11 @@ pub fn batch_replace_from_proto(
                     .as_option()
                     .map(crate::codecs::decode::rate_limit_detail_from_proto)
             }),
+            existing_order_id: item
+                .error
+                .as_option()
+                .and_then(|err| err.existing_order_id)
+                .and_then(optional_order_id),
             violations: field_violations_from_proto(item.error.as_option()),
         });
     }
@@ -946,8 +960,10 @@ pub fn batch_replace_from_proto(
             ),
         ));
     }
-    let accepted_ts_ns =
-        TsNs::from_wire(msg.accepted_ts_ns, "BatchReplaceOrders.accepted_ts_ns")?.get();
+    let accepted_ts_ns = paired_ts_ns(
+        TsNs::from_wire(msg.accepted_ts_ns, "BatchReplaceOrders.accepted_ts_ns")?.get(),
+        msg.accepted_ts.as_option(),
+    );
     Ok(BatchReplaceOrdersResult {
         batch_request_id: format_uint64_id(msg.batch_request_id),
         status: status.to_owned(),
@@ -1373,25 +1389,25 @@ mod tests {
             order(OrderStatus::Rejected, |o| {
                 o.reject_reason = ErrorCode::ERROR_CODE_POST_ONLY_CROSS.into();
             }),
-            (some("ERROR_CODE_POST_ONLY_CROSS"), None)
+            (some("post_only_cross"), None)
         );
         assert_eq!(
             order(OrderStatus::Rejected, |o| {
                 o.reject_reason = ErrorCode::ERROR_CODE_ATTACHED_LEGS_EXCEEDED.into();
             }),
-            (some("ERROR_CODE_ATTACHED_LEGS_EXCEEDED"), None)
+            (some("attached_legs_exceeded"), None)
         );
         assert_eq!(
             order(OrderStatus::Canceled, |o| {
                 o.cancel_reason = CancelReason::CANCEL_REASON_STP_EXPIRE_MAKER.into();
             }),
-            (None, some("CANCEL_REASON_STP_EXPIRE_MAKER"))
+            (None, some("stp_expire_maker"))
         );
         assert_eq!(
             order(OrderStatus::Canceled, |o| {
                 o.cancel_reason = CancelReason::CANCEL_REASON_SYSTEM.into();
             }),
-            (None, some("CANCEL_REASON_SYSTEM"))
+            (None, some("system"))
         );
         // A market halt cancels every open order of the market (17), and
         // refuses after admission an order that reaches it (reject 56).
@@ -1399,13 +1415,13 @@ mod tests {
             order(OrderStatus::Canceled, |o| {
                 o.cancel_reason = CancelReason::CANCEL_REASON_MARKET_HALTED.into();
             }),
-            (None, some("CANCEL_REASON_MARKET_HALTED"))
+            (None, some("market_halted"))
         );
         assert_eq!(
             order(OrderStatus::Rejected, |o| {
                 o.reject_reason = ErrorCode::ERROR_CODE_MARKET_HALTED.into();
             }),
-            (some("ERROR_CODE_MARKET_HALTED"), None)
+            (some("market_halted"), None)
         );
         // An attached exit that fires while its order still rests cancels the
         // order's unfilled rest first (18). 307 names a self-trade prevention
@@ -1414,16 +1430,34 @@ mod tests {
             order(OrderStatus::Canceled, |o| {
                 o.cancel_reason = CancelReason::CANCEL_REASON_ATTACHED_EXIT_FIRED.into();
             }),
-            (None, some("CANCEL_REASON_ATTACHED_EXIT_FIRED"))
+            (None, some("attached_exit_fired"))
         );
         assert_eq!(
             order(OrderStatus::Rejected, |o| {
                 o.reject_reason = ErrorCode::ERROR_CODE_SELF_TRADE_PREVENTED.into();
             }),
-            (some("ERROR_CODE_SELF_TRADE_PREVENTED"), None)
+            (some("self_trade_prevented"), None)
         );
-        // Unknown values keep their number; a reject reason is formatted like
-        // the matching `Error::Api` code so the two compare equal.
+        // Every SDK spells a reason the same way: the short lowercase label.
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_STP_DECREMENT.into();
+            }),
+            (None, some("stp_decrement"))
+        );
+        assert_eq!(
+            order(OrderStatus::Canceled, |o| {
+                o.cancel_reason = CancelReason::CANCEL_REASON_USER_REQUEST.into();
+            }),
+            (None, some("user_request"))
+        );
+        assert_eq!(
+            order(OrderStatus::Rejected, |o| {
+                o.reject_reason = ErrorCode::ERROR_CODE_PEG_LIMIT_VIOLATION.into();
+            }),
+            (some("peg_limit_violation"), None)
+        );
+        // Unknown values keep their number, as before.
         assert_eq!(
             order(OrderStatus::Rejected, |o| {
                 o.reject_reason = buffa::EnumValue::from(999);
@@ -2954,17 +2988,13 @@ mod tests {
             (
                 CancelReason::CANCEL_REASON_STP_DECREMENT,
                 19,
-                "CANCEL_REASON_STP_DECREMENT",
+                "stp_decrement",
             ),
-            (
-                CancelReason::CANCEL_REASON_PRICE_BAND,
-                20,
-                "CANCEL_REASON_PRICE_BAND",
-            ),
+            (CancelReason::CANCEL_REASON_PRICE_BAND, 20, "price_band"),
             (
                 CancelReason::CANCEL_REASON_CANCEL_ON_DISCONNECT,
                 21,
-                "CANCEL_REASON_CANCEL_ON_DISCONNECT",
+                "cancel_on_disconnect",
             ),
         ] {
             for value in [reason.into(), buffa::EnumValue::from(number)] {
@@ -3901,5 +3931,209 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// The response times of an order write: the exact `*_ts_ns` field, the
+    /// paired `Timestamp` when only it is sent, and 0 when neither is.
+    #[test]
+    fn order_write_results_carry_their_response_times() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateResultItem as ProtoBatchCreateItem,
+            BatchReplaceAdmissionItem as ProtoAdmission, ModifyActionTaken,
+        };
+        use buffa_types::google::protobuf::Timestamp;
+
+        const EXACT: u64 = 1_763_164_800_123_456_789;
+        let stamp = || Timestamp {
+            seconds: 1_763_164_800,
+            nanos: 123_456_000,
+            ..Default::default()
+        };
+        const FROM_STAMP: u64 = 1_763_164_800_123_456_000;
+        // (ts_ns, Timestamp, expected)
+        let cases: [(u64, Option<Timestamp>, u64); 4] = [
+            (EXACT, None, EXACT),
+            (EXACT, Some(stamp()), EXACT),
+            (0, Some(stamp()), FROM_STAMP),
+            (0, None, 0),
+        ];
+        for (ts_ns, ts, want) in cases {
+            let create = order_mutation_from_create(&CreateOrderResponse {
+                order_id: 7,
+                accepted_at_ts_ns: ts_ns,
+                accepted_at: ts.clone().into(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(create.accepted_ts_ns, want, "create {ts_ns} {ts:?}");
+
+            let batch = batch_create_from_proto(&BatchCreateOrdersResponse {
+                results: vec![ProtoBatchCreateItem {
+                    outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                        BatchCreateAccepted {
+                            order_id: 8,
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                }],
+                accepted_count: 1,
+                ts_ns,
+                ts: ts.clone().into(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(batch.ts_ns, want, "batch create {ts_ns} {ts:?}");
+
+            let modify = modify_order_from_proto(&ModifyOrderResponse {
+                action_taken: ModifyActionTaken::Amended.into(),
+                old_order_id: 9,
+                final_order_id: 9,
+                ts_ns,
+                ts: ts.clone().into(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(modify.ts_ns, want, "modify {ts_ns} {ts:?}");
+
+            let replace = batch_replace_from_proto(&BatchReplaceOrdersResponse {
+                batch_request_id: 10,
+                status: BatchReplaceAdmissionStatus::Admitted.into(),
+                results: vec![ProtoAdmission {
+                    status: BatchReplaceItemAdmissionStatus::Admitted.into(),
+                    old_order_id: 11,
+                    action_taken: ModifyActionTaken::Amended.into(),
+                    ..Default::default()
+                }],
+                accepted_count: 1,
+                accepted_ts_ns: ts_ns,
+                accepted_ts: ts.clone().into(),
+                ..Default::default()
+            })
+            .unwrap();
+            assert_eq!(replace.accepted_ts_ns, want, "batch replace {ts_ns} {ts:?}");
+        }
+        // A time before the epoch reads as unset.
+        let before_epoch = order_mutation_from_create(&CreateOrderResponse {
+            order_id: 7,
+            accepted_at: Some(Timestamp {
+                seconds: -5,
+                ..Default::default()
+            })
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(before_epoch.accepted_ts_ns, 0);
+        // A cancel carries no acceptance time.
+        let cancel = order_mutation_from_cancel(&CancelOrderResponse {
+            order_id: 7,
+            status: cancel_order_response::Status::Accepted.into(),
+            ts_ns: EXACT,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(cancel.accepted_ts_ns, 0);
+    }
+
+    /// An accepted batch item carries the base quantity the server resolved,
+    /// as a single create does; a rejected one carries none.
+    #[test]
+    fn batch_create_accepted_items_carry_the_resolved_base_quantity() {
+        use crate::proto::orders::v1::{
+            BatchCreateAccepted, BatchCreateRejected,
+            BatchCreateResultItem as ProtoBatchCreateItem, ErrorCode,
+        };
+
+        let accepted = |order_id: u64, resolved: i64| ProtoBatchCreateItem {
+            outcome: Some(batch_create_result_item::Outcome::Accepted(Box::new(
+                BatchCreateAccepted {
+                    order_id,
+                    resolved_base_qty_scaled: resolved,
+                    ..Default::default()
+                },
+            ))),
+            ..Default::default()
+        };
+        let result = batch_create_from_proto(&BatchCreateOrdersResponse {
+            results: vec![
+                accepted(1, 1_000_000),
+                accepted(2, 776_079),
+                accepted(3, 0),
+                ProtoBatchCreateItem {
+                    outcome: Some(batch_create_result_item::Outcome::Rejected(Box::new(
+                        BatchCreateRejected {
+                            error: ErrorDetail {
+                                code: ErrorCode::ERROR_CODE_MIN_QTY.into(),
+                                ..Default::default()
+                            }
+                            .into(),
+                            ..Default::default()
+                        },
+                    ))),
+                    ..Default::default()
+                },
+            ],
+            accepted_count: 3,
+            rejected_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+        let resolved: Vec<Option<i64>> = result
+            .results
+            .iter()
+            .map(|item| item.resolved_base_qty.as_ref().map(|qty| qty.as_scaled()))
+            .collect();
+        assert_eq!(resolved, [Some(1_000_000), Some(776_079), None, None]);
+        // The decoder has no catalog: the service attaches the pair's scale.
+        assert!(
+            result.results[0]
+                .resolved_base_qty
+                .as_ref()
+                .unwrap()
+                .scale()
+                .is_none()
+        );
+    }
+
+    /// A rejected batch replace item names the order already holding its new
+    /// client order ID, as a rejected batch create item does.
+    #[test]
+    fn batch_replace_rejection_exposes_existing_order_id() {
+        use crate::proto::orders::v1::{BatchReplaceAdmissionItem as ProtoAdmission, ErrorCode};
+
+        let result = batch_replace_from_proto(&BatchReplaceOrdersResponse {
+            batch_request_id: 10,
+            status: BatchReplaceAdmissionStatus::Rejected.into(),
+            results: vec![
+                ProtoAdmission {
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    old_order_id: 11,
+                    code: "CONFLICT_DUPLICATE_CLIENT_ORDER_ID".into(),
+                    error: ErrorDetail {
+                        code: ErrorCode::ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID.into(),
+                        existing_order_id: Some(77),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                },
+                ProtoAdmission {
+                    item_index: 1,
+                    status: BatchReplaceItemAdmissionStatus::Rejected.into(),
+                    old_order_id: 12,
+                    code: "BAD_PRICE".into(),
+                    ..Default::default()
+                },
+            ],
+            rejected_count: 2,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            result.results[0].existing_order_id.as_deref(),
+            Some(format_uint64_id(77).as_str())
+        );
+        assert_eq!(result.results[1].existing_order_id, None);
     }
 }

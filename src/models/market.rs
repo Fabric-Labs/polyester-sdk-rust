@@ -118,7 +118,7 @@ pub struct PairOrderLimits {
 /// `ERROR_CODE_PRICE_BAND_VIOLATION`, as is a replace that would add exposure
 /// beyond the band. A market order, or another order whose price the exchange
 /// sets, trades only up to the limit, and its unfilled remainder is canceled
-/// with `CANCEL_REASON_PRICE_BAND`. The band never cancels a resting order,
+/// with `cancel_reason` `price_band`. The band never cancels a resting order,
 /// and a limit order priced away from the market on the passive side is
 /// accepted.
 ///

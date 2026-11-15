@@ -490,7 +490,9 @@ impl OrdersService {
 
     /// Build the transport-independent [`OrderIntent`] shared by single and batch
     /// create. The flat public params (`order_type`/`time_in_force`/`post_only`)
-    /// are mapped onto the appropriate execution variant.
+    /// are mapped onto the appropriate execution variant. The services resolve
+    /// the market themselves and call [`Self::order_intent_for_market`].
+    #[cfg(test)]
     fn order_intent_from_params(&self, params: &CreateOrderParams) -> Result<OrderIntent> {
         let market = self
             .ctx
@@ -499,8 +501,8 @@ impl OrdersService {
         self.order_intent_for_market(params, &market)
     }
 
-    /// [`Self::order_intent_from_params`] for a market already resolved: the
-    /// ID sent, every scale and every symbol check come from `pair`.
+    /// The [`OrderIntent`] of `params` for a market already resolved: the ID
+    /// sent, every scale and every symbol check come from `pair`.
     fn order_intent_for_market(
         &self,
         params: &CreateOrderParams,
@@ -1231,8 +1233,14 @@ impl OrdersService {
         Self::validate_batch_client_order_ids(&items)?;
         self.ctx.wait_for_catalogs().await?;
         let mut encoded = Vec::with_capacity(items.len());
+        let mut markets = Vec::with_capacity(items.len());
         for item in &items {
-            encoded.push(self.order_intent_from_params(item)?);
+            let market = self
+                .ctx
+                .catalogs
+                .require_order_market(&item.symbol, item.symbol_id)?;
+            encoded.push(self.order_intent_for_market(item, &market)?);
+            markets.push(market);
         }
         let req = BatchCreateOrdersRequest {
             subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
@@ -1249,7 +1257,22 @@ impl OrdersService {
         )
         .await?
         .into_owned();
-        batch_create_from_proto(&resp)
+        let mut result = batch_create_from_proto(&resp)?;
+        // Results come in request order: give each accepted item's resolved
+        // quantity its own pair's base scale, as `create` does.
+        if result.results.len() == markets.len() {
+            for (item, market) in result.results.iter_mut().zip(markets) {
+                if let Some(qty) = item.resolved_base_qty.as_ref() {
+                    item.resolved_base_qty = crate::codecs::decode::decode_qty_scaled(
+                        qty.as_scaled(),
+                        Some(market.base_quantity_scale),
+                        Some(market.symbol),
+                        Some(market.symbol_id),
+                    );
+                }
+            }
+        }
+        Ok(result)
     }
 
     /// Batch-cancel orders.
