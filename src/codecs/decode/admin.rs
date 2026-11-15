@@ -1,7 +1,9 @@
 //! API key and resolve-account decoders.
 
+use crate::codecs::decode::common::require_str_id;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_optional_uint64_id, format_uint64_id};
+use crate::errors::Result;
 use crate::models::{ApiKeySummary, ApiKeysList, ResolvedAccount, ResolvedAccountsList};
 use crate::proto::auth::v1::{
     ApiKey as ProtoApiKey, CreateApiKeyResponse, GetApiKeyResponse, ListApiKeysResponse,
@@ -34,14 +36,27 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
     }
 }
 
-pub fn api_keys_list_from_proto(msg: &ListApiKeysResponse) -> ApiKeysList {
-    ApiKeysList {
-        keys: msg.api_keys.iter().map(api_key_from_proto).collect(),
-    }
+/// A read API key, refused with `Error::ResponseContract` without its key ID.
+pub(crate) fn required_api_key(operation: &str, msg: &ProtoApiKey) -> Result<ApiKeySummary> {
+    require_str_id(operation, "key_id", &msg.key_id)?;
+    Ok(api_key_from_proto(msg))
 }
 
-pub fn api_key_from_get_proto(msg: &GetApiKeyResponse) -> Option<ApiKeySummary> {
-    msg.api_key.as_option().map(api_key_from_proto)
+pub fn api_keys_list_from_proto(msg: &ListApiKeysResponse) -> Result<ApiKeysList> {
+    Ok(ApiKeysList {
+        keys: msg
+            .api_keys
+            .iter()
+            .map(|key| required_api_key("ListApiKeys", key))
+            .collect::<Result<_>>()?,
+    })
+}
+
+pub fn api_key_from_get_proto(msg: &GetApiKeyResponse) -> Result<Option<ApiKeySummary>> {
+    msg.api_key
+        .as_option()
+        .map(|key| required_api_key("GetApiKey", key))
+        .transpose()
 }
 
 pub fn api_key_from_create_proto(msg: &CreateApiKeyResponse) -> Option<ApiKeySummary> {
@@ -129,6 +144,7 @@ mod tests {
             api_key: key.into(),
             ..Default::default()
         })
+        .unwrap()
         .unwrap();
         assert_eq!(updated, read);
         assert_eq!(updated.policy_id, format_uint64_id(42));
@@ -169,7 +185,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let result = api_keys_list_from_proto(&msg);
+        let result = api_keys_list_from_proto(&msg).unwrap();
         assert_eq!(result.keys.len(), 1);
         assert_eq!(result.keys[0].key_id, "key-1");
         assert_eq!(result.keys[0].status, "ACTIVE");

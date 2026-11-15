@@ -35,6 +35,6 @@ impl AuthService {
         )
         .await?
         .into_owned();
-        Ok(me_from_proto(&resp))
+        me_from_proto(&resp)
     }
 }

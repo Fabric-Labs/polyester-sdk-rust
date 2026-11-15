@@ -91,7 +91,7 @@ impl BalancesService {
         )
         .await?
         .into_owned();
-        Ok(transfers_list_from_proto(&resp))
+        transfers_list_from_proto(&resp)
     }
 
     /// Subscribe to private balance updates (requires `realtime` feature).

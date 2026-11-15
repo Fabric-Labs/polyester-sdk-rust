@@ -11,6 +11,7 @@ fn read_transfer_opaque_token() {
             transfers: vec![TransferRow {
                 asset_id: 1,
                 ts_us: 999,
+                transfer_id: "7".into(),
                 ..Default::default()
             }],
             next_page_token: token.into(),
@@ -20,10 +21,10 @@ fn read_transfer_opaque_token() {
         let json: ListTransfersResponse =
             serde_json::from_slice(&serde_json::to_vec(&raw).unwrap()).unwrap();
         assert_eq!(
-            transfers_list_from_proto(&json),
-            transfers_list_from_proto(&msg)
+            transfers_list_from_proto(&json).unwrap(),
+            transfers_list_from_proto(&msg).unwrap()
         );
-        let result = transfers_list_from_proto(&msg);
+        let result = transfers_list_from_proto(&msg).unwrap();
         assert_eq!(result.transfers.len(), 1);
         assert_eq!(result.transfers[0].timestamp, 999);
         assert_eq!(result.next_page_token, token);

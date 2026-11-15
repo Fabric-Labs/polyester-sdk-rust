@@ -435,7 +435,7 @@ impl SubAccountsService {
             .await?
             .into_owned()
         };
-        Ok(subaccounts_list_from_proto(&resp))
+        subaccounts_list_from_proto(&resp)
     }
 
     /// Read a sub-account's aggregated view. An API key needs
@@ -487,7 +487,7 @@ impl SubAccountsService {
             .await?
             .into_owned()
         };
-        let mut result = get_subaccount_from_proto(&resp);
+        let mut result = get_subaccount_from_proto(&resp)?;
         result.balances = if opts.include_balances {
             Some(result.balances.unwrap_or(crate::models::BalancesList {
                 balances: Vec::new(),
@@ -541,7 +541,7 @@ impl SubAccountsService {
             .await?
             .into_owned()
         };
-        Ok(subaccount_invites_list_from_proto(&resp))
+        subaccount_invites_list_from_proto(&resp)
     }
 
     /// List a sub-account's activity. An API key needs
@@ -649,7 +649,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(list_entries_from_proto(&resp))
+        list_entries_from_proto(&resp)
     }
 
     pub async fn list_transfer_counterparties(
@@ -670,7 +670,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(list_counterparties_from_proto(&resp))
+        list_counterparties_from_proto(&resp)
     }
 
     pub async fn list_transfer_destinations(
@@ -691,7 +691,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(list_destinations_from_proto(&resp))
+        list_destinations_from_proto(&resp)
     }
 
     pub async fn list_internal_transfer_whitelist_entries(
@@ -712,7 +712,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(list_internal_whitelist_from_proto(&resp))
+        list_internal_whitelist_from_proto(&resp)
     }
 
     pub async fn get_withdraw_whitelist_view(
@@ -759,7 +759,7 @@ impl AddressBookService {
             .await?
             .into_owned()
         };
-        Ok(address_book_view_from_proto(&resp))
+        address_book_view_from_proto(&resp)
     }
 
     /// Build an update request that selects `new_tags` via FieldMask.
@@ -959,7 +959,7 @@ impl TransfersService {
             .await?
             .into_owned()
         };
-        Ok(transfers_list_from_proto(&resp))
+        transfers_list_from_proto(&resp)
     }
 
     /// Subscribe to private transfer updates (requires `realtime` feature).
@@ -1019,7 +1019,6 @@ impl ChainAnalyticsService {
         end_ts_sec: u32,
     ) -> crate::errors::Result<crate::models::ApiData> {
         use crate::codecs::analytics::resolve_analytics_range;
-        use crate::codecs::decode::api_data_from_proto;
         use crate::proto::chain::analytics::v1::GetZippedAssetSupplyGroupRequest;
         let req = GetZippedAssetSupplyGroupRequest {
             group_id: group_id.to_owned(),
@@ -1033,7 +1032,7 @@ impl ChainAnalyticsService {
         let resp = super::unary::await_public(client.get_zipped_asset_supply_group(req))
             .await?
             .into_owned();
-        Ok(api_data_from_proto(&resp))
+        crate::codecs::decode::zipped_asset_supply_group_from_proto(&resp)
     }
 
     pub async fn get_unified_asset_balances(
@@ -1091,7 +1090,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        Ok(flows_list_from_proto(&resp))
+        flows_list_from_proto(&resp)
     }
 
     pub async fn get_flow(
@@ -1143,7 +1142,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        Ok(flows_by_tx_list_from_proto(&resp))
+        flows_by_tx_list_from_proto(&resp)
     }
 
     /// Return all matches in the requested page for a transaction lookup.
@@ -1170,7 +1169,7 @@ impl LifecycleService {
             .await?
             .into_owned()
         };
-        Ok(flow_from_get_by_tx_response(&resp))
+        flow_from_get_by_tx_response(&resp)
     }
 
     /// Subscribe to open lifecycle flow summaries.

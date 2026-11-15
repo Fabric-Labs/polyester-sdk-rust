@@ -413,19 +413,45 @@ fn attached_risk_from_proto(msg: &ProtoAttachedRisk) -> Result<Option<AttachedRi
     }))
 }
 
+/// A read order or trade's lineage, when present, must carry its ID.
+fn require_lineage(operation: &str, lineage: Option<&ProtoOrderLineage>) -> Result<()> {
+    lineage.map_or(Ok(()), |lineage| {
+        require_id(operation, "lineage.id", lineage.id)
+    })
+}
+
+/// A read order, refused with `Error::ResponseContract` without its order ID
+/// or with a lineage without its ID.
+fn required_order(operation: &str, msg: &ProtoOrder) -> Result<Order> {
+    require_id(operation, "order_id", msg.order_id)?;
+    require_lineage(operation, msg.lineage.as_option())?;
+    order_from_proto(msg)
+}
+
+/// A read trade, refused with `Error::ResponseContract` with a lineage without
+/// its ID.
+fn required_trade(operation: &str, msg: &ProtoUserTrade) -> Result<UserTrade> {
+    require_lineage(operation, msg.lineage.as_option())?;
+    user_trade_from_proto(msg)
+}
+
 pub fn orders_list_from_open(msg: &GetOpenOrdersResponse) -> Result<OrdersList> {
-    orders_list(&msg.orders, &msg.next_page_token)
+    orders_list("GetOpenOrders", &msg.orders, &msg.next_page_token)
 }
 
 pub fn orders_list_from_history(msg: &GetOrderHistoryResponse) -> Result<OrdersList> {
-    orders_list(&msg.orders, &msg.next_page_token)
+    orders_list("GetOrderHistory", &msg.orders, &msg.next_page_token)
 }
 
-fn orders_list(orders: &[ProtoOrder], next_page_token: &str) -> Result<OrdersList> {
+fn orders_list(
+    operation: &str,
+    orders: &[ProtoOrder],
+    next_page_token: &str,
+) -> Result<OrdersList> {
     Ok(OrdersList {
         orders: orders
             .iter()
-            .map(order_from_proto)
+            .map(|order| required_order(operation, order))
             .collect::<Result<Vec<_>>>()?,
         next_page_token: next_page_token.to_owned(),
     })
@@ -471,7 +497,7 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
         trades: msg
             .trades
             .iter()
-            .map(user_trade_from_proto)
+            .map(|trade| required_trade("GetUserTrades", trade))
             .collect::<Result<Vec<_>>>()?,
         transfers: msg
             .transfers
@@ -483,11 +509,15 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
 }
 
 pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
-    let order = msg.order.as_option().map(order_from_proto).transpose()?;
+    let order = msg
+        .order
+        .as_option()
+        .map(|order| required_order("GetOrder", order))
+        .transpose()?;
     let trades = msg
         .trades
         .iter()
-        .map(user_trade_from_proto)
+        .map(|trade| required_trade("GetOrder", trade))
         .collect::<Result<Vec<_>>>()?;
     let transfers = msg
         .transfers

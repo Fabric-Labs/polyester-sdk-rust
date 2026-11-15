@@ -508,18 +508,31 @@ pub(crate) fn attach_trigger_scale(trigger: &mut Trigger, base_scale: Option<u32
     }
 }
 
-pub fn triggers_list_from_proto(msg: &ListTriggersResponse) -> TriggersList {
-    let triggers: Vec<_> = msg.triggers.iter().map(trigger_from_proto).collect();
+/// A read trigger, refused with `Error::ResponseContract` without its ID.
+fn required_trigger(operation: &str, msg: &ProtoTrigger) -> crate::errors::Result<Trigger> {
+    require_id(operation, "trigger_id", msg.trigger_id)?;
+    Ok(trigger_from_proto(msg))
+}
+
+pub fn triggers_list_from_proto(msg: &ListTriggersResponse) -> crate::errors::Result<TriggersList> {
+    let triggers = msg
+        .triggers
+        .iter()
+        .map(|trigger| required_trigger("ListTriggers", trigger))
+        .collect::<crate::errors::Result<Vec<_>>>()?;
     let total = triggers.len();
-    TriggersList {
+    Ok(TriggersList {
         triggers,
         total,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
-pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> Option<Trigger> {
-    msg.trigger.as_option().map(trigger_from_proto)
+pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> crate::errors::Result<Option<Trigger>> {
+    msg.trigger
+        .as_option()
+        .map(|trigger| required_trigger("GetTrigger", trigger))
+        .transpose()
 }
 
 fn trigger_mutation(
@@ -774,7 +787,10 @@ pub fn trigger_events_list_from_proto(
         events: msg
             .events
             .iter()
-            .map(trigger_event_from_proto)
+            .map(|event| {
+                require_id("ListTriggerEvents", "trigger_id", event.trigger_id)?;
+                trigger_event_from_proto(event)
+            })
             .collect::<crate::errors::Result<Vec<_>>>()?,
         next_page_token: msg.next_page_token.clone(),
     })
@@ -844,7 +860,8 @@ mod tests {
                 ..Default::default()
             }],
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(listed.triggers[0].version, Some(3));
     }
 
@@ -955,7 +972,8 @@ mod tests {
                 trigger_market_ioc::MaxSlippage::MaxSlippageBps(50),
             ))],
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(listed.triggers[0].max_slippage, Some(MaxSlippage::Bps(50)));
         let got = get_trigger_from_proto(&GetTriggerResponse {
             trigger: buffa::MessageField::some(market(Some(
@@ -963,6 +981,7 @@ mod tests {
             ))),
             ..Default::default()
         })
+        .unwrap()
         .unwrap();
         assert_eq!(got.max_slippage, Some(MaxSlippage::Bps(10)));
     }
@@ -1030,6 +1049,7 @@ mod tests {
                         triggers: vec![msg.clone()],
                         ..Default::default()
                     })
+                    .unwrap()
                     .triggers
                     .remove(0),
                 ),
@@ -1039,6 +1059,7 @@ mod tests {
                         trigger: buffa::MessageField::some(msg.clone()),
                         ..Default::default()
                     })
+                    .unwrap()
                     .unwrap(),
                 ),
             ];
@@ -1623,7 +1644,8 @@ mod tests {
             }],
             next_page_token: "trig-page-2".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(listed.triggers.len(), 1);
         assert_eq!(listed.total, 1);
         assert_eq!(listed.next_page_token, "trig-page-2");
@@ -1636,7 +1658,8 @@ mod tests {
             }
             .into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(got.unwrap().trigger_id, format_uint64_id(3));
     }
 

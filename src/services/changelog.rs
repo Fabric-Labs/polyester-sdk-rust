@@ -174,7 +174,7 @@ impl ChangelogService {
         let resp = unary::await_public(self.client().list_changes(req))
             .await?
             .into_owned();
-        Ok(changelog_changes_page_from_proto(&resp))
+        changelog_changes_page_from_proto(&resp)
     }
 
     /// Every post summary from `opts.page_token` on, newest first, fetching

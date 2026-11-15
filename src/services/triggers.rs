@@ -257,7 +257,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        let mut list = triggers_list_from_proto(&resp);
+        let mut list = triggers_list_from_proto(&resp)?;
         for trigger in &mut list.triggers {
             self.label_from_catalogs(trigger);
         }
@@ -347,7 +347,7 @@ impl TriggersService {
         )
         .await?
         .into_owned();
-        Ok(get_trigger_from_proto(&resp).map(|mut trigger| {
+        Ok(get_trigger_from_proto(&resp)?.map(|mut trigger| {
             self.label_from_catalogs(&mut trigger);
             trigger
         }))

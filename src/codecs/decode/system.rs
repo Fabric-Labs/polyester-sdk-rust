@@ -1,7 +1,9 @@
 //! Server build version and status event decoders.
 
 use crate::codecs::decode::changelog_enum_label;
+use crate::codecs::decode::common::require_id;
 use crate::codecs::scalars::format_id;
+use crate::errors::Result;
 use crate::models::{ServerVersion, StatusEvent, StatusEventUpdate, StatusEventsPage};
 use crate::proto::system::v1::{
     GetVersionResponse, ListStatusEventsResponse, StatusEvent as ProtoStatusEvent,
@@ -48,11 +50,20 @@ pub fn status_event_from_proto(msg: &ProtoStatusEvent) -> StatusEvent {
     }
 }
 
-pub fn status_events_page_from_proto(msg: &ListStatusEventsResponse) -> StatusEventsPage {
-    StatusEventsPage {
-        events: msg.events.iter().map(status_event_from_proto).collect(),
+/// Decode a `ListStatusEvents` answer, refused with `Error::ResponseContract`
+/// when an event has no ID.
+pub fn status_events_page_from_proto(msg: &ListStatusEventsResponse) -> Result<StatusEventsPage> {
+    Ok(StatusEventsPage {
+        events: msg
+            .events
+            .iter()
+            .map(|event| {
+                require_id("ListStatusEvents", "id", event.id)?;
+                Ok(status_event_from_proto(event))
+            })
+            .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -115,7 +126,7 @@ mod tests {
             next_page_token: "p2".into(),
             ..Default::default()
         };
-        let page = status_events_page_from_proto(&msg);
+        let page = status_events_page_from_proto(&msg).unwrap();
         assert_eq!(page.next_page_token, "p2");
         let incident = &page.events[0];
         assert_eq!(incident.id, format_id(7_433_029_815_562_201_289));

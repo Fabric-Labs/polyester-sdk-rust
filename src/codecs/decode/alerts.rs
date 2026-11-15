@@ -1,5 +1,6 @@
 //! Price alert decoders.
 
+use super::common::require_id;
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{PriceAlert, PriceAlertsPage, UpdateAlertResult};
@@ -121,7 +122,10 @@ pub fn price_alerts_page_from_proto(
         alerts: msg
             .alerts
             .iter()
-            .map(|alert| price_alert_from_proto(alert, symbol_of(alert.symbol_id)))
+            .map(|alert| {
+                require_id("ListAlerts", "alert_id", alert.alert_id)?;
+                price_alert_from_proto(alert, symbol_of(alert.symbol_id))
+            })
             .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
     })

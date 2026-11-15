@@ -214,7 +214,8 @@ async fn sub_accounts_get_returns_members_invites_and_policy_when_asked() {
         let listed_invites = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {
             invites: invites(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(
             got.invites, listed_invites.invites,
             "{wire:?}: as list_invites"

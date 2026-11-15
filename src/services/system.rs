@@ -72,7 +72,7 @@ pub(crate) async fn list_status_events(
     let resp = unary::await_public(client(factory).list_status_events(req))
         .await?
         .into_owned();
-    Ok(status_events_page_from_proto(&resp))
+    status_events_page_from_proto(&resp)
 }
 
 /// Every status event from `opts.page_token` on; see
