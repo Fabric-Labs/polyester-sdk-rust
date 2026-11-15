@@ -1210,6 +1210,294 @@ impl ::buffa::Enumeration for AssistantKeyState {
         &[Self::KEY_STATE_UNSPECIFIED, Self::ACTIVE, Self::DISABLED]
     }
 }
+/// AccountSelection says whether a message's run reads an account at all.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AccountSelection {
+    /// The default: the run reads the account subaccount_id names, or the main
+    /// account when subaccount_id is omitted.
+    ACCOUNT_SELECTION_UNSPECIFIED = 0i32,
+    /// The run reads no account: it answers about the markets and Polyester
+    /// only. subaccount_id must be omitted.
+    ACCOUNT_SELECTION_NONE = 1i32,
+}
+impl AccountSelection {
+    ///Idiomatic alias for [`Self::ACCOUNT_SELECTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::ACCOUNT_SELECTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACCOUNT_SELECTION_NONE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const None: Self = Self::ACCOUNT_SELECTION_NONE;
+}
+impl ::core::default::Default for AccountSelection {
+    fn default() -> Self {
+        Self::ACCOUNT_SELECTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AccountSelection {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AccountSelection {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AccountSelection;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(AccountSelection)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AccountSelection, E> {
+                <AccountSelection as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AccountSelection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AccountSelection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AccountSelection, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AccountSelection as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AccountSelection, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AccountSelection {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AccountSelection {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ACCOUNT_SELECTION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACCOUNT_SELECTION_NONE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ACCOUNT_SELECTION_UNSPECIFIED => "ACCOUNT_SELECTION_UNSPECIFIED",
+            Self::ACCOUNT_SELECTION_NONE => "ACCOUNT_SELECTION_NONE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ACCOUNT_SELECTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ACCOUNT_SELECTION_UNSPECIFIED)
+            }
+            "ACCOUNT_SELECTION_NONE" => {
+                ::core::option::Option::Some(Self::ACCOUNT_SELECTION_NONE)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::ACCOUNT_SELECTION_UNSPECIFIED, Self::ACCOUNT_SELECTION_NONE]
+    }
+}
+/// AssistantKeyView selects how much of each assistant key ListAssistantKeys
+/// returns.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AssistantKeyView {
+    /// The default: each key's account, ID, public key and state, without its
+    /// account's name.
+    ASSISTANT_KEY_VIEW_UNSPECIFIED = 0i32,
+    /// Everything in the default view, plus each key's account name (label).
+    ASSISTANT_KEY_VIEW_FULL = 1i32,
+}
+impl AssistantKeyView {
+    ///Idiomatic alias for [`Self::ASSISTANT_KEY_VIEW_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::ASSISTANT_KEY_VIEW_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ASSISTANT_KEY_VIEW_FULL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Full: Self = Self::ASSISTANT_KEY_VIEW_FULL;
+}
+impl ::core::default::Default for AssistantKeyView {
+    fn default() -> Self {
+        Self::ASSISTANT_KEY_VIEW_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AssistantKeyView {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AssistantKeyView {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AssistantKeyView;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(AssistantKeyView)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AssistantKeyView, E> {
+                <AssistantKeyView as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AssistantKeyView, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AssistantKeyView as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AssistantKeyView, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AssistantKeyView as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AssistantKeyView, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AssistantKeyView {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AssistantKeyView {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ASSISTANT_KEY_VIEW_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ASSISTANT_KEY_VIEW_FULL),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ASSISTANT_KEY_VIEW_UNSPECIFIED => "ASSISTANT_KEY_VIEW_UNSPECIFIED",
+            Self::ASSISTANT_KEY_VIEW_FULL => "ASSISTANT_KEY_VIEW_FULL",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ASSISTANT_KEY_VIEW_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ASSISTANT_KEY_VIEW_UNSPECIFIED)
+            }
+            "ASSISTANT_KEY_VIEW_FULL" => {
+                ::core::option::Option::Some(Self::ASSISTANT_KEY_VIEW_FULL)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::ASSISTANT_KEY_VIEW_UNSPECIFIED, Self::ASSISTANT_KEY_VIEW_FULL]
+    }
+}
 /// DisplaySetting is one of the client's display preferences the assistant may
 /// change for the user: cosmetic settings the user can change back at any
 /// time. Each value names the values the assistant may apply to it, exactly as
@@ -19656,6 +19944,18 @@ pub struct AssistantKey {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub state: ::buffa::EnumValue<AssistantKeyState>,
+    /// Name of the key's subaccount, as its owner set it. Returned only when
+    /// ListAssistantKeys asks for ASSISTANT_KEY_VIEW_FULL. Empty for the main
+    /// account, for a subaccount without a name, and when the name could not be
+    /// read: the keys are listed either way.
+    ///
+    /// Field 5: `label`
+    #[serde(
+        rename = "label",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub label: ::buffa::alloc::string::String,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -19667,6 +19967,7 @@ impl ::core::fmt::Debug for AssistantKey {
             .field("key_id", &self.key_id)
             .field("public_key_ed25519", &self.public_key_ed25519)
             .field("state", &self.state)
+            .field("label", &self.label)
             .finish()
     }
 }
@@ -19721,6 +20022,9 @@ impl ::buffa::Message for AssistantKey {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if !self.label.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -19745,6 +20049,9 @@ impl ::buffa::Message for AssistantKey {
             if val != 0 {
                 ::buffa::types::put_int32_field(4u32, val, buf);
             }
+        }
+        if !self.label.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.label, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -19791,6 +20098,13 @@ impl ::buffa::Message for AssistantKey {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.label, buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -19803,6 +20117,7 @@ impl ::buffa::Message for AssistantKey {
         self.key_id.clear();
         self.public_key_ed25519.clear();
         self.state = ::buffa::EnumValue::from(0);
+        self.label.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -20630,7 +20945,8 @@ pub struct SendMessageRequest {
     pub idempotency_key: ::buffa::alloc::string::String,
     /// Trading account (subaccount) the run reads and acts on. It must be one
     /// the caller's account owns; any other value, also one that does not
-    /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+    /// exist, is INVALID_ARGUMENT. Omit it for the main account (unless
+    /// account_selection is ACCOUNT_SELECTION_NONE): the run then
     /// reads the main account (its balances, funding included, every trading
     /// account with its equity, API keys, price alerts, fee rates and
     /// permissions) and places, changes or cancels no order, trigger or swap;
@@ -20684,6 +21000,20 @@ pub struct SendMessageRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub display_settings: ::buffa::alloc::vec::Vec<::buffa::EnumValue<DisplaySetting>>,
+    /// Whether the run reads an account. Omit it to read the account
+    /// subaccount_id names, or the main account. ACCOUNT_SELECTION_NONE for a
+    /// run that reads no account, such as a client whose user has not given the
+    /// assistant access to any account: subaccount_id must then be omitted. It
+    /// is part of the request the idempotency key covers.
+    ///
+    /// Field 8: `account_selection`
+    #[serde(
+        rename = "accountSelection",
+        alias = "account_selection",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub account_selection: ::buffa::EnumValue<AccountSelection>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -20698,6 +21028,7 @@ impl ::core::fmt::Debug for SendMessageRequest {
             .field("destinations", &self.destinations)
             .field("page", &self.page)
             .field("display_settings", &self.display_settings)
+            .field("account_selection", &self.account_selection)
             .finish()
     }
 }
@@ -20781,6 +21112,12 @@ impl ::buffa::Message for SendMessageRequest {
             size
                 += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
         }
+        {
+            let val = self.account_selection.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -20820,6 +21157,12 @@ impl ::buffa::Message for SendMessageRequest {
             ::buffa::types::put_len_delimited_header(7u32, payload, buf);
             for v in &self.display_settings {
                 ::buffa::types::encode_int32(v.to_i32(), buf);
+            }
+        }
+        {
+            let val = self.account_selection.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
             }
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -20925,6 +21268,15 @@ impl ::buffa::Message for SendMessageRequest {
                     );
                 }
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.account_selection = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -20940,6 +21292,7 @@ impl ::buffa::Message for SendMessageRequest {
         self.destinations.clear();
         self.page = ::buffa::MessageField::none();
         self.display_settings.clear();
+        self.account_selection = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -23736,13 +24089,23 @@ pub const __COMPLETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListAssistantKeysRequest {
+    /// How much of each key to return. Omit it for the default view, without
+    /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name.
+    ///
+    /// Field 1: `view`
+    #[serde(
+        rename = "view",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub view: ::buffa::EnumValue<AssistantKeyView>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for ListAssistantKeysRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ListAssistantKeysRequest").finish()
+        f.debug_struct("ListAssistantKeysRequest").field("view", &self.view).finish()
     }
 }
 impl ListAssistantKeysRequest {
@@ -23770,6 +24133,12 @@ impl ::buffa::Message for ListAssistantKeysRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        {
+            let val = self.view.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -23780,6 +24149,12 @@ impl ::buffa::Message for ListAssistantKeysRequest {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        {
+            let val = self.view.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -23793,6 +24168,13 @@ impl ::buffa::Message for ListAssistantKeysRequest {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.view = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -23801,6 +24183,7 @@ impl ::buffa::Message for ListAssistantKeysRequest {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.view = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -50532,6 +50915,13 @@ pub mod __buffa {
             ///
             /// Field 4: `state`
             pub state: ::buffa::EnumValue<super::super::AssistantKeyState>,
+            /// Name of the key's subaccount, as its owner set it. Returned only when
+            /// ListAssistantKeys asks for ASSISTANT_KEY_VIEW_FULL. Empty for the main
+            /// account, for a subaccount without a name, and when the name could not be
+            /// read: the keys are listed either way.
+            ///
+            /// Field 5: `label`
+            pub label: &'a str,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssistantKeyView<'a> {
@@ -50599,6 +50989,13 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.label = ::buffa::types::borrow_str(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -50632,6 +51029,7 @@ pub mod __buffa {
                     key_id: self.key_id.to_string(),
                     public_key_ed25519: (self.public_key_ed25519).to_vec(),
                     state: self.state,
+                    label: self.label.to_string(),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -50666,6 +51064,10 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if !self.label.is_empty() {
+                    size
+                        += 1u32 + ::buffa::types::string_encoded_len(&self.label) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -50691,6 +51093,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(4u32, val, buf);
                     }
+                }
+                if !self.label.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.label, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -50734,6 +51139,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.state) {
                     __map.serialize_entry("state", &self.state)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.label) {
+                    __map.serialize_entry("label", self.label)?;
                 }
                 __map.end()
             }
@@ -50856,6 +51264,16 @@ pub mod __buffa {
             #[must_use]
             pub fn state(&self) -> ::buffa::EnumValue<super::super::AssistantKeyState> {
                 self.0.reborrow().state
+            }
+            /// Name of the key's subaccount, as its owner set it. Returned only when
+            /// ListAssistantKeys asks for ASSISTANT_KEY_VIEW_FULL. Empty for the main
+            /// account, for a subaccount without a name, and when the name could not be
+            /// read: the keys are listed either way.
+            ///
+            /// Field 5: `label`
+            #[must_use]
+            pub fn label(&self) -> &'_ str {
+                self.0.reborrow().label
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssistantKeyView<'static>>>
@@ -52293,7 +52711,8 @@ pub mod __buffa {
             pub idempotency_key: &'a str,
             /// Trading account (subaccount) the run reads and acts on. It must be one
             /// the caller's account owns; any other value, also one that does not
-            /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+            /// exist, is INVALID_ARGUMENT. Omit it for the main account (unless
+            /// account_selection is ACCOUNT_SELECTION_NONE): the run then
             /// reads the main account (its balances, funding included, every trading
             /// account with its equity, API keys, price alerts, fee rates and
             /// permissions) and places, changes or cancels no order, trigger or swap;
@@ -52334,6 +52753,14 @@ pub mod __buffa {
                 'a,
                 ::buffa::EnumValue<super::super::DisplaySetting>,
             >,
+            /// Whether the run reads an account. Omit it to read the account
+            /// subaccount_id names, or the main account. ACCOUNT_SELECTION_NONE for a
+            /// run that reads no account, such as a client whose user has not given the
+            /// assistant access to any account: subaccount_id must then be omitted. It
+            /// is part of the request the idempotency key covers.
+            ///
+            /// Field 8: `account_selection`
+            pub account_selection: ::buffa::EnumValue<super::super::AccountSelection>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SendMessageRequestView<'a> {
@@ -52423,6 +52850,15 @@ pub mod __buffa {
                                 );
                             }
                         }
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.account_selection = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -52519,6 +52955,7 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     display_settings: self.display_settings.to_vec(),
+                    account_selection: self.account_selection,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -52574,6 +53011,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
                             + payload;
                 }
+                {
+                    let val = self.account_selection.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -52622,6 +53065,12 @@ pub mod __buffa {
                     ::buffa::types::put_len_delimited_header(7u32, payload, buf);
                     for v in &self.display_settings {
                         ::buffa::types::encode_int32(v.to_i32(), buf);
+                    }
+                }
+                {
+                    let val = self.account_selection.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -52679,6 +53128,11 @@ pub mod __buffa {
                             "displaySettings",
                             &::buffa::json_helpers::EnumSeqJson(&self.display_settings),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.account_selection,
+                ) {
+                    __map.serialize_entry("accountSelection", &self.account_selection)?;
                 }
                 __map.end()
             }
@@ -52801,7 +53255,8 @@ pub mod __buffa {
             }
             /// Trading account (subaccount) the run reads and acts on. It must be one
             /// the caller's account owns; any other value, also one that does not
-            /// exist, is INVALID_ARGUMENT. Omit it for the main account: the run then
+            /// exist, is INVALID_ARGUMENT. Omit it for the main account (unless
+            /// account_selection is ACCOUNT_SELECTION_NONE): the run then
             /// reads the main account (its balances, funding included, every trading
             /// account with its equity, API keys, price alerts, fee rates and
             /// permissions) and places, changes or cancels no order, trigger or swap;
@@ -52859,6 +53314,19 @@ pub mod __buffa {
                 ::buffa::EnumValue<super::super::DisplaySetting>,
             > {
                 &self.0.reborrow().display_settings
+            }
+            /// Whether the run reads an account. Omit it to read the account
+            /// subaccount_id names, or the main account. ACCOUNT_SELECTION_NONE for a
+            /// run that reads no account, such as a client whose user has not given the
+            /// assistant access to any account: subaccount_id must then be omitted. It
+            /// is part of the request the idempotency key covers.
+            ///
+            /// Field 8: `account_selection`
+            #[must_use]
+            pub fn account_selection(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::AccountSelection> {
+                self.0.reborrow().account_selection
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SendMessageRequestView<'static>>>
@@ -58690,6 +59158,11 @@ pub mod __buffa {
         /// ListAssistantKeysRequest lists the assistant keys the assistant holds.
         #[derive(Clone, Debug, Default)]
         pub struct ListAssistantKeysRequestView<'a> {
+            /// How much of each key to return. Omit it for the default view, without
+            /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name.
+            ///
+            /// Field 1: `view`
+            pub view: ::buffa::EnumValue<super::super::AssistantKeyView>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListAssistantKeysRequestView<'a> {
@@ -58723,6 +59196,15 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.view = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -58752,6 +59234,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::ListAssistantKeysRequest {
+                    view: self.view,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -58766,6 +59249,12 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                {
+                    let val = self.view.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -58777,6 +59266,12 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                {
+                    let val = self.view.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -58798,6 +59293,9 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.view) {
+                    __map.serialize_entry("view", &self.view)?;
+                }
                 __map.end()
             }
         }
@@ -62411,8 +62909,6 @@ pub use self::__buffa::view::RunFailedOwnedView;
 pub use self::__buffa::view::RunEventView;
 #[doc(inline)]
 pub use self::__buffa::view::RunEventOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::AssistantKeyView;
 #[doc(inline)]
 pub use self::__buffa::view::AssistantKeyOwnedView;
 #[doc(inline)]

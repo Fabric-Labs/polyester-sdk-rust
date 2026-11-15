@@ -5534,8 +5534,11 @@ pub struct LimitGtc {
     /// rounded up, so the order splits into at most 100 parts: otherwise the
     /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
     /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-    /// it.
+    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+    /// order's quantity in place to the display or below is allowed: the order
+    /// then shows all of its remaining quantity. A replace keeps the display
+    /// while the new quantity is above it; otherwise the new order is a plain
+    /// order with no display.
     ///
     /// Field 3: `display_qty_scaled`
     #[serde(
@@ -5737,8 +5740,11 @@ pub struct LimitGtd {
     /// rounded up, so the order splits into at most 100 parts: otherwise the
     /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
     /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-    /// it.
+    /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+    /// order's quantity in place to the display or below is allowed: the order
+    /// then shows all of its remaining quantity. A replace keeps the display
+    /// while the new quantity is above it; otherwise the new order is a plain
+    /// order with no display.
     ///
     /// Field 4: `display_qty_scaled`
     #[serde(
@@ -9310,6 +9316,32 @@ pub struct ErrorDetail {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub existing_order_id: ::core::option::Option<u64>,
+    /// Why the refused order of a ladder can't be placed, when a trigger create
+    /// is rejected with LADDER_LEVEL_REJECTED: the code that order would return
+    /// as a single order, for example MAX_OPEN_ORDERS_PER_PAIR. Unspecified for
+    /// every other error.
+    ///
+    /// Field 8: `cause_code`
+    #[serde(
+        rename = "causeCode",
+        alias = "cause_code",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub cause_code: ::buffa::EnumValue<ErrorCode>,
+    /// The refused order of a ladder, when a trigger create is rejected with
+    /// LADDER_LEVEL_REJECTED: its zero-based index among the ladder's orders, the
+    /// i of the violation's trigger.strategy.ladder.levels\[i\], so 0 is the first
+    /// order. Omitted for every other error.
+    ///
+    /// Field 9: `level_index`
+    #[serde(
+        rename = "levelIndex",
+        alias = "level_index",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub level_index: ::core::option::Option<u32>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9321,6 +9353,8 @@ impl ::core::fmt::Debug for ErrorDetail {
             .field("violations", &self.violations)
             .field("rate_limit", &self.rate_limit)
             .field("existing_order_id", &self.existing_order_id)
+            .field("cause_code", &self.cause_code)
+            .field("level_index", &self.level_index)
             .finish()
     }
 }
@@ -9337,6 +9371,13 @@ impl ErrorDetail {
     ///Sets [`Self::existing_order_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_existing_order_id(mut self, value: u64) -> Self {
         self.existing_order_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::level_index`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_level_index(mut self, value: u32) -> Self {
+        self.level_index = Some(value);
         self
     }
 }
@@ -9383,6 +9424,15 @@ impl ::buffa::Message for ErrorDetail {
         if self.existing_order_id.is_some() {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        {
+            let val = self.cause_code.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(v) = self.level_index {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9409,6 +9459,15 @@ impl ::buffa::Message for ErrorDetail {
         }
         if let Some(v) = self.existing_order_id {
             ::buffa::types::put_fixed64_field(4u32, v, buf);
+        }
+        {
+            let val = self.cause_code.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
+        }
+        if let Some(v) = self.level_index {
+            ::buffa::types::put_uint32_field(9u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9459,6 +9518,24 @@ impl ::buffa::Message for ErrorDetail {
                     ::buffa::types::decode_fixed64(buf)?,
                 );
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.cause_code = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.level_index = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9471,6 +9548,8 @@ impl ::buffa::Message for ErrorDetail {
         self.violations.clear();
         self.rate_limit = ::buffa::MessageField::none();
         self.existing_order_id = ::core::option::Option::None;
+        self.cause_code = ::buffa::EnumValue::from(0);
+        self.level_index = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -21236,7 +21315,8 @@ pub struct Order {
     /// Iceberg display quantity the order was placed with, scaled by the pair's
     /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
     /// order the order book shows at once. Zero for a plain order. A replace
-    /// keeps it.
+    /// keeps it while the new quantity is above it; a replace to the display or
+    /// below it is a plain order, zero here.
     ///
     /// Field 39: `display_qty_scaled`
     #[serde(
@@ -27538,8 +27618,11 @@ pub mod __buffa {
             /// rounded up, so the order splits into at most 100 parts: otherwise the
             /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
             /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-            /// it.
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+            /// order's quantity in place to the display or below is allowed: the order
+            /// then shows all of its remaining quantity. A replace keeps the display
+            /// while the new quantity is above it; otherwise the new order is a plain
+            /// order with no display.
             ///
             /// Field 3: `display_qty_scaled`
             pub display_qty_scaled: i64,
@@ -27829,8 +27912,11 @@ pub mod __buffa {
             /// rounded up, so the order splits into at most 100 parts: otherwise the
             /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
             /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-            /// it.
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+            /// order's quantity in place to the display or below is allowed: the order
+            /// then shows all of its remaining quantity. A replace keeps the display
+            /// while the new quantity is above it; otherwise the new order is a plain
+            /// order with no display.
             ///
             /// Field 3: `display_qty_scaled`
             #[must_use]
@@ -27898,8 +27984,11 @@ pub mod __buffa {
             /// rounded up, so the order splits into at most 100 parts: otherwise the
             /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
             /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-            /// it.
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+            /// order's quantity in place to the display or below is allowed: the order
+            /// then shows all of its remaining quantity. A replace keeps the display
+            /// while the new quantity is above it; otherwise the new order is a plain
+            /// order with no display.
             ///
             /// Field 4: `display_qty_scaled`
             pub display_qty_scaled: i64,
@@ -28256,8 +28345,11 @@ pub mod __buffa {
             /// rounded up, so the order splits into at most 100 parts: otherwise the
             /// order is refused with ICEBERG_DISPLAY_TOO_SMALL or
             /// ICEBERG_DISPLAY_INVALID. An iceberg order cannot carry attached_risk
-            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified; a replace keeps
-            /// it.
+            /// (ICEBERG_NOT_ALLOWED). The display cannot be modified. Lowering the
+            /// order's quantity in place to the display or below is allowed: the order
+            /// then shows all of its remaining quantity. A replace keeps the display
+            /// while the new quantity is above it; otherwise the new order is a plain
+            /// order with no display.
             ///
             /// Field 4: `display_qty_scaled`
             #[must_use]
@@ -33256,6 +33348,20 @@ pub mod __buffa {
             ///
             /// Field 4: `existing_order_id`
             pub existing_order_id: ::core::option::Option<u64>,
+            /// Why the refused order of a ladder can't be placed, when a trigger create
+            /// is rejected with LADDER_LEVEL_REJECTED: the code that order would return
+            /// as a single order, for example MAX_OPEN_ORDERS_PER_PAIR. Unspecified for
+            /// every other error.
+            ///
+            /// Field 8: `cause_code`
+            pub cause_code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// The refused order of a ladder, when a trigger create is rejected with
+            /// LADDER_LEVEL_REJECTED: its zero-based index among the ladder's orders, the
+            /// i of the violation's trigger.strategy.ladder.levels\[i\], so 0 is the first
+            /// order. Omitted for every other error.
+            ///
+            /// Field 9: `level_index`
+            pub level_index: ::core::option::Option<u32>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -33332,6 +33438,24 @@ pub mod __buffa {
                             ::buffa::types::decode_fixed64(&mut cur)?,
                         );
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.cause_code = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.level_index = Some(
+                            ::buffa::types::decode_uint32(&mut cur)?,
+                        );
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -33391,6 +33515,8 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     existing_order_id: self.existing_order_id,
+                    cause_code: self.cause_code,
+                    level_index: self.level_index,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -33430,6 +33556,15 @@ pub mod __buffa {
                 if self.existing_order_id.is_some() {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                {
+                    let val = self.cause_code.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(v) = self.level_index {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -33465,6 +33600,15 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.existing_order_id {
                     ::buffa::types::put_fixed64_field(4u32, v, buf);
+                }
+                {
+                    let val = self.cause_code.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
+                }
+                if let Some(v) = self.level_index {
+                    ::buffa::types::put_uint32_field(9u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -33505,6 +33649,18 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "existingOrderId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.cause_code,
+                ) {
+                    __map.serialize_entry("causeCode", &self.cause_code)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.level_index {
+                    __map
+                        .serialize_entry(
+                            "levelIndex",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -33643,6 +33799,26 @@ pub mod __buffa {
             #[must_use]
             pub fn existing_order_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().existing_order_id
+            }
+            /// Why the refused order of a ladder can't be placed, when a trigger create
+            /// is rejected with LADDER_LEVEL_REJECTED: the code that order would return
+            /// as a single order, for example MAX_OPEN_ORDERS_PER_PAIR. Unspecified for
+            /// every other error.
+            ///
+            /// Field 8: `cause_code`
+            #[must_use]
+            pub fn cause_code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
+                self.0.reborrow().cause_code
+            }
+            /// The refused order of a ladder, when a trigger create is rejected with
+            /// LADDER_LEVEL_REJECTED: its zero-based index among the ladder's orders, the
+            /// i of the violation's trigger.strategy.ladder.levels\[i\], so 0 is the first
+            /// order. Omitted for every other error.
+            ///
+            /// Field 9: `level_index`
+            #[must_use]
+            pub fn level_index(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().level_index
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
@@ -49729,7 +49905,8 @@ pub mod __buffa {
             /// Iceberg display quantity the order was placed with, scaled by the pair's
             /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
             /// order the order book shows at once. Zero for a plain order. A replace
-            /// keeps it.
+            /// keeps it while the new quantity is above it; a replace to the display or
+            /// below it is a plain order, zero here.
             ///
             /// Field 39: `display_qty_scaled`
             pub display_qty_scaled: i64,
@@ -51344,7 +51521,8 @@ pub mod __buffa {
             /// Iceberg display quantity the order was placed with, scaled by the pair's
             /// base_quantity_scale from GetSpotConfig for symbol_id: the most of the
             /// order the order book shows at once. Zero for a plain order. A replace
-            /// keeps it.
+            /// keeps it while the new quantity is above it; a replace to the display or
+            /// below it is a plain order, zero here.
             ///
             /// Field 39: `display_qty_scaled`
             #[must_use]

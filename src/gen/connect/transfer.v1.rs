@@ -18,6 +18,18 @@ pub type OwnedCreateInternalTransferResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<BatchCreateInternalTransfersRequestView<'static>>`.
+pub type OwnedBatchCreateInternalTransfersRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<BatchCreateInternalTransfersResponseView<'static>>`.
+pub type OwnedBatchCreateInternalTransfersResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::transfer::v1::GetInternalTransferResponse>
 for crate::proto::transfer::v1::__buffa::view::GetInternalTransferResponseView<'_> {
     fn encode(
@@ -60,6 +72,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+>
+for crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const INTERNAL_TRANSFER_SERVICE_SERVICE_NAME: &str = "transfer.v1.InternalTransferService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetInternalTransfer` RPC.
@@ -77,6 +117,15 @@ pub const INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_SPEC: ::connectrpc::Sp
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const INTERNAL_TRANSFER_SERVICE_CREATE_INTERNAL_TRANSFER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/transfer.v1.InternalTransferService/CreateInternalTransfer",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `BatchCreateInternalTransfers` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -184,6 +233,37 @@ pub trait InternalTransferService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Submit up to 10 Trading to Trading transfers authorized by one MFA check.
+    /// Every leg passes the same checks as CreateInternalTransfer before any leg
+    /// runs; if one fails, the whole batch is refused, nothing moves and no
+    /// step-up is used. Legs then run independently, in order, and are not
+    /// atomic: a leg can be refused, for example for insufficient balance, after
+    /// earlier legs were accepted. The batch accepts recent MFA when the root
+    /// owner moves funds between its own accounts or to explicitly whitelisted
+    /// destinations; any other leg requires one fresh step-up for the whole
+    /// batch. Each leg is its own transfer, readable with GetInternalTransfer.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn batch_create_internal_transfers<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -274,6 +354,35 @@ impl<S: InternalTransferService> InternalTransferServiceExt for S {
                 },
             )
             .with_spec(INTERNAL_TRANSFER_SERVICE_CREATE_INTERNAL_TRANSFER_SPEC)
+            .route_view(
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "BatchCreateInternalTransfers",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.batch_create_internal_transfers(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -345,6 +454,14 @@ for InternalTransferServiceServer<T> {
                         ),
                 )
             }
+            "BatchCreateInternalTransfers" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC,
+                        ),
+                )
+            }
             _ => None,
         }
     }
@@ -400,6 +517,27 @@ for InternalTransferServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::transfer::v1::CreateInternalTransferResponse,
+                        >(format)
+                })
+            }
+            "BatchCreateInternalTransfers" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+                    >::from_parts(&req, &body);
+                    svc.batch_create_internal_transfers(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
                         >(format)
                 })
             }
@@ -593,6 +731,1169 @@ where
                 &self.config,
                 INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
                 "CreateInternalTransfer",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the BatchCreateInternalTransfers RPC. Sends a request to /transfer.v1.InternalTransferService/BatchCreateInternalTransfers.
+    pub async fn batch_create_internal_transfers(
+        &self,
+        request: crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.batch_create_internal_transfers_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the BatchCreateInternalTransfers RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn batch_create_internal_transfers_with_options(
+        &self,
+        request: crate::proto::transfer::v1::BatchCreateInternalTransfersRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::BatchCreateInternalTransfersResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "BatchCreateInternalTransfers",
+                request,
+                options,
+            )
+            .await
+    }
+}
+
+///Shorthand for `OwnedView<ListDustBalancesRequestView<'static>>`.
+pub type OwnedListDustBalancesRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustBalancesRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListDustBalancesResponseView<'static>>`.
+pub type OwnedListDustBalancesResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustBalancesResponseView<'static>,
+>;
+///Shorthand for `OwnedView<QuoteDustConversionRequestView<'static>>`.
+pub type OwnedQuoteDustConversionRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::QuoteDustConversionRequestView<'static>,
+>;
+///Shorthand for `OwnedView<QuoteDustConversionResponseView<'static>>`.
+pub type OwnedQuoteDustConversionResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::QuoteDustConversionResponseView<'static>,
+>;
+///Shorthand for `OwnedView<CreateDustConversionRequestView<'static>>`.
+pub type OwnedCreateDustConversionRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::CreateDustConversionRequestView<'static>,
+>;
+///Shorthand for `OwnedView<CreateDustConversionResponseView<'static>>`.
+pub type OwnedCreateDustConversionResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::CreateDustConversionResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetDustConversionRequestView<'static>>`.
+pub type OwnedGetDustConversionRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetDustConversionRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetDustConversionResponseView<'static>>`.
+pub type OwnedGetDustConversionResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetDustConversionResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListDustConversionsRequestView<'static>>`.
+pub type OwnedListDustConversionsRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustConversionsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListDustConversionsResponseView<'static>>`.
+pub type OwnedListDustConversionsResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustConversionsResponseView<'static>,
+>;
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::ListDustBalancesResponse>
+for crate::proto::transfer::v1::__buffa::view::ListDustBalancesResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::ListDustBalancesResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustBalancesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::QuoteDustConversionResponse>
+for crate::proto::transfer::v1::__buffa::view::QuoteDustConversionResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::QuoteDustConversionResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::QuoteDustConversionResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::CreateDustConversionResponse>
+for crate::proto::transfer::v1::__buffa::view::CreateDustConversionResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::CreateDustConversionResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::CreateDustConversionResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::GetDustConversionResponse>
+for crate::proto::transfer::v1::__buffa::view::GetDustConversionResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::GetDustConversionResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetDustConversionResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::ListDustConversionsResponse>
+for crate::proto::transfer::v1::__buffa::view::ListDustConversionsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::transfer::v1::ListDustConversionsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::ListDustConversionsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+/// Full service name for this service.
+pub const DUST_CONVERSION_SERVICE_SERVICE_NAME: &str = "transfer.v1.DustConversionService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListDustBalances` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const DUST_CONVERSION_SERVICE_LIST_DUST_BALANCES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.DustConversionService/ListDustBalances",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `QuoteDustConversion` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const DUST_CONVERSION_SERVICE_QUOTE_DUST_CONVERSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.DustConversionService/QuoteDustConversion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateDustConversion` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const DUST_CONVERSION_SERVICE_CREATE_DUST_CONVERSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.DustConversionService/CreateDustConversion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetDustConversion` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const DUST_CONVERSION_SERVICE_GET_DUST_CONVERSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.DustConversionService/GetDustConversion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListDustConversions` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const DUST_CONVERSION_SERVICE_LIST_DUST_CONVERSIONS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.DustConversionService/ListDustConversions",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// DustConversionService converts dust, Trading balances too small to trade, into
+/// one target asset at index prices less a disclosed fee. A conversion moves
+/// every source and credits the payout atomically, or moves nothing.
+/// Limits: a balance converts when no open market accepts an order for it and it
+/// is worth at most 10 USD; one conversion takes at most 20 balances worth at
+/// most 200 USD together; an account converts once every 6 hours, refused
+/// conversions excepted; each target has a daily conversion limit.
+/// Quoting, converting and reading conversions need the CONVERT_DUST permission;
+/// listing balances needs READ_BALANCES. Sessions have both for the root
+/// account. On a subaccount, the role must be owner, admin, trader or leveraged
+/// trader, and the subaccount's policy must grant CONVERT_DUST, which its
+/// default policy does not. An API key's policy must grant CONVERT_DUST, and a
+/// subaccount-scoped key's subaccount policy too. No step-up is required: the
+/// value stays in the account.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait DustConversionService: Send + Sync + 'static {
+    /// List the account's available Trading balances with their eligibility and
+    /// the payout the eligible ones would bring now. Reserves nothing.
+    /// Errors:
+    /// - INVALID_ARGUMENT: INVALID_REQUEST (target_asset_id is not a target) or
+    /// INVALID_SUBACCOUNT_ID.
+    /// - NOT_FOUND: SUBACCOUNT_NOT_FOUND.
+    /// - PERMISSION_DENIED: PERMISSION_DENIED or POLICY_DENIED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_dust_balances<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::ListDustBalancesRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::ListDustBalancesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Price the account's dust into a target. The quote is valid for 30 seconds
+    /// and reserves nothing.
+    /// Errors:
+    /// - INVALID_ARGUMENT: INVALID_REQUEST (target_asset_id is not a target) or
+    /// INVALID_SUBACCOUNT_ID.
+    /// - FAILED_PRECONDITION: DUST_TARGET_UNAVAILABLE (the target cannot be paid
+    /// now or has no current price) or SOURCE_ACCOUNT_INACTIVE.
+    /// - NOT_FOUND: SUBACCOUNT_NOT_FOUND.
+    /// - PERMISSION_DENIED: PERMISSION_DENIED or POLICY_DENIED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn quote_dust_conversion<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::QuoteDustConversionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::QuoteDustConversionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Convert a quote at current index prices, or return the conversion already
+    /// made under the idempotency key. Every source must still be the whole
+    /// available balance the quote showed. A refused conversion moves nothing.
+    /// Errors:
+    /// - FAILED_PRECONDITION: DUST_QUOTE_EXPIRED, DUST_PRICE_MOVED (the payout fell
+    /// more than 1% below the quote), DUST_NOT_ELIGIBLE (a quoted balance is no
+    /// longer dust), DUST_TARGET_UNAVAILABLE, DUST_BALANCE_CHANGED (a source
+    /// balance moved since the quote) or DUST_CONVERSION_FAILED.
+    /// - RESOURCE_EXHAUSTED: DUST_WINDOW_ACTIVE (the account converted within the
+    /// last 6 hours or a conversion is still processing), DUST_DAILY_LIMIT or
+    /// DUST_BUSY (retry shortly).
+    /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT (the key or the quote was used for
+    /// another conversion).
+    /// - PERMISSION_DENIED: PERMISSION_DENIED or POLICY_DENIED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE or ACCOUNT_SHARD_UNAVAILABLE; retry the
+    /// same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_dust_conversion<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::CreateDustConversionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::CreateDustConversionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Read one of the account's conversions.
+    /// Errors:
+    /// - NOT_FOUND: NOT_FOUND.
+    /// - PERMISSION_DENIED: PERMISSION_DENIED or POLICY_DENIED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_dust_conversion<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::GetDustConversionRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::GetDustConversionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// List the account's conversions, newest first.
+    /// Errors:
+    /// - INVALID_ARGUMENT: INVALID_REQUEST (malformed page_token).
+    /// - PERMISSION_DENIED: PERMISSION_DENIED or POLICY_DENIED.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_dust_conversions<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::ListDustConversionsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::ListDustConversionsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait DustConversionServiceExt: DustConversionService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: DustConversionService> DustConversionServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "ListDustBalances",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::ListDustBalancesRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::ListDustBalancesRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_dust_balances(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::ListDustBalancesResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DUST_CONVERSION_SERVICE_LIST_DUST_BALANCES_SPEC)
+            .route_view(
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "QuoteDustConversion",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::QuoteDustConversionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::QuoteDustConversionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.quote_dust_conversion(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::QuoteDustConversionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DUST_CONVERSION_SERVICE_QUOTE_DUST_CONVERSION_SPEC)
+            .route_view(
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "CreateDustConversion",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::CreateDustConversionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::CreateDustConversionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_dust_conversion(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::CreateDustConversionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DUST_CONVERSION_SERVICE_CREATE_DUST_CONVERSION_SPEC)
+            .route_view(
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "GetDustConversion",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::GetDustConversionRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::GetDustConversionRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_dust_conversion(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::GetDustConversionResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DUST_CONVERSION_SERVICE_GET_DUST_CONVERSION_SPEC)
+            .route_view(
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "ListDustConversions",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::ListDustConversionsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::ListDustConversionsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_dust_conversions(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::ListDustConversionsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(DUST_CONVERSION_SERVICE_LIST_DUST_CONVERSIONS_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct DustConversionServiceRegisterMarker;
+impl<
+    S: DustConversionService,
+> ::connectrpc::ServiceRegister<DustConversionServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as DustConversionServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `DustConversionService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = DustConversionServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct DustConversionServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: DustConversionService> DustConversionServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for DustConversionServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: DustConversionService> ::connectrpc::Dispatcher
+for DustConversionServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("transfer.v1.DustConversionService/")?;
+        match method {
+            "ListDustBalances" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DUST_CONVERSION_SERVICE_LIST_DUST_BALANCES_SPEC),
+                )
+            }
+            "QuoteDustConversion" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DUST_CONVERSION_SERVICE_QUOTE_DUST_CONVERSION_SPEC),
+                )
+            }
+            "CreateDustConversion" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DUST_CONVERSION_SERVICE_CREATE_DUST_CONVERSION_SPEC),
+                )
+            }
+            "GetDustConversion" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DUST_CONVERSION_SERVICE_GET_DUST_CONVERSION_SPEC),
+                )
+            }
+            "ListDustConversions" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(DUST_CONVERSION_SERVICE_LIST_DUST_CONVERSIONS_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("transfer.v1.DustConversionService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "ListDustBalances" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::ListDustBalancesRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::ListDustBalancesRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::ListDustBalancesRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_dust_balances(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::ListDustBalancesResponse,
+                        >(format)
+                })
+            }
+            "QuoteDustConversion" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::QuoteDustConversionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::QuoteDustConversionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::QuoteDustConversionRequest,
+                    >::from_parts(&req, &body);
+                    svc.quote_dust_conversion(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::QuoteDustConversionResponse,
+                        >(format)
+                })
+            }
+            "CreateDustConversion" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::CreateDustConversionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::CreateDustConversionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::CreateDustConversionRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_dust_conversion(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::CreateDustConversionResponse,
+                        >(format)
+                })
+            }
+            "GetDustConversion" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::GetDustConversionRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::GetDustConversionRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::GetDustConversionRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_dust_conversion(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::GetDustConversionResponse,
+                        >(format)
+                })
+            }
+            "ListDustConversions" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::ListDustConversionsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::ListDustConversionsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::ListDustConversionsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_dust_conversions(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::ListDustConversionsResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("transfer.v1.DustConversionService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("transfer.v1.DustConversionService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("transfer.v1.DustConversionService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.list_dust_balances(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.list_dust_balances(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[derive(Clone)]
+pub struct DustConversionServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+impl<T> DustConversionServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the ListDustBalances RPC. Sends a request to /transfer.v1.DustConversionService/ListDustBalances.
+    pub async fn list_dust_balances(
+        &self,
+        request: crate::proto::transfer::v1::ListDustBalancesRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::ListDustBalancesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_dust_balances_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListDustBalances RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_dust_balances_with_options(
+        &self,
+        request: crate::proto::transfer::v1::ListDustBalancesRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::ListDustBalancesResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "ListDustBalances",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the QuoteDustConversion RPC. Sends a request to /transfer.v1.DustConversionService/QuoteDustConversion.
+    pub async fn quote_dust_conversion(
+        &self,
+        request: crate::proto::transfer::v1::QuoteDustConversionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::QuoteDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.quote_dust_conversion_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the QuoteDustConversion RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn quote_dust_conversion_with_options(
+        &self,
+        request: crate::proto::transfer::v1::QuoteDustConversionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::QuoteDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "QuoteDustConversion",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateDustConversion RPC. Sends a request to /transfer.v1.DustConversionService/CreateDustConversion.
+    pub async fn create_dust_conversion(
+        &self,
+        request: crate::proto::transfer::v1::CreateDustConversionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::CreateDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_dust_conversion_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateDustConversion RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_dust_conversion_with_options(
+        &self,
+        request: crate::proto::transfer::v1::CreateDustConversionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::CreateDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "CreateDustConversion",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetDustConversion RPC. Sends a request to /transfer.v1.DustConversionService/GetDustConversion.
+    pub async fn get_dust_conversion(
+        &self,
+        request: crate::proto::transfer::v1::GetDustConversionRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::GetDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_dust_conversion_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetDustConversion RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_dust_conversion_with_options(
+        &self,
+        request: crate::proto::transfer::v1::GetDustConversionRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::GetDustConversionResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "GetDustConversion",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListDustConversions RPC. Sends a request to /transfer.v1.DustConversionService/ListDustConversions.
+    pub async fn list_dust_conversions(
+        &self,
+        request: crate::proto::transfer::v1::ListDustConversionsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::ListDustConversionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_dust_conversions_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListDustConversions RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_dust_conversions_with_options(
+        &self,
+        request: crate::proto::transfer::v1::ListDustConversionsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::ListDustConversionsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                DUST_CONVERSION_SERVICE_SERVICE_NAME,
+                "ListDustConversions",
                 request,
                 options,
             )

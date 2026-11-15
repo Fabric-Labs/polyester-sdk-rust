@@ -2151,10 +2151,14 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         >,
     > + Send;
     /// RespondToInvite accepts or declines a pending invite addressed to the
-    /// caller. Session token only; no step-up proof is needed.
+    /// caller. Session token only; no step-up proof is needed. An invite is
+    /// accepted only while the member who sent it may still grant its role.
+    /// SetMemberRole, RemoveMember and TransferOwnership cancel the invites
+    /// they take that from; accepting any other such invite cancels it.
     /// Errors:
     /// - NOT_FOUND: INVITE_NOT_FOUND.
     /// - ALREADY_EXISTS: ALREADY_MEMBER.
+    /// - FAILED_PRECONDITION: INVITE_VOID.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2206,6 +2210,7 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
     > + Send;
     /// InviteMember invites a person with any role but OWNER; the person
     /// accepts with their own login. Inviting again replaces the pending invite.
+    /// The invite stays pending only while the caller may still grant its role.
     /// Session token and step-up proof only.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND, or MEMBER_NOT_FOUND when the account does
@@ -2235,8 +2240,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         >,
     > + Send;
     /// SetMemberRole changes a member's role to any role but OWNER. The Owner's
-    /// role cannot be changed; transfer ownership instead. Session token and
-    /// step-up proof only.
+    /// role cannot be changed; transfer ownership instead. The member's pending
+    /// invites that the new role may not grant are cancelled in the same
+    /// change. Session token and step-up proof only.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
     /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
@@ -2264,8 +2270,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         >,
     > + Send;
     /// RemoveMember removes a member, ending their access immediately, or
-    /// cancels the person's pending invite. The Owner cannot be removed. Session
-    /// token and step-up proof only.
+    /// cancels the person's pending invite. The Owner cannot be removed. A
+    /// removed member's pending invites are cancelled in the same change.
+    /// Session token and step-up proof only.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
     /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
@@ -2293,8 +2300,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
         >,
     > + Send;
     /// TransferOwnership makes another member the Owner; the caller, the
-    /// current Owner, becomes an Admin in the same change. Session token and
-    /// step-up proof only.
+    /// current Owner, becomes an Admin in the same change, and the caller's
+    /// pending invites that an Admin may not grant (Finance) are cancelled.
+    /// Session token and step-up proof only.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
     /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.

@@ -845,8 +845,10 @@ pub const __GET_TRADING_RATE_LIMITS_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     from_json: ::buffa::type_registry::any_from_json::<GetTradingRateLimitsRequest>,
     is_wkt: false,
 };
-/// GetTradingRateLimitsResponse contains every placement and cancellation
-/// policy enforced for the selected account target and caller.
+/// GetTradingRateLimitsResponse contains the placement and cancellation limits
+/// enforced for the selected account target. Trading limits apply per account:
+/// the root account and each subaccount have their own limits, and every API
+/// key and session that trades for an account shares that account's limits.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -873,8 +875,9 @@ pub struct GetTradingRateLimitsResponse {
     pub effective_from: ::buffa::MessageField<
         ::buffa_types::google::protobuf::Timestamp,
     >,
-    /// Account-scoped placement and cancellation rules for the selected account,
-    /// ordered with placement first and cancellation second.
+    /// Placement and cancellation rules enforced for the selected account,
+    /// ordered with placement first and cancellation second. All of the
+    /// account's API keys and sessions draw on these limits together.
     ///
     /// Field 3: `rules`
     #[serde(
@@ -883,9 +886,11 @@ pub struct GetTradingRateLimitsResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub rules: ::buffa::alloc::vec::Vec<TradingRateLimitRule>,
-    /// API-key-scoped placement and cancellation rules, ordered with placement
-    /// first and cancellation second. Present only when the caller authenticated
-    /// with an API key. Both this scope and the account scope are enforced.
+    /// Placement and cancellation rules resolved for the calling API key, ordered
+    /// with placement first and cancellation second. Present only when the caller
+    /// authenticated with an API key. These rules are informational: trading
+    /// requests are not limited per API key, and only the account rules in
+    /// `rules` are enforced.
     ///
     /// Field 4: `api_key_rules`
     #[serde(
@@ -2477,8 +2482,10 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetTradingRateLimitsResponse contains every placement and cancellation
-        /// policy enforced for the selected account target and caller.
+        /// GetTradingRateLimitsResponse contains the placement and cancellation limits
+        /// enforced for the selected account target. Trading limits apply per account:
+        /// the root account and each subaccount have their own limits, and every API
+        /// key and session that trades for an account shares that account's limits.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradingRateLimitsResponseView<'a> {
             /// Positive identifier of the rate-limit policy version used for the
@@ -2492,17 +2499,20 @@ pub mod __buffa {
             pub effective_from: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Account-scoped placement and cancellation rules for the selected account,
-            /// ordered with placement first and cancellation second.
+            /// Placement and cancellation rules enforced for the selected account,
+            /// ordered with placement first and cancellation second. All of the
+            /// account's API keys and sessions draw on these limits together.
             ///
             /// Field 3: `rules`
             pub rules: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::TradingRateLimitRuleView<'a>,
             >,
-            /// API-key-scoped placement and cancellation rules, ordered with placement
-            /// first and cancellation second. Present only when the caller authenticated
-            /// with an API key. Both this scope and the account scope are enforced.
+            /// Placement and cancellation rules resolved for the calling API key, ordered
+            /// with placement first and cancellation second. Present only when the caller
+            /// authenticated with an API key. These rules are informational: trading
+            /// requests are not limited per API key, and only the account rules in
+            /// `rules` are enforced.
             ///
             /// Field 4: `api_key_rules`
             pub api_key_rules: ::buffa::RepeatedView<
@@ -2895,8 +2905,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().effective_from
             }
-            /// Account-scoped placement and cancellation rules for the selected account,
-            /// ordered with placement first and cancellation second.
+            /// Placement and cancellation rules enforced for the selected account,
+            /// ordered with placement first and cancellation second. All of the
+            /// account's API keys and sessions draw on these limits together.
             ///
             /// Field 3: `rules`
             #[must_use]
@@ -2908,9 +2919,11 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().rules
             }
-            /// API-key-scoped placement and cancellation rules, ordered with placement
-            /// first and cancellation second. Present only when the caller authenticated
-            /// with an API key. Both this scope and the account scope are enforced.
+            /// Placement and cancellation rules resolved for the calling API key, ordered
+            /// with placement first and cancellation second. Present only when the caller
+            /// authenticated with an API key. These rules are informational: trading
+            /// requests are not limited per API key, and only the account rules in
+            /// `rules` are enforced.
             ///
             /// Field 4: `api_key_rules`
             #[must_use]
