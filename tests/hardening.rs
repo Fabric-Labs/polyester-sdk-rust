@@ -2985,6 +2985,65 @@ async fn l2_cancel_all_after_rejects_empty_and_unknown_status_through_public_ser
     }
 }
 
+/// A dead-man-switch timeout the contract refuses (other than 0 or
+/// 10..=120) is refused before sending; one it accepts is sent unchanged.
+#[tokio::test]
+async fn l2_cancel_all_after_refuses_timeouts_outside_the_contract_before_sending() {
+    use polyester::proto::orders::v1::{
+        CancelAllAfterRequest, CancelAllAfterResponse, cancel_all_after_response,
+    };
+
+    let sent = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path == "/orders.v1.OrdersService/CancelAllAfter" {
+            let request = CancelAllAfterRequest::decode_from_slice(&req.body).unwrap();
+            seen.lock().unwrap().push(request.timeout_sec);
+            connect_proto_ok(&CancelAllAfterResponse {
+                status: cancel_all_after_response::Status::Armed.into(),
+                effective_timeout_sec: request.timeout_sec,
+                ..Default::default()
+            })
+        } else {
+            hardening_support::HttpScript::NotFound
+        }
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    for timeout in [5, 9, 121, 1, u32::MAX] {
+        match client
+            .orders
+            .cancel_all_after(timeout, None, SubAccountScope::Default, None)
+            .await
+        {
+            Err(polyester::Error::Validation(message)) => {
+                assert!(message.contains("timeout_sec"), "{timeout}: {message}")
+            }
+            other => panic!("timeout {timeout}: expected a validation error, got {other:?}"),
+        }
+    }
+    assert!(
+        sent.lock().unwrap().is_empty(),
+        "a refused timeout was sent"
+    );
+
+    for timeout in [0, 10, 11, 119, 120] {
+        let _ = client
+            .orders
+            .cancel_all_after(timeout, None, SubAccountScope::Default, None)
+            .await;
+    }
+    assert_eq!(*sent.lock().unwrap(), vec![0, 10, 11, 119, 120]);
+}
+
 #[tokio::test]
 async fn l2_batch_replace_rejects_inconsistent_server_counts_through_public_service() {
     use polyester::Price;

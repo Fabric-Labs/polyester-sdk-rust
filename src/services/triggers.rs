@@ -42,6 +42,18 @@ const MAX_BATCH_CANCEL_TRIGGERS: usize = 50;
 /// not say which trigger it changes, so it takes up to [`MAX_BPS`], as the
 /// contract does, and the server refuses 10000 where it does not apply.
 const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
+/// Shortest TWAP the contract takes, in milliseconds: the `int64.gte` rule on
+/// `TwapTrigger.duration_ms`. A test pins it to the generated field docs.
+const TWAP_DURATION_MS_MIN: i64 = 1_000;
+/// Shortest TWAP slice interval the contract takes, in milliseconds: the
+/// `int64.gte` rule on `TwapTrigger.slice_interval_ms` (whose CEL rule also
+/// caps it at the duration). A test pins it to the generated field docs.
+const TWAP_SLICE_INTERVAL_MS_MIN: i64 = 100;
+/// Ladder level counts the contract takes: the `int32.gte`/`lte` validate
+/// rule on `LadderTrigger.levels` is the source. The generated docs do not
+/// state this range, so a test pins the literal values.
+const LADDER_LEVELS_MIN: i32 = 2;
+const LADDER_LEVELS_MAX: i32 = 100;
 
 fn validate_bps(field: &str, bps: i32, allow_clear: bool) -> Result<()> {
     validate_bps_at_most(field, bps, allow_clear, MAX_BPS)
@@ -537,15 +549,24 @@ impl TriggersService {
             CreateTriggerType::Twap => {
                 let duration_ms = params
                     .twap_duration_ms
-                    .filter(|value| *value > 0)
-                    .ok_or_else(|| Error::validation("twap requires positive duration_ms"))?;
-                let slice_interval_ms = params
-                    .twap_slice_interval_ms
-                    .filter(|value| *value > 0)
-                    .ok_or_else(|| Error::validation("twap requires positive slice_interval_ms"))?;
+                    .ok_or_else(|| Error::validation("twap_duration_ms is required for a twap"))?;
+                if duration_ms < TWAP_DURATION_MS_MIN {
+                    return Err(Error::validation(format!(
+                        "twap_duration_ms {duration_ms} is below the minimum {TWAP_DURATION_MS_MIN}"
+                    )));
+                }
+                let slice_interval_ms = params.twap_slice_interval_ms.ok_or_else(|| {
+                    Error::validation("twap_slice_interval_ms is required for a twap")
+                })?;
+                if slice_interval_ms < TWAP_SLICE_INTERVAL_MS_MIN {
+                    return Err(Error::validation(format!(
+                        "twap_slice_interval_ms {slice_interval_ms} is below the minimum \
+                         {TWAP_SLICE_INTERVAL_MS_MIN}"
+                    )));
+                }
                 if slice_interval_ms > duration_ms {
                     return Err(Error::validation(
-                        "twap slice_interval_ms must not exceed duration_ms",
+                        "twap_slice_interval_ms must not exceed twap_duration_ms",
                     ));
                 }
                 let mut twap = TwapTrigger {
@@ -620,8 +641,12 @@ impl TriggersService {
                     .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
                 let levels = params
                     .ladder_levels
-                    .filter(|value| *value > 0)
-                    .ok_or_else(|| Error::validation("ladder requires positive ladder_levels"))?;
+                    .ok_or_else(|| Error::validation("ladder_levels is required for a ladder"))?;
+                if !(LADDER_LEVELS_MIN..=LADDER_LEVELS_MAX).contains(&levels) {
+                    return Err(Error::validation(format!(
+                        "ladder_levels {levels} is outside {LADDER_LEVELS_MIN}..={LADDER_LEVELS_MAX}"
+                    )));
+                }
                 if price_min_ticks <= 0 || price_max_ticks <= price_min_ticks {
                     return Err(Error::validation(
                         "ladder prices must be positive and max must exceed min",
@@ -2530,6 +2555,120 @@ mod tests {
             Some(crate::Price::from_decimal_str("49000", Some("BTC-USDT".into())).unwrap());
         params.ladder_levels = Some(4);
         params
+    }
+
+    fn expect_validation(
+        client: &crate::Client,
+        params: &CreateTriggerParams,
+        mention: &str,
+        label: &str,
+    ) {
+        match client.triggers.encode_create_params(params) {
+            Err(Error::Validation(message)) => {
+                assert!(message.contains(mention), "{label}: {message}")
+            }
+            other => panic!("{label}: expected a validation error, got {other:?}"),
+        }
+    }
+
+    /// The TWAP limits are the contract's: the generated field docs state the
+    /// same bounds, so a contract change that regenerates them breaks this.
+    #[test]
+    fn twap_limits_match_the_generated_contract_docs() {
+        let docs = include_str!("../gen/buffa/triggers.v1.rs");
+        let duration = format!(
+            "/// Total execution duration in milliseconds, at least {TWAP_DURATION_MS_MIN}.\n"
+        );
+        assert!(
+            docs.contains(&duration),
+            "duration docs changed: {duration}"
+        );
+        let interval = format!(
+            "/// Interval between slices in milliseconds, at least {TWAP_SLICE_INTERVAL_MS_MIN} \
+             and at most\n    /// duration_ms.\n"
+        );
+        assert!(
+            docs.contains(&interval),
+            "slice interval docs changed: {interval}"
+        );
+        assert_eq!(
+            (TWAP_DURATION_MS_MIN, TWAP_SLICE_INTERVAL_MS_MIN),
+            (1_000, 100)
+        );
+    }
+
+    /// The contract's `LadderTrigger.levels` validate rule is `gte: 2, lte:
+    /// 100`. The generated docs do not state it, so the values are pinned here.
+    #[test]
+    fn ladder_levels_limits_are_the_contract_rule() {
+        assert_eq!((LADDER_LEVELS_MIN, LADDER_LEVELS_MAX), (2, 100));
+    }
+
+    /// A TWAP duration or slice interval the contract refuses is refused
+    /// before sending: duration at least 1000, slice interval at least 100
+    /// and no longer than the duration.
+    #[test]
+    fn twap_refuses_values_outside_the_contract() {
+        let client = client();
+        for (duration, interval, mention) in [
+            (500, 100, "twap_duration_ms"),
+            (0, 100, "twap_duration_ms"),
+            (-1000, 100, "twap_duration_ms"),
+            (999, 100, "twap_duration_ms"),
+            (60_000, 0, "twap_slice_interval_ms"),
+            (60_000, -5, "twap_slice_interval_ms"),
+            (60_000, 99, "twap_slice_interval_ms"),
+            (1_000, 1_001, "must not exceed"),
+        ] {
+            let mut params = twap_create(CreateOrderType::Market);
+            params.twap_duration_ms = Some(duration);
+            params.twap_slice_interval_ms = Some(interval);
+            expect_validation(&client, &params, mention, &format!("{duration}/{interval}"));
+        }
+        for (duration, interval) in [
+            (60_000, 1_000),
+            (1_000, 100),
+            (1_000, 1_000),
+            (i64::MAX, 100),
+            (i64::MAX, i64::MAX),
+        ] {
+            let mut params = twap_create(CreateOrderType::Market);
+            params.twap_duration_ms = Some(duration);
+            params.twap_slice_interval_ms = Some(interval);
+            let req = client.triggers.encode_create_params(&params).unwrap();
+            let Some(trigger_intent::Strategy::Twap(twap)) =
+                req.trigger.as_option().and_then(|t| t.strategy.as_ref())
+            else {
+                panic!("expected twap strategy");
+            };
+            assert_eq!(
+                (twap.duration_ms, twap.slice_interval_ms),
+                (duration, interval)
+            );
+        }
+    }
+
+    /// Ladder levels the contract refuses (outside 2..=100) are refused
+    /// before sending.
+    #[test]
+    fn ladder_refuses_levels_outside_the_contract() {
+        let client = client();
+        for levels in [1, 0, 101, -3, i32::MAX] {
+            let mut params = ladder_create();
+            params.ladder_levels = Some(levels);
+            expect_validation(&client, &params, "ladder_levels", &levels.to_string());
+        }
+        for levels in [2, 3, 99, 100] {
+            let mut params = ladder_create();
+            params.ladder_levels = Some(levels);
+            let req = client.triggers.encode_create_params(&params).unwrap();
+            let Some(trigger_intent::Strategy::Ladder(ladder)) =
+                req.trigger.as_option().and_then(|t| t.strategy.as_ref())
+            else {
+                panic!("expected ladder strategy");
+            };
+            assert_eq!(ladder.levels, levels);
+        }
     }
 
     /// POLY-8758: no trigger child has a GTD execution, so a selected Gtd is

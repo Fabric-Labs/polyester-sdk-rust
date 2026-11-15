@@ -139,6 +139,11 @@ impl OrdersService {
     const MAX_BATCH_CREATE_ITEMS: usize = 20;
     const MAX_BATCH_CANCEL_ITEMS: usize = 50;
     const MAX_BATCH_REPLACE_ITEMS: usize = 50;
+    // Dead-man-switch timeouts the contract takes besides 0, which disarms
+    // it (its `cancel_all_after.timeout_range` rule). A test pins them to the
+    // generated field docs.
+    const CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC: u32 = 10;
+    const CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC: u32 = 120;
 
     pub fn new(ctx: ServiceContext) -> Self {
         Self { ctx }
@@ -1596,6 +1601,9 @@ impl OrdersService {
     /// [`crate::services::TriggersService::cancel`], or stop everything with
     /// [`crate::Client::stop_all_trading`].
     ///
+    /// `timeout_sec` is 10 to 120, or 0 to disarm the switch; any other value
+    /// is a validation error before sending.
+    ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value when retrying the same logical cancel-all-after.
     pub async fn cancel_all_after(
@@ -1605,6 +1613,16 @@ impl OrdersService {
         subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
+        if timeout_sec != 0
+            && !(Self::CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC..=Self::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC)
+                .contains(&timeout_sec)
+        {
+            return Err(Error::validation(format!(
+                "cancel_all_after timeout_sec must be 0 or between {} and {}; received {timeout_sec}",
+                Self::CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC,
+                Self::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC,
+            )));
+        }
         if symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -3844,6 +3862,29 @@ mod tests {
             intent.attached_risk.as_option().unwrap().stop_leg,
             Some(risk_policy::StopLeg::TrailingStop(_))
         ));
+    }
+
+    /// The dead-man-switch range is the contract's: the generated
+    /// `timeout_sec` docs state the same bounds, so a contract change that
+    /// regenerates them breaks this.
+    #[test]
+    fn cancel_all_after_limits_match_the_generated_contract_docs() {
+        let docs = include_str!("../gen/buffa/orders.v1.rs");
+        let disarm = "/// - 0 disables the dead-man switch for this account.\n";
+        let arm = format!(
+            "/// - {}..{} arms or refreshes the switch.\n",
+            OrdersService::CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC,
+            OrdersService::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC,
+        );
+        assert!(docs.contains(disarm), "timeout_sec docs changed: {disarm}");
+        assert!(docs.contains(&arm), "timeout_sec docs changed: {arm}");
+        assert_eq!(
+            (
+                OrdersService::CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC,
+                OrdersService::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC
+            ),
+            (10, 120)
+        );
     }
 
     #[test]
