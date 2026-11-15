@@ -74,7 +74,7 @@ pub struct Order {
     /// know. Its attached take-profit, stop-loss and trailing-stop exits use
     /// the same mode. A `decrement` order that self-trade prevention reduced
     /// reads its lowered quantity; one it reduced to nothing ends `canceled`
-    /// with `CANCEL_REASON_STP_DECREMENT`.
+    /// with `cancel_reason` `stp_decrement`.
     pub self_trade_prevention_mode: String,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
@@ -109,19 +109,19 @@ pub struct Order {
     /// ended before the server retained it may read empty.
     pub batch_request_id: String,
     /// Why a `rejected` order was refused: the order error code the Orders
-    /// API returns for the same refusal, formatted like
-    /// [`crate::Error::Api`]'s `code` (for example
-    /// `ERROR_CODE_POST_ONLY_CROSS`, or `UNKNOWN_ERROR_CODE(<number>)` for a
-    /// code this SDK does not know). `None` for every other status.
+    /// API returns for the same refusal, as a short lowercase label without
+    /// its `ERROR_CODE_` prefix (for example `post_only_cross` where
+    /// [`crate::Error::Api`]'s `code` reads `ERROR_CODE_POST_ONLY_CROSS`), or
+    /// `UNKNOWN_ERROR_CODE(<number>)` for a code this SDK does not know.
+    /// `None` for every other status.
     pub reject_reason: Option<String>,
-    /// Why a `canceled` order ended: an `orders.v1.CancelReason` proto name
-    /// (for example `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_REPLACED`,
-    /// `CANCEL_REASON_GTD_EXPIRED`, `CANCEL_REASON_STP_DECREMENT` for an order
-    /// `decrement` self-trade prevention reduced to nothing,
-    /// `CANCEL_REASON_PRICE_BAND` for the remainder of a market order the
-    /// pair's price band stopped, or `CANCEL_REASON_CANCEL_ON_DISCONNECT`), or
-    /// `UNKNOWN(<number>)` for a reason this SDK does not know. `None` for
-    /// every other status.
+    /// Why a `canceled` order ended: an `orders.v1.CancelReason` as a short
+    /// lowercase label without its `CANCEL_REASON_` prefix (for example
+    /// `user_request`, `replaced`, `gtd_expired`, `stp_decrement` for an
+    /// order `decrement` self-trade prevention reduced to nothing,
+    /// `price_band` for the remainder of a market order the pair's price band
+    /// stopped, or `cancel_on_disconnect`), or `UNKNOWN(<number>)` for a
+    /// reason this SDK does not know. `None` for every other status.
     pub cancel_reason: Option<String>,
 }
 
@@ -319,6 +319,10 @@ pub struct OrderMutationResult {
     pub status: String,
     pub order_id: String,
     pub client_order_id: String,
+    /// When the create's admission completed, in nanoseconds since the Unix
+    /// epoch: the contract's `accepted_at_ts_ns`, or `accepted_at` when only
+    /// that is sent; 0 when neither is, and for a cancel.
+    pub accepted_ts_ns: u64,
     /// Gross base quantity resolved by the admission service.
     pub resolved_base_qty: Option<Quantity>,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
@@ -389,6 +393,10 @@ pub struct ModifyOrderResult {
     pub stop_loss_trigger_id: Option<String>,
     /// Public ID of the attached trailing-stop trigger, when the final order has one.
     pub trailing_stop_trigger_id: Option<String>,
+    /// When the server answered the modify, in nanoseconds since the Unix
+    /// epoch: the contract's `ts_ns`, or `ts` when only that is sent; 0 when
+    /// neither is.
+    pub ts_ns: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -434,6 +442,10 @@ pub struct BatchCreateResultItem {
     /// and the server knows the holder. Absent for a duplicate within the
     /// same batch.
     pub existing_order_id: Option<String>,
+    /// Gross base quantity the server resolved for an accepted item, at the
+    /// pair's base quantity scale, as [`OrderMutationResult::resolved_base_qty`]
+    /// for a single create; `None` for a rejected item.
+    pub resolved_base_qty: Option<Quantity>,
     /// Hard all-in quote debit an accepted item was sized by, at the pair's
     /// quote quantity scale; `None` when it was sized otherwise or rejected.
     pub submitted_max_quote_debit_scaled: Option<i64>,
@@ -453,9 +465,14 @@ pub struct BatchCreateResultItem {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BatchCreateOrdersResult {
+    /// One result per requested order, in request order.
     pub results: Vec<BatchCreateResultItem>,
     pub accepted_count: u32,
     pub rejected_count: u32,
+    /// When the server answered the batch, in nanoseconds since the Unix
+    /// epoch: the contract's `ts_ns`, or `ts` when only that is sent; 0 when
+    /// neither is.
+    pub ts_ns: u64,
 }
 
 /// Identifies an order by exactly one of exchange order id or client order id.
@@ -827,6 +844,11 @@ pub struct BatchReplaceAdmissionItem {
     pub action_taken: String,
     pub code: String,
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// Public ID of the order that already holds the item's new client order
+    /// ID, when the item is rejected with
+    /// `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID` and the server knows
+    /// the holder; `None` otherwise.
+    pub existing_order_id: Option<String>,
     /// Field violations a rejection names, in the order the server sent them;
     /// empty for an accepted item or a rejection that names no field.
     pub violations: Vec<OrderFieldViolation>,
@@ -1372,7 +1394,7 @@ pub enum OrderSelfTradePrevention {
     ExpireBoth,
     /// Reduce both orders by the quantity that would have traded, with no
     /// trade. The order left with no quantity is canceled with
-    /// `CANCEL_REASON_STP_DECREMENT` (both, when their quantities are equal);
+    /// `cancel_reason` `stp_decrement` (both, when their quantities are equal);
     /// a resting order that keeps a quantity keeps its place in the queue,
     /// and an incoming one goes on matching and may rest. A fill-or-kill
     /// order that would meet such an order before it is completely filled is
