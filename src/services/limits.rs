@@ -11,6 +11,10 @@ use crate::errors::{Error, Result};
 /// Most flows one `ListAccountFlows` page returns: the `uint32.lte` rule on
 /// `ListAccountFlowsRequest.limit`.
 pub(crate) const LIST_ACCOUNT_FLOWS_LIMIT_MAX: u32 = 500;
+/// Most IDs each `ListAccountFlowsRequest` ID filter takes
+/// (`polyester_chain_ids`, `zipped_asset_ids`, `unified_asset_ids`): the
+/// `repeated.max_items` rule, with `unique: true` and `items.uint32.gt: 0`.
+pub(crate) const ACCOUNT_FLOWS_ID_FILTER_MAX: usize = 100;
 /// Most legs one `BatchCreateInternalTransfers` request takes: the
 /// `repeated.max_items` rule on `BatchCreateInternalTransfersRequest.legs`.
 pub(crate) const BATCH_TRANSFER_LEGS_MAX: usize = 10;
@@ -48,6 +52,25 @@ pub(crate) const LIST_STATEMENT_EXPORTS_LIMIT_MAX: u32 = 100;
 /// Longest `ListStatementExports` page token: the `string.max_len` rule on
 /// `ListStatementExportsRequest.page_token`.
 pub(crate) const STATEMENT_EXPORT_PAGE_TOKEN_MAX_LEN: usize = 512;
+
+/// Refuse an ID filter that breaks its `repeated` rule: more than `max`
+/// IDs, an ID of 0, or an ID listed twice.
+pub(crate) fn check_id_filter(field: &str, ids: &[u32], max: usize) -> Result<()> {
+    if ids.len() > max {
+        return Err(Error::validation(format!(
+            "{field} holds at most {max} IDs, not {}",
+            ids.len()
+        )));
+    }
+    if ids.contains(&0) {
+        return Err(Error::validation(format!("{field} IDs must be positive")));
+    }
+    let mut seen = std::collections::HashSet::with_capacity(ids.len());
+    if let Some(repeated) = ids.iter().find(|id| !seen.insert(**id)) {
+        return Err(Error::validation(format!("{field} repeats {repeated}")));
+    }
+    Ok(())
+}
 
 /// Refuse a page size above the contract's maximum; 0 asks for the server's
 /// default.
@@ -106,6 +129,18 @@ mod tests {
                 "/// Maximum number of flows to return. Defaults to 100 when omitted; maximum is\n    /// {LIST_ACCOUNT_FLOWS_LIMIT_MAX}.\n    ///\n    /// Field 2: `limit`\n"
             ),
         );
+        for (line, number, filter) in [
+            ("Optional Polyester Chain ids", 8, "polyester_chain_ids"),
+            ("Optional chain asset mapping ids", 9, "zipped_asset_ids"),
+            ("Optional unified asset ids", 10, "unified_asset_ids"),
+        ] {
+            assert_docs(
+                lifecycle,
+                &format!(
+                    "/// {line} to include. Maximum {ACCOUNT_FLOWS_ID_FILTER_MAX} unique ids.\n    ///\n    /// Field {number}: `{filter}`\n"
+                ),
+            );
+        }
         let transfer = include_str!("../gen/buffa/transfer.v1.rs");
         assert_docs(
             transfer,
@@ -168,6 +203,15 @@ mod tests {
             check_len("op", "key", "abc", 2),
             Err(Error::Validation(_))
         ));
+        assert!(check_id_filter("ids", &[1, 2], 2).is_ok());
+        for (ids, want) in [
+            (&[1, 2, 3][..], "ids holds at most 2 IDs, not 3"),
+            (&[0][..], "ids IDs must be positive"),
+            (&[4, 4][..], "ids repeats 4"),
+        ] {
+            let err = check_id_filter("ids", ids, 2).unwrap_err();
+            assert!(err.to_string().contains(want), "{err}");
+        }
         assert!(check_page_token("op", "", 2).is_ok());
         assert!(matches!(
             check_page_token("op", "abc", 2),

@@ -5,8 +5,8 @@ use crate::codecs::scalars::{LEDGER_SCALE, format_ledger_u128, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
     DepositAddress, DepositAddressesList, InternalTransferBatchLegResult,
-    InternalTransferBatchResult, InternalTransferResult, WalletBalance, WalletBalances,
-    WithdrawDestinationValidation, WithdrawIntentResult,
+    InternalTransferBatchResult, InternalTransferResult, ResolvedDestination, WalletBalance,
+    WalletBalances, WithdrawDestinationValidation, WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{
     CreateDepositAddressResponse, DepositAddress as ProtoDepositAddress,
@@ -237,6 +237,11 @@ pub fn internal_transfer_batch_from_proto(
                 asset_id: leg.asset_id,
                 asset_code: leg.asset_code.clone(),
                 quantity,
+                destination: leg.destination.as_option().map(|d| ResolvedDestination {
+                    root_account_public_id: d.root_account_public_id.clone(),
+                    subaccount_public_id: d.subaccount_public_id.clone(),
+                    smart_account_address: d.smart_account_address.clone(),
+                }),
                 error_code: super::dust::transfer_reason_label(&leg.error_code),
                 error_message: leg.error_message.clone(),
             })
@@ -505,7 +510,7 @@ mod tests {
 
     #[test]
     fn batch_decodes_each_leg_in_order() {
-        use crate::proto::transfer::v1::ErrorCode;
+        use crate::proto::transfer::v1::{ErrorCode, ResolvedDestination as ProtoDestination};
         let mut refused = batch_leg(2, InternalTransferBatchLegStatus::LEG_REFUSED, "r3", "");
         refused.error_code = ErrorCode::ERROR_CODE_INSUFFICIENT_FUNDS.into();
         refused.error_message = "insufficient funds".into();
@@ -513,7 +518,18 @@ mod tests {
             request_id: "batch-1".into(),
             status: InternalTransferBatchStatus::BATCH_SUBMITTED.into(),
             legs: vec![
-                batch_leg(0, InternalTransferBatchLegStatus::LEG_ACCEPTED, "r1", "t1"),
+                {
+                    let mut leg =
+                        batch_leg(0, InternalTransferBatchLegStatus::LEG_ACCEPTED, "r1", "t1");
+                    leg.destination = ProtoDestination {
+                        root_account_public_id: "AAo8yKqygTg".into(),
+                        subaccount_public_id: "Bht3tfQZv8E".into(),
+                        smart_account_address: "0x2222222222222222222222222222222222222222".into(),
+                        ..Default::default()
+                    }
+                    .into();
+                    leg
+                },
                 batch_leg(1, InternalTransferBatchLegStatus::LEG_PENDING, "r2", ""),
                 refused,
                 batch_leg(3, InternalTransferBatchLegStatus::LEG_NOT_SUBMITTED, "", ""),
@@ -524,6 +540,14 @@ mod tests {
         assert_eq!(
             (got.request_id.as_str(), got.status.as_str()),
             ("batch-1", "submitted")
+        );
+        assert_eq!(
+            got.legs[0].destination,
+            Some(ResolvedDestination {
+                root_account_public_id: "AAo8yKqygTg".into(),
+                subaccount_public_id: "Bht3tfQZv8E".into(),
+                smart_account_address: "0x2222222222222222222222222222222222222222".into(),
+            })
         );
         let statuses: Vec<_> = got.legs.iter().map(|l| l.status.as_str()).collect();
         assert_eq!(

@@ -430,6 +430,8 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
             message: "m".into(),
             retry_after: None,
             detail: None,
+            cause_code: None,
+            level_index: None,
         }
         .is_request_too_large()
     );

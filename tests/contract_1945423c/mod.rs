@@ -195,6 +195,52 @@ async fn account_flow_reads_are_signed_and_scoped() {
     assert!(requests(&seen).is_empty(), "refused calls were sent");
 }
 
+/// Each ID filter of `list_account_flows` follows its contract rule (at most
+/// 100 unique, positive IDs): a breaking filter is refused before anything
+/// is sent, and exactly 100 distinct IDs are sent as given.
+#[tokio::test]
+async fn account_flow_id_filters_follow_the_contract_rule() {
+    let (client, seen) = server(|_| connect_proto_ok(&ListAccountFlowsResponse::default())).await;
+    type Setter = fn(&mut ListAccountFlowsRequest, Vec<u32>);
+    let filters: [(&str, Setter); 3] = [
+        ("polyester_chain_ids", |r, ids| r.polyester_chain_ids = ids),
+        ("zipped_asset_ids", |r, ids| r.zipped_asset_ids = ids),
+        ("unified_asset_ids", |r, ids| r.unified_asset_ids = ids),
+    ];
+    for (field, set) in filters {
+        for (ids, want) in [
+            (
+                (1..=101).collect::<Vec<u32>>(),
+                format!("{field} holds at most 100 IDs, not 101"),
+            ),
+            (vec![3, 0], format!("{field} IDs must be positive")),
+            (vec![5, 7, 5], format!("{field} repeats 5")),
+        ] {
+            let mut req = ListAccountFlowsRequest::default();
+            set(&mut req, ids);
+            let err = client.lifecycle.list_account_flows(req).await.unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{field}: {err:?}");
+            assert!(err.to_string().contains(&want), "{field}: {err}");
+        }
+        assert!(
+            requests(&seen).is_empty(),
+            "{field}: a refused filter was sent"
+        );
+        let mut req = ListAccountFlowsRequest::default();
+        set(&mut req, (1..=100).collect());
+        client.lifecycle.list_account_flows(req).await.unwrap();
+        let sent = requests(&seen);
+        assert_eq!(sent.len(), 1, "{field}");
+        let got = ListAccountFlowsRequest::decode_from_slice(&sent[0].2).unwrap();
+        let ids = match field {
+            "polyester_chain_ids" => got.polyester_chain_ids,
+            "zipped_asset_ids" => got.zipped_asset_ids,
+            _ => got.unified_asset_ids,
+        };
+        assert_eq!(ids, (1..=100).collect::<Vec<u32>>(), "{field}");
+    }
+}
+
 fn leg(asset_id: u32, amount: &str) -> InternalTransferBatchLeg {
     InternalTransferBatchLeg {
         asset_id,
@@ -875,6 +921,55 @@ async fn dust_and_export_refusals_follow_their_retry_rule() {
         );
         assert_eq!(err.is_retryable(), retryable, "{code}: {err:?}");
         assert!(!err.mutation_outcome_unknown(), "{code}: {err:?}");
+    }
+}
+
+/// A ladder order refused for the account's rate limit is a rate-limit
+/// error that still names the refused order's cause and zero-based index;
+/// index 0 is kept as `Some(0)`.
+#[tokio::test]
+async fn rate_limited_ladder_keeps_cause_and_level() {
+    use polyester::proto::orders::v1::{ErrorCode, ErrorDetail};
+    use polyester::proto::polyester::ratelimit::v1::RateLimitDetail;
+    for index in [2u32, 0] {
+        let detail = ErrorDetail {
+            code: ErrorCode::ERROR_CODE_LADDER_LEVEL_REJECTED.into(),
+            cause_code: ErrorCode::ERROR_CODE_RATE_LIMIT_EXCEEDED.into(),
+            level_index: Some(index),
+            rate_limit: RateLimitDetail {
+                retry_after_ms: Some(1_500),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let script = Arc::new(Mutex::new(Some(connect_error(
+            "resource_exhausted",
+            "orders.v1.ErrorDetail",
+            detail,
+        ))));
+        let (client, _) = server(move |_| {
+            script
+                .lock()
+                .unwrap()
+                .take()
+                .unwrap_or(HttpScript::NotFound)
+        })
+        .await;
+        let err = client.auth.me().await.unwrap_err();
+        assert!(
+            matches!(&err, Error::RateLimit { code: Some(code), .. } if code == "ERROR_CODE_LADDER_LEVEL_REJECTED"),
+            "{err:?}"
+        );
+        assert_eq!(err.retry_after(), Some(1.5), "{err:?}");
+        assert!(err.is_retryable(), "{err:?}");
+        assert_eq!(
+            err.cause_code(),
+            Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
+            "{err:?}"
+        );
+        assert_eq!(err.level_index(), Some(index), "{err:?}");
     }
 }
 

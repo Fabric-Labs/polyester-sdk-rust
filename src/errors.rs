@@ -183,6 +183,15 @@ pub enum Error {
         /// schedule then.
         /// Boxed so `Error` stays small enough for Clippy's `result_large_err`.
         detail: Option<Box<RateLimitDetail>>,
+        /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the code the refused
+        /// ladder order would return as a single order, such as
+        /// `ERROR_CODE_RATE_LIMIT_EXCEEDED`; `None` otherwise. Read it with
+        /// [`Error::cause_code`].
+        cause_code: Option<String>,
+        /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the refused order's
+        /// zero-based index among the ladder's orders (`Some(0)` is the
+        /// first); `None` otherwise. Read it with [`Error::level_index`].
+        level_index: Option<u32>,
     },
     #[error("{0}")]
     Server(String),
@@ -910,8 +919,12 @@ impl Error {
                 message,
                 retry_after,
                 detail,
+                cause_code,
+                level_index,
             } => Self::RateLimit {
                 code,
+                cause_code,
+                level_index,
                 message: text(message),
                 retry_after,
                 detail: detail.map(|mut detail| {
@@ -1340,9 +1353,14 @@ impl Error {
     /// own code (for example `ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`), from
     /// `orders.v1.ErrorDetail.cause_code`. `None` for every other refusal.
     /// A ladder order refused for the account's rate limit is an
-    /// [`Error::RateLimit`] whose code is `ERROR_CODE_LADDER_LEVEL_REJECTED`.
+    /// [`Error::RateLimit`] whose code is `ERROR_CODE_LADDER_LEVEL_REJECTED`;
+    /// it carries the cause (`ERROR_CODE_RATE_LIMIT_EXCEEDED`) and the index
+    /// too.
     pub fn cause_code(&self) -> Option<&str> {
-        self.api_metadata(CAUSE_CODE_METADATA)
+        match self {
+            Self::RateLimit { cause_code, .. } => cause_code.as_deref(),
+            _ => self.api_metadata(CAUSE_CODE_METADATA),
+        }
     }
 
     /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the refused order's
@@ -1350,7 +1368,10 @@ impl Error {
     /// path `trigger.strategy.ladder.levels[i]`, so `Some(0)` is the first
     /// order. `None` for every other refusal.
     pub fn level_index(&self) -> Option<u32> {
-        self.api_metadata(LEVEL_INDEX_METADATA)?.parse().ok()
+        match self {
+            Self::RateLimit { level_index, .. } => *level_index,
+            _ => self.api_metadata(LEVEL_INDEX_METADATA)?.parse().ok(),
+        }
     }
 
     /// With `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`: when the
@@ -1567,6 +1588,17 @@ pub(crate) fn retryable_resource_code(code: &str) -> bool {
     )
 }
 
+/// An `orders.v1.ErrorDetail.cause_code`, spelled like the error's own
+/// code; `None` when unspecified.
+fn ladder_cause_code(detail: &OrderErrorDetail) -> Option<String> {
+    (detail.cause_code.to_i32() != 0).then(|| {
+        known_or_unknown_code(
+            detail.cause_code.as_known().map(|c| c.proto_name()),
+            detail.cause_code.to_i32(),
+        )
+    })
+}
+
 fn rate_limit_error(
     message: String,
     detail: Option<RateLimitDetail>,
@@ -1582,6 +1614,8 @@ fn rate_limit_error(
         message,
         retry_after,
         detail: detail.map(Box::new),
+        cause_code: None,
+        level_index: None,
     }
 }
 
@@ -1878,12 +1912,18 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     .as_option()
                     .map(rate_limit_detail_from_proto_local)
                     .or(problem_rate_limit);
-                return rate_limit_error(
-                    fallback_message.clone(),
-                    detail,
-                    header_retry,
-                    Some(code),
-                );
+                let mut limited =
+                    rate_limit_error(fallback_message.clone(), detail, header_retry, Some(code));
+                if let Error::RateLimit {
+                    cause_code,
+                    level_index,
+                    ..
+                } = &mut limited
+                {
+                    *cause_code = ladder_cause_code(&order_detail);
+                    *level_index = order_detail.level_index;
+                }
+                return limited;
             }
             // Backoff hints and unknown mutation outcomes take precedence.
             if err.code == ErrorCode::Unavailable
@@ -1933,14 +1973,8 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     )]
                 })
                 .unwrap_or_default();
-            if order_detail.cause_code.to_i32() != 0 {
-                metadata.push((
-                    CAUSE_CODE_METADATA.to_owned(),
-                    known_or_unknown_code(
-                        order_detail.cause_code.as_known().map(|c| c.proto_name()),
-                        order_detail.cause_code.to_i32(),
-                    ),
-                ));
+            if let Some(cause) = ladder_cause_code(&order_detail) {
+                metadata.push((CAUSE_CODE_METADATA.to_owned(), cause));
             }
             if let Some(index) = order_detail.level_index {
                 metadata.push((LEVEL_INDEX_METADATA.to_owned(), index.to_string()));
@@ -2232,6 +2266,7 @@ mod tests {
                 retry_after,
                 detail,
                 code,
+                ..
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
                 assert_eq!(retry_after, Some(2.5));
@@ -2325,6 +2360,8 @@ mod tests {
             message: "slow down".into(),
             retry_after: Some(1.0),
             detail: None,
+            cause_code: None,
+            level_index: None,
         };
         assert!(limited.is_retryable());
         assert!(!limited.mutation_outcome_unknown());

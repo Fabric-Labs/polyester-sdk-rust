@@ -1262,19 +1262,30 @@ impl LifecycleService {
     /// configured default sub-account, else the key's bound sub-account or
     /// the main account; `Some(0)` is refused. `limit` 0 asks for the
     /// server's default (100); one above 500, the contract's maximum, is
-    /// refused before sending. A `page_token` is bound to the account and the
+    /// refused before sending, as is an ID filter (`polyester_chain_ids`,
+    /// `zipped_asset_ids`, `unified_asset_ids`) with more than 100 IDs, an ID
+    /// of 0 or an ID listed twice. A `page_token` is bound to the account and the
     /// request it was returned for: only `limit` may change between pages.
     pub async fn list_account_flows(
         &self,
         mut req: crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
-        use super::limits::{LIST_ACCOUNT_FLOWS_LIMIT_MAX, check_limit};
+        use super::limits::{
+            ACCOUNT_FLOWS_ID_FILTER_MAX, LIST_ACCOUNT_FLOWS_LIMIT_MAX, check_id_filter, check_limit,
+        };
         use crate::codecs::decode::account_flows_list_from_proto;
         check_limit(
             "list_account_flows",
             req.limit,
             LIST_ACCOUNT_FLOWS_LIMIT_MAX,
         )?;
+        for (field, ids) in [
+            ("polyester_chain_ids", &req.polyester_chain_ids),
+            ("zipped_asset_ids", &req.zipped_asset_ids),
+            ("unified_asset_ids", &req.unified_asset_ids),
+        ] {
+            check_id_filter(field, ids, ACCOUNT_FLOWS_ID_FILTER_MAX)?;
+        }
         req.subaccount_id = super::scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = super::unary::await_auth(

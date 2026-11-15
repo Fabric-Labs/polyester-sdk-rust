@@ -1543,6 +1543,19 @@ pub struct InternalTransferBatchResult {
     pub legs: Vec<InternalTransferBatchLegResult>,
 }
 
+/// The destination the server resolved for a transfer leg
+/// (`transfer.v1.ResolvedDestination`). Each field is empty when the server
+/// sent none.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ResolvedDestination {
+    /// Public ID of the destination's main account.
+    pub root_account_public_id: String,
+    /// Public ID of the destination sub-account, when the destination is one.
+    pub subaccount_public_id: String,
+    /// The destination's smart account address.
+    pub smart_account_address: String,
+}
+
 /// The outcome of one leg of a batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferBatchLegResult {
@@ -1574,6 +1587,9 @@ pub struct InternalTransferBatchLegResult {
     /// The leg's amount, echoed, exact at 18 decimals; `None` when the
     /// server sent none.
     pub quantity: Option<AssetAmount>,
+    /// The destination the server resolved for the leg, set once the leg is
+    /// submitted; `None` when the server sent none.
+    pub destination: Option<ResolvedDestination>,
     /// Why the leg was refused, or why its outcome is not known yet: the
     /// `transfer.v1.ErrorCode` as a lowercase label without its
     /// `ERROR_CODE_` prefix, such as `insufficient_funds`;
