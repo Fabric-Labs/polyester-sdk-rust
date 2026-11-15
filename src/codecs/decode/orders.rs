@@ -509,11 +509,14 @@ pub fn user_trades_list_from_proto(msg: &GetUserTradesResponse) -> Result<UserTr
 }
 
 pub fn get_order_from_proto(msg: &GetOrderResponse) -> Result<GetOrderResult> {
-    let order = msg
-        .order
-        .as_option()
-        .map(|order| required_order("GetOrder", order))
-        .transpose()?;
+    // An order that does not exist is refused by the API with its own error,
+    // never answered with an empty success.
+    let order = Some(required_order(
+        "GetOrder",
+        msg.order
+            .as_option()
+            .ok_or_else(|| Error::response_contract("GetOrder", "missing order"))?,
+    )?);
     let trades = msg
         .trades
         .iter()
@@ -2451,9 +2454,21 @@ mod tests {
 
     #[test]
     fn get_order_reports_whether_executions_are_complete() {
-        let recording = get_order_from_proto(&GetOrderResponse::default()).unwrap();
+        let order = || -> buffa::MessageField<ProtoOrder> {
+            ProtoOrder {
+                order_id: 7,
+                ..Default::default()
+            }
+            .into()
+        };
+        let recording = get_order_from_proto(&GetOrderResponse {
+            order: order(),
+            ..Default::default()
+        })
+        .unwrap();
         assert!(!recording.executions_complete);
         let complete = get_order_from_proto(&GetOrderResponse {
+            order: order(),
             executions_complete: true,
             ..Default::default()
         })

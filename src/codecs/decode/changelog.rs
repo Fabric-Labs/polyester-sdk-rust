@@ -141,7 +141,7 @@ pub fn changelog_post_from_proto(msg: &GetPostResponse) -> Result<ChangelogPost>
     let post = msg
         .post
         .as_option()
-        .ok_or_else(|| Error::transport("invalid GetPost response: missing post"))?;
+        .ok_or_else(|| Error::response_contract("GetPost", "missing post"))?;
     Ok(ChangelogPost {
         summary: post
             .summary
@@ -218,10 +218,10 @@ pub fn changelog_deployment_group_from_proto(
     msg: &GetDeploymentGroupResponse,
 ) -> Result<ChangelogDeploymentGroup> {
     let group = msg.group.as_option().ok_or_else(|| {
-        Error::transport("invalid GetDeploymentGroup response: missing deployment group")
+        Error::response_contract("GetDeploymentGroup", "missing deployment group")
     })?;
     let summary = group.summary.as_option().ok_or_else(|| {
-        Error::transport("invalid GetDeploymentGroup response: missing deployment group summary")
+        Error::response_contract("GetDeploymentGroup", "missing deployment group summary")
     })?;
     Ok(ChangelogDeploymentGroup {
         summary: deployment_group_summary_from_proto(summary),

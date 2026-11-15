@@ -1,0 +1,361 @@
+# Every ID field of every RPC reply in the public contract, recursively: a
+# non-repeated scalar field named `id` or ending in `_id`, as the generated
+# messages of this SDK declare it. A guard test walks the generated reply
+# messages and fails when a field is missing here or listed but gone, so a new
+# ID in the contract must be classified before the build passes.
+#
+# required: the identity of the object a reply returns, or the ID a write
+# reply assigns or echoes. A decoder of the reply refuses 0 (or "") with the
+# response-contract error. Inside a nested message the reply may leave out,
+# it is checked when the message is present.
+# not_required: a reference to another object, a catalog key, a cursor, a
+# client correlation ID, or a field the contract allows to be 0 or empty.
+#
+# field	class	reason
+ai.v1.ApprovalRequested.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.ApprovalRequested.approval_id	required	
+ai.v1.ApprovalResolved.approval_id	required	
+ai.v1.AssistantKey.key_id	required	
+ai.v1.AssistantKey.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.BalanceHistoryChart.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.BalancesTable.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.CancelTriggerPreview.symbol_id	not_required	reference to a market
+ai.v1.CancelTriggerPreview.trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+ai.v1.Conversation.conversation_id	required	
+ai.v1.DepositAddressCard.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.DepositAddressCard.asset_id	not_required	reference to an asset
+ai.v1.DestinationsSuggested.tool_call_id	not_required	reference to another object; 0 or empty when none
+ai.v1.DisplaySettingAction.tool_call_id	not_required	reference to another object; 0 or empty when none
+ai.v1.EquityHistoryChart.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.MemoriesRecalled.tool_call_id	not_required	reference to another object; 0 or empty when none
+ai.v1.Memory.conversation_id	not_required	reference to another object; 0 or empty when none
+ai.v1.Memory.memory_id	required	
+ai.v1.Message.message_id	required	
+ai.v1.Message.run_id	not_required	reference to another object; 0 or empty when none
+ai.v1.OrderChange.order_id	not_required	reference to another order, trigger or batch; 0 when none
+ai.v1.OrderChangePreview.symbol_id	not_required	reference to a market
+ai.v1.OrderPreview.symbol_id	not_required	reference to a market
+ai.v1.OrderToCancel.order_id	not_required	reference to another order, trigger or batch; 0 when none
+ai.v1.OrdersTable.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.PrepareAssistantKeysResponse.setup_id	required	
+ai.v1.PreparedAssistantKey.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.PriceChart.symbol_id	not_required	reference to a market
+ai.v1.RecalledMemory.memory_id	required	
+ai.v1.SendMessageResponse.conversation_id	required	
+ai.v1.SendMessageResponse.run_id	required	
+ai.v1.SubagentFinished.subagent_id	required	
+ai.v1.SubagentStarted.subagent_id	required	
+ai.v1.ToolFinished.tool_call_id	required	
+ai.v1.ToolStarted.tool_call_id	required	
+ai.v1.TransfersTable.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ai.v1.TriggerChangePreview.symbol_id	not_required	reference to a market
+ai.v1.TriggerChangePreview.trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+ai.v1.TriggersTable.account_id	not_required	reference to an account; 0 or empty where the contract allows
+alerts.v1.PriceAlert.alert_id	required	
+alerts.v1.PriceAlert.symbol_id	not_required	reference to a market
+auth.v1.AccountScopeRef.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.AccountScopeRef.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.ActivityEvent.actor_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.AddressBookEntry.address_book_entry_id	required	
+auth.v1.AddressBookTag.tag_id	required	
+auth.v1.AddressBookTagSummary.tag_id	required	
+auth.v1.ApiKey.key_id	required	
+auth.v1.ApiKey.policy_id	not_required	optional reference; 0 or empty means none
+auth.v1.ApiKey.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.ApiPolicyView.id	required	
+auth.v1.ApiPolicyView.source_template_id	not_required	optional reference; 0 or empty means none
+auth.v1.BeginMFAChallengeResponse.challenge_id	required	
+auth.v1.BeginPasskeyEnrollmentResponse.enrollment_id	required	
+auth.v1.BeginTOTPEnrollmentResponse.enrollment_id	required	
+auth.v1.ClaimFreshStepUpResponse.step_up_id	required	
+auth.v1.CreateSubaccountChallengeResponse.polyester_chain_id	not_required	reference to a chain
+auth.v1.CreateSubaccountResponse.subaccount_id	required	
+auth.v1.ExternalAddressBookEntry.address_book_entry_id	required	
+auth.v1.ExternalAddressBookEntry.polychain_chain_id	not_required	reference to a chain
+auth.v1.ExternalRecentDestination.address_book_entry_id	not_required	reference to another object; 0 or empty when none
+auth.v1.ExternalRecentDestination.polychain_chain_id	not_required	reference to a chain
+auth.v1.ExternalWithdrawAddress.polychain_chain_id	not_required	reference to a chain
+auth.v1.GetEffectiveSubaccountPermissionsResponse.subaccount_policy_id	not_required	optional reference; 0 or empty means none
+auth.v1.InternalAddressBookEntry.address_book_entry_id	required	
+auth.v1.InternalAddressBookEntry.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalAddressBookEntry.target_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalRecentDestination.address_book_entry_id	not_required	reference to another object; 0 or empty when none
+auth.v1.InternalRecentDestination.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalRecentDestination.target_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalTransferAccount.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalTransferAccount.target_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalTransferWhitelistEntry.entry_id	required	
+auth.v1.InternalTransferWhitelistEntry.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.InternalTransferWhitelistEntry.target_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.LoginWithWalletResponse.account_id	required	
+auth.v1.MFAFactor.factor_id	required	
+auth.v1.MeResponse.account_id	required	
+auth.v1.MeResponse.api_key_id	not_required	optional reference; 0 or empty means none
+auth.v1.MirroredWithdrawWhitelistEntry.polychain_chain_id	not_required	reference to a chain
+auth.v1.ResolvedAccount.account_id	required	
+auth.v1.SessionInfo.session_id	required	
+auth.v1.SocialVerification.id	not_required	an API-key read returns only the link status; every other field, id included, is empty by contract
+auth.v1.SocialVerification.provider_user_id	not_required	reference to another object; 0 or empty when none
+auth.v1.SpotMarketRule.symbol_id	not_required	reference to a market
+auth.v1.Subaccount.id	required	
+auth.v1.Subaccount.subaccount_policy_id	not_required	optional reference; 0 or empty means none
+auth.v1.SubaccountInvite.grantee_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.SubaccountInvite.id	required	
+auth.v1.SubaccountInvite.inviter_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.SubaccountInvite.subaccount_id	required	
+auth.v1.SubaccountMemberView.account_id	required	
+auth.v1.SubaccountPolicyView.id	required	
+auth.v1.SubaccountPolicyView.source_template_id	not_required	optional reference; 0 or empty means none
+auth.v1.TransferCounterparty.address_book_entry_id	not_required	reference to another object; 0 or empty when none
+auth.v1.TransferCounterparty.counterparty_id	required	
+chain.analytics.v1.GetUnifiedAssetBalancesResponse.asset_id	not_required	reference to an asset
+chain.analytics.v1.GetZippedAssetSupplyGroupResponse.group_id	required	
+chain.analytics.v1.GetZippedAssetSupplyResponse.zipped_asset_id	not_required	reference to an asset
+chain.analytics.v1.ZippedAssetSupplySeries.zipped_asset_id	not_required	reference to an asset
+chain.deposit.v1.DepositAddress.chain_id	not_required	reference to a chain
+chain.lifecycle.v1.AssetIds.unified_asset_id	not_required	reference to an asset
+chain.lifecycle.v1.AssetIds.zipped_asset_id	not_required	reference to an asset
+chain.lifecycle.v1.FlowStepActivityView.ledger_transfer_id	not_required	reference to another object; 0 or empty when none
+chain.lifecycle.v1.FlowStepActivityView.tx_chain_id	not_required	reference to a chain
+chain.lifecycle.v1.FlowStepView.milestone_tx_chain_id	not_required	reference to a chain
+chain.lifecycle.v1.FlowStepView.polyester_chain_id	not_required	reference to a chain
+chain.lifecycle.v1.FlowSummaryView.flow_id	required	
+chain.lifecycle.v1.FlowSummaryView.owner_account_id	not_required	reference to an account; 0 or empty where the contract allows
+chain.lifecycle.v1.FlowSummaryView.polyester_chain_id	not_required	reference to a chain
+chain.lifecycle.v1.FlowTxMatchView.flow_id	required	
+chain.lifecycle.v1.FlowTxMatchView.owner_account_id	not_required	reference to an account; 0 or empty where the contract allows
+chain.lifecycle.v1.FlowTxMatchView.polyester_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawDestination.asset_id	not_required	reference to an asset
+chain.withdraw.v1.AutoWithdrawDestination.destination_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawPause.asset_id	not_required	reference to an asset
+chain.withdraw.v1.AutoWithdrawPreviewAsset.asset_id	not_required	reference to an asset
+chain.withdraw.v1.AutoWithdrawPreviewAsset.destination_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawRule.created_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+chain.withdraw.v1.AutoWithdrawRule.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+chain.withdraw.v1.AutoWithdrawStep.asset_id	not_required	reference to an asset
+chain.withdraw.v1.AutoWithdrawStep.destination_chain_id	not_required	reference to a chain
+chain.withdraw.v1.AutoWithdrawStep.intent_id	not_required	reference to another object; 0 or empty when none
+chain.withdraw.v1.CreateTradingWithdrawResponse.intent_id	required	
+chain.withdraw.v1.CreateWalletTradingWithdrawResponse.intent_id	required	
+chain.withdraw.v1.WalletBalance.chain_id	not_required	reference to a chain
+chain.withdraw.v1.WalletBalance.unified_asset_id	not_required	reference to an asset
+chain.withdraw.v1.WalletBalance.zipped_asset_id	not_required	reference to an asset
+chain.zipper.v1.AssetChainVariant.chain_id	not_required	reference to a chain
+chain.zipper.v1.AssetChainVariant.zipped_asset_id	not_required	reference to an asset
+chain.zipper.v1.AssetConfig.ledger_id	not_required	reference to an asset
+chain.zipper.v1.AssetConfig.u_asset_id	not_required	reference to an asset
+chain.zipper.v1.ChainConfig.chain_id	not_required	reference to a chain
+chain.zipper.v1.ChainConfig.native_chain_id	not_required	reference to a chain
+chain.zipper.v1.ZipperReasonDetails.reason_id	not_required	catalog or message key, not an object ID
+changelog.v1.Change.id	required	
+checkpoints.v1.BiggestTrade.symbol_id	not_required	reference to a market
+checkpoints.v1.ChainFlow.polyester_chain_id	not_required	reference to a chain
+checkpoints.v1.PairActivity.symbol_id	not_required	reference to a market
+claims.v1.ClaimCampaign.campaign_id	required	
+claims.v1.ClaimDailyRewardResponse.claim_id	required	
+claims.v1.ClaimDailyRewardResponse.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+claims.v1.DailyClaimReward.asset_id	not_required	reference to an asset
+claims.v1.DailyClaimTransfer.asset_id	not_required	reference to an asset
+claims.v1.DailyClaimTransfer.transfer_id	not_required	reference to another object; 0 or empty when none
+claims.v1.GetDailyClaimStatusResponse.claim_id	not_required	empty until a claim has been created
+claims.v1.GetDailyClaimStatusResponse.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+fees.v1.SpotFeeRate.symbol_id	not_required	reference to a market
+ledger.read.v1.AssetBalance.asset_id	not_required	reference to an asset
+ledger.read.v1.AssetGrouping.id	not_required	grouping key; 0 for the OTHER bucket
+ledger.read.v1.BalanceSeries.asset_id	not_required	reference to an asset
+ledger.read.v1.PortfolioAccountEquity.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ledger.read.v1.PortfolioAccountGrouping.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ledger.read.v1.PortfolioAssetEquity.asset_id	not_required	reference to an asset
+ledger.read.v1.TransferRow.asset_id	not_required	reference to an asset
+ledger.read.v1.TransferRow.flow_id	not_required	reference to another object; 0 or empty when none
+ledger.read.v1.TransferRow.link_id	not_required	reference to another object; 0 or empty when none
+ledger.read.v1.TransferRow.transfer_id	required	
+ledger.read.v1.TransferSide.account_id	not_required	reference to an account; 0 or empty where the contract allows
+ledger.read.v1.TransferSide.chain_id	not_required	reference to a chain
+marketdata.v1.AssetConfig.ledger_id	not_required	reference to an asset
+marketdata.v1.AssetInfo.asset_id	not_required	reference to an asset
+marketdata.v1.Candle.symbol_id	not_required	reference to a market
+marketdata.v1.GetCandlesColumnsResponse.symbol_id	not_required	reference to a market
+marketdata.v1.GetCandlesResponse.symbol_id	not_required	reference to a market
+marketdata.v1.GetOrderbookHeatmapResponse.symbol_id	not_required	reference to a market
+marketdata.v1.GetTradesResponse.complete_through_trade_id	not_required	paging cursor; 0 is valid
+marketdata.v1.GetTradesResponse.next_after_trade_id	not_required	paging cursor; 0 is valid
+marketdata.v1.HeatmapLiveBucket.symbol_id	not_required	reference to a market
+marketdata.v1.MarketTrade.match_id	not_required	trade sequence number, read as absent when 0
+marketdata.v1.MarketTrade.symbol_id	not_required	reference to a market
+marketdata.v1.PairConfig.symbol_id	not_required	reference to a market
+marketdata.v1.TradeEpochEnd.last_trade_id	not_required	sequence position; (epoch-1) * 2^40 when the epoch had no trades
+marketoverview.v1.MarketOverview.symbol_id	not_required	reference to a market
+marketoverview.v1.SpotPairVolumeSeries.symbol_id	not_required	reference to a market
+notifications.v1.BrokerAllowlistNotice.change_id	not_required	reference to another object; 0 or empty when none
+notifications.v1.BrokerAllowlistNotice.destination_chain_id	not_required	reference to a chain
+notifications.v1.BrokerAllowlistNotice.requested_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+notifications.v1.BrokerAllowlistNotice.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+notifications.v1.Notification.notification_id	required	
+notifications.v1.PriceAlertNotice.alert_id	not_required	reference to another object; 0 or empty when none
+notifications.v1.PriceAlertNotice.symbol_id	not_required	reference to a market
+notifications.v1.TelegramApprovalNotice.account_id	not_required	reference to an account; 0 or empty where the contract allows
+notifications.v1.TelegramApprovalNotice.approval_id	not_required	reference to another object; 0 or empty when none
+orderbook.v1.GetOrderBookResponse.symbol_id	not_required	reference to a market
+orders.v1.AttachedRiskLegState.child_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.AttachedRiskLegState.trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchCancelResultItem.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.BatchCancelResultItem.order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchCreateAccepted.order_id	required	
+orders.v1.BatchCreateAccepted.stop_loss_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchCreateAccepted.take_profit_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchCreateAccepted.trailing_stop_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchCreateResultItem.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.BatchReplaceAdmissionItem.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.BatchReplaceAdmissionItem.old_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchReplaceAdmissionItem.replacement_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.BatchReplaceOrdersResponse.batch_request_id	required	
+orders.v1.BatchReplaceStatusItem.old_order_id	not_required	reference to the targeted order; as on the admission item, unset when a requested client order ID names no order
+orders.v1.BatchReplaceStatusItem.replacement_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.CancelOrderResponse.order_id	required	
+orders.v1.CancelledOrder.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.CancelledOrder.order_id	required	
+orders.v1.CreateOrderResponse.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.CreateOrderResponse.order_id	required	
+orders.v1.CreateOrderResponse.stop_loss_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.CreateOrderResponse.take_profit_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.CreateOrderResponse.trailing_stop_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.DeadManSwitchScope.account_id	not_required	reference to an account; 0 or empty where the contract allows
+orders.v1.DeadManSwitchScope.symbol_id	not_required	reference to a market
+orders.v1.ErrorDetail.existing_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.FieldViolation.rule_id	not_required	catalog or message key, not an object ID
+orders.v1.GetBatchReplaceStatusResponse.batch_request_id	required	
+orders.v1.ModifyOrderResponse.final_order_id	required	
+orders.v1.ModifyOrderResponse.old_order_id	required	
+orders.v1.ModifyOrderResponse.stop_loss_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.ModifyOrderResponse.take_profit_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.ModifyOrderResponse.trailing_stop_trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.Order.batch_request_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.Order.client_order_id	not_required	client correlation ID; empty when none was supplied
+orders.v1.Order.order_id	required	
+orders.v1.Order.symbol_id	not_required	reference to a market
+orders.v1.OrderLineage.id	required	
+orders.v1.OrderOrigin.parent_order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.OrderOrigin.trigger_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.OrderTransfer.asset_id	not_required	reference to an asset
+orders.v1.OrderTransfer.match_id	not_required	reference to a trade; absent for transfers of no trade
+orders.v1.OrderTransfer.symbol_id	not_required	reference to a market
+orders.v1.OrderTransfer.tx_id	not_required	reference to another object; 0 or empty when none
+orders.v1.UserTrade.match_id	not_required	trade sequence number, read as absent when 0
+orders.v1.UserTrade.order_id	not_required	reference to another order, trigger or batch; 0 when none
+orders.v1.UserTrade.symbol_id	not_required	reference to a market
+polyester.ratelimit.v1.RateLimitDetail.operation_id	not_required	catalog or message key, not an object ID
+rewards.v1.RewardAward.asset_id	not_required	reference to an asset
+rewards.v1.RewardAward.award_id	required	
+rewards.v1.RewardAward.campaign_id	not_required	reference to another object; 0 or empty when none
+rewards.v1.RewardAward.transaction_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.AffiliateShare.account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.AffiliateVault.account_id	required	
+swap.quickswap.v1.AssetVolume.asset_id	not_required	reference to an asset
+swap.quickswap.v1.AssetWithoutDestination.asset_id	not_required	reference to an asset
+swap.quickswap.v1.Broker.default_vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.Broker.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.BrokerKey.created_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.BrokerKey.key_id	required	
+swap.quickswap.v1.ChargedFee.account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.ChargedFee.asset_id	not_required	reference to an asset
+swap.quickswap.v1.Deposit.flow_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.Deposit.zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.DepositInstructions.zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.FeeSplit.asset_id	not_required	reference to an asset
+swap.quickswap.v1.FeeTotal.asset_id	not_required	reference to an asset
+swap.quickswap.v1.FeeTotal.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.Invite.account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.Invite.invite_id	required	
+swap.quickswap.v1.Invite.invited_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.Member.account_id	required	
+swap.quickswap.v1.Payout.run_id	required	
+swap.quickswap.v1.Payout.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.PayoutRuleDestination.asset_id	not_required	reference to an asset
+swap.quickswap.v1.PayoutRuleDestination.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.PayoutStep.asset_id	not_required	reference to an asset
+swap.quickswap.v1.PayoutStep.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.QuickSwap.refund_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuickSwap.swap_id	required	
+swap.quickswap.v1.QuickSwapQuote.intermediate_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuickSwapSummary.swap_id	required	
+swap.quickswap.v1.QuickSwapTerms.destination_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuickSwapTerms.source_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuoteFee.account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.QuoteFee.zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ReferralCommission.asset_id	not_required	reference to an asset
+swap.quickswap.v1.ReferralCredit.asset_id	not_required	reference to an asset
+swap.quickswap.v1.ReferralPartner.earnings_subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.ReferralPartner.partner_id	required	
+swap.quickswap.v1.ReferredQuickSwap.destination_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ReferredQuickSwap.source_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ReferredQuickSwap.swap_id	required	
+swap.quickswap.v1.UpcomingPayout.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.UpcomingPayoutAsset.asset_id	not_required	reference to an asset
+swap.quickswap.v1.UpcomingPayoutAsset.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.VaultAllowlistChange.change_id	required	
+swap.quickswap.v1.VaultAllowlistChange.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.VaultAllowlistChange.requested_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.VaultAllowlistChange.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.VaultAllowlistEntry.created_by_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.VaultAllowlistEntry.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.VaultAssetBalance.asset_id	not_required	reference to an asset
+swap.quickswap.v1.VaultBalance.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.VaultLedgerEntry.asset_id	not_required	reference to an asset
+swap.quickswap.v1.VaultLedgerEntry.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.VaultLedgerFeeCredit.credit_id	required	
+swap.quickswap.v1.VaultLedgerFeeCredit.destination_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.VaultLedgerFeeCredit.source_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.VaultLedgerFeeCredit.swap_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.VaultLedgerPayoutDebit.destination_chain_id	not_required	reference to a chain
+swap.quickswap.v1.VaultLedgerPayoutDebit.run_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.VaultLedgerPayoutRefund.run_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.VaultPayoutRule.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.quickswap.v1.Withdrawal.flow_id	not_required	reference to another object; 0 or empty when none
+swap.quickswap.v1.Withdrawal.zipped_asset_id	not_required	reference to an asset
+swap.v1.Swap.destination_asset_id	not_required	reference to an asset
+swap.v1.Swap.source_asset_id	not_required	reference to an asset
+swap.v1.Swap.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+swap.v1.Swap.swap_id	required	
+swap.v1.SwapOrder.order_id	not_required	reference to another order, trigger or batch; 0 when none
+swap.v1.SwapOrder.symbol_id	not_required	reference to a market
+swap.v1.SwapQuoteLeg.fee_asset_id	not_required	reference to an asset
+swap.v1.SwapQuoteLeg.symbol_id	not_required	reference to a market
+swap.v1.SwapTerms.destination_asset_id	not_required	reference to an asset
+swap.v1.SwapTerms.source_asset_id	not_required	reference to an asset
+swap.v1.SwapTerms.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+system.v1.StatusEvent.id	required	
+system.v1.StatusEventUpdate.id	required	
+transfer.v1.CreateInternalTransferResponse.asset_id	not_required	reference to an asset
+transfer.v1.CreateInternalTransferResponse.flow_id	not_required	an older server sends none; the receipt decodes with an empty flow ID
+transfer.v1.CreateInternalTransferResponse.request_id	required	
+transfer.v1.CreateInternalTransferResponse.transfer_id	required	
+transfer.v1.CreateInternalTransferResponse.u_asset_id	not_required	reference to an asset
+transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sends none, as for CreateInternalTransfer
+transfer.v1.GetInternalTransferResponse.request_id	required	
+transfer.v1.GetInternalTransferResponse.transfer_id	required	
+transfer.v1.ResolvedDestination.root_account_public_id	not_required	reference to an account; 0 or empty where the contract allows
+transfer.v1.ResolvedDestination.subaccount_public_id	not_required	reference to an account; 0 or empty where the contract allows
+triggers.v1.BatchCancelTriggersResultItem.trigger_id	required	
+triggers.v1.CancelOcoResponse.order_list_id	required	
+triggers.v1.CancelTriggerResponse.trigger_id	required	
+triggers.v1.CreateOcoResponse.client_list_id	not_required	client correlation ID; empty when none was supplied
+triggers.v1.CreateOcoResponse.order_list_id	required	
+triggers.v1.CreateOcoResponse.stop_loss_trigger_id	required	
+triggers.v1.CreateOcoResponse.take_profit_trigger_id	required	
+triggers.v1.CreateTriggerResponse.client_trigger_id	not_required	client correlation ID; empty when none was supplied
+triggers.v1.CreateTriggerResponse.trigger_id	required	
+triggers.v1.ModifyTriggerResponse.trigger_id	required	
+triggers.v1.PauseTriggerResponse.trigger_id	required	
+triggers.v1.ResumeTriggerResponse.trigger_id	required	
+triggers.v1.Trigger.client_list_id	not_required	client correlation ID; empty when none was supplied
+triggers.v1.Trigger.client_trigger_id	not_required	client correlation ID; empty when none was supplied
+triggers.v1.Trigger.order_list_id	not_required	reference to another order, trigger or batch; 0 when none
+triggers.v1.Trigger.parent_order_id	not_required	reference to another order, trigger or batch; 0 when none
+triggers.v1.Trigger.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+triggers.v1.Trigger.symbol_id	not_required	reference to a market
+triggers.v1.Trigger.trigger_id	required	
+triggers.v1.TriggerEvent.child_order_id	not_required	reference to another order, trigger or batch; 0 when none
+triggers.v1.TriggerEvent.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
+triggers.v1.TriggerEvent.symbol_id	not_required	reference to a market
+triggers.v1.TriggerEvent.trigger_id	required	

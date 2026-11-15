@@ -59,6 +59,9 @@ pub fn status_events_page_from_proto(msg: &ListStatusEventsResponse) -> Result<S
             .iter()
             .map(|event| {
                 require_id("ListStatusEvents", "id", event.id)?;
+                for update in &event.updates {
+                    require_id("ListStatusEvents", "update id", u64::from(update.id))?;
+                }
                 Ok(status_event_from_proto(event))
             })
             .collect::<Result<_>>()?,

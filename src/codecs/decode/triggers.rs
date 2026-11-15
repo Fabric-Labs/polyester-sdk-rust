@@ -528,11 +528,16 @@ pub fn triggers_list_from_proto(msg: &ListTriggersResponse) -> crate::errors::Re
     })
 }
 
+/// Decode a `GetTrigger` answer. A reply without its trigger, or a trigger
+/// without its ID, is refused with `Error::ResponseContract`: a trigger that
+/// does not exist is refused by the API with its own error, never answered
+/// with an empty success. The result is never `None`.
 pub fn get_trigger_from_proto(msg: &GetTriggerResponse) -> crate::errors::Result<Option<Trigger>> {
-    msg.trigger
+    let trigger = msg
+        .trigger
         .as_option()
-        .map(|trigger| required_trigger("GetTrigger", trigger))
-        .transpose()
+        .ok_or_else(|| crate::Error::response_contract("GetTrigger", "missing trigger"))?;
+    required_trigger("GetTrigger", trigger).map(Some)
 }
 
 fn trigger_mutation(

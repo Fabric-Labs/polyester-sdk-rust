@@ -187,11 +187,11 @@ pub fn flow_from_get_response(msg: &GetFlowResponse) -> Result<LifecycleFlowSumm
     let detail = msg
         .flow
         .as_option()
-        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow"))?;
+        .ok_or_else(|| Error::response_contract("GetFlowById", "missing flow"))?;
     let summary = detail
         .summary
         .as_option()
-        .ok_or_else(|| Error::transport("invalid GetFlow response: missing flow summary"))?;
+        .ok_or_else(|| Error::response_contract("GetFlowById", "missing flow summary"))?;
     required_flow_summary("GetFlowById", summary)
 }
 

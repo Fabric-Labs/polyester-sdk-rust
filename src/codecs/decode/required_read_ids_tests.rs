@@ -1,6 +1,6 @@
-//! Every read reply that carries an object's required ID refuses 0 (or an
-//! empty string ID) with `Error::ResponseContract`; the same reply with a real
-//! ID decodes. A nested message the reply may leave out (an order's lineage,
+//! Every read reply that carries an object's required ID (see
+//! `testdata/reply_id_inventory.tsv`) refuses 0 (or an empty string ID) with
+//! `Error::ResponseContract`; the same reply with a real ID decodes. A nested message the reply may leave out (an order's lineage,
 //! the caller's session, a sub-account's policy, a destination's saved entry)
 //! is checked only when present.
 
@@ -8,14 +8,16 @@ use super::*;
 use crate::errors::{Error, Result};
 use crate::proto::alerts::v1::{ListAlertsResponse, PriceAlert};
 use crate::proto::auth::v1::{
-    AddressBookEntriesView, AddressBookEntry, AddressBookTag, ApiKey,
-    CreateAddressBookEntryResponse, ExternalAddressBookEntry, GetAddressBookViewResponse,
-    GetApiKeyResponse, GetSubaccountResponse, InternalAddressBookEntry,
-    InternalTransferWhitelistEntry, ListAddressBookEntriesResponse, ListApiKeysResponse,
-    ListInternalTransferWhitelistEntriesResponse, ListSubaccountInvitesResponse,
-    ListSubaccountsResponse, ListTransferCounterpartiesResponse, ListTransferDestinationsResponse,
-    MeResponse, SessionInfo, Subaccount, SubaccountInvite, SubaccountPolicyView,
-    TransferCounterparty, TransferDestination,
+    AddressBookEntriesView, AddressBookEntry, AddressBookTag, AddressBookTagSummary, ApiKey,
+    CreateAddressBookEntryResponse, CreateApiKeyResponse, CreateSubaccountResponse,
+    ExternalAddressBookEntry, GetAddressBookViewResponse, GetApiKeyResponse, GetSubaccountResponse,
+    InternalAddressBookEntry, InternalTransferWhitelistEntry, ListAddressBookEntriesResponse,
+    ListApiKeysResponse, ListInternalTransferWhitelistEntriesResponse,
+    ListSubaccountInvitesResponse, ListSubaccountMembersResponse, ListSubaccountsResponse,
+    ListTransferCounterpartiesResponse, ListTransferDestinationsResponse, MeResponse,
+    ResolveAccountResponse, ResolvedAccount, SessionInfo, Subaccount, SubaccountInvite,
+    SubaccountMemberView, SubaccountPolicyView, TransferCounterparty, TransferDestination,
+    UpdateApiKeyResponse,
 };
 use crate::proto::chain::analytics::v1::GetZippedAssetSupplyGroupResponse;
 use crate::proto::chain::lifecycle::v1::{
@@ -31,7 +33,7 @@ use crate::proto::orders::v1::{
     GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse, Order,
     OrderLineage, UserTrade,
 };
-use crate::proto::system::v1::{ListStatusEventsResponse, StatusEvent};
+use crate::proto::system::v1::{ListStatusEventsResponse, StatusEvent, StatusEventUpdate};
 use crate::proto::triggers::v1::{
     GetTriggerResponse, ListTriggerEventsResponse, ListTriggersResponse, Trigger, TriggerEvent,
 };
@@ -205,12 +207,6 @@ fn trigger_reads_refuse_a_zero_trigger_id() {
         })
     };
     check("ListTriggerEvents", events(0), Some(events(7)));
-    // A get that finds nothing still reads as None.
-    assert!(
-        get_trigger_from_proto(&GetTriggerResponse::default())
-            .unwrap()
-            .is_none()
-    );
 }
 
 #[test]
@@ -252,12 +248,6 @@ fn order_reads_refuse_a_zero_order_or_lineage_id() {
         })
     };
     check("GetUserTrades lineage.id", trades(0), Some(trades(3)));
-    assert!(
-        get_order_from_proto(&GetOrderResponse::default())
-            .unwrap()
-            .order
-            .is_none()
-    );
 }
 
 #[test]
@@ -374,11 +364,7 @@ fn account_reads_refuse_a_zero_id() {
         })
     };
     check("GetApiKey", key(""), Some(key("ak_1")));
-    assert!(
-        api_key_from_get_proto(&GetApiKeyResponse::default())
-            .unwrap()
-            .is_none()
-    );
+
     let keys = |key_id: &str| {
         api_keys_list_from_proto(&ListApiKeysResponse {
             api_keys: vec![ApiKey {
@@ -550,4 +536,143 @@ fn flow_changelog_transfer_and_status_reads_refuse_a_zero_id() {
         })
     };
     check("ListStatusEvents", events(0), Some(events(7)));
+}
+
+#[test]
+fn get_replies_without_their_object_are_refused() {
+    check::<()>(
+        "GetTrigger",
+        get_trigger_from_proto(&GetTriggerResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetOrder",
+        get_order_from_proto(&GetOrderResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetApiKey",
+        api_key_from_get_proto(&GetApiKeyResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetSubaccount",
+        get_subaccount_from_proto(&GetSubaccountResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetFlowById",
+        flow_from_get_response(&GetFlowResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetFlowById summary",
+        flow_from_get_response(&GetFlowResponse {
+            flow: FlowDetailView::default().into(),
+            ..Default::default()
+        })
+        .map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetPost",
+        changelog_post_from_proto(&GetPostResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetDeploymentGroup",
+        changelog_deployment_group_from_proto(&GetDeploymentGroupResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "CreateApiKey",
+        api_key_from_create_proto(&CreateApiKeyResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "UpdateApiKey",
+        api_key_from_update_proto(&UpdateApiKeyResponse::default()).map(|_| ()),
+        None,
+    );
+}
+
+#[test]
+fn more_replies_refuse_a_zero_required_id() {
+    let view_tag = |tag_id| {
+        address_book_view_from_proto(&GetAddressBookViewResponse {
+            tags: vec![AddressBookTagSummary {
+                tag_id,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+    };
+    check("GetAddressBookView tag", view_tag(0), Some(view_tag(7)));
+    let update = |id| {
+        status_events_page_from_proto(&ListStatusEventsResponse {
+            events: vec![StatusEvent {
+                id: 7,
+                updates: vec![StatusEventUpdate {
+                    id,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+    };
+    check("ListStatusEvents update id", update(0), Some(update(1)));
+    let member = |account_id| SubaccountMemberView {
+        account_id,
+        ..Default::default()
+    };
+    let get_with_member = |account_id| {
+        let mut reply = subaccount(4, "ak_1", invite(5, 6), 7);
+        reply.members = vec![member(account_id)];
+        get_subaccount_from_proto(&reply)
+    };
+    check(
+        "GetSubaccount member account_id",
+        get_with_member(0),
+        Some(get_with_member(8)),
+    );
+    let members = |account_id| {
+        subaccount_members_list_from_proto(&ListSubaccountMembersResponse {
+            members: vec![member(account_id)],
+            ..Default::default()
+        })
+    };
+    check("ListSubaccountMembers", members(0), Some(members(8)));
+    let resolved = |account_id| {
+        resolved_accounts_from_proto(&ResolveAccountResponse {
+            matches: vec![ResolvedAccount {
+                account_id,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+    };
+    check("ResolveAccount", resolved(0), Some(resolved(8)));
+    let created = |subaccount_id| {
+        create_subaccount_from_proto(&CreateSubaccountResponse {
+            subaccount_id,
+            ..Default::default()
+        })
+    };
+    check("CreateSubaccount", created(0), Some(created(4)));
+    let created_key = |key_id: &str| {
+        api_key_from_create_proto(&CreateApiKeyResponse {
+            api_key: ApiKey {
+                key_id: key_id.into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+    };
+    check(
+        "CreateApiKey key_id",
+        created_key(""),
+        Some(created_key("ak_1")),
+    );
 }

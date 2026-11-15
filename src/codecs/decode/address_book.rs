@@ -133,15 +133,13 @@ fn required_entry(
     operation: &str,
     entry: Option<&ProtoAddressBookEntry>,
 ) -> Result<AddressBookEntry> {
-    let entry = entry
-        .ok_or_else(|| Error::transport(format!("invalid {operation} response: missing entry")))?;
+    let entry = entry.ok_or_else(|| Error::response_contract(operation, "missing entry"))?;
     entry_from_proto(operation, entry)
 }
 
 /// The tag a create or update returns: refused when it is missing or has no ID.
 fn required_tag(operation: &str, tag: Option<&ProtoAddressBookTag>) -> Result<AddressBookTag> {
-    let tag =
-        tag.ok_or_else(|| Error::transport(format!("invalid {operation} response: missing tag")))?;
+    let tag = tag.ok_or_else(|| Error::response_contract(operation, "missing tag"))?;
     tag_from_proto(operation, tag)
 }
 
@@ -427,12 +425,15 @@ pub fn address_book_view_from_proto(msg: &GetAddressBookViewResponse) -> Result<
         tags: msg
             .tags
             .iter()
-            .map(|tag| AddressBookTagSummary {
-                tag_id: format_uint64_id(tag.tag_id),
-                name: tag.name.clone(),
-                color: tag.color.clone(),
+            .map(|tag| {
+                require_id("GetAddressBookView", "tag_id", tag.tag_id)?;
+                Ok(AddressBookTagSummary {
+                    tag_id: format_uint64_id(tag.tag_id),
+                    name: tag.name.clone(),
+                    color: tag.color.clone(),
+                })
             })
-            .collect(),
+            .collect::<Result<_>>()?,
         withdraw_whitelist: msg
             .withdraw_whitelist
             .as_option()

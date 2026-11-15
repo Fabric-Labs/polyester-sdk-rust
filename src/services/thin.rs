@@ -519,7 +519,7 @@ impl SubAccountsService {
             .await?
             .into_owned()
         };
-        Ok(subaccount_members_list_from_proto(&resp))
+        subaccount_members_list_from_proto(&resp)
     }
 
     /// List a sub-account's invites. An API key needs

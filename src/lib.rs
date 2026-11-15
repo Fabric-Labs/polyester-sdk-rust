@@ -52,6 +52,8 @@ pub mod errors;
 pub mod marketoverview;
 pub mod models;
 pub mod orderbook;
+#[cfg(test)]
+mod reply_id_inventory_tests;
 pub mod services;
 pub mod transport;
 pub mod types;
