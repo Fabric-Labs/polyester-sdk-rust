@@ -23,20 +23,27 @@ pub struct ZipperAssetChainVariant {
     /// Whether this route accepts new deposits: [`ROUTE_STATUS_NORMAL`] or
     /// [`ROUTE_STATUS_SUSPENDED`]. Empty while availability is not known, and
     /// `"unknown(n)"` for a status this SDK version does not know: neither
-    /// means the route is available. Funds sent to a deposit address while
-    /// deposits are suspended are delayed, not lost. Use
+    /// means the route is available, and neither means it is suspended.
+    /// While it is suspended, do not send funds to a deposit address on this
+    /// route; wait until it returns to normal. Use
     /// [`Self::accepts_deposits`].
     pub deposit_status: String,
     /// Whether this route accepts new withdrawals, read as `deposit_status`.
-    /// A suspension can stop one direction and not the other. Use
-    /// [`Self::accepts_withdrawals`].
+    /// A suspension can stop one direction and not the other. A Trading
+    /// withdrawal accepted before the route became suspended and not yet
+    /// sent stays pending, with its funds held, and is sent once the route
+    /// returns to normal; one already being sent when the suspension takes
+    /// effect may fail instead, and its funds then return to the account. A
+    /// new withdrawal on a suspended route is refused with
+    /// `ERROR_CODE_ROUTE_SUSPENDED`. Use [`Self::accepts_withdrawals`].
     pub withdrawal_status: String,
 }
 
 /// Route status label: the route accepts new requests.
 pub const ROUTE_STATUS_NORMAL: &str = "normal";
-/// Route status label: the route does not accept new requests; requests
-/// created before the suspension continue to process. No reason is published.
+/// Route status label: the route does not accept new requests. Do not send
+/// funds on it until it returns to [`ROUTE_STATUS_NORMAL`]. No reason is
+/// published.
 pub const ROUTE_STATUS_SUSPENDED: &str = "suspended";
 
 impl ZipperAssetChainVariant {

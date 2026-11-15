@@ -57,7 +57,7 @@ impl BalancesService {
         )
         .await?
         .into_owned();
-        Ok(balance_history_from_proto(&resp))
+        balance_history_from_proto(&resp)
     }
 
     pub async fn get_equity_history(

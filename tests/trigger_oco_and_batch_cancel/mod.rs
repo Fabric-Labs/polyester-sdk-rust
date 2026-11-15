@@ -651,13 +651,14 @@ async fn list_sends_the_oco_filters() {
     }
 }
 
-/// A client OCO ID is any 1 to 36 bytes of UTF-8, matched by the server byte
-/// for byte: the create and the recovery listing send the caller's key
-/// unchanged, untrimmed, non-ASCII included, so the listing finds the OCO the
-/// create made. A key over 36 bytes is refused before anything is sent.
+/// A client OCO ID follows the client order ID rule
+/// (`^[A-Za-z0-9._:/-]{1,36}$`): the create and the recovery listing send the
+/// caller's key unchanged, so the listing finds the OCO the create made. Any
+/// other key (empty, too long, with spaces or non-ASCII characters) is
+/// refused by both before anything is sent.
 #[tokio::test]
 async fn create_and_list_send_the_same_client_oco_id_bytes() {
-    let key = " oco-\u{00e9}t\u{00e9} 1 ";
+    let key = "tp-sl:btc/2026-11-15_1";
     for wire in WIRES {
         let s = server(wire).await;
         let mut params = sell_oco();
@@ -689,7 +690,20 @@ async fn create_and_list_send_the_same_client_oco_id_bytes() {
         );
 
         let sent_before = s.sent();
-        for bad in [String::new(), "x".repeat(37), "\u{30b9}".repeat(13)] {
+        for bad in [
+            String::new(),
+            "x".repeat(37),
+            "\u{30b9}".repeat(12),
+            " oco-1 ".to_owned(),
+            "oco 1".to_owned(),
+        ] {
+            let mut params = sell_oco();
+            params.client_list_id = bad.clone();
+            let err = s.client.triggers.create_oco(params).await.unwrap_err();
+            assert!(
+                matches!(err, Error::Validation(_)),
+                "{wire:?} {bad:?}: {err}"
+            );
             let err = s
                 .client
                 .triggers

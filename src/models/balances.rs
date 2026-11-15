@@ -23,8 +23,14 @@ pub struct BalanceHistorySeries {
     pub asset_id: u32,
     /// Raw protobuf enum value; unknown/negative future values are preserved.
     pub account_code: i32,
-    /// Unsigned scaled balance values from the ledger protocol.
-    pub balance_q: Vec<u64>,
+    /// The exact balance at each point, in whole units of the asset at the
+    /// fixed 18-decimal ledger scale ([`crate::types::AssetAmount`] with
+    /// scale 18, domain `LedgerE18` and this series' asset ID), aligned 1:1
+    /// with the implicit timestamps: one value per point, `points` in all.
+    /// Decoded exactly from the contract's `polyester.type.v1.U128`:
+    /// [`crate::types::AssetAmount::as_scaled`] is the balance times 10^18.
+    /// Never convert it through a float.
+    pub balance: Vec<crate::types::AssetAmount>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

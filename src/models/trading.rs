@@ -762,6 +762,40 @@ pub struct CreateInternalTransferParams {
     pub quantity_scale: Option<u32>,
 }
 
+/// One transfer of a [`BatchCreateInternalTransfersParams`]: the fields of
+/// [`CreateInternalTransferParams`] without the idempotency key, which the
+/// batch carries for every leg.
+#[derive(Debug, Clone)]
+pub struct InternalTransferBatchLeg {
+    /// Numeric asset ID; required (not 0).
+    pub asset_id: u32,
+    /// The amount, rescaled exactly to 18 decimals as for a single transfer.
+    pub quantity: AssetAmount,
+    /// Input quantity scale when `quantity` does not carry one.
+    pub quantity_scale: Option<u32>,
+    /// The source account of this leg (see [`SubAccountScope`]): legs of one
+    /// batch may debit different accounts of the caller.
+    pub subaccount_id: SubAccountScope,
+    /// Exactly one destination, as for a single transfer.
+    pub destination_account_id: Option<String>,
+    pub destination_subaccount_id: Option<String>,
+    pub destination_smart_account_address: Option<String>,
+}
+
+/// Typed batch internal-transfer params: 1 to 10 Trading to Trading
+/// transfers under one idempotency key and one MFA check.
+#[derive(Debug, Clone)]
+pub struct BatchCreateInternalTransfersParams {
+    /// The transfers, run in order: 1 to 10 legs.
+    pub legs: Vec<InternalTransferBatchLeg>,
+    /// Stable key for the whole batch, 1 to 128 characters, scoped to the
+    /// caller. Persist it and retry with the same key and the same legs in
+    /// the same order: accepted legs answer the same transfers and legs not
+    /// yet accepted run again. Different legs under the key are refused with
+    /// `ERROR_CODE_IDEMPOTENCY_CONFLICT`.
+    pub idempotency_key: String,
+}
+
 /// Typed trading-withdraw create params.
 #[derive(Debug, Clone)]
 pub struct CreateTradingWithdrawParams {
@@ -1481,6 +1515,65 @@ pub struct InternalTransferResult {
     /// `LifecycleService::get_flow`; its ledger settlement step names
     /// `transfer_id`. Empty when the server sent none.
     pub flow_id: String,
+}
+
+/// The outcome of a batch of internal transfers, from
+/// [`crate::services::InternalTransfersService::batch_create`].
+///
+/// Legs are not atomic. When `status` is `refused`, at least one leg failed
+/// its checks (`refused`, with `error_code`), every other leg is
+/// `not_submitted`, and nothing moved. When it is `submitted`, legs ran in
+/// order, each on its own: a leg can be `refused` (for example
+/// `insufficient_funds`) after earlier legs were `accepted`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InternalTransferBatchResult {
+    /// Stable ID of the batch request; empty when the batch was refused.
+    pub request_id: String,
+    /// `submitted` or `refused`.
+    pub status: String,
+    /// One result per requested leg, in request order.
+    pub legs: Vec<InternalTransferBatchLegResult>,
+}
+
+/// The outcome of one leg of a batch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InternalTransferBatchLegResult {
+    /// Zero-based position of the leg in the request.
+    pub leg_index: u32,
+    /// `accepted` (the transfer has a durable `transfer_id`; it has not
+    /// necessarily settled), `pending` (the outcome is not known yet: it
+    /// completes without the caller; retry the batch with the same
+    /// idempotency key to learn it, since reading one transfer needs an
+    /// interactive session), `refused` (no funds moved; `error_code` says
+    /// why) or `not_submitted` (the leg did not run; a retry with the same
+    /// key runs it). `UNKNOWN(<n>)` for a status this SDK does not know:
+    /// treat it as not known yet.
+    pub status: String,
+    /// Stable request ID of the leg's transfer; empty while the leg has not
+    /// been submitted.
+    pub request_id: String,
+    /// Transfer ID, set once the leg is accepted.
+    pub transfer_id: String,
+    /// Lifecycle flow ID, set once the leg is accepted.
+    pub flow_id: String,
+    /// Acceptance time in nanoseconds since the Unix epoch (server time),
+    /// set once the leg is accepted; 0 otherwise.
+    pub accepted_at_ts_ns: u64,
+    /// The leg's asset, echoed.
+    pub asset_id: u32,
+    /// Resolved asset code, set once the leg is submitted.
+    pub asset_code: String,
+    /// The leg's amount, echoed, exact at 18 decimals; `None` when the
+    /// server sent none.
+    pub quantity: Option<AssetAmount>,
+    /// Why the leg was refused, or why its outcome is not known yet: the
+    /// `transfer.v1.ErrorCode` as a lowercase label without its
+    /// `ERROR_CODE_` prefix, such as `insufficient_funds`;
+    /// `UNKNOWN_ERROR_CODE(<n>)` for a code this SDK does not know. `None`
+    /// for an accepted or not-submitted leg.
+    pub error_code: Option<String>,
+    /// Human-readable description of `error_code`.
+    pub error_message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

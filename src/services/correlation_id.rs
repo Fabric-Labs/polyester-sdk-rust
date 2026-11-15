@@ -39,20 +39,14 @@ pub(crate) fn optional_client_order_id(value: Option<&str>) -> Result<Option<Str
     Ok(Some(trimmed.to_owned()))
 }
 
-/// The contract's limit on a client OCO ID (`OcoIntent.client_list_id` and
-/// the `ListTriggersRequest.client_list_id` filter), in UTF-8 bytes.
-pub(crate) const CLIENT_LIST_ID_MAX_BYTES: usize = 36;
-
-/// Validate a client OCO ID as the contract does: 1 to 36 bytes of UTF-8, any
-/// characters. It is neither trimmed nor normalised: the server matches the
-/// bytes, so the create and the recovery listing must send the same ones.
+/// Validate a client OCO ID (`OcoIntent.client_list_id` and the
+/// `ListTriggersRequest.client_list_id` filter) as the contract does: the
+/// client order ID rule, 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/` or
+/// `-` (`^[A-Za-z0-9._:/-]{1,36}$`), with the same error text. It is sent as
+/// given, never trimmed, so the create and the recovery listing send the
+/// same ID; outer spaces are refused like any other space.
 pub(crate) fn require_client_list_id(value: &str, field: &str) -> Result<String> {
-    if value.is_empty() || value.len() > CLIENT_LIST_ID_MAX_BYTES {
-        return Err(Error::validation(format!(
-            "{field} must be 1 to {CLIENT_LIST_ID_MAX_BYTES} bytes of UTF-8, got {}",
-            value.len()
-        )));
-    }
+    validate_correlation_id(value, field, CLIENT_ORDER_ID_MAX_LEN)?;
     Ok(value.to_owned())
 }
 
@@ -123,5 +117,32 @@ mod tests {
         );
         let too_long = "r".repeat(REQUEST_ID_MAX_LEN + 1);
         assert!(optional_request_id(Some(&too_long)).is_err());
+    }
+
+    /// A client OCO ID follows the client order ID rule and keeps its error
+    /// text; it is never trimmed.
+    #[test]
+    fn client_list_id_follows_the_client_order_id_rule() {
+        for ok in ["tp-sl:btc/2026-11-15_1", "A.B_c:1/2-3", &"x".repeat(36)] {
+            assert_eq!(require_client_list_id(ok, "client_list_id").unwrap(), ok);
+        }
+        for (bad, want) in [
+            ("", "client_list_id must be 1 to 36 characters"),
+            (
+                &"x".repeat(37) as &str,
+                "client_list_id must be 1 to 36 characters",
+            ),
+            (" oco-1 ", "client_list_id contains invalid characters"),
+            ("oco 1", "client_list_id contains invalid characters"),
+            ("oco!", "client_list_id contains invalid characters"),
+            (
+                "\u{e9}t\u{e9}",
+                "client_list_id contains invalid characters",
+            ),
+        ] {
+            let err = require_client_list_id(bad, "client_list_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{bad:?}: {err:?}");
+            assert!(err.to_string().contains(want), "{bad:?}: {err}");
+        }
     }
 }

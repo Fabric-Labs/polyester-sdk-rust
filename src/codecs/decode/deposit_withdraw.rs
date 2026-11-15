@@ -4,7 +4,8 @@ use super::money::decode_asset_amount_u128;
 use crate::codecs::scalars::{LEDGER_SCALE, format_ledger_u128, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
-    DepositAddress, DepositAddressesList, InternalTransferResult, WalletBalance, WalletBalances,
+    DepositAddress, DepositAddressesList, InternalTransferBatchLegResult,
+    InternalTransferBatchResult, InternalTransferResult, WalletBalance, WalletBalances,
     WithdrawDestinationValidation, WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{
@@ -16,7 +17,10 @@ use crate::proto::chain::withdraw::v1::{
     ValidateWithdrawDestinationResponse, WalletBalance as ProtoWalletBalance,
     WithdrawDestinationValidationCode,
 };
-use crate::proto::transfer::v1::{CreateInternalTransferResponse, InternalTransferStatus};
+use crate::proto::transfer::v1::{
+    BatchCreateInternalTransfersResponse, CreateInternalTransferResponse,
+    InternalTransferBatchLegStatus, InternalTransferBatchStatus, InternalTransferStatus,
+};
 use crate::types::QuantityDomain;
 
 fn withdraw_destination_validation_code_label(
@@ -150,6 +154,98 @@ pub fn internal_transfer_from_proto(
         quantity,
         status: internal_transfer_status_label(&msg.status),
         flow_id: msg.flow_id.clone(),
+    })
+}
+
+/// Decode a batch of internal transfers sent with `requested_legs` legs.
+///
+/// Refused with [`Error::ResponseContract`]: a batch status that is unset or
+/// unknown to this SDK; a submitted batch without its request ID; another
+/// number of leg results than legs requested, or leg results out of request
+/// order; a leg without a status; an accepted leg without its request ID or
+/// transfer ID; a pending leg without its request ID. The batch may have
+/// moved funds: retry it with the same idempotency key to read its outcome.
+pub fn internal_transfer_batch_from_proto(
+    msg: &BatchCreateInternalTransfersResponse,
+    requested_legs: usize,
+) -> Result<InternalTransferBatchResult> {
+    const OP: &str = "BatchCreateInternalTransfers";
+    let status = match msg.status.as_known() {
+        Some(InternalTransferBatchStatus::BATCH_SUBMITTED) => {
+            super::common::require_str_id(OP, "request_id", &msg.request_id)?;
+            "submitted"
+        }
+        Some(InternalTransferBatchStatus::BATCH_REFUSED) => "refused",
+        _ => {
+            return Err(Error::response_contract(
+                OP,
+                format!("batch status {} is not known", msg.status.to_i32()),
+            ));
+        }
+    };
+    if msg.legs.len() != requested_legs {
+        return Err(Error::response_contract(
+            OP,
+            format!("{} leg results for {requested_legs} legs", msg.legs.len()),
+        ));
+    }
+    let legs = msg
+        .legs
+        .iter()
+        .enumerate()
+        .map(|(index, leg)| {
+            if usize::try_from(leg.leg_index).ok() != Some(index) {
+                return Err(Error::response_contract(
+                    OP,
+                    format!("leg result {index} has leg_index {}", leg.leg_index),
+                ));
+            }
+            let status = match leg.status.as_known() {
+                Some(InternalTransferBatchLegStatus::LEG_STATUS_UNSPECIFIED) => {
+                    return Err(Error::response_contract(
+                        OP,
+                        format!("leg {index} has no status"),
+                    ));
+                }
+                Some(InternalTransferBatchLegStatus::LEG_ACCEPTED) => {
+                    super::common::require_str_id(OP, "request_id", &leg.request_id)?;
+                    super::common::require_str_id(OP, "transfer_id", &leg.transfer_id)?;
+                    "accepted".to_owned()
+                }
+                Some(InternalTransferBatchLegStatus::LEG_PENDING) => {
+                    super::common::require_str_id(OP, "request_id", &leg.request_id)?;
+                    "pending".to_owned()
+                }
+                Some(InternalTransferBatchLegStatus::LEG_REFUSED) => "refused".to_owned(),
+                Some(InternalTransferBatchLegStatus::LEG_NOT_SUBMITTED) => {
+                    "not_submitted".to_owned()
+                }
+                None => format!("UNKNOWN({})", leg.status.to_i32()),
+            };
+            let quantity = leg
+                .amount_e18
+                .as_option()
+                .map(|u| super::dust::e18_amount(OP, "amount_e18", Some(u), Some(leg.asset_id)))
+                .transpose()?;
+            Ok(InternalTransferBatchLegResult {
+                leg_index: leg.leg_index,
+                status,
+                request_id: leg.request_id.clone(),
+                transfer_id: leg.transfer_id.clone(),
+                flow_id: leg.flow_id.clone(),
+                accepted_at_ts_ns: leg.accepted_at_ts_ns,
+                asset_id: leg.asset_id,
+                asset_code: leg.asset_code.clone(),
+                quantity,
+                error_code: super::dust::transfer_reason_label(&leg.error_code),
+                error_message: leg.error_message.clone(),
+            })
+        })
+        .collect::<Result<_>>()?;
+    Ok(InternalTransferBatchResult {
+        request_id: msg.request_id.clone(),
+        status: status.to_owned(),
+        legs,
     })
 }
 
@@ -383,5 +479,182 @@ mod tests {
                 .flow_id,
             ""
         );
+    }
+
+    fn batch_leg(
+        index: u32,
+        status: InternalTransferBatchLegStatus,
+        request_id: &str,
+        transfer_id: &str,
+    ) -> crate::proto::transfer::v1::InternalTransferBatchLegResult {
+        crate::proto::transfer::v1::InternalTransferBatchLegResult {
+            leg_index: index,
+            status: status.into(),
+            request_id: request_id.into(),
+            transfer_id: transfer_id.into(),
+            asset_id: 1,
+            amount_e18: crate::proto::polyester::r#type::v1::U128 {
+                hi: 0,
+                lo: 500_000_000_000_000_000,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn batch_decodes_each_leg_in_order() {
+        use crate::proto::transfer::v1::ErrorCode;
+        let mut refused = batch_leg(2, InternalTransferBatchLegStatus::LEG_REFUSED, "r3", "");
+        refused.error_code = ErrorCode::ERROR_CODE_INSUFFICIENT_FUNDS.into();
+        refused.error_message = "insufficient funds".into();
+        let msg = BatchCreateInternalTransfersResponse {
+            request_id: "batch-1".into(),
+            status: InternalTransferBatchStatus::BATCH_SUBMITTED.into(),
+            legs: vec![
+                batch_leg(0, InternalTransferBatchLegStatus::LEG_ACCEPTED, "r1", "t1"),
+                batch_leg(1, InternalTransferBatchLegStatus::LEG_PENDING, "r2", ""),
+                refused,
+                batch_leg(3, InternalTransferBatchLegStatus::LEG_NOT_SUBMITTED, "", ""),
+            ],
+            ..Default::default()
+        };
+        let got = internal_transfer_batch_from_proto(&msg, 4).unwrap();
+        assert_eq!(
+            (got.request_id.as_str(), got.status.as_str()),
+            ("batch-1", "submitted")
+        );
+        let statuses: Vec<_> = got.legs.iter().map(|l| l.status.as_str()).collect();
+        assert_eq!(
+            statuses,
+            ["accepted", "pending", "refused", "not_submitted"]
+        );
+        assert_eq!(
+            got.legs[0].quantity.as_ref().map(|q| q.as_scaled()),
+            Some(500_000_000_000_000_000)
+        );
+        assert_eq!(
+            got.legs[2].error_code.as_deref(),
+            Some("insufficient_funds")
+        );
+        assert_eq!(got.legs[0].error_code, None);
+
+        let refused_batch = BatchCreateInternalTransfersResponse {
+            status: InternalTransferBatchStatus::BATCH_REFUSED.into(),
+            legs: vec![batch_leg(
+                0,
+                InternalTransferBatchLegStatus::LEG_REFUSED,
+                "",
+                "",
+            )],
+            ..Default::default()
+        };
+        let got = internal_transfer_batch_from_proto(&refused_batch, 1).unwrap();
+        assert_eq!(
+            (got.request_id.as_str(), got.status.as_str()),
+            ("", "refused")
+        );
+    }
+
+    /// A batch reply that breaks its contract is refused, never read as an
+    /// outcome: the batch may have moved funds.
+    #[test]
+    fn batch_refuses_replies_that_break_the_contract() {
+        let ok_leg = || batch_leg(0, InternalTransferBatchLegStatus::LEG_ACCEPTED, "r", "t");
+        let reply = |status: i32, request_id: &str, legs| BatchCreateInternalTransfersResponse {
+            request_id: request_id.into(),
+            status: buffa::EnumValue::from(status),
+            legs,
+            ..Default::default()
+        };
+        let cases = [
+            ("unset status", reply(0, "b", vec![ok_leg()]), 1),
+            ("unknown status", reply(9, "b", vec![ok_leg()]), 1),
+            (
+                "submitted without request_id",
+                reply(1, "", vec![ok_leg()]),
+                1,
+            ),
+            ("missing leg", reply(1, "b", vec![ok_leg()]), 2),
+            ("extra leg", reply(1, "b", vec![ok_leg(), ok_leg()]), 1),
+            (
+                "out of order",
+                reply(
+                    1,
+                    "b",
+                    vec![batch_leg(
+                        1,
+                        InternalTransferBatchLegStatus::LEG_ACCEPTED,
+                        "r",
+                        "t",
+                    )],
+                ),
+                1,
+            ),
+            (
+                "leg without status",
+                reply(
+                    1,
+                    "b",
+                    vec![batch_leg(
+                        0,
+                        InternalTransferBatchLegStatus::LEG_STATUS_UNSPECIFIED,
+                        "r",
+                        "",
+                    )],
+                ),
+                1,
+            ),
+            (
+                "accepted without transfer_id",
+                reply(
+                    1,
+                    "b",
+                    vec![batch_leg(
+                        0,
+                        InternalTransferBatchLegStatus::LEG_ACCEPTED,
+                        "r",
+                        "",
+                    )],
+                ),
+                1,
+            ),
+            (
+                "accepted without request_id",
+                reply(
+                    1,
+                    "b",
+                    vec![batch_leg(
+                        0,
+                        InternalTransferBatchLegStatus::LEG_ACCEPTED,
+                        "",
+                        "t",
+                    )],
+                ),
+                1,
+            ),
+            (
+                "pending without request_id",
+                reply(
+                    1,
+                    "b",
+                    vec![batch_leg(
+                        0,
+                        InternalTransferBatchLegStatus::LEG_PENDING,
+                        "",
+                        "",
+                    )],
+                ),
+                1,
+            ),
+        ];
+        for (label, msg, requested) in cases {
+            let err = internal_transfer_batch_from_proto(&msg, requested).unwrap_err();
+            assert!(
+                matches!(err, Error::ResponseContract { .. }),
+                "{label}: {err:?}"
+            );
+        }
     }
 }

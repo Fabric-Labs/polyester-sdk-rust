@@ -120,10 +120,8 @@ chain.lifecycle.v1.FlowStepActivityView.tx_chain_id	not_required	reference to a 
 chain.lifecycle.v1.FlowStepView.milestone_tx_chain_id	not_required	reference to a chain
 chain.lifecycle.v1.FlowStepView.polyester_chain_id	not_required	reference to a chain
 chain.lifecycle.v1.FlowSummaryView.flow_id	required	
-chain.lifecycle.v1.FlowSummaryView.owner_account_id	not_required	reference to an account; 0 or empty where the contract allows
 chain.lifecycle.v1.FlowSummaryView.polyester_chain_id	not_required	reference to a chain
 chain.lifecycle.v1.FlowTxMatchView.flow_id	required	
-chain.lifecycle.v1.FlowTxMatchView.owner_account_id	not_required	reference to an account; 0 or empty where the contract allows
 chain.lifecycle.v1.FlowTxMatchView.polyester_chain_id	not_required	reference to a chain
 chain.withdraw.v1.AutoWithdrawDestination.asset_id	not_required	reference to an asset
 chain.withdraw.v1.AutoWithdrawDestination.destination_chain_id	not_required	reference to a chain
@@ -166,6 +164,9 @@ ledger.read.v1.BalanceSeries.asset_id	not_required	reference to an asset
 ledger.read.v1.PortfolioAccountEquity.account_id	not_required	reference to an account; 0 or empty where the contract allows
 ledger.read.v1.PortfolioAccountGrouping.account_id	not_required	reference to an account; 0 or empty where the contract allows
 ledger.read.v1.PortfolioAssetEquity.asset_id	not_required	reference to an asset
+ledger.read.v1.StatementExport.asset_id	not_required	reference to an asset; 0 for every asset
+ledger.read.v1.StatementExport.export_id	required	
+ledger.read.v1.StatementExport.subaccount_id	not_required	reference to an account; unset for a main account
 ledger.read.v1.TransferRow.asset_id	not_required	reference to an asset
 ledger.read.v1.TransferRow.flow_id	not_required	reference to another object; 0 or empty when none
 ledger.read.v1.TransferRow.link_id	not_required	reference to another object; 0 or empty when none
@@ -326,14 +327,28 @@ swap.v1.SwapTerms.source_asset_id	not_required	reference to an asset
 swap.v1.SwapTerms.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 system.v1.StatusEvent.id	required	
 system.v1.StatusEventUpdate.id	required	
+transfer.v1.BatchCreateInternalTransfersResponse.request_id	not_required	empty when the batch was refused; a submitted batch requires it
 transfer.v1.CreateInternalTransferResponse.asset_id	not_required	reference to an asset
 transfer.v1.CreateInternalTransferResponse.flow_id	not_required	an older server sends none; the receipt decodes with an empty flow ID
 transfer.v1.CreateInternalTransferResponse.request_id	required	
 transfer.v1.CreateInternalTransferResponse.transfer_id	required	
 transfer.v1.CreateInternalTransferResponse.u_asset_id	not_required	reference to an asset
+transfer.v1.DustAssetPrice.asset_id	not_required	reference to an asset
+transfer.v1.DustBalance.asset_id	not_required	reference to an asset
+transfer.v1.DustConversion.conversion_id	required	
+transfer.v1.DustConversion.quote_id	not_required	reference to the quote the conversion converted
+transfer.v1.DustConversion.target_asset_id	not_required	reference to an asset
+transfer.v1.DustSource.asset_id	not_required	reference to an asset
 transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sends none, as for CreateInternalTransfer
 transfer.v1.GetInternalTransferResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.transfer_id	required	
+transfer.v1.InternalTransferBatchLegResult.asset_id	not_required	reference to an asset
+transfer.v1.InternalTransferBatchLegResult.flow_id	not_required	set once the leg is accepted; empty otherwise
+transfer.v1.InternalTransferBatchLegResult.request_id	not_required	empty while the leg has not been submitted; an accepted or pending leg requires it
+transfer.v1.InternalTransferBatchLegResult.transfer_id	not_required	set once the leg is accepted; an accepted leg requires it
+transfer.v1.ListDustBalancesResponse.target_asset_id	not_required	reference to an asset
+transfer.v1.QuoteDustConversionResponse.quote_id	not_required	empty when no balance converts
+transfer.v1.QuoteDustConversionResponse.target_asset_id	not_required	reference to an asset
 transfer.v1.ResolvedDestination.root_account_public_id	not_required	reference to an account; 0 or empty where the contract allows
 transfer.v1.ResolvedDestination.subaccount_public_id	not_required	reference to an account; 0 or empty where the contract allows
 triggers.v1.BatchCancelTriggersResultItem.trigger_id	required	

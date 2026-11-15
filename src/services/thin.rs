@@ -325,6 +325,125 @@ impl InternalTransfersService {
         .into_owned();
         internal_transfer_from_proto(&resp)
     }
+
+    /// Submit 1 to 10 Trading to Trading transfers under one idempotency key
+    /// and one MFA check (`BatchCreateInternalTransfers`). An API key needs
+    /// no MFA. Each leg's amount is rescaled exactly to 18 decimals as for
+    /// [`Self::create`].
+    ///
+    /// Every leg passes the same checks as a single transfer before any leg
+    /// runs: if one fails, the result's `status` is `refused`, nothing moves
+    /// and no step-up is used. Otherwise legs run in order and are not
+    /// atomic: a leg can be refused after earlier legs were accepted. Read
+    /// each leg's `status`; a `pending` leg's outcome is not known yet, so
+    /// retry the batch with the same `idempotency_key` and legs to learn it
+    /// (accepted legs answer the same transfers; looking one transfer up
+    /// needs an interactive session). Each leg counts as one internal
+    /// transfer against the rate limit.
+    ///
+    /// Refused before sending: no legs or more than 10, an idempotency key
+    /// that is empty or over 128 characters, a leg without an asset ID or
+    /// without exactly one destination, and an amount that is not exact at
+    /// 18 decimals. A reply that breaks the contract is an
+    /// [`crate::errors::Error::ResponseContract`]: the batch may have moved
+    /// funds, so retry it with the same key.
+    pub async fn batch_create(
+        &self,
+        params: crate::models::BatchCreateInternalTransfersParams,
+    ) -> crate::errors::Result<crate::models::InternalTransferBatchResult> {
+        use crate::codecs::decode::internal_transfer_batch_from_proto;
+        let req = self.encode_batch_create(params)?;
+        let requested = req.legs.len();
+        let client = self.connect_client();
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers",
+            req,
+            |req, opts| client.batch_create_internal_transfers_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        internal_transfer_batch_from_proto(&resp, requested)
+    }
+
+    /// The `BatchCreateInternalTransfersRequest` [`Self::batch_create`]
+    /// sends for `params`.
+    pub(crate) fn encode_batch_create(
+        &self,
+        params: crate::models::BatchCreateInternalTransfersParams,
+    ) -> crate::errors::Result<crate::proto::transfer::v1::BatchCreateInternalTransfersRequest>
+    {
+        use super::limits::{
+            BATCH_TRANSFER_LEGS_MAX, BATCH_TRANSFER_LEGS_MIN, IDEMPOTENCY_KEY_MAX_LEN, check_len,
+        };
+        use crate::codecs::scalars::parse_account_id;
+        use crate::errors::Error;
+        use crate::proto::transfer::v1::{
+            BatchCreateInternalTransfersRequest, InternalTransferBatchLeg,
+            internal_transfer_batch_leg::Destination,
+        };
+        const OP: &str = "batch_create_internal_transfers";
+        if !(BATCH_TRANSFER_LEGS_MIN..=BATCH_TRANSFER_LEGS_MAX).contains(&params.legs.len()) {
+            return Err(Error::validation(format!(
+                "{OP} takes {BATCH_TRANSFER_LEGS_MIN} to {BATCH_TRANSFER_LEGS_MAX} legs, not {}",
+                params.legs.len()
+            )));
+        }
+        check_len(
+            OP,
+            "idempotency_key",
+            &params.idempotency_key,
+            IDEMPOTENCY_KEY_MAX_LEN,
+        )?;
+        let mut legs = Vec::with_capacity(params.legs.len());
+        for (index, leg) in params.legs.into_iter().enumerate() {
+            if leg.asset_id == 0 {
+                return Err(Error::validation(format!(
+                    "{OP} legs[{index}].asset_id is required"
+                )));
+            }
+            let present =
+                |value: &Option<String>| value.as_ref().is_some_and(|s| !s.trim().is_empty());
+            let destination = match (
+                present(&leg.destination_account_id),
+                present(&leg.destination_subaccount_id),
+                present(&leg.destination_smart_account_address),
+            ) {
+                (true, false, false) => Destination::DestinationAccountId(parse_account_id(
+                    leg.destination_account_id.as_deref().unwrap_or_default(),
+                    "destination_account_id",
+                )?),
+                (false, true, false) => Destination::DestinationSubaccountId(parse_account_id(
+                    leg.destination_subaccount_id.as_deref().unwrap_or_default(),
+                    "destination_subaccount_id",
+                )?),
+                (false, false, true) => Destination::DestinationSmartAccountAddress(
+                    leg.destination_smart_account_address.unwrap_or_default(),
+                ),
+                _ => {
+                    return Err(Error::validation(format!(
+                        "{OP} legs[{index}] requires exactly one of destination_account_id, destination_subaccount_id, or destination_smart_account_address"
+                    )));
+                }
+            };
+            let amount_e18 =
+                internal_transfer_amount_e18(&leg.quantity, leg.quantity_scale, leg.asset_id)?;
+            let mut out = InternalTransferBatchLeg {
+                subaccount_id: super::scope::resolve_subaccount(&self.ctx, leg.subaccount_id)?
+                    .unwrap_or(0),
+                asset_id: leg.asset_id,
+                destination: Some(destination),
+                ..Default::default()
+            };
+            *out.amount_e18.get_or_insert_default() = amount_e18;
+            legs.push(out);
+        }
+        Ok(BatchCreateInternalTransfersRequest {
+            legs,
+            idempotency_key: params.idempotency_key,
+            ..Default::default()
+        })
+    }
 }
 
 impl PoliciesService {
@@ -1067,12 +1186,17 @@ impl ChainAnalyticsService {
 }
 
 impl LifecycleService {
-    /// List lifecycle flows. A request that selects an account
-    /// (`account_selector`) returns the flows it owns and the transfers other
-    /// accounts sent to it; each row's `participation` says which, and
-    /// `participation` on the request narrows the list to one side (the server
-    /// refuses it without an account). A `page_token` is bound to the request
-    /// it was returned for: only `limit` may change between pages.
+    /// List lifecycle flows a chain transaction started (those with a
+    /// `source_tx_hash`); a flow settled without one, such as a transfer
+    /// between Trading accounts or a Trading withdrawal not yet sent to a
+    /// chain, is not listed: an account reads those with
+    /// [`Self::list_account_flows`]. A request that selects an account by its
+    /// smart account address (`account_selector`, the only selector) returns
+    /// the flows it owns and the transfers other accounts sent to it; each
+    /// row's `participation` says which, and `participation` on the request
+    /// narrows the list to one side (the server refuses it without a smart
+    /// account address). A `page_token` is bound to the request it was
+    /// returned for: only `limit` may change between pages.
     pub async fn list_flows(
         &self,
         req: crate::proto::chain::lifecycle::v1::ListFlowsRequest,
@@ -1093,6 +1217,10 @@ impl LifecycleService {
         flows_list_from_proto(&resp)
     }
 
+    /// One lifecycle flow a chain transaction started, by flow ID. A flow
+    /// settled without one, such as a transfer between Trading accounts or a
+    /// Trading withdrawal not yet sent to a chain, is not found: its account
+    /// reads it with [`Self::get_account_flow`].
     pub async fn get_flow(
         &self,
         flow_id: &str,
@@ -1120,6 +1248,78 @@ impl LifecycleService {
             .into_owned()
         };
         flow_from_get_response(&resp)
+    }
+
+    /// List the authenticated account's own lifecycle flows: the flows it
+    /// owns and the transfers it receives, including those no chain
+    /// transaction started, with the filters, ordering and pagination of
+    /// [`Self::list_flows`]. Each row's `participation` is `owner` or
+    /// `recipient`, and `participation` on the request narrows the list to
+    /// one side.
+    ///
+    /// Signed with the session or API key; an API key needs
+    /// `READ_FUNDING_FLOWS` on its policy. `subaccount_id` `None` takes the
+    /// configured default sub-account, else the key's bound sub-account or
+    /// the main account; `Some(0)` is refused. `limit` 0 asks for the
+    /// server's default (100); one above 500, the contract's maximum, is
+    /// refused before sending. A `page_token` is bound to the account and the
+    /// request it was returned for: only `limit` may change between pages.
+    pub async fn list_account_flows(
+        &self,
+        mut req: crate::proto::chain::lifecycle::v1::ListAccountFlowsRequest,
+    ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
+        use super::limits::{LIST_ACCOUNT_FLOWS_LIMIT_MAX, check_limit};
+        use crate::codecs::decode::account_flows_list_from_proto;
+        check_limit(
+            "list_account_flows",
+            req.limit,
+            LIST_ACCOUNT_FLOWS_LIMIT_MAX,
+        )?;
+        req.subaccount_id = super::scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        let client = self.connect_client();
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/chain.lifecycle.v1.LifecycleReadService/ListAccountFlows",
+            req,
+            |req, opts| client.list_account_flows_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        account_flows_list_from_proto(&resp)
+    }
+
+    /// One lifecycle flow the authenticated account owns or receives, by
+    /// flow ID, including one no chain transaction started; its
+    /// `participation` says which. A flow the account takes no part in is
+    /// not found. Signed like [`Self::list_account_flows`], with the account
+    /// chosen by `subaccount_id` as there. A reply without the flow or its
+    /// flow ID is an [`crate::errors::Error::ResponseContract`].
+    pub async fn get_account_flow(
+        &self,
+        flow_id: &str,
+        subaccount_id: SubAccountScope,
+    ) -> crate::errors::Result<crate::models::LifecycleFlowSummary> {
+        use crate::codecs::decode::account_flow_from_get_response;
+        use crate::errors::Error;
+        use crate::proto::chain::lifecycle::v1::GetAccountFlowRequest;
+        if flow_id.trim().is_empty() {
+            return Err(Error::validation("get_account_flow flow_id is required"));
+        }
+        let req = GetAccountFlowRequest {
+            subaccount_id: super::scope::resolve_subaccount(&self.ctx, subaccount_id)?,
+            flow_id: flow_id.to_owned(),
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/chain.lifecycle.v1.LifecycleReadService/GetAccountFlow",
+            req,
+            |req, opts| client.get_account_flow_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        account_flow_from_get_response(&resp)
     }
 
     pub async fn list_flows_by_tx(
@@ -1362,6 +1562,13 @@ impl GuardSignerService {
 }
 
 impl SocialVerificationService {
+    /// Start or restart a social verification (session only). While an
+    /// X/Twitter or Discord account is linked, starting again can change it,
+    /// so the server also needs enrolled MFA and a fresh step-up proof; the
+    /// linked account stays linked until the new verification succeeds. A
+    /// change within 30 days of the last one is refused with
+    /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED`, and [`crate::Error::retry_at`]
+    /// says when it may succeed.
     pub async fn start(
         &self,
         provider: &str,
@@ -1415,7 +1622,12 @@ impl SocialVerificationService {
     /// `READ_SOCIAL_VERIFICATION` on its policy and a main-account scope, and
     /// receives the link status only (`provider`, `method`, `handle`,
     /// `status`, `verified_at`). A Telegram link waiting for the user to
-    /// confirm reads `STATUS_AWAITING_CONFIRMATION`. Starting, confirming and
+    /// confirm reads `STATUS_AWAITING_CONFIRMATION`. A verification that
+    /// failed with `AUTH_SOCIAL_ACCOUNT_COOLDOWN` or
+    /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED` carries `retryAfter`, the time
+    /// from which a new one may succeed; a restarted X/Twitter or Discord
+    /// verification keeps the linked account's `providerUserId` and
+    /// `verifiedAt` until it succeeds. Starting, confirming and
     /// unlinking a verification stay session-only; confirming a Telegram link
     /// also needs a fresh MFA step-up.
     pub async fn get(&self, provider: &str) -> crate::errors::Result<crate::models::ApiData> {

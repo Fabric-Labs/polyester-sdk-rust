@@ -2866,7 +2866,7 @@ mod tests {
     fn oco_create_encodes_the_intent_and_both_legs() {
         let client = client();
         let mut params = sell_oco();
-        params.client_list_id = " oco-1 ".into();
+        params.client_list_id = "tp-sl:btc/2026-11-15_1".into();
         params.stop_loss.trigger_price_source = Some("index".into());
         params.self_trade_prevention_mode = Some("expire_taker".into());
         params.subaccount_id = SubAccountScope::Id(12);
@@ -2876,9 +2876,8 @@ mod tests {
         assert_eq!(oco.symbol_id, 7);
         assert_eq!(oco.side, Side::Sell);
         assert_eq!(oco.qty_scaled, 10_000_000);
-        // The contract takes any 1 to 36 bytes of UTF-8 and the server
-        // matches them exactly: the key is sent as given, never trimmed.
-        assert_eq!(oco.client_list_id, " oco-1 ");
+        // The server matches the key exactly: it is sent as given.
+        assert_eq!(oco.client_list_id, "tp-sl:btc/2026-11-15_1");
         assert_eq!(
             oco.self_trade_prevention_mode,
             SelfTradePreventionMode::ExpireTaker
@@ -3025,18 +3024,17 @@ mod tests {
         }
     }
 
+    /// A client OCO ID follows the client order ID rule
+    /// (`^[A-Za-z0-9._:/-]{1,36}$`) and is sent unchanged; spaces, other
+    /// punctuation and non-ASCII characters are refused before sending.
     #[test]
-    fn oco_client_list_id_is_any_1_to_36_bytes_of_utf8_sent_as_given() {
+    fn oco_client_list_id_follows_the_client_order_id_rule() {
         let client = client();
-        let keys: Vec<String> = vec![
-            " oco-1 ".into(),
-            " ".into(),
-            "\u{6b62}\u{640d}-\u{00e9}t\u{00e9}".into(),
-            "\u{30b9}".repeat(12),
+        for key in [
+            "tp-sl:btc/2026-11-15_1".to_owned(),
             "x".repeat(36),
-            "tab\tand/slash".into(),
-        ];
-        for key in keys {
+            "A.b_C:1/2-3".to_owned(),
+        ] {
             let mut params = sell_oco();
             params.client_list_id = key.clone();
             let wire = client
@@ -3045,6 +3043,25 @@ mod tests {
                 .unwrap_or_else(|err| panic!("{key:?}: {err}"));
             let oco = wire.oco.as_option().expect("oco intent");
             assert_eq!(oco.client_list_id, key, "{key:?}");
+        }
+        for key in [
+            " oco-1 ".to_owned(),
+            " ".to_owned(),
+            "\u{6b62}\u{640d}-\u{00e9}t\u{00e9}".to_owned(),
+            "tab\tand/slash".to_owned(),
+            "oco#1".to_owned(),
+        ] {
+            let mut params = sell_oco();
+            params.client_list_id = key.clone();
+            let err = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_err();
+            assert!(
+                err.to_string()
+                    .contains("client_list_id contains invalid characters"),
+                "{key:?}: {err}"
+            );
         }
     }
 
@@ -3062,14 +3079,13 @@ mod tests {
 
         let mut p = sell_oco();
         p.client_list_id = String::new();
-        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
+        refused(p, "client_list_id must be 1 to 36 characters");
         let mut p = sell_oco();
         p.client_list_id = "x".repeat(37);
-        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
-        // 13 three-byte characters are 39 bytes: the limit counts bytes.
+        refused(p, "client_list_id must be 1 to 36 characters");
         let mut p = sell_oco();
-        p.client_list_id = "\u{30b9}".repeat(13);
-        refused(p, "client_list_id must be 1 to 36 bytes of UTF-8");
+        p.client_list_id = "\u{30b9}".repeat(12);
+        refused(p, "client_list_id contains invalid characters");
 
         let mut p = sell_oco();
         p.take_profit.limit_price = None;

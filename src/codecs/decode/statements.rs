@@ -1,7 +1,14 @@
 //! Account statement CSV reader.
 
+use crate::codecs::decode::common::require_id;
+use crate::codecs::decode::dust::prefixed_label;
+use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
-use crate::models::StatementRow;
+use crate::models::{StatementExport, StatementExportsList, StatementRow};
+use crate::proto::ledger::read::v1::{
+    CreateStatementExportResponse, GetStatementExportResponse, ListStatementExportsResponse,
+    StatementExport as ProtoStatementExport, StatementExportFailureReason, StatementExportStatus,
+};
 use buffa_types::google::protobuf::Timestamp;
 use serde::Deserialize;
 
@@ -87,6 +94,74 @@ fn parse_time(value: &str, line: usize) -> Result<Timestamp> {
                 "row {line}: time {value:?} is not an RFC 3339 time"
             ))
         })
+}
+
+/// A statement export, refused with [`Error::ResponseContract`] without its
+/// export ID.
+fn statement_export(operation: &str, msg: &ProtoStatementExport) -> Result<StatementExport> {
+    require_id(operation, "export_id", msg.export_id)?;
+    let failure_reason = prefixed_label::<StatementExportFailureReason>(
+        &msg.failure_reason,
+        "STATEMENT_EXPORT_FAILURE_REASON_",
+    );
+    Ok(StatementExport {
+        export_id: format_uint64_id(msg.export_id),
+        subaccount_id: msg
+            .subaccount_id
+            .filter(|id| *id != 0)
+            .map(format_uint64_id),
+        start_time: msg.start_time.as_option().cloned(),
+        end_time: msg.end_time.as_option().cloned(),
+        asset_id: msg.asset_id,
+        idempotency_key: msg.idempotency_key.clone(),
+        status: prefixed_label::<StatementExportStatus>(&msg.status, "STATEMENT_EXPORT_STATUS_"),
+        complete_through: msg.complete_through.as_option().cloned(),
+        movements: msg.movements,
+        bytes: msg.bytes,
+        created_at: msg.created_at.as_option().cloned(),
+        ready_at: msg.ready_at.as_option().cloned(),
+        expires_at: msg.expires_at.as_option().cloned(),
+        failure_reason: (!failure_reason.is_empty()).then_some(failure_reason),
+    })
+}
+
+/// The export a `CreateStatementExport` reply returns; a reply without it,
+/// or without its export ID, is an [`Error::ResponseContract`].
+pub fn statement_export_from_create_response(
+    msg: &CreateStatementExportResponse,
+) -> Result<StatementExport> {
+    const OP: &str = "CreateStatementExport";
+    let export = msg
+        .export
+        .as_option()
+        .ok_or_else(|| Error::response_contract(OP, "missing export"))?;
+    statement_export(OP, export)
+}
+
+/// The export a `GetStatementExport` reply returns; a reply without it, or
+/// without its export ID, is an [`Error::ResponseContract`].
+pub fn statement_export_from_get_response(
+    msg: &GetStatementExportResponse,
+) -> Result<StatementExport> {
+    const OP: &str = "GetStatementExport";
+    let export = msg
+        .export
+        .as_option()
+        .ok_or_else(|| Error::response_contract(OP, "missing export"))?;
+    statement_export(OP, export)
+}
+
+pub fn statement_exports_list_from_proto(
+    msg: &ListStatementExportsResponse,
+) -> Result<StatementExportsList> {
+    Ok(StatementExportsList {
+        exports: msg
+            .exports
+            .iter()
+            .map(|e| statement_export("ListStatementExports", e))
+            .collect::<Result<_>>()?,
+        next_page_token: msg.next_page_token.clone(),
+    })
 }
 
 /// Read a complete statement's rows by header name: the CSV text of
@@ -298,5 +373,82 @@ mod tests {
             assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
             assert!(err.to_string().contains(want), "{csv:?}: {err}");
         }
+    }
+
+    fn export(id: u64) -> ProtoStatementExport {
+        ProtoStatementExport {
+            export_id: id,
+            subaccount_id: Some(9),
+            asset_id: 3,
+            idempotency_key: "statement-2026".into(),
+            status: StatementExportStatus::STATEMENT_EXPORT_STATUS_FAILED.into(),
+            failure_reason: StatementExportFailureReason::STATEMENT_EXPORT_FAILURE_REASON_TOO_LARGE
+                .into(),
+            movements: u64::MAX,
+            bytes: 12,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn statement_export_decodes_labels_ids_and_counters() {
+        let got = statement_export_from_get_response(&GetStatementExportResponse {
+            export: export(7).into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(got.export_id, format_uint64_id(7));
+        assert_eq!(got.subaccount_id, Some(format_uint64_id(9)));
+        assert_eq!(got.status, "failed");
+        assert_eq!(got.failure_reason.as_deref(), Some("too_large"));
+        assert_eq!((got.movements, got.bytes), (u64::MAX, 12));
+        let mut ready = export(8);
+        ready.subaccount_id = None;
+        ready.status = StatementExportStatus::STATEMENT_EXPORT_STATUS_READY.into();
+        ready.failure_reason = buffa::EnumValue::from(0);
+        let got = statement_export_from_create_response(&CreateStatementExportResponse {
+            export: ready.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            (got.status.as_str(), got.subaccount_id, got.failure_reason),
+            ("ready", None, None)
+        );
+        let mut future = export(9);
+        future.status = buffa::EnumValue::from(42);
+        let list = statement_exports_list_from_proto(&ListStatementExportsResponse {
+            exports: vec![future],
+            next_page_token: "n".into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(list.exports[0].status, "UNKNOWN(42)");
+        assert_eq!(list.next_page_token, "n");
+    }
+
+    /// An export reply must carry the export and its ID.
+    #[test]
+    fn statement_export_replies_require_the_export_and_its_id() {
+        for err in [
+            statement_export_from_create_response(&CreateStatementExportResponse::default()),
+            statement_export_from_get_response(&GetStatementExportResponse::default()),
+            statement_export_from_get_response(&GetStatementExportResponse {
+                export: export(0).into(),
+                ..Default::default()
+            }),
+        ] {
+            assert!(
+                matches!(err, Err(Error::ResponseContract { .. })),
+                "{err:?}"
+            );
+        }
+        assert!(matches!(
+            statement_exports_list_from_proto(&ListStatementExportsResponse {
+                exports: vec![export(0)],
+                ..Default::default()
+            }),
+            Err(Error::ResponseContract { .. })
+        ));
     }
 }
