@@ -585,6 +585,38 @@ fn get_replies_without_their_object_are_refused() {
         None,
     );
     check::<()>(
+        "GetPost summary",
+        changelog_post_from_proto(&GetPostResponse {
+            post: Post::default().into(),
+            ..Default::default()
+        })
+        .map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "ListChanges change",
+        changelog_changes_page_from_proto(&ListChangesResponse {
+            changes: vec![ChangeEntry::default()],
+            ..Default::default()
+        })
+        .map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "GetDeploymentGroup attention change",
+        changelog_deployment_group_from_proto(&GetDeploymentGroupResponse {
+            group: DeploymentGroup {
+                summary: DeploymentGroupSummary::default().into(),
+                attention: vec![DeploymentGroupAttention::default()],
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .map(|_| ()),
+        None,
+    );
+    check::<()>(
         "CreateApiKey",
         api_key_from_create_proto(&CreateApiKeyResponse::default()).map(|_| ()),
         None,
@@ -674,5 +706,127 @@ fn more_replies_refuse_a_zero_required_id() {
         "CreateApiKey key_id",
         created_key(""),
         Some(created_key("ak_1")),
+    );
+}
+
+#[test]
+fn policy_and_invite_replies_refuse_a_missing_object_or_zero_id() {
+    use crate::proto::auth::v1::{
+        ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse,
+        GetApiPolicyResponse, GetSubaccountPolicyResponse, InviteSubaccountMemberResponse,
+        ListApiPoliciesResponse, ListSubaccountPoliciesResponse, RespondSubaccountInviteResponse,
+        UpdateApiPolicyResponse, UpdateSubaccountPolicyResponse,
+    };
+    let sub_policy = |id| -> buffa::MessageField<SubaccountPolicyView> {
+        SubaccountPolicyView {
+            id,
+            ..Default::default()
+        }
+        .into()
+    };
+    let api_policy = |id| -> buffa::MessageField<ApiPolicyView> {
+        ApiPolicyView {
+            id,
+            ..Default::default()
+        }
+        .into()
+    };
+    check::<()>(
+        "GetSubaccountPolicy",
+        get_subaccount_policy_from_proto(&GetSubaccountPolicyResponse::default()).map(|_| ()),
+        None,
+    );
+    for id in [0, 7] {
+        let got = get_subaccount_policy_from_proto(&GetSubaccountPolicyResponse {
+            policy: sub_policy(id),
+            ..Default::default()
+        });
+        let created = create_subaccount_policy_from_proto(&CreateSubaccountPolicyResponse {
+            policy: sub_policy(id),
+            ..Default::default()
+        });
+        let updated = update_subaccount_policy_from_proto(&UpdateSubaccountPolicyResponse {
+            policy: sub_policy(id),
+            ..Default::default()
+        });
+        let listed = subaccount_policies_list_from_proto(&ListSubaccountPoliciesResponse {
+            policies: vec![SubaccountPolicyView {
+                id,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let api_got = get_api_policy_from_proto(&GetApiPolicyResponse {
+            policy: api_policy(id),
+            ..Default::default()
+        });
+        let api_created = create_api_policy_from_proto(&CreateApiPolicyResponse {
+            policy: api_policy(id),
+            ..Default::default()
+        });
+        let api_updated = update_api_policy_from_proto(&UpdateApiPolicyResponse {
+            policy: api_policy(id),
+            ..Default::default()
+        });
+        let api_listed = api_policies_list_from_proto(&ListApiPoliciesResponse {
+            policies: vec![ApiPolicyView {
+                id,
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+        let results = [
+            got.map(|_| ()),
+            created.map(|_| ()),
+            updated.map(|_| ()),
+            listed.map(|_| ()),
+            api_got.map(|_| ()),
+            api_created.map(|_| ()),
+            api_updated.map(|_| ()),
+            api_listed.map(|_| ()),
+        ];
+        for (index, result) in results.into_iter().enumerate() {
+            match (id, result) {
+                (0, Err(Error::ResponseContract { .. })) | (7, Ok(())) => {}
+                (_, other) => panic!("policy reply {index} with id {id}: {other:?}"),
+            }
+        }
+    }
+    check::<()>(
+        "GetApiPolicy",
+        get_api_policy_from_proto(&GetApiPolicyResponse::default()).map(|_| ()),
+        None,
+    );
+    check::<()>(
+        "InviteSubaccountMember",
+        invite_subaccount_member_from_proto(&InviteSubaccountMemberResponse::default()).map(|_| ()),
+        None,
+    );
+    let invited = |inv| {
+        invite_subaccount_member_from_proto(&InviteSubaccountMemberResponse {
+            invite: inv,
+            ..Default::default()
+        })
+    };
+    check(
+        "InviteSubaccountMember id",
+        invited(invite(0, 6).into()),
+        Some(invited(invite(5, 6).into())),
+    );
+    let responded = |inv| {
+        respond_subaccount_invite_from_proto(&RespondSubaccountInviteResponse {
+            invite: inv,
+            ..Default::default()
+        })
+    };
+    check(
+        "RespondSubaccountInvite",
+        responded(buffa::MessageField::default()),
+        None,
+    );
+    check(
+        "RespondSubaccountInvite subaccount_id",
+        responded(invite(5, 0).into()),
+        Some(responded(invite(5, 6).into())),
     );
 }

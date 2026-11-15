@@ -116,12 +116,12 @@ fn post_summary_from_proto(msg: &PostSummary) -> ChangelogPostSummary {
 
 fn change_entry_from_proto(msg: &ChangeEntry) -> Result<ChangelogChangeEntry> {
     Ok(ChangelogChangeEntry {
-        change: msg
-            .change
-            .as_option()
-            .map(|change| required_change("ListChanges", change))
-            .transpose()?
-            .unwrap_or_default(),
+        change: required_change(
+            "ListChanges",
+            msg.change
+                .as_option()
+                .ok_or_else(|| Error::response_contract("ListChanges", "missing change"))?,
+        )?,
         post_slug: msg.post_slug.clone(),
         published_at: clone_timestamp(msg.published_at.as_option()),
         section_heading: msg.section_heading.clone(),
@@ -135,19 +135,19 @@ pub fn changelog_posts_page_from_proto(msg: &ListPostsResponse) -> ChangelogPost
     }
 }
 
-/// Decode `GetPostResponse`; a response without a post is a contract
-/// violation.
+/// Decode `GetPostResponse`; a response without a post or its summary is a
+/// contract violation.
 pub fn changelog_post_from_proto(msg: &GetPostResponse) -> Result<ChangelogPost> {
     let post = msg
         .post
         .as_option()
         .ok_or_else(|| Error::response_contract("GetPost", "missing post"))?;
     Ok(ChangelogPost {
-        summary: post
-            .summary
-            .as_option()
-            .map(post_summary_from_proto)
-            .unwrap_or_default(),
+        summary: post_summary_from_proto(
+            post.summary
+                .as_option()
+                .ok_or_else(|| Error::response_contract("GetPost", "missing post summary"))?,
+        ),
         sections: post
             .sections
             .iter()
@@ -232,12 +232,12 @@ pub fn changelog_deployment_group_from_proto(
                 Ok(ChangelogDeploymentGroupAttention {
                     post_slug: item.post_slug.clone(),
                     release_version: item.release_version.clone(),
-                    change: item
-                        .change
-                        .as_option()
-                        .map(|change| required_change("GetDeploymentGroup", change))
-                        .transpose()?
-                        .unwrap_or_default(),
+                    change: required_change(
+                        "GetDeploymentGroup",
+                        item.change.as_option().ok_or_else(|| {
+                            Error::response_contract("GetDeploymentGroup", "missing change")
+                        })?,
+                    )?,
                 })
             })
             .collect::<Result<_>>()?,

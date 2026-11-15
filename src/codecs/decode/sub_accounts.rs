@@ -185,16 +185,26 @@ fn required_invite(operation: &str, msg: &SubaccountInvite) -> SdkResult<SubAcco
     Ok(invite_from_proto(msg))
 }
 
+/// Decode an `InviteSubaccountMember` answer, refused with
+/// `Error::ResponseContract` without its invite or the invite's IDs.
 pub fn invite_subaccount_member_from_proto(
     msg: &InviteSubaccountMemberResponse,
-) -> Option<SubAccountInvite> {
-    msg.invite.as_option().map(invite_from_proto)
+) -> SdkResult<SubAccountInvite> {
+    let invite = msg.invite.as_option().ok_or_else(|| {
+        crate::Error::response_contract("InviteSubaccountMember", "missing invite")
+    })?;
+    required_invite("InviteSubaccountMember", invite)
 }
 
+/// Decode a `RespondSubaccountInvite` answer, refused with
+/// `Error::ResponseContract` without its invite or the invite's IDs.
 pub fn respond_subaccount_invite_from_proto(
     msg: &RespondSubaccountInviteResponse,
-) -> Option<SubAccountInvite> {
-    msg.invite.as_option().map(invite_from_proto)
+) -> SdkResult<SubAccountInvite> {
+    let invite = msg.invite.as_option().ok_or_else(|| {
+        crate::Error::response_contract("RespondSubaccountInvite", "missing invite")
+    })?;
+    required_invite("RespondSubaccountInvite", invite)
 }
 
 pub fn subaccount_invites_list_from_proto(
