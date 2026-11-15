@@ -932,7 +932,7 @@ balance (see below).
 ## User trade fees
 
 `trades.list(scope, limit)` (a `SubAccountScope`) remains. Use
-`trades.list_with(ListUserTradesOpts { ... })` for symbol filters, `page_token`,
+`trades.list_with(ListUserTradesOpts)` for symbol filters, `page_token`,
 and `after_match_id`. When `after_match_id` is set, a resolved non-zero
 `symbol_id` is required (display `symbol` or numeric id).
 
@@ -1212,12 +1212,33 @@ state change caused only by time passing does not move `updated_at`.
 
 ## Triggers
 
-`triggers.list_with(ListTriggersOpts { status: ... })` filters by lifecycle
+`triggers.list_with(ListTriggersOpts)` with `status` filters by lifecycle
 status. `trigger_type: Some(CreateTriggerType::Ladder)` lists only one trigger
 type, and `parent_order_id: Some(order_id)` only the triggers attached to that
 order (base58 or decimal, as order reads spell it; an ID that does not parse
 or names order 0 fails locally with `Error::Validation`). Leave the other
-fields with `..Default::default()`. Valid status values:
+fields with `..Default::default()`:
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let order_id = String::new();
+use polyester::models::{CreateTriggerType, ListTriggersOpts};
+
+let armed_ladders = client
+    .triggers
+    .list_with(ListTriggersOpts {
+        status: vec!["armed".to_string()],
+        trigger_type: Some(CreateTriggerType::Ladder),
+        parent_order_id: Some(order_id),
+        ..Default::default()
+    })
+    .await?;
+# let _ = armed_ladders;
+# Ok(())
+# }
+```
+
+Valid status values:
 
 `created`, `armed`, `running`, `completed`, `canceled`, `failed`, `paused`
 
@@ -1225,8 +1246,33 @@ Unknown values return a validation error (they do not silently return an empty
 list). Response `status` uses the same labels, with `canceled` spelled as
 trigger events and order statuses spell it.
 
-`orders.get_with(GetOrderOpts { key: OrderKey::OrderId(id), include_attached_risk: true, subaccount_id: SubAccountScope::Default, include_attached_risk_state: false })`
-returns policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+`orders.get_with(GetOrderOpts)` with `include_attached_risk: true` returns
+policy data on `Order.attached_risk`. `Order` also exposes `post_only`.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let order_id = String::new();
+use polyester::models::{GetOrderOpts, OrderKey, SubAccountScope};
+
+let read = client
+    .orders
+    .get_with(GetOrderOpts {
+        key: OrderKey::OrderId(order_id),
+        subaccount_id: SubAccountScope::Default,
+        include_attached_risk: true,
+        include_attached_risk_state: false,
+        include_execution_history: None,
+        limit: None,
+        page_token: None,
+    })
+    .await?;
+if let Some(order) = read.order {
+    println!("attached risk {:?}", order.attached_risk);
+}
+# Ok(())
+# }
+```
+
 Identify orders with `OrderKey::OrderId` or `OrderKey::ClientOrderId` (exclusive oneOf).
 Set `include_attached_risk_state: true` to populate each decoded leg's optional
 `state` (`status`, `armed_ts_ns`, `terminal_ts_ns`, `trigger_id`, and
@@ -1247,8 +1293,8 @@ not-found error as `triggers.get` for an unreadable trigger. It retries catching
 with the same bounded policy and request as trigger reads.
 
 A trailing stop created with an activation price the market has already
-reached now ends `FAILED` with reason
-`TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY` (244). So does a
+reached now ends with `status` `failed` and `failure_reason`
+`trigger_would_trigger_immediately` (244). So does a
 stop-loss or take-profit whose trigger price the watched price, the last or
 the index price alike, has reached when the trigger takes effect, a few
 milliseconds after it is submitted: it never armed and placed nothing.
@@ -1262,9 +1308,35 @@ activation price with a present zero.
 When modifying a trigger, omit `activation_price` / `max_slippage_ticks` /
 `max_slippage_bps` to preserve the current values. A trigger's child limit
 price is fixed at create: cancel the trigger and create a new one to change
-it. Send an explicit zero
-(`Price::from_ticks(0)` or `Some(0)`) to clear an existing activation price
-or maximum-slippage cap. A trailing stop's `max_slippage_bps` (standalone or
+it. Send an explicit zero to clear an existing activation price
+or maximum-slippage cap:
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+# let trigger_id = String::new();
+use polyester::Price;
+use polyester::models::{ModifyTriggerParams, SubAccountScope};
+
+client
+    .triggers
+    .modify(ModifyTriggerParams {
+        trigger_id,
+        subaccount_id: SubAccountScope::Default,
+        symbol: None,
+        symbol_id: None,
+        trigger_price: None,
+        activation_price: Some(Price::from_ticks(0, None)?),
+        trailing_distance_ticks: None,
+        trailing_distance_bps: None,
+        max_slippage_ticks: Some(0),
+        max_slippage_bps: None,
+    })
+    .await?;
+# Ok(())
+# }
+```
+
+A trailing stop's `max_slippage_bps` (standalone or
 attached, buy or sell) takes 1–9999 at create. A buy market child and a buy
 TWAP slice take up to 10000; a sell market child and a sell TWAP slice take up
 to 9999. A modify takes `max_slippage_bps` from 0 (clear) to 10000, as the
@@ -1716,7 +1788,7 @@ The API gateway checks an API-key request's signature and timestamp before any s
 `Error::TimestampSkew` (`TIMESTAMP_SKEW`) means the request timestamp was outside the allowed skew
 window. It is retryable: the request did nothing, and a retry signs it again with a fresh
 timestamp. If it persists, fix the local clock. Other gateway rejections (`SIGNATURE_INVALID`,
-`KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code }` and are not
+`KEY_DISABLED`, `IP_NOT_ALLOWED`, ...) are `Error::ApiKeyRejected { status, code, .. }` and are not
 retryable. `Error::auth_error_code()` returns the code of either.
 
 A REST HTTP 403 problem that refuses the operation rather than the key, such as
