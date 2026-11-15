@@ -560,7 +560,7 @@ reads report it as `Order.self_trade_prevention_mode` (`expire_taker`,
 `expire_maker`, `expire_both`, `decrement`), and each leg's trigger as
 `Trigger.self_trade_prevention_mode`. `Decrement` reduces both orders by the
 quantity that would have traded, with no trade: the order left with no
-quantity ends `canceled` with `CANCEL_REASON_STP_DECREMENT`, a resting order
+quantity ends `canceled` with `cancel_reason` `stp_decrement`, a resting order
 that keeps a quantity keeps its place in the queue, and an incoming one goes on
 matching. A fill-or-kill order that would meet such an order is rejected
 `FOK_INSUFFICIENT_LIQUIDITY`. The incoming order's mode decides, so a resting
@@ -568,7 +568,7 @@ order of any mode can be reduced or canceled this way. Trigger creates take
 `decrement` too (`CreateTriggerParams.self_trade_prevention_mode`). An attached exit never trades with the
 order it protects: when it fires while that order still rests, the order's
 unfilled rest is canceled first (fills before stand) and the order ends
-`canceled` with `CANCEL_REASON_ATTACHED_EXIT_FIRED`.
+`canceled` with `cancel_reason` `attached_exit_fired`.
 
 Standalone trailing stops take either side. A SELL trailing stop tracks the
 highest price and fires a market-IOC child; it takes no `limit_price`. A BUY
@@ -718,7 +718,7 @@ a rebate subtracted, a base fee left out) and
 `submitted_max_quote_debit_scaled`. Both are `None` until `fee_total.qty`
 equals `cum_qty`: a fill's fee is recorded shortly after the fill. Such a buy
 ends `filled` once it spent its amount, and `canceled` with
-`CANCEL_REASON_MARKET_REMAINDER` or `CANCEL_REASON_IOC_REMAINDER` when the book
+`cancel_reason` `market_remainder` or `ioc_remainder` when the book
 or its price limit stopped it first.
 
 ```rust,no_run
@@ -763,18 +763,18 @@ rejected with `ERROR_CODE_CONFLICT_DUPLICATE_CLIENT_ORDER_ID`, and
 `Error::existing_order_id()` (or `BatchCreateResultItem.existing_order_id`)
 names the order that holds it when the server knows it.
 
-An ended order says why. A `rejected` order carries `Order.reject_reason`,
-the order error code the Orders API returns for the same refusal and in the
-same form as `Error::Api`'s `code` (for example `ERROR_CODE_POST_ONLY_CROSS`).
-A `canceled` order carries `Order.cancel_reason`, a `CancelReason` proto name
-such as `CANCEL_REASON_USER_REQUEST`, `CANCEL_REASON_IOC_REMAINDER`,
-`CANCEL_REASON_STP_EXPIRE_MAKER`, `CANCEL_REASON_REPLACED`,
-`CANCEL_REASON_GTD_EXPIRED`, `CANCEL_REASON_STP_DECREMENT`,
-`CANCEL_REASON_PRICE_BAND` (the rest of a market order the price band stopped)
-or `CANCEL_REASON_CANCEL_ON_DISCONNECT`. Both are `None` for every other
+An ended order says why, in the short lowercase labels every Polyester SDK
+uses. A `rejected` order carries `Order.reject_reason`, the order error code
+the Orders API returns for the same refusal without its `ERROR_CODE_` prefix
+(for example `post_only_cross` where `Error::Api`'s `code` reads
+`ERROR_CODE_POST_ONLY_CROSS`). A `canceled` order carries
+`Order.cancel_reason`, a `CancelReason` without its `CANCEL_REASON_` prefix,
+such as `user_request`, `ioc_remainder`, `stp_expire_maker`, `replaced`,
+`gtd_expired`, `stp_decrement`, `price_band` (the rest of a market order the
+price band stopped) or `cancel_on_disconnect`. Both are `None` for every other
 status. A value
 this SDK does not know yet keeps its number: `UNKNOWN_ERROR_CODE(<n>)` and
-`UNKNOWN(<n>)`. Match on these codes, not on message text.
+`UNKNOWN(<n>)`. Match on these labels, not on message text.
 
 Each spot pair publishes order limits, read with
 `market_data.get_spot_config()` (`SpotConfig.pair_order_limits`,
@@ -795,7 +795,7 @@ the limits are `ceil(R * (1 - lower_bps / 10000) / T) * T` and
 `floor(R * (1 + upper_bps / 10000) / T) * T`. A limit buy above the upper
 limit or a limit sell below the lower one is refused `PRICE_BAND_VIOLATION`; a
 market order trades only to the limit and the rest is canceled with
-`CANCEL_REASON_PRICE_BAND`. R is not published; the last trade price is a
+`cancel_reason` `price_band`. R is not published; the last trade price is a
 close estimate.
 
 ```rust,no_run
@@ -1220,8 +1220,8 @@ prevention expired the attached exit's order against another of the account's
 resting orders; the leg stays armed and fires again at the next trade through
 its trigger price, or once the blocking order is gone). `fire_price` is the
 price it fired at. For `self_trade_prevented`, `child_seq` names the child
-order that was placed and expired (`CANCEL_REASON_STP_EXPIRE_TAKER` or
-`CANCEL_REASON_STP_EXPIRE_BOTH`). A ladder level the order book rejected when
+order that was placed and expired (`cancel_reason` `stp_expire_taker` or
+`stp_expire_both`). A ladder level the order book rejected when
 it arrived (for example `post_only_cross`) is reported the same way while the
 ladder keeps working its other levels: it follows that level's `fired` event,
 with the same `child_seq` and the level's price as `fire_price`, and that level
@@ -1270,7 +1270,7 @@ Trigger-event `fire_price` is `None` for time-scheduled TWAP slice fires
 `terminal_reason` oneof (empty when unset; unspecified enum → `""`).
 When the exchange halts a market it ends the market's open triggers with
 `cancel_reason` `market_halted` and cancels its open orders with
-`Order.cancel_reason` `CANCEL_REASON_MARKET_HALTED`. A trigger the halted
+`Order.cancel_reason` `market_halted`. A trigger the halted
 market refuses reads `failure_reason` `market_halted` when it ends `failed`,
 and `fire_refusal_reason` `market_halted` on a refused fire. A reason this SDK
 does not name still decodes as `UNKNOWN_TRIGGER_FAILURE_REASON(<n>)`.

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** Order cancel and reject reasons use the short lowercase labels every Polyester SDK now uses: `Order::cancel_reason` and an order event's `cancel_reason` drop the `CANCEL_REASON_` prefix (`stp_decrement`, `user_request`, `replaced`, `price_band`), and `Order::reject_reason`, an order event's `reject_reason` and a command outcome's `reason` drop the `ERROR_CODE_` prefix (`post_only_cross`, `peg_limit_violation`, `order_unknown`). A value this SDK does not know reads as before: `UNKNOWN_ERROR_CODE(<n>)` for a reject reason, `UNKNOWN(<n>)` for a cancel reason or a command outcome. `Error::Api`'s `code`, `OrderErrorDetail::code` and the batch item `code` fields are unchanged, and trigger reasons already read this way. Affected: `orders.get`, `orders.list_open`, `orders.list_history`, `orders.subscribe` (`OrderStreamEvent`, `OrderCommandOutcome`). Migration: compare reasons with the lowercase label, for example `Some("stp_decrement")` instead of `Some("CANCEL_REASON_STP_DECREMENT")`.
+- **Breaking:** Order write results keep the times and quantities the server returns. `OrderMutationResult` gains `accepted_ts_ns`, when `orders.create` was admitted (0 for a cancel); `BatchCreateOrdersResult` and `ModifyOrderResult` gain `ts_ns`, when the server answered; each is in nanoseconds since the Unix epoch, read from the exact nanosecond field, or from its paired timestamp when only that is sent, and 0 when neither is. `BatchCreateResultItem` gains `resolved_base_qty`, the base quantity the server resolved for an accepted item, at that item's pair base scale as `orders.create` returns it (`None` for a rejected item), and `BatchReplaceAdmissionItem` gains `existing_order_id`, the order already holding a rejected item's new client order ID when the server knows it, as `BatchCreateResultItem::existing_order_id` does. Affected: `orders.create`, `orders.batch_create`, `orders.modify`, `orders.batch_replace`. Migration: struct literals of these types no longer compile; add the new fields.
+- `BatchReplaceOrdersResult::accepted_ts_ns` reads the paired `accepted_ts` timestamp when the server sends only that, instead of 0. Affected: `orders.batch_replace`.
+
 ## 0.28.0
 
 Package version: `0.28.0`. Git tag: `v0.28.0`. Released 2026-11-14. Built on public contract `ebbbeac`.

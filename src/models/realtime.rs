@@ -97,13 +97,13 @@ pub struct OrderStreamEvent {
     pub kind: String,
     /// For a `rejected` event, the order's
     /// [`reject_reason`](crate::models::Order::reject_reason): the order error
-    /// code the Orders API returns for the same refusal (for example
-    /// `ERROR_CODE_POST_ONLY_CROSS`). `None` otherwise.
+    /// code the Orders API returns for the same refusal as a short lowercase
+    /// label (for example `post_only_cross`). `None` otherwise.
     pub reject_reason: Option<String>,
     /// For a `canceled` event, the order's
     /// [`cancel_reason`](crate::models::Order::cancel_reason) (for example
-    /// `CANCEL_REASON_USER_REQUEST`); also set on the `replaced` event of the
-    /// order a replace ended (`CANCEL_REASON_REPLACED`). `None` otherwise,
+    /// `user_request`); also set on the `replaced` event of the order a
+    /// replace ended (`replaced`). `None` otherwise,
     /// including the `replaced` event that installs the successor.
     pub cancel_reason: Option<String>,
     /// The successor's public ID for a `replaced` event.
@@ -136,8 +136,9 @@ pub struct OrderCommandOutcome {
     pub order_id: Option<String>,
     pub new_order_id: Option<String>,
     pub client_order_id: String,
-    /// The order error code the Orders API returns for the same refusal
-    /// (for example `ERROR_CODE_ORDER_UNKNOWN`), `UNKNOWN(<number>)` for a
-    /// code this SDK does not know, or empty when none applies.
+    /// The order error code the Orders API returns for the same refusal, as
+    /// a short lowercase label without its `ERROR_CODE_` prefix (for example
+    /// `order_unknown`), `UNKNOWN(<number>)` for a code this SDK does not
+    /// know, or empty when none applies.
     pub reason: String,
 }
