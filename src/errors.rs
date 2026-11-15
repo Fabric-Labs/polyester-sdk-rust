@@ -261,6 +261,11 @@ pub enum Error {
     },
     #[error("{0}")]
     Realtime(String),
+    /// The binary market-data stream refused a message: one of another
+    /// schema, one whose layout or values break the protocol, or a depth
+    /// update its book could not apply.
+    #[error(transparent)]
+    MarketStream(crate::marketstream::StreamError),
     /// Realtime subscription queue was full; the subscription fails instead of
     /// silently dropping updates.
     #[error("{0}")]
@@ -920,6 +925,9 @@ impl Error {
                 problem: problem(p),
             },
             Self::Realtime(message) => Self::Realtime(text(message)),
+            // Template IDs, pair IDs and protocol positions only: nothing to
+            // redact.
+            Self::MarketStream(err) => Self::MarketStream(err),
             Self::QueueOverflow(message) => Self::QueueOverflow(text(message)),
             Self::RealtimeSetupTimeout { channel, deadline } => {
                 Self::RealtimeSetupTimeout { channel, deadline }

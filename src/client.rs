@@ -525,6 +525,31 @@ impl Client {
         self.wait_for(CatalogKind::Spot).await
     }
 
+    /// Connects to the public binary market-data stream of the client's
+    /// environment ([`crate::marketstream::connect`]). It waits for the spot
+    /// catalogs, whose pair scales every price level and trade is decoded
+    /// with, and backfills trade gaps from [`Self::market_data`]. The stream
+    /// needs no credentials.
+    pub async fn market_stream(&self) -> Result<crate::marketstream::MarketStream> {
+        self.market_stream_with(|_| {}).await
+    }
+
+    /// [`Self::market_stream`] with its [`crate::marketstream::Config`]
+    /// adjusted by `configure` before connecting.
+    pub async fn market_stream_with(
+        &self,
+        configure: impl FnOnce(&mut crate::marketstream::Config),
+    ) -> Result<crate::marketstream::MarketStream> {
+        self.wait_for_catalogs().await?;
+        let mut config = crate::marketstream::Config::new(
+            crate::marketstream::url(&self.ws_url)?,
+            self.catalogs.clone(),
+        );
+        config.history = Some(Arc::new(self.market_data.clone()));
+        configure(&mut config);
+        crate::marketstream::connect(config).await
+    }
+
     /// Wait until the funding (deposit/withdraw) config is ready, as
     /// [`Self::wait_for_catalogs`] does for the spot config. Read the zipper
     /// catalog and [`CatalogManager::ledger_id_for_asset`] after it returns

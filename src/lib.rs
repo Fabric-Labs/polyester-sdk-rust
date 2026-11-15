@@ -50,6 +50,7 @@ pub mod codecs;
 pub mod environment;
 pub mod errors;
 pub mod marketoverview;
+pub mod marketstream;
 pub mod models;
 pub mod orderbook;
 #[cfg(test)]

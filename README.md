@@ -2106,6 +2106,120 @@ if let Some(markets) = sub.updates().recv().await {
 # }
 ```
 
+## Binary market-data stream
+
+`polyester::marketstream` connects to the public binary market-data WebSocket
+(`/ws/market.sbe` on the API's WebSocket host). It is the low-latency feed of
+trades, best bid and offer, and order book depth per spot pair, encoded with
+Simple Binary Encoding (SBE). Connecting needs no API key.
+
+`Client::market_stream` waits for the spot catalogs and connects to the
+client's environment (`Client::market_stream_with` adjusts the
+`marketstream::Config` first). Every price is a `types::Price` and every
+quantity a `types::Quantity` with the pair's base quantity scale from the
+catalogs, so values are exact decimals, never floats.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::marketstream::{Event, Stream, Topic};
+
+let mut stream = client.market_stream().await?;
+let symbol_id = client.catalogs.symbol_id_for_symbol("BTC-USDT").expect("a listed pair");
+let results = stream
+    .subscribe(&[
+        Topic::new(symbol_id, Stream::Trades),
+        Topic::new(symbol_id, Stream::Bbo),
+        Topic::new(symbol_id, Stream::Depth),
+    ])
+    .await?;
+for r in &results {
+    if !r.result.subscribed() {
+        eprintln!("pair {} not subscribed: {}", r.symbol_id, r.result);
+    }
+}
+
+while let Some(event) = stream.recv().await {
+    match event {
+        Event::Trades(t) => {
+            for trade in &t.trades {
+                println!("{} {:?} {} {}", trade.trade_id, trade.taker_side, trade.price.format(), trade.qty.format(None)?);
+            }
+        }
+        Event::TradesGap(gap) => eprintln!("trades after {} missed live ({:?}); recovering", gap.after_trade_id, gap.cause),
+        Event::TradesBackfill(b) => {
+            if let Err(e) = b.trades {
+                eprintln!("trade recovery failed: {e}");
+            }
+        }
+        Event::BestBidOffer(q) => {
+            if let (Some(bid), Some(ask)) = (&q.bid, &q.ask) {
+                println!("bbo {} {}", bid.price.format(), ask.price.format());
+            }
+        }
+        Event::DepthSnapshot(_) | Event::DepthUpdate(_) => {
+            if let Some(book) = stream.order_book(symbol_id, Stream::Depth, 10) {
+                println!("book at {} stale: {}", book.update_id, book.stale);
+            }
+        }
+        Event::MarketStatus(s) => eprintln!("pair {} feed {:?}", s.symbol_id, s.feed),
+        Event::Disconnected { error, delay } => eprintln!("market stream reconnecting in {delay:?}: {error}"),
+        _ => {}
+    }
+}
+if let Some(err) = stream.err() {
+    return Err(err.into());
+}
+# Ok(())
+# }
+```
+
+Streams and recovery:
+
+- `Stream::Trades` delivers every trade once, in trade ID order. The stream
+  starts with a `TradesThrough` frontier and repeats it every second. Trades
+  the connection did not receive live, whether the server named them, the
+  client found them missing, or they fell between two connections, arrive as a
+  `TradesGap`. With `Config::history` set (the default of
+  `Client::market_stream`), the client recovers each gap from the trade history
+  API by trade ID and delivers a `TradesBackfill`; `marketstream::backfill`
+  does the same on demand. A recovery waits, retrying, while the trade history
+  catches up with the live stream.
+- `Stream::Bbo` and `Stream::Depth20` carry the full state in every message.
+  The client delivers only states newer than the last one and keeps the newest
+  (`MarketStream::best_bid_offer`, `MarketStream::order_book`).
+- `Stream::Depth` opens with a `DepthSnapshot`, then each `DepthUpdate` applies
+  only to a book at exactly its base: each level is set, and a level with
+  quantity 0 is deleted. After each update, each side is truncated to the live
+  window the snapshot names (`DepthSnapshot::levels_per_side`). An update the
+  book cannot apply is never patched over: the client reconnects and the new
+  subscription's snapshot replaces the book.
+- `MarketStatus` reports a pair whose feed went stale (`FeedState::Stale`): its
+  best bid and offer and depth pause until it recovers. A depth book then waits
+  for its replacement snapshot, which arrives before the pair is reported live
+  again; `OrderBook::stale` is set while the book may not be current.
+
+The client pings every 15 seconds and reconnects when a pong is late or the
+connection drops, with jittered backoff, and resubscribes every topic the
+server accepted. Topics it refused (an unknown or disabled pair, or more
+subscriptions than one connection may hold) are not resubscribed. Events are
+queued up to `Config::queue_size`: a consumer that falls behind fails the
+stream with `Error::QueueOverflow` instead of losing messages.
+
+`MarketStream::unsubscribe` ends topics and `MarketStream::unsubscribe_symbol`
+every stream of one pair. Each topic's result is `SubscribeResult::Ok` when its
+stream ended or `SubscribeResult::NotSubscribed` when it was not held. The
+client stops resubscribing them at once and drops their books, quotes and trade
+tracking, so subscribing again starts from a fresh snapshot or baseline.
+
+Decoders are generated from the published schema with Real Logic's sbe-tool
+(`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the
+client does not know are skipped. A message of a newer schema version is read
+by its declared block lengths, as the SBE versioning rules allow; a message
+whose layout cannot be read this way ends the connection with
+`Error::MarketStream(StreamError::Frame { .. })`, and a message of another
+schema stops the stream with `StreamError::Schema`. No message is ever
+misread.
+
 ## Realtime
 
 Realtime is binary-only. Account orders stream over the private WebSocket;
@@ -2371,6 +2485,7 @@ CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python)
 | `src/services`, `src/client` | Ergonomic async `Client` surface |
 | `src/realtime` | WebSocket subscriptions (always included; `realtime`/`chain` are empty compat flags) |
 | `src/catalogs`, `src/orderbook` | Catalog cache + local book helpers |
+| `src/marketstream` | Binary market-data stream client, local depth book, trade recovery; `sbe/` holds its schema and `src/marketstream/sbe` the generated SBE decoders |
 
 Proto stubs are updated when a new `src/gen/` bundle is landed. Day-to-day SDK
 work does not require local `buf` generation. After replacing gen files, run:
