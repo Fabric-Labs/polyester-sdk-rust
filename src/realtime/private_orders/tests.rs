@@ -520,7 +520,7 @@ async fn delivers_units_with_orders_removals_and_events() {
             version: 2,
             kind: "canceled".into(),
             reject_reason: None,
-            cancel_reason: Some("CANCEL_REASON_USER_REQUEST".into()),
+            cancel_reason: Some("user_request".into()),
             replacement_order_id: None,
             fill: None,
         })]

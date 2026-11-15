@@ -1,5 +1,6 @@
 //! Trigger response decoders.
 
+use super::common::paired_ts_ns;
 use super::enums::{enum_value_self_trade_prevention_mode, enum_value_side};
 use super::money::{attach_qty_scale, decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
@@ -577,22 +578,6 @@ pub fn trigger_mutation_from_modify(
     msg: &ModifyTriggerResponse,
 ) -> crate::errors::Result<TriggerMutationResult> {
     trigger_mutation(msg.trigger_id, msg.status)
-}
-
-/// A response time in nanoseconds since the Unix epoch: the exact `*_ts_ns`
-/// field, or its paired `Timestamp` when the nanosecond field is unset; 0
-/// when neither is set or the time is before the epoch.
-fn paired_ts_ns(ts_ns: u64, ts: Option<&Timestamp>) -> u64 {
-    if ts_ns != 0 {
-        return ts_ns;
-    }
-    ts.map_or(0, |ts| {
-        u64::try_from(ts.seconds)
-            .ok()
-            .and_then(|secs| secs.checked_mul(1_000_000_000))
-            .and_then(|ns| ns.checked_add(u64::try_from(ts.nanos).ok()?))
-            .unwrap_or(0)
-    })
 }
 
 /// `CreateOcoResponse` acknowledges the OCO and both legs; an answer missing
@@ -1287,6 +1272,54 @@ mod tests {
             ladder.executed_qty.as_ref().unwrap().as_scaled(),
             25_000_000
         );
+    }
+
+    /// A TWAP or ladder that has executed nothing reads `executed_qty: None`
+    /// (there is no quantity to format); once it has executed, the quantity
+    /// formats at the pair's base scale, as `qty` does.
+    #[test]
+    fn executed_qty_is_none_until_executed_and_formats_at_the_pair_scale() {
+        use crate::proto::triggers::v1::{LadderDetails, TwapDetails};
+
+        let read = |details: trigger::RuntimeDetails| {
+            let mut t = trigger_from_proto(&ProtoTrigger {
+                trigger_id: 12,
+                symbol_id: 1,
+                status: TriggerStatus::StatusRunning.into(),
+                qty_scaled: 60_000,
+                runtime_details: Some(details),
+                ..Default::default()
+            });
+            attach_trigger_scale(&mut t, Some(8));
+            let executed = match t.details.as_ref() {
+                Some(TriggerDetails::Twap(twap)) => twap.executed_qty.clone(),
+                Some(TriggerDetails::Ladder(ladder)) => ladder.executed_qty.clone(),
+                other => panic!("unexpected details {other:?}"),
+            };
+            (
+                t.qty.as_ref().map(|q| q.format(None).unwrap()),
+                executed.map(|q| q.format(None).unwrap()),
+            )
+        };
+        let twap = |executed: i64| {
+            trigger::RuntimeDetails::TwapState(Box::new(TwapDetails {
+                slice_idx: 1,
+                executed_qty_scaled: executed,
+                ..Default::default()
+            }))
+        };
+        let ladder = |executed: i64| {
+            trigger::RuntimeDetails::LadderState(Box::new(LadderDetails {
+                ladder_levels: 3,
+                executed_qty_scaled: executed,
+                ..Default::default()
+            }))
+        };
+        let qty = Some("0.0006".to_owned());
+        assert_eq!(read(twap(0)), (qty.clone(), None));
+        assert_eq!(read(ladder(0)), (qty.clone(), None));
+        assert_eq!(read(twap(20_000)), (qty.clone(), Some("0.0002".to_owned())));
+        assert_eq!(read(ladder(40_000)), (qty, Some("0.0004".to_owned())));
     }
 
     #[test]

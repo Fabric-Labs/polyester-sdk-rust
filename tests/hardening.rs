@@ -41,6 +41,8 @@ mod order_by_symbol_id;
 mod order_read_scales;
 #[path = "order_trades_wait/mod.rs"]
 mod order_trades_wait;
+#[path = "order_write_results/mod.rs"]
+mod order_write_results;
 #[path = "orderbook_depths/mod.rs"]
 mod orderbook_depths;
 #[path = "orders_and_batches/mod.rs"]
