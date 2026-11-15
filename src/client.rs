@@ -611,17 +611,29 @@ impl Client {
     /// This pages through the triggers in the live statuses (`created`,
     /// `armed`, `running`, `paused`, attached legs included, up to 1000 per
     /// page), cancels each one, and only then cancels all open orders, so an
-    /// order a trigger places before its cancel is still canceled.
+    /// order a trigger places before its cancel is still canceled. The two
+    /// legs of an OCO are canceled together, once, with
+    /// [`TriggersService::cancel_oco_by_id`] by their `order_list_id`, since
+    /// canceling one leg ends the other.
     ///
-    /// A trigger whose cancel fails does not stop the run; it is listed in
-    /// [`StopAllTradingResult::trigger_failures`]. An error listing the
-    /// triggers returns before anything is canceled; an error of the final
-    /// cancel-all is returned as is.
+    /// A trigger or OCO whose cancel is refused because it has ended since
+    /// the listing ([`Error::is_trigger_already_ended`], or
+    /// `ERROR_CODE_TRIGGER_NOT_FOUND`), after a fill or an expiry for
+    /// example, is stopped, not failed. A trigger whose cancel fails
+    /// otherwise does not stop the run; it is listed in
+    /// [`StopAllTradingResult::trigger_failures`] (each listed leg of an OCO
+    /// whose cancel failed). An error listing the triggers returns before
+    /// anything is canceled; an error of the final cancel-all is returned as
+    /// is.
     pub async fn stop_all_trading(
         &self,
         scope: StopAllTradingScope,
     ) -> Result<StopAllTradingResult> {
-        let mut trigger_ids = Vec::new();
+        // Each cancel to send, in listing order: a trigger (no OCO ID), or an
+        // OCO with the legs listed.
+        let mut targets: Vec<(Option<String>, Vec<String>)> = Vec::new();
+        let mut oco_targets = std::collections::HashMap::<String, usize>::new();
+        let mut seen_triggers = std::collections::HashSet::new();
         let mut seen_tokens = std::collections::HashSet::new();
         let mut page_token = None;
         loop {
@@ -638,7 +650,21 @@ impl Client {
                     ..Default::default()
                 })
                 .await?;
-            trigger_ids.extend(page.triggers.into_iter().map(|t| t.trigger_id));
+            for trigger in page.triggers {
+                if !seen_triggers.insert(trigger.trigger_id.clone()) {
+                    continue;
+                }
+                match trigger.order_list_id {
+                    Some(oco) => match oco_targets.get(&oco) {
+                        Some(&i) => targets[i].1.push(trigger.trigger_id),
+                        None => {
+                            oco_targets.insert(oco.clone(), targets.len());
+                            targets.push((Some(oco), vec![trigger.trigger_id]));
+                        }
+                    },
+                    None => targets.push((None, vec![trigger.trigger_id])),
+                }
+            }
             if page.next_page_token.is_empty() {
                 break;
             }
@@ -653,14 +679,28 @@ impl Client {
 
         let mut canceled_trigger_ids = Vec::new();
         let mut trigger_failures = Vec::new();
-        for trigger_id in trigger_ids {
-            match self
-                .triggers
-                .cancel_by_id(&trigger_id, scope.subaccount_id)
-                .await
-            {
-                Ok(_) => canceled_trigger_ids.push(trigger_id),
-                Err(error) => trigger_failures.push(StopAllTradingFailure { trigger_id, error }),
+        for (oco, legs) in targets {
+            let canceled = match &oco {
+                Some(oco) => self
+                    .triggers
+                    .cancel_oco_by_id(oco, scope.subaccount_id)
+                    .await
+                    .map(drop),
+                None => self
+                    .triggers
+                    .cancel_by_id(&legs[0], scope.subaccount_id)
+                    .await
+                    .map(drop),
+            };
+            match canceled {
+                Ok(()) => canceled_trigger_ids.extend(legs),
+                Err(error) if stop_all_already_ended(&error) => {}
+                Err(error) => trigger_failures.extend(legs.into_iter().map(|trigger_id| {
+                    StopAllTradingFailure {
+                        trigger_id,
+                        error: error.clone(),
+                    }
+                })),
             }
         }
 
@@ -679,6 +719,13 @@ impl Client {
             orders,
         })
     }
+}
+
+/// A cancel refused because the trigger or OCO, listed as live, has ended
+/// since: [`Client::stop_all_trading`] counts it as stopped.
+fn stop_all_already_ended(error: &Error) -> bool {
+    error.is_trigger_already_ended()
+        || error.auth_error_code() == Some(crate::errors::order_codes::TRIGGER_NOT_FOUND)
 }
 
 /// One of the two catalogs the client loads when it is created.
