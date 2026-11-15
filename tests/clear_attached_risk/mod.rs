@@ -7,6 +7,7 @@
 
 use super::*;
 use polyester::Price;
+use polyester::models::SubAccountScope;
 use polyester::models::{AttachedRisk, BatchReplaceItem, ModifyOrderParams, OrderKey, RiskLeg};
 use polyester::proto::orders::v1::{BatchReplaceOrdersRequest, ModifyOrderRequest, RiskPolicy};
 
@@ -58,7 +59,7 @@ fn modify(new_price: Option<Price>) -> ModifyOrderParams {
     ModifyOrderParams {
         symbol: "BTC-USDT".into(),
         key: OrderKey::OrderId("9".into()),
-        subaccount_id: None,
+        subaccount_id: SubAccountScope::Default,
         request_id: None,
         new_price,
         new_qty: None,
@@ -91,7 +92,7 @@ async fn modify_and_batch_replace_clear_attached_risk_send_an_empty_risk_policy(
         item.clear_attached_risk = true;
         let _ = client
             .orders
-            .batch_replace(vec![item], "BTC-USDT", None, None)
+            .batch_replace(vec![item], "BTC-USDT", SubAccountScope::Default, None)
             .await;
 
         let got = std::mem::take(&mut *seen.lock().unwrap());
@@ -129,7 +130,7 @@ async fn clear_with_new_risk_and_an_empty_risk_are_refused_before_sending() {
     both.clear_attached_risk = true;
     let err = client
         .orders
-        .batch_replace(vec![both], "BTC-USDT", None, None)
+        .batch_replace(vec![both], "BTC-USDT", SubAccountScope::Default, None)
         .await
         .unwrap_err();
     assert!(matches!(err, Error::Validation(_)), "{err:?}");

@@ -591,9 +591,14 @@ async fn deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_config() 
 
     for pending in [true, false] {
         let (client, api) = funding_state_client(pending).await;
-        let list = tokio::time::timeout(Duration::from_secs(5), client.deposit.list_addresses())
-            .await
-            .expect("list ended");
+        let list = tokio::time::timeout(
+            Duration::from_secs(5),
+            client
+                .deposit
+                .list_addresses(polyester::models::SubAccountScope::Default),
+        )
+        .await
+        .expect("list ended");
         let create = tokio::time::timeout(
             Duration::from_secs(5),
             client

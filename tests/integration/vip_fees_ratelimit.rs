@@ -1,6 +1,7 @@
 //! VIP catalog/status, spot fees, and trading rate-limit integration tests.
 
 use crate::support::{call_optional, require_live_client};
+use polyester::models::SubAccountScope;
 
 #[tokio::test]
 async fn list_vip_tiers() {
@@ -32,7 +33,9 @@ async fn get_spot_fee_rates() {
         return;
     };
     let _ = call_optional("fees.get_spot_fee_rates", || {
-        client.fees.get_spot_fee_rates(None, vec![])
+        client
+            .fees
+            .get_spot_fee_rates(SubAccountScope::Default, vec![])
     })
     .await;
 }
@@ -54,7 +57,9 @@ async fn get_trading_rate_limits() {
         return;
     };
     let _ = call_optional("rate_limits.get_trading_rate_limits", || {
-        client.rate_limits.get_trading_rate_limits(None)
+        client
+            .rate_limits
+            .get_trading_rate_limits(SubAccountScope::Default)
     })
     .await;
 }

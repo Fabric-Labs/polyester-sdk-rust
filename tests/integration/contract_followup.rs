@@ -1,6 +1,7 @@
 //! Credentialed confirmation of the public fee and trigger-read contract.
 use crate::support::require_live_client;
 use polyester::errors::Error;
+use polyester::models::SubAccountScope;
 use polyester::proto::triggers::v1::{GetTriggerRequest, ListTriggerEventsRequest};
 
 #[tokio::test]
@@ -10,7 +11,7 @@ async fn contract_fees_and_unknown_trigger() {
     };
     let fees = client
         .fees
-        .get_spot_fee_rates(None, vec![])
+        .get_spot_fee_rates(SubAccountScope::Default, vec![])
         .await
         .expect("fee rates");
     assert!(!fees.fee_rates.is_empty(), "fee scenario must occur");

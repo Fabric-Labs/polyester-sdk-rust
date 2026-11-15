@@ -16,6 +16,7 @@ use crate::codecs::decode::{
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::orders::v1::{OrdersReadServiceClient, OrdersServiceClient};
 use crate::errors::{Error, Result};
+use crate::models::SubAccountScope;
 use crate::models::{
     AttachedRisk, BatchCancelItem, BatchCancelOrdersResult, BatchCreateOrdersResult,
     BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterResult,
@@ -157,7 +158,7 @@ impl OrdersService {
         )
     }
 
-    pub async fn list_open(&self, subaccount_id: Option<u64>) -> Result<OrdersList> {
+    pub async fn list_open(&self, subaccount_id: SubAccountScope) -> Result<OrdersList> {
         self.list_open_with(ListOpenOrdersOpts {
             subaccount_id,
             ..Default::default()
@@ -172,7 +173,7 @@ impl OrdersService {
         };
         let limit = super::positive_limit(opts.limit, "list_open_orders")?;
         let req = GetOpenOrdersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             page_token: opts.page_token.unwrap_or_default(),
             limit,
             include_attached_risk: Some(opts.include_attached_risk),
@@ -198,7 +199,7 @@ impl OrdersService {
 
     pub async fn list_history(
         &self,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         limit: Option<u32>,
     ) -> Result<OrdersList> {
         self.list_history_with(ListOrderHistoryOpts {
@@ -251,7 +252,7 @@ impl OrdersService {
             _ => None,
         };
         let req = GetOrderHistoryRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,
             page_token: opts.page_token.unwrap_or_default(),
             // Option wire field: None omits; Some(0) means server default.
@@ -275,7 +276,11 @@ impl OrdersService {
         Ok(scale_orders(&self.ctx, list))
     }
 
-    pub async fn get(&self, key: OrderKey, subaccount_id: Option<u64>) -> Result<GetOrderResult> {
+    pub async fn get(
+        &self,
+        key: OrderKey,
+        subaccount_id: SubAccountScope,
+    ) -> Result<GetOrderResult> {
         self.get_with(GetOrderOpts {
             key,
             subaccount_id,
@@ -302,7 +307,7 @@ impl OrdersService {
         }
         let key = Some(Self::encode_get_order_key(&opts.key)?);
         let req = GetOrderRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             key,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
@@ -371,7 +376,7 @@ impl OrdersService {
             let page = self
                 .get_with(GetOrderOpts {
                     key: key.clone(),
-                    subaccount_id: None,
+                    subaccount_id: SubAccountScope::Default,
                     include_attached_risk: false,
                     include_attached_risk_state: false,
                     include_execution_history: Some(true),
@@ -806,7 +811,7 @@ impl OrdersService {
     ) -> Result<CreateOrderRequest> {
         let order = self.order_intent_for_market(params, market)?;
         let mut req = CreateOrderRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
         };
         *req.order.get_or_insert_default() = order;
@@ -1101,7 +1106,7 @@ impl OrdersService {
         let market = self.ctx.catalogs.require_market(&params.symbol)?;
         let symbol = market.symbol.as_str();
         let mut req = ModifyOrderRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             request_id: Self::coalesce_request_id(params.request_id, "mod")?,
             key: Some(Self::encode_modify_order_key(&params.key)?),
             symbol_id: market.symbol_id,
@@ -1235,7 +1240,7 @@ impl OrdersService {
         };
         let order = self.order_intent_for_market(&create, market)?;
         let mut req = PreviewOrderRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             ..Default::default()
         };
         *req.order.get_or_insert_default() = order;
@@ -1249,11 +1254,14 @@ impl OrdersService {
     pub async fn batch_create(
         &self,
         items: Vec<CreateOrderParams>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<BatchCreateOrdersResult> {
         Self::validate_batch_size("batch_create", items.len(), Self::MAX_BATCH_CREATE_ITEMS)?;
-        if items.iter().any(|item| item.subaccount_id.is_some()) {
+        if items
+            .iter()
+            .any(|item| item.subaccount_id != SubAccountScope::Default)
+        {
             return Err(Error::validation(
                 "batch_create item scope is unsupported; use the batch-level subaccount_id",
             ));
@@ -1271,7 +1279,7 @@ impl OrdersService {
             markets.push(market);
         }
         let req = BatchCreateOrdersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             request_id: Self::coalesce_request_id(request_id, "batch-create")?,
             items: encoded,
             ..Default::default()
@@ -1310,7 +1318,7 @@ impl OrdersService {
     pub async fn batch_cancel(
         &self,
         items: Vec<BatchCancelItem>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<BatchCancelOrdersResult> {
         Self::validate_batch_size("batch_cancel", items.len(), Self::MAX_BATCH_CANCEL_ITEMS)?;
@@ -1331,7 +1339,7 @@ impl OrdersService {
             proto_items.push(proto);
         }
         let req = BatchCancelOrdersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             request_id: Self::coalesce_request_id(request_id, "batch-cancel")?,
             items: proto_items,
             ..Default::default()
@@ -1371,7 +1379,7 @@ impl OrdersService {
         &self,
         items: Vec<BatchReplaceItem>,
         symbol: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<BatchReplaceOrdersResult> {
         Self::validate_batch_size("batch_replace", items.len(), Self::MAX_BATCH_REPLACE_ITEMS)?;
@@ -1426,7 +1434,7 @@ impl OrdersService {
             proto_items.push(proto);
         }
         let req = BatchReplaceOrdersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             symbol_id,
             request_id: Self::coalesce_request_id(request_id, "batch-replace")?,
             items: proto_items,
@@ -1473,10 +1481,10 @@ impl OrdersService {
     pub async fn get_batch_replace_status(
         &self,
         batch_request_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<BatchReplaceStatusResult> {
         let req = GetBatchReplaceStatusRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             batch_request_id: id_to_u64(batch_request_id, "batch_request_id")?,
             ..Default::default()
         };
@@ -1511,7 +1519,7 @@ impl OrdersService {
     pub async fn wait_batch_replace(
         &self,
         batch_request_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         timeout: Option<Duration>,
     ) -> Result<BatchReplaceStatusResult> {
         const STATUS_WINDOW: Duration = Duration::from_secs(60);
@@ -1519,7 +1527,7 @@ impl OrdersService {
         const MAX_DELAY: Duration = Duration::from_millis(500);
 
         let req = GetBatchReplaceStatusRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             batch_request_id: id_to_u64(batch_request_id, "batch_request_id")?,
             ..Default::default()
         };
@@ -1594,14 +1602,14 @@ impl OrdersService {
         &self,
         timeout_sec: u32,
         symbol: Option<&str>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
         if symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
         let req = CancelAllAfterRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             timeout_sec,
             symbol_id: self.ctx.catalogs.optional_symbol_id(symbol, None)?,
             request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
@@ -1636,6 +1644,13 @@ impl OrdersService {
     /// the typed helpers do; a sub-account set on `req` is sent unchanged.
     pub async fn cancel(&self, mut req: CancelOrderRequest) -> Result<OrderMutationResult> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
+        self.cancel_scoped(req).await
+    }
+
+    /// Sends `req` with its sub-account as given: the typed helpers resolve
+    /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
+    /// account.
+    async fn cancel_scoped(&self, req: CancelOrderRequest) -> Result<OrderMutationResult> {
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1660,18 +1675,18 @@ impl OrdersService {
             .optional_symbol_id(params.symbol.as_deref(), params.symbol_id)?;
         let req = CancelOrderRequest {
             symbol_id,
-            subaccount_id: scope::optional_subaccount(&self.ctx, params.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, params.subaccount_id)?,
             key: Some(Self::encode_cancel_order_key(&params.key)?),
             ..Default::default()
         };
-        self.cancel(req).await
+        self.cancel_scoped(req).await
     }
 
     pub async fn cancel_by_client_order_id(
         &self,
         client_order_id: &str,
         symbol: Option<&str>,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<OrderMutationResult> {
         self.cancel_with(CancelOrderParams {
             key: OrderKey::ClientOrderId(client_order_id.to_owned()),
@@ -1685,7 +1700,7 @@ impl OrdersService {
     pub async fn cancel_by_order_id(
         &self,
         order_id: &str,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<OrderMutationResult> {
         self.cancel_with(CancelOrderParams {
             key: OrderKey::OrderId(order_id.to_owned()),
@@ -1714,7 +1729,7 @@ impl OrdersService {
         &self,
         symbol: Option<&str>,
         dry_run: bool,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
     ) -> Result<CancelAllOrdersResult> {
         self.cancel_all_with(CancelAllOpts {
             symbol: symbol.map(|s| s.to_owned()),
@@ -1734,7 +1749,7 @@ impl OrdersService {
             self.ctx.wait_for_catalogs().await?;
         }
         let mut req = CancelAllOrdersRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_ids: {
                 let mut ids = opts.symbol_ids.clone();
                 if let Some(symbol_id) = opts.symbol_id {
@@ -1855,7 +1870,7 @@ impl TradesService {
 
     pub async fn list(
         &self,
-        subaccount_id: Option<u64>,
+        subaccount_id: SubAccountScope,
         limit: Option<u32>,
     ) -> Result<UserTradesList> {
         self.list_with(ListUserTradesOpts {
@@ -1911,7 +1926,7 @@ impl TradesService {
             _ => None,
         };
         let req = GetUserTradesRequest {
-            subaccount_id: scope::optional_subaccount(&self.ctx, opts.subaccount_id)?,
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id,
             after_match_id: opts.after_match_id,
             // Option wire field: None omits; Some(0) means server default.
@@ -2224,7 +2239,7 @@ mod tests {
             peg: None,
             time_in_force: None,
             client_order_id: Some("order-equivalence".into()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             post_only: Some(true),
             market_client_ref_price: None,
             fee_asset: None,
@@ -2263,7 +2278,7 @@ mod tests {
         ModifyOrderParams {
             symbol: "BTC-USDT".into(),
             key: OrderKey::OrderId("1".into()),
-            subaccount_id: None,
+            subaccount_id: SubAccountScope::Default,
             request_id: Some("modify-equivalence".into()),
             new_price,
             new_qty,
@@ -3140,7 +3155,11 @@ mod tests {
         assert!(OrdersService::validate_batch_client_order_ids(&[item.clone(), distinct]).is_ok());
         let err = client
             .orders
-            .batch_create(vec![item.clone(), item], None, Some("batch-dup".into()))
+            .batch_create(
+                vec![item.clone(), item],
+                SubAccountScope::Default,
+                Some("batch-dup".into()),
+            )
             .await
             .expect_err("duplicate client_order_id must fail before transport");
         assert!(
@@ -3168,7 +3187,11 @@ mod tests {
         blank.client_order_id = Some(" ".into());
         let err = client
             .orders
-            .batch_create(vec![empty, blank], None, Some("batch-empty".into()))
+            .batch_create(
+                vec![empty, blank],
+                SubAccountScope::Default,
+                Some("batch-empty".into()),
+            )
             .await
             .expect_err("missing credentials should be reached for allowed empty ids");
         assert!(matches!(err, Error::Auth(_)), "unexpected error: {err}");
@@ -3292,7 +3315,7 @@ mod tests {
             peg: None,
             time_in_force: create.time_in_force,
             client_order_id: Some("preview-cid".into()),
-            subaccount_id: Some(9),
+            subaccount_id: SubAccountScope::Id(9),
             post_only: create.post_only,
             market_client_ref_price: None,
             fee_asset: Some(FeeAsset::Quote),
@@ -3882,7 +3905,7 @@ mod tests {
         let client = client();
         let err = client
             .orders
-            .cancel_by_client_order_id("bad id!", None, None)
+            .cancel_by_client_order_id("bad id!", None, SubAccountScope::Default)
             .await
             .unwrap_err();
         assert!(matches!(err, Error::Validation(_)));
@@ -3890,7 +3913,10 @@ mod tests {
 
         let err = client
             .orders
-            .get(OrderKey::ClientOrderId("bad id!".into()), None)
+            .get(
+                OrderKey::ClientOrderId("bad id!".into()),
+                SubAccountScope::Default,
+            )
             .await
             .unwrap_err();
         assert!(matches!(err, Error::Validation(_)));
@@ -3936,7 +3962,7 @@ mod tests {
                 key: OrderKey::OrderId(format_id(9)),
                 symbol: Some("UNKNOWN-USDT".into()),
                 symbol_id: None,
-                subaccount_id: None,
+                subaccount_id: SubAccountScope::Default,
             })
             .await
             .unwrap_err();

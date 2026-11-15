@@ -9,6 +9,7 @@ use buffa::Message as _;
 use polyester::codecs::decode::{api_key_from_bytes, api_keys_list_from_proto};
 use polyester::codecs::scalars::format_id;
 use polyester::models::ApiKeySummary;
+use polyester::models::SubAccountScope;
 use polyester::proto::auth::v1::{
     ApiKey as ProtoApiKey, ApiKeyStatus, GetApiKeyRequest, GetApiKeyResponse, GetSubaccountRequest,
     GetSubaccountResponse, ListApiKeysResponse, Subaccount,
@@ -169,7 +170,11 @@ async fn server(wire: WireFormat) -> (Client, MockHttpServer) {
 async fn api_key_reads_keep_display_fields_and_main_account() {
     for wire in WIRES {
         let (client, _http) = server(wire).await;
-        let listed = client.api_keys.list(None).await.expect("list");
+        let listed = client
+            .api_keys
+            .list(SubAccountScope::Default)
+            .await
+            .expect("list");
         assert_keys(&format!("{wire:?} list"), &listed.keys);
 
         let mut got = Vec::new();

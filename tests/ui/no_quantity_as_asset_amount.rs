@@ -1,4 +1,4 @@
-use polyester::models::CreateInternalTransferParams;
+use polyester::models::{CreateInternalTransferParams, SubAccountScope};
 use polyester::types::{Quantity, QuantityDomain};
 
 fn main() {
@@ -8,7 +8,7 @@ fn main() {
         asset_id: 1,
         quantity: qty,
         idempotency_key: "x".into(),
-        subaccount_id: None,
+        subaccount_id: SubAccountScope::Default,
         destination_account_id: Some("1".into()),
         destination_subaccount_id: None,
         destination_smart_account_address: None,

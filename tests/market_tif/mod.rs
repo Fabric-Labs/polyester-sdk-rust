@@ -7,6 +7,7 @@
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
 use buffa_types::google::protobuf::Timestamp;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, CreateTriggerParams,
     CreateTriggerType, PreviewOrderParams,
@@ -110,7 +111,7 @@ async fn send_order(client: &Client, method: &str, params: CreateOrderParams) ->
         "preview" => client.orders.preview(preview(&params)).await.map(drop),
         _ => client
             .orders
-            .batch_create(vec![params], None, None)
+            .batch_create(vec![params], SubAccountScope::Default, None)
             .await
             .map(drop),
     }

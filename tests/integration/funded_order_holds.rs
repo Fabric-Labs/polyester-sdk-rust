@@ -7,6 +7,7 @@ use crate::support::{
     wait_for_open_order, wait_until_reserved_reconciles,
 };
 use polyester::codecs::scalars::{format_price_ticks, parse_price_ticks_str};
+use polyester::models::SubAccountScope;
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::ledger::read::v1::GetBalancesRequest;
 use polyester::types::{Price, Quantity};
@@ -123,7 +124,7 @@ async fn contract_reserved_visible_while_open() {
     .await;
     let cancellation = client
         .orders
-        .cancel_by_client_order_id(&client_order_id, Some(&symbol), None)
+        .cancel_by_client_order_id(&client_order_id, Some(&symbol), SubAccountScope::Default)
         .await;
     // Cancel even when the create acknowledgement or observation fails.
     if observed.is_ok() {

@@ -5,6 +5,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{ListTriggersOpts, Order, OrderKey, TriggerDetails, UserTrade};
 use polyester::proto::orders::v1::{
     GetOpenOrdersResponse, GetOrderHistoryResponse, GetOrderResponse, GetUserTradesResponse,
@@ -178,14 +179,14 @@ async fn read_all(client: &Client) -> Vec<(String, Option<u32>)> {
     let mut seen = Vec::new();
     let got = client
         .orders
-        .get(OrderKey::OrderId("9".into()), None)
+        .get(OrderKey::OrderId("9".into()), SubAccountScope::Default)
         .await
         .expect("get");
     seen.extend(order_scales("get", got.order.as_ref().expect("order")));
     seen.extend(trade_scales("get", &got.trades));
     for order in client
         .orders
-        .list_open(None)
+        .list_open(SubAccountScope::Default)
         .await
         .expect("list_open")
         .orders
@@ -194,18 +195,22 @@ async fn read_all(client: &Client) -> Vec<(String, Option<u32>)> {
     }
     for order in client
         .orders
-        .list_history(None, None)
+        .list_history(SubAccountScope::Default, None)
         .await
         .expect("list_history")
         .orders
     {
         seen.extend(order_scales("list_history", &order));
     }
-    let trades = client.trades.list(None, None).await.expect("trades.list");
+    let trades = client
+        .trades
+        .list(SubAccountScope::Default, None)
+        .await
+        .expect("trades.list");
     seen.extend(trade_scales("trades.list", &trades.trades));
     let one = client
         .triggers
-        .get_by_id("11", None)
+        .get_by_id("11", SubAccountScope::Default)
         .await
         .expect("trigger get")
         .expect("trigger");
@@ -246,7 +251,7 @@ async fn order_and_trigger_reads_carry_the_catalog_base_scale() {
 
     let order = client
         .orders
-        .get(OrderKey::OrderId("9".into()), None)
+        .get(OrderKey::OrderId("9".into()), SubAccountScope::Default)
         .await
         .unwrap()
         .order

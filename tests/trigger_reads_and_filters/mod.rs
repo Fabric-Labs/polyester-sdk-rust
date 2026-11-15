@@ -7,6 +7,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     CreateOrderType, CreateSide, CreateTriggerParams, CreateTriggerType, ListTriggersOpts,
     MaxSlippage, ModifyTriggerParams, Trigger,
@@ -246,7 +247,7 @@ async fn poly_9396_9425_trigger_reads_report_the_twap_and_trailing_caps() {
         let got = s
             .client
             .triggers
-            .get_by_id("3", None)
+            .get_by_id("3", SubAccountScope::Default)
             .await
             .expect("get")
             .expect("trigger");
@@ -282,7 +283,7 @@ async fn poly_9424_trigger_reads_and_stream_name_the_pair() {
             let got = s
                 .client
                 .triggers
-                .get_by_id("3", None)
+                .get_by_id("3", SubAccountScope::Default)
                 .await
                 .unwrap()
                 .unwrap();
@@ -445,7 +446,7 @@ async fn poly_9423_ladder_refuses_a_market_order_type_before_sending() {
 fn modify_bps(bps: i32) -> ModifyTriggerParams {
     ModifyTriggerParams {
         trigger_id: "9".into(),
-        subaccount_id: None,
+        subaccount_id: SubAccountScope::Default,
         symbol: Some("BTC-USDT".into()),
         symbol_id: None,
         trigger_price: None,

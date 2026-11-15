@@ -11,6 +11,7 @@
 
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{
     BatchCancelItem, BatchReplaceItem, CreateOrderParams, CreateOrderType, CreateSide,
     CreateTimeInForce, CreateTriggerParams, CreateTriggerType, GetCandlesOpts, GetTradesOpts,
@@ -173,7 +174,7 @@ async fn batch_create_keeps_each_rejections_field_violations() {
         .collect();
     let result = client
         .orders
-        .batch_create(items, None, None)
+        .batch_create(items, SubAccountScope::Default, None)
         .await
         .expect("batch create");
 
@@ -257,7 +258,7 @@ async fn batch_cancel_and_replace_keep_each_rejections_field_violations() {
                     symbol_id: None,
                 },
             ],
-            None,
+            SubAccountScope::Default,
             None,
         )
         .await
@@ -320,7 +321,12 @@ async fn batch_cancel_and_replace_keep_each_rejections_field_violations() {
     };
     let replaced = client
         .orders
-        .batch_replace(vec![item(42), item(44)], "BTC-USDT", None, None)
+        .batch_replace(
+            vec![item(42), item(44)],
+            "BTC-USDT",
+            SubAccountScope::Default,
+            None,
+        )
         .await
         .expect("batch replace");
     assert_eq!(replaced.results[1].old_order_id, id(44));
@@ -380,7 +386,7 @@ async fn batch_cancel_keeps_an_unresolved_order_id_empty() {
                     symbol_id: None,
                 },
             ],
-            None,
+            SubAccountScope::Default,
             None,
         )
         .await

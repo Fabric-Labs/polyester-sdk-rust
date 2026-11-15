@@ -7,6 +7,7 @@
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use base64::Engine as _;
 use buffa::Message as _;
+use polyester::models::SubAccountScope;
 use polyester::models::{CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce};
 use polyester::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail, FieldViolation};
 use polyester::proto::polyester::ratelimit::v1::RateLimitDetail;
@@ -114,7 +115,11 @@ async fn call(
         )
         .expect("catalog");
     let error = if op == "read" {
-        client.triggers.get_by_id("9", None).await.err()
+        client
+            .triggers
+            .get_by_id("9", SubAccountScope::Default)
+            .await
+            .err()
     } else {
         let mut params =
             CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
