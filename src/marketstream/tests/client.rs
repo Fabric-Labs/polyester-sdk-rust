@@ -982,3 +982,344 @@ async fn the_client_connects_to_its_environment_without_credentials() {
     assert!(!authorization, "credentials sent to a public stream");
     stream.close();
 }
+
+/// The moment the transport is lost, every book, quote and trades stream it
+/// fed is stale: no consumer sees a live-looking book from a dead connection.
+#[tokio::test]
+async fn transport_loss_makes_every_stream_stale_before_disconnected() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    let topics = [
+        t(7, Stream::Depth),
+        t(7, Stream::Depth20),
+        t(7, Stream::Bbo),
+        t(7, Stream::Trades),
+    ];
+    answered(&mut conn, stream.subscribe(&topics), |m| {
+        vec![
+            respond(m, Wire::OK),
+            depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
+            depth_snapshot(7, Stream::Depth20, 1, 10, &[lv(100, 1)], &[]),
+            bbo(7, 1, 10, (100, 1), (101, 1)),
+            trades_through(7, 1, 100),
+        ]
+    })
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::TradesThrough(_)).then_some(())
+    })
+    .await;
+    for topic in topics {
+        assert!(
+            stream.live(topic),
+            "{topic} not live on a healthy connection"
+        );
+    }
+
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    // Checked as the Disconnected event is observed, before any reconnect.
+    for s in [Stream::Depth, Stream::Depth20] {
+        assert!(
+            stream.order_book(7, s, 0).unwrap().stale,
+            "{s} book not stale after the transport closed"
+        );
+    }
+    assert!(
+        stream.best_bid_offer(7).unwrap().stale,
+        "quote not stale after the transport closed"
+    );
+    for topic in topics {
+        assert!(
+            !stream.live(topic),
+            "{topic} live after the transport closed"
+        );
+    }
+
+    // A new session: stale until its snapshot and quote arrive, and, for a
+    // pair reported stale, until LIVE after them.
+    let mut conn = server.accept().await;
+    let resub = conn.request().await;
+    conn.send(&[
+        respond(&resub, Wire::OK),
+        market_status(7, FeedState::Stale),
+        depth_snapshot(7, Stream::Depth, 1, 20, &[lv(100, 2)], &[]),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    assert!(
+        stream.order_book(7, Stream::Depth, 0).unwrap().stale,
+        "book of a pair reported stale is live before LIVE"
+    );
+    conn.send(&[
+        market_status(7, FeedState::Live),
+        bbo(7, 1, 10, (100, 1), (101, 1)),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+    assert!(
+        !stream.order_book(7, Stream::Depth, 0).unwrap().stale && stream.live(t(7, Stream::Depth))
+    );
+    assert!(
+        !stream.best_bid_offer(7).unwrap().stale,
+        "quote stale after a fresh quote"
+    );
+}
+
+/// An Unsubscribe that was sent is committed: cancelling the wait does not
+/// stop a late OK from ending the stream.
+#[tokio::test]
+async fn unsubscribe_cancelled_after_sending_still_ends_the_stream() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(&mut conn, stream.subscribe(&[t(7, Stream::Bbo)]), |m| {
+        vec![respond(m, Wire::OK), bbo(7, 1, 5, (100, 1), (101, 1))]
+    })
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+
+    assert!(
+        tokio::time::timeout(
+            Duration::from_millis(50),
+            stream.unsubscribe(&[t(7, Stream::Bbo)])
+        )
+        .await
+        .is_err(),
+        "answered early"
+    );
+    let m = conn.request().await;
+    assert!(m.unsubscribe);
+    conn.send(&[respond(&m, Wire::OK)]);
+    let resp = expect(&mut stream, |e| {
+        if let Event::SubscribeResponse(r) = e {
+            Some(r)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(resp.request_id, m.request_id);
+    assert!(
+        !stream.live(t(7, Stream::Bbo)),
+        "stream still held after its Unsubscribe was answered"
+    );
+    assert!(
+        stream.best_bid_offer(7).is_none(),
+        "quote kept after its Unsubscribe was answered"
+    );
+}
+
+/// An Unsubscribe whose connection drops before the answer counts as done.
+#[tokio::test]
+async fn unsubscribe_unanswered_before_a_drop_counts_as_done() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(
+        &mut conn,
+        stream.subscribe(&[t(7, Stream::Bbo), t(7, Stream::Trades)]),
+        |m| vec![respond(m, Wire::OK), bbo(7, 1, 5, (100, 1), (101, 1))],
+    )
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+    let _ = tokio::time::timeout(
+        Duration::from_millis(50),
+        stream.unsubscribe(&[t(7, Stream::Bbo)]),
+    )
+    .await;
+    conn.request().await;
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    assert!(
+        stream.best_bid_offer(7).is_none(),
+        "quote of an unsubscribed stream kept after the connection dropped"
+    );
+    let mut conn = server.accept().await;
+    assert_eq!(conn.request().await.topics, vec![t(7, Stream::Trades)]);
+}
+
+/// A Subscribe cancelled after sending is committed too: its late OK
+/// activates the stream, which the next reconnect resubscribes.
+#[tokio::test]
+async fn subscribe_cancelled_after_sending_still_takes_effect() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    let _ = tokio::time::timeout(
+        Duration::from_millis(50),
+        stream.subscribe(&[t(7, Stream::Bbo)]),
+    )
+    .await;
+    let m = conn.request().await;
+    conn.send(&[respond(&m, Wire::OK), bbo(7, 1, 5, (100, 1), (101, 1))]);
+    let q = expect(&mut stream, |e| {
+        if let Event::BestBidOffer(q) = e {
+            Some(q)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(q.update_id, 5);
+    assert!(stream.live(t(7, Stream::Bbo)));
+    conn.close();
+    let mut conn = server.accept().await;
+    assert_eq!(conn.request().await.topics, vec![t(7, Stream::Bbo)]);
+}
+
+/// A response to no request of this connection changes nothing.
+#[tokio::test]
+async fn a_response_to_no_request_changes_nothing() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let conn = server.accept().await;
+    conn.send(&[
+        subscribe_response(4242, &[(7, Stream::Bbo, Wire::OK)]),
+        bbo(7, 1, 5, (100, 1), (101, 1)),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::SubscribeResponse(_)).then_some(())
+    })
+    .await;
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    assert!(
+        !stream.live(t(7, Stream::Bbo)),
+        "an unrequested OK activated a stream"
+    );
+    assert!(
+        stream.best_bid_offer(7).is_none(),
+        "a quote of an unrequested stream applied"
+    );
+}
+
+/// A book keeps its highest (epoch, update) for its whole life: a reconnect
+/// to a replica behind never takes it or its quote backwards.
+#[tokio::test]
+async fn books_and_quotes_never_go_backwards_across_reconnects() {
+    for s in [Stream::Depth20, Stream::Depth] {
+        let mut server = FakeServer::start().await;
+        let mut stream = dial(&server, |_| {}).await;
+        let mut conn = server.accept().await;
+        answered(
+            &mut conn,
+            stream.subscribe(&[t(7, s), t(7, Stream::Bbo)]),
+            |m| {
+                vec![
+                    respond(m, Wire::OK),
+                    depth_snapshot(7, s, 1, 10, &[lv(100, 1)], &[]),
+                    bbo(7, 1, 10, (100, 1), (101, 1)),
+                ]
+            },
+        )
+        .await;
+        expect(&mut stream, |e| {
+            matches!(e, Event::BestBidOffer(_)).then_some(())
+        })
+        .await;
+        conn.close();
+        expect(&mut stream, |e| {
+            matches!(e, Event::Disconnected { .. }).then_some(())
+        })
+        .await;
+
+        // The new connection's replica is behind: its state is older.
+        let mut conn = server.accept().await;
+        let resub = conn.request().await;
+        // A status of another pair after them: once it arrives, they are applied.
+        conn.send(&[
+            respond(&resub, Wire::OK),
+            depth_snapshot(7, s, 1, 9, &[lv(99, 1)], &[]),
+            bbo(7, 1, 9, (99, 1), (101, 1)),
+            market_status(9, FeedState::Live),
+        ]);
+        expect(&mut stream, |e| {
+            matches!(e, Event::MarketStatus(m) if m.symbol_id == 9).then_some(())
+        })
+        .await;
+        let book = stream.order_book(7, s, 0).unwrap();
+        assert!(
+            book.update_id == 10 && book.stale && book.bids[0].price.as_ticks() == 100,
+            "{s}: {book:?} after an older snapshot"
+        );
+        let q = stream.best_bid_offer(7).unwrap();
+        assert!(
+            q.update_id == 10 && q.stale,
+            "{s}: {q:?} after an older quote"
+        );
+
+        if s == Stream::Depth {
+            // Updates that catch the replica up are skipped; the first at the
+            // book's base resumes it.
+            conn.send(&[
+                depth_update(7, 1, 10, 10, &[lv(99, 0), lv(100, 1)], &[]),
+                depth_update(7, 1, 11, 11, &[lv(100, 4)], &[]),
+            ]);
+            let u = expect(&mut stream, |e| {
+                if let Event::DepthUpdate(u) = e {
+                    Some(u)
+                } else {
+                    None
+                }
+            })
+            .await;
+            assert_eq!(u.first_update_id, 11);
+        } else {
+            // An equal snapshot confirms the kept state.
+            conn.send(&[depth_snapshot(7, s, 1, 10, &[lv(100, 1)], &[])]);
+            expect(&mut stream, |e| {
+                matches!(e, Event::DepthSnapshot(_)).then_some(())
+            })
+            .await;
+        }
+        conn.send(&[bbo(7, 1, 10, (100, 1), (101, 1))]);
+        expect(&mut stream, |e| {
+            matches!(e, Event::BestBidOffer(_)).then_some(())
+        })
+        .await;
+        let book = stream.order_book(7, s, 0).unwrap();
+        assert!(
+            !book.stale && book.update_id >= 10,
+            "{s}: {book:?} not current once the replica caught up"
+        );
+        let q = stream.best_bid_offer(7).unwrap();
+        assert!(
+            !q.stale && q.update_id == 10,
+            "{s}: {q:?} not confirmed by an equal quote"
+        );
+
+        // A higher epoch is a rebuilt book: taken whatever it holds.
+        conn.send(&[depth_snapshot(7, s, 2, 3, &[lv(50, 1)], &[])]);
+        let snap = expect(&mut stream, |e| {
+            if let Event::DepthSnapshot(x) = e {
+                Some(x)
+            } else {
+                None
+            }
+        })
+        .await;
+        assert_eq!(snap.book_epoch, 2);
+        let book = stream.order_book(7, s, 0).unwrap();
+        assert!(
+            book.book_epoch == 2 && book.update_id == 3 && !book.stale,
+            "{s}: {book:?} after a new epoch"
+        );
+    }
+}

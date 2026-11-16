@@ -172,11 +172,20 @@ struct Inner {
     /// reconnect until the server refuses or the caller unsubscribes it.
     wanted: Vec<Topic>,
     waiting: HashMap<u64, oneshot::Sender<Result<SubscribeResponse>>>,
-    /// Requests in flight that are Unsubscribes: their responses end streams.
-    unsubscribes: HashSet<u64>,
+    /// Every Subscribe and Unsubscribe sent on the current connection, by
+    /// request ID: its kind and topics. A response is matched to it by ID
+    /// alone; a caller that stops waiting leaves it in place, as the server
+    /// acts on the request regardless.
+    sent: HashMap<u64, Sent>,
     /// The ping owed its pong.
     ping: Option<(u64, Instant)>,
     backfills: Vec<AbortHandle>,
+}
+
+/// A Subscribe or Unsubscribe sent on the current connection.
+struct Sent {
+    unsubscribe: bool,
+    topics: Vec<Topic>,
 }
 
 #[derive(Default)]
@@ -352,10 +361,32 @@ impl MarketStream {
 
     /// A pair's latest best bid and offer; `None` before the first.
     pub fn best_bid_offer(&self, symbol_id: u32) -> Option<BestBidOffer> {
-        read_unpoisoned(&self.shared.state)
-            .quotes
-            .get(&symbol_id)
-            .cloned()
+        let state = read_unpoisoned(&self.shared.state);
+        let mut quote = state.quotes.get(&symbol_id).cloned()?;
+        quote.stale |= state.feeds.get(&symbol_id) == Some(&FeedState::Stale);
+        Some(quote)
+    }
+
+    /// Whether a topic is current: the connection holds it, its state arrived
+    /// on that connection (a depth book's snapshot, a quote, the trades
+    /// stream's baseline) and the pair's feed is not stale. A lost connection
+    /// makes every topic not live at once, before its
+    /// [`Event::Disconnected`].
+    pub fn live(&self, topic: Topic) -> bool {
+        let state = read_unpoisoned(&self.shared.state);
+        if !state.active.contains(&topic)
+            || state.feeds.get(&topic.symbol_id) == Some(&FeedState::Stale)
+        {
+            return false;
+        }
+        match topic.stream {
+            Stream::Trades => state
+                .trackers
+                .get(&topic.symbol_id)
+                .is_some_and(Tracker::started),
+            Stream::Bbo => state.quotes.get(&topic.symbol_id).is_some_and(|q| !q.stale),
+            Stream::Depth20 | Stream::Depth => state.books.get(&topic).is_some_and(|b| b.synced),
+        }
     }
 
     /// A pair's feed state as last reported; [`FeedState::Live`] unless the
@@ -415,15 +446,65 @@ impl Shared {
         Some((inner.wanted.clone(), rx))
     }
 
+    /// Ends a connection: everything it fed becomes stale before the client
+    /// reports the loss. Books wait for a new snapshot, quotes for a new
+    /// quote and trades for a new baseline; Unsubscribes the connection never
+    /// answered are done.
     fn detach(&self) {
-        let mut inner = lock_unpoisoned(&self.inner);
-        inner.out = None;
-        for (_, waiter) in inner.waiting.drain() {
-            let _ = waiter.send(Err(Error::realtime(
-                "market stream connection lost before the response; the request applies once it reconnects",
-            )));
+        let ended: Vec<Topic> = {
+            let mut inner = lock_unpoisoned(&self.inner);
+            inner.out = None;
+            for (_, waiter) in inner.waiting.drain() {
+                let _ = waiter.send(Err(Error::realtime(
+                    "market stream connection lost before the response; the request applies once it reconnects",
+                )));
+            }
+            inner
+                .sent
+                .drain()
+                .filter(|(_, s)| s.unsubscribe)
+                .flat_map(|(_, s)| s.topics)
+                .collect()
+        };
+        self.drop_topics(&ended);
+        let mut state = write_unpoisoned(&self.state);
+        state.active.clear();
+        state.feeds.clear();
+        for b in state.books.values_mut() {
+            b.synced = false;
         }
-        inner.unsubscribes.clear();
+        for q in state.quotes.values_mut() {
+            q.stale = true;
+        }
+        for t in state.trackers.values_mut() {
+            t.restart();
+        }
+    }
+
+    /// Forgets the state of topics no longer subscribed: their books, quotes
+    /// and trade accounting, and a pair's feed state once it holds none.
+    fn drop_topics(&self, topics: &[Topic]) {
+        let mut state = write_unpoisoned(&self.state);
+        for topic in topics {
+            state.active.remove(topic);
+            match topic.stream {
+                Stream::Trades => {
+                    state.trackers.remove(&topic.symbol_id);
+                }
+                Stream::Bbo => {
+                    state.quotes.remove(&topic.symbol_id);
+                }
+                Stream::Depth20 | Stream::Depth => {
+                    state.books.remove(topic);
+                }
+            }
+            if !Stream::ALL
+                .iter()
+                .any(|s| state.active.contains(&Topic::new(topic.symbol_id, *s)))
+            {
+                state.feeds.remove(&topic.symbol_id);
+            }
+        }
     }
 
     async fn request(&self, topics: &[Topic], unsubscribe: bool) -> Result<SubscribeResponse> {
@@ -442,22 +523,34 @@ impl Shared {
                 }
             }
             let Some(out) = inner.out.clone() else {
+                drop(inner);
+                if unsubscribe {
+                    // No connection holds the topics; they are not
+                    // resubscribed.
+                    self.drop_topics(topics);
+                }
                 return Err(Error::realtime(
                     "market stream is reconnecting; the request applies once it is connected",
                 ));
             };
             inner.waiting.insert(id, tx);
-            if unsubscribe {
-                inner.unsubscribes.insert(id);
-            }
+            // Recorded before it is sent and kept until the response or the
+            // end of the connection, whether or not the caller keeps waiting.
+            inner.sent.insert(
+                id,
+                Sent {
+                    unsubscribe,
+                    topics: topics.to_vec(),
+                },
+            );
             let frame = if unsubscribe {
                 codec::encode_unsubscribe(id, topics)
             } else {
                 codec::encode_subscribe(id, topics)
             };
             if out.send(frame).is_err() {
+                // The connection ended: its end applies the record.
                 inner.waiting.remove(&id);
-                inner.unsubscribes.remove(&id);
                 return Err(Error::realtime(
                     "market stream connection lost; the request applies once it reconnects",
                 ));
@@ -629,6 +722,13 @@ async fn session(
     }
     for chunk in wanted.chunks(codec::MAX_ITEMS) {
         let id = shared.ids.fetch_add(1, Ordering::SeqCst) + 1;
+        lock_unpoisoned(&shared.inner).sent.insert(
+            id,
+            Sent {
+                unsubscribe: false,
+                topics: chunk.to_vec(),
+            },
+        );
         if let Err(e) = write
             .send(Message::binary(codec::encode_subscribe(id, chunk)))
             .await
@@ -871,11 +971,15 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 if !state.active.contains(&Topic::new(symbol_id, Stream::Bbo)) {
                     return Ok(());
                 }
+                // An older state, or a re-send of the current one. A quote
+                // kept, stale, from a lost connection stays until one at
+                // least as new confirms or replaces it.
                 if let Some(prev) = state.quotes.get(&symbol_id)
                     && (epoch < prev.book_epoch
-                        || (epoch == prev.book_epoch && update_id <= prev.update_id))
+                        || (epoch == prev.book_epoch && update_id < prev.update_id)
+                        || (!prev.stale && epoch == prev.book_epoch && update_id == prev.update_id))
                 {
-                    return Ok(()); // an older state, or a re-send of the same one
+                    return Ok(());
                 }
                 let quote = BestBidOffer {
                     symbol_id,
@@ -886,6 +990,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                     send_ts_ns: send_ns,
                     bid,
                     ask,
+                    stale: false,
                 };
                 state.quotes.insert(symbol_id, quote.clone());
                 quote
@@ -954,8 +1059,13 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 let Some(book) = state.books.get_mut(&topic) else {
                     return Ok(());
                 };
-                if let Err(refusal) = book.update(epoch, first, last, &bids, &asks) {
+                let applied = book.update(epoch, first, last, &bids, &asks);
+                if matches!(applied, Ok(false)) {
+                    return Ok(());
+                }
+                if let Err(refusal) = applied {
                     book.synced = false;
+                    book.behind = false;
                     return Err(match refusal {
                         Refusal::Gap(message) => {
                             Error::MarketStream(StreamError::BookGap { symbol_id, message })
@@ -1041,9 +1151,9 @@ fn on_subscribe_response(
     results: Vec<(u32, Option<Stream>, sbe::subscribe_result::SubscribeResult)>,
 ) -> Result<()> {
     use sbe::subscribe_result::SubscribeResult as Wire;
-    let unsubscribe = lock_unpoisoned(&shared.inner)
-        .unsubscribes
-        .contains(&request_id);
+    // Matched by request ID to what this connection sent; its kind is the
+    // recorded one.
+    let sent = lock_unpoisoned(&shared.inner).sent.remove(&request_id);
     let results: Vec<TopicResult> = results
         .into_iter()
         .map(|(symbol_id, stream, result)| TopicResult {
@@ -1060,36 +1170,33 @@ fn on_subscribe_response(
             },
         })
         .collect();
-    {
-        let mut state = write_unpoisoned(&shared.state);
-        for r in &results {
-            let Some(topic) = r.topic else { continue };
-            if unsubscribe {
-                if !matches!(
-                    r.result,
-                    SubscribeResult::Ok | SubscribeResult::NotSubscribed
-                ) {
+    match &sent {
+        // No request of this connection: delivered, never applied.
+        None => {}
+        Some(Sent {
+            unsubscribe: true, ..
+        }) => {
+            let ended: Vec<Topic> = results
+                .iter()
+                .filter(|r| {
+                    matches!(
+                        r.result,
+                        SubscribeResult::Ok | SubscribeResult::NotSubscribed
+                    )
+                })
+                .filter_map(|r| r.topic)
+                .collect();
+            shared.drop_topics(&ended);
+        }
+        Some(Sent {
+            unsubscribe: false, ..
+        }) => {
+            let mut state = write_unpoisoned(&shared.state);
+            for r in &results {
+                let Some(topic) = r.topic else { continue };
+                if !r.result.subscribed() {
                     continue;
                 }
-                state.active.remove(&topic);
-                match topic.stream {
-                    Stream::Trades => {
-                        state.trackers.remove(&topic.symbol_id);
-                    }
-                    Stream::Bbo => {
-                        state.quotes.remove(&topic.symbol_id);
-                    }
-                    Stream::Depth20 | Stream::Depth => {
-                        state.books.remove(&topic);
-                    }
-                }
-                if !Stream::ALL
-                    .iter()
-                    .any(|s| state.active.contains(&Topic::new(topic.symbol_id, *s)))
-                {
-                    state.feeds.remove(&topic.symbol_id);
-                }
-            } else if r.result.subscribed() {
                 state.active.insert(topic);
                 match topic.stream {
                     Stream::Trades => {
@@ -1111,7 +1218,13 @@ fn on_subscribe_response(
     }
     let waiter = {
         let mut inner = lock_unpoisoned(&shared.inner);
-        if !unsubscribe {
+        if matches!(
+            sent,
+            Some(Sent {
+                unsubscribe: false,
+                ..
+            })
+        ) {
             // Refused: not resubscribed on reconnect.
             for r in &results {
                 if let Some(topic) = r.topic
@@ -1121,7 +1234,6 @@ fn on_subscribe_response(
                 }
             }
         }
-        inner.unsubscribes.remove(&request_id);
         inner.waiting.remove(&request_id)
     };
     let response = SubscribeResponse {
@@ -1179,6 +1291,19 @@ fn on_market_status(
         send_ts_ns: send_ns,
     }));
     Ok(())
+}
+
+/// Records a Subscribe as sent on the current connection, as the client does
+/// for what it sends.
+#[cfg(test)]
+pub(crate) fn record_subscribe(shared: &Shared, request_id: u64, topics: Vec<Topic>) {
+    lock_unpoisoned(&shared.inner).sent.insert(
+        request_id,
+        Sent {
+            unsubscribe: false,
+            topics,
+        },
+    );
 }
 
 #[cfg(test)]

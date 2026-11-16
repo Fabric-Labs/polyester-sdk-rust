@@ -54,6 +54,11 @@ impl Tracker {
         }
     }
 
+    /// Whether the current subscription's baseline arrived.
+    pub fn started(&self) -> bool {
+        self.started
+    }
+
     /// Forgets the subscription, keeping what was accounted for.
     pub fn restart(&mut self) {
         self.started = false;

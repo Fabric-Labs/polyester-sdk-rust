@@ -8,7 +8,9 @@ use std::sync::Arc;
 
 use super::frames::window;
 use crate::errors::Error;
-use crate::marketstream::client::{depth_book, feed_of, force_feed, handle, offline};
+use crate::marketstream::client::{
+    depth_book, feed_of, force_feed, handle, offline, record_subscribe,
+};
 use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::{ReadBuf, message_header_codec, ping_codec, subscribe_codec};
 use crate::marketstream::{Config, Event, FeedState, Pairs, Stream, StreamError, Topic};
@@ -159,7 +161,27 @@ fn golden_captures_replay() {
         // whose baseline it did not keep are not replayed.
         let mut baseline = HashSet::new();
         let mut old_order = false;
-        for f in frames.iter().filter(|f| f.direction == "server") {
+        for f in &frames {
+            if f.direction == "client" {
+                // The captured client's requests, recorded as this client
+                // records what it sends: responses are matched to them by ID.
+                if f.message == "Subscribe" {
+                    let h = message_header_codec::MessageHeaderDecoder::default()
+                        .wrap(ReadBuf::new(&f.data), 0);
+                    let d = subscribe_codec::SubscribeDecoder::default().header(h, 0);
+                    let id = d.request_id();
+                    let mut items = d.items_decoder();
+                    let mut topics = Vec::new();
+                    while items.advance().unwrap().is_some() {
+                        topics.push(Topic::new(
+                            items.symbol_id(),
+                            Stream::from_wire(items.stream()).unwrap(),
+                        ));
+                    }
+                    record_subscribe(&shared, id, topics);
+                }
+                continue;
+            }
             let msg = codec::decode(&f.data).unwrap().unwrap();
             match &msg {
                 Msg::TradesThrough { symbol_id, .. } => {

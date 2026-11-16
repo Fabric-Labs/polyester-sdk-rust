@@ -2198,6 +2198,17 @@ Streams and recovery:
   for its replacement snapshot, which arrives before the pair is reported live
   again; `OrderBook::stale` is set while the book may not be current.
 
+The moment a connection is lost, everything it fed is stale, before the
+`Event::Disconnected` arrives: `OrderBook::stale` and `BestBidOffer::stale` are
+set and `MarketStream::live` reports false for every topic. A topic is live
+again once the new connection delivers its snapshot, quote or trades baseline,
+and, for a pair the server reports stale, once it reports the pair live. Books
+and quotes never go backwards: each keeps the newest state it has held, by book
+epoch and update, across connections. A newer connection's older snapshot or
+quote is ignored and the kept state stays stale until one at least as new
+confirms or replaces it; a depth book also resumes with the first update at its
+own position. A higher book epoch, a rebuilt book, always replaces it.
+
 The client pings every 15 seconds and reconnects when a pong is late or the
 connection drops, with jittered backoff, and resubscribes every topic the
 server accepted. Topics it refused (an unknown or disabled pair, or more
@@ -2209,7 +2220,10 @@ stream with `Error::QueueOverflow` instead of losing messages.
 every stream of one pair. Each topic's result is `SubscribeResult::Ok` when its
 stream ended or `SubscribeResult::NotSubscribed` when it was not held. The
 client stops resubscribing them at once and drops their books, quotes and trade
-tracking, so subscribing again starts from a fresh snapshot or baseline.
+tracking, so subscribing again starts from a fresh snapshot or baseline. A
+request that was sent takes effect even if the caller stops waiting for its
+answer, and an Unsubscribe the connection drops before answering counts as
+done.
 
 Decoders are generated from the published schema with Real Logic's sbe-tool
 (`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the

@@ -34,6 +34,10 @@ pub(crate) struct Book {
     pub has: bool,
     pub epoch: u64,
     pub update_id: u64,
+    /// This connection's snapshot was older than the book: the book keeps its
+    /// state, stale, and resumes with the first update at its base; updates
+    /// up to it are skipped.
+    pub behind: bool,
     /// The snapshot's levels per side: each side is truncated to it after
     /// every update.
     pub window: u16,
@@ -98,14 +102,11 @@ impl Book {
             has: false,
             epoch: 0,
             update_id: 0,
+            behind: false,
             window: 0,
             bids: Vec::new(),
             asks: Vec::new(),
         }
-    }
-
-    fn newer(&self, epoch: u64, update_id: u64) -> bool {
-        !self.has || epoch > self.epoch || (epoch == self.epoch && update_id > self.update_id)
     }
 
     /// Replaces the book. A depth20 snapshot not newer than the book is a
@@ -128,9 +129,22 @@ impl Book {
                 asks.len()
             ));
         }
-        if self.stream == Stream::Depth20 && self.synced && !self.newer(epoch, update_id) {
-            return Ok(false);
+        // The book keeps its highest (epoch, update) for its whole life,
+        // across connections: an older snapshot changes nothing; an equal one
+        // confirms it (on depth20, a re-send while current changes nothing); a
+        // newer one, a higher epoch included, replaces it.
+        if self.has {
+            let older = epoch < self.epoch || (epoch == self.epoch && update_id < self.update_id);
+            let equal = epoch == self.epoch && update_id == self.update_id;
+            if older {
+                self.behind = !self.synced;
+                return Ok(false);
+            }
+            if equal && self.synced && self.stream == Stream::Depth20 {
+                return Ok(false);
+            }
         }
+        self.behind = false;
         self.synced = true;
         self.has = true;
         self.epoch = epoch;
@@ -142,7 +156,8 @@ impl Book {
     }
 
     /// Applies a DepthUpdate at exactly its base, then truncates each side to
-    /// the snapshot's levels per side.
+    /// the snapshot's levels per side. `Ok(false)` is an update skipped while
+    /// the book waits for a replica behind it to catch up.
     pub fn update(
         &mut self,
         epoch: u64,
@@ -150,7 +165,7 @@ impl Book {
         last: u64,
         bids: &[WireLevel],
         asks: &[WireLevel],
-    ) -> Result<(), Refusal> {
+    ) -> Result<bool, Refusal> {
         if last < first {
             return Err(Refusal::Invalid(format!("update covers {first}..{last}")));
         }
@@ -160,6 +175,16 @@ impl Book {
                     "update level {i} has price {} and quantity {}",
                     l.price, l.qty
                 )));
+            }
+        }
+        if self.behind && epoch == self.epoch {
+            if last <= self.update_id {
+                return Ok(false); // the replica catching up to the book
+            }
+            if self.update_id.checked_add(1) == Some(first) {
+                // The book's own base: it resumes.
+                self.synced = true;
+                self.behind = false;
             }
         }
         if !self.synced {
@@ -184,6 +209,6 @@ impl Book {
         self.bids.truncate(self.window as usize);
         self.asks.truncate(self.window as usize);
         self.update_id = last;
-        Ok(())
+        Ok(true)
     }
 }

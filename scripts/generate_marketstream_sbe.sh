@@ -146,6 +146,8 @@ if python3 -I -c 'import sys, xml.etree.ElementTree as ET; r = ET.parse(sys.argv
     "$work/out/marketstream/trades_codec.rs"
 fi
 rustfmt --edition 2024 --config-path "$ROOT/rustfmt.toml" "$work/out/marketstream/mod.rs"
+# rustfmt keeps trailing whitespace inside comments; sbe-tool writes some.
+sed -i -E 's/[[:space:]]+$//' "$work/out/marketstream"/*.rs
 
 python3 -I - "$work/lock.json" "$schema_name" "$id" "$version" "$(sha256 "$work/$schema_name")" "$source_kind" "$SBE_VERSION" "$SBE_SHA256" "$MANIFEST_BLOCK" <<'PY'
 import json, sys

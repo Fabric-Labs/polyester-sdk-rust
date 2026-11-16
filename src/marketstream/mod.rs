@@ -282,6 +282,10 @@ pub struct BestBidOffer {
     pub send_ts_ns: u64,
     pub bid: Option<Level>,
     pub ask: Option<Level>,
+    /// Set on the copy [`MarketStream::best_bid_offer`] returns while the
+    /// quote may not be current: the connection that fed it was lost, or the
+    /// pair's feed is stale. Events always carry `false`.
+    pub stale: bool,
 }
 
 /// Replaces a pair's book of the depth20 or depth stream. Bids are best
