@@ -33,11 +33,13 @@ on:
 permissions:
   contents: read
 
-# One publish per ref at a time: each tag, and main, publishes in order. A
+# One publish per ref at a time, every push in its turn: queue: max keeps up to
+# 100 runs pending (the default keeps one, and a newer push cancels it). A
 # manual dry run publishes nothing and takes no lock.
 concurrency:
   group: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('publish-dry-run-{0}', github.run_id) || format('publish-{0}', github.ref) }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   route:

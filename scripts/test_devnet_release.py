@@ -289,6 +289,44 @@ class CliTest(GitRepoCase):
         self.assertEqual(code, 1)
 
 
+@unittest.skipUnless(shutil.which("go"), "needs the go command")
+class VerifyGoTest(unittest.TestCase):
+    """verify_go against a throwaway module repository, offline."""
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = Path(self.tmp.name)
+        run_git(self.repo, "init", "-q", "-b", "main")
+        (self.repo / "go.mod").write_text("module github.com/example/sdk\n\ngo 1.22\n")
+        (self.repo / "sdk.go").write_text("package sdk\n")
+        run_git(self.repo, "add", "-A")
+        run_git(self.repo, "commit", "-q", "-m", "base", date="2026-11-01T10:00:00+00:00")
+        run_git(self.repo, "tag", "-a", "v0.34.0", "-m", "v0.34.0")
+        (self.repo / "sdk.go").write_text("package sdk\n\nconst X = 1\n")
+        run_git(self.repo, "commit", "-q", "-am", "next", date="2026-11-17T09:30:00+00:00")
+        self.sha = run_git(self.repo, "rev-parse", "HEAD")
+        self.version = "0.34.1-devnet.20261117093000"
+
+    def tearDown(self) -> None:
+        self.tmp.cleanup()
+
+    def test_tag_resolves_and_latest_stays_stable(self) -> None:
+        lines = dr.verify_go(self.repo, self.version, self.sha)
+        self.assertIn(f"github.com/example/sdk@v{self.version} -> v{self.version}", lines[0])
+        self.assertTrue(lines[1].endswith("@latest -> v0.34.0"))
+
+    def test_rerun_after_publish_reuses_the_tag(self) -> None:
+        # After a publish, the checkout (fetch-depth: 0) already has the tag.
+        run_git(self.repo, "tag", f"v{self.version}", self.sha)
+        lines = dr.verify_go(self.repo, self.version, self.sha)
+        self.assertTrue(lines[1].endswith("@latest -> v0.34.0"))
+
+    def test_tag_on_another_commit_is_an_error(self) -> None:
+        run_git(self.repo, "tag", f"v{self.version}", "v0.34.0^{commit}")
+        with self.assertRaisesRegex(dr.ReleaseError, "already exists"):
+            dr.verify_go(self.repo, self.version, self.sha)
+
+
 class StampTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
@@ -462,6 +500,52 @@ class ReleaseTest(unittest.TestCase):
         )
         self.assertNotIn("v0.34.0-devnet", [c[3] for c in gh.calls])
 
+    def test_stale_run_never_touches_a_newer_target(self) -> None:
+        # A re-run of an old commit (target 0.34.1) after main moved on to a
+        # breaking change (target 0.35.0) must not delete the newer release.
+        for ecosystem in dr.ECOSYSTEMS:
+            with self.subTest(ecosystem=ecosystem):
+                newer = dr.package_version("0.35.0", "20261117000000", ecosystem)
+                tag = dr.release_tag("0.35.0", newer, ecosystem)
+                gh = FakeGh([{"tagName": tag, "name": f"v{newer}"}])
+                log = dr.sync_release(
+                    ecosystem,
+                    snapshot(ecosystem, "0.34.1", "20261116000000"),
+                    self.notes,
+                    {"v0.34.0"},
+                    gh,
+                    dry_run=False,
+                )
+                self.assertEqual(gh.calls, [])
+                self.assertIn("stale", log[0])
+
+    def test_stale_run_never_touches_a_newer_snapshot_of_its_target(self) -> None:
+        older = snapshot("python", "0.35.0", "20261117000000")
+        gh = FakeGh(
+            [
+                {"tagName": "v0.35.0-devnet", "name": "v0.35.0.dev20261117100000"},
+                {"tagName": "v0.34.1-devnet", "name": "v0.34.1.dev20261116000000"},
+            ]
+        )
+        dr.sync_release("python", older, self.notes, {"v0.34.0"}, gh, dry_run=False)
+        self.assertEqual(gh.calls, [])
+
+    def test_rerun_of_the_same_snapshot_only_finishes_the_cleanup(self) -> None:
+        p = snapshot("go", "0.35.0", "20261117093000")
+        gh = FakeGh(
+            [
+                {"tagName": p.tag, "name": p.title},
+                {
+                    "tagName": "v0.34.1-devnet.20261116000000",
+                    "name": "v0.34.1-devnet.20261116000000",
+                },
+            ]
+        )
+        dr.sync_release("go", p, self.notes, {"v0.34.0"}, gh, dry_run=False)
+        self.assertEqual(
+            gh.calls, [["gh", "release", "delete", "v0.34.1-devnet.20261116000000", "--yes"]]
+        )
+
     def test_dry_run_only_lists(self) -> None:
         gh = FakeGh([{"tagName": "v0.35.0-devnet", "name": "v0.35.0-devnet.20261117080000"}])
         log = dr.sync_release(
@@ -634,6 +718,9 @@ class WorkflowTest(unittest.TestCase):
     def test_one_publish_at_a_time(self) -> None:
         block = "\n".join(top_level_block(self.text, "concurrency"))
         self.assertIn("cancel-in-progress: false", block)
+        # Without it, GitHub keeps one pending run per group and a newer push
+        # cancels it, so that snapshot would never publish.
+        self.assertRegex(block, r"(?m)^  queue: max$")
         self.assertIn("github.ref", block)
 
 

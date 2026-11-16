@@ -529,7 +529,25 @@ def verify_go(root: Path, version: str, sha: str) -> list[str]:
         home = Path(tmp)
         mirror = home / "mirror.git"
         run(["git", "clone", "--quiet", "--bare", "--no-local", str(root), str(mirror)])
-        run(["git", "--git-dir", str(mirror), "tag", tag, sha])
+        # After a publish the checkout already has the tag (fetch-depth: 0), so
+        # a re-run reuses it when it names this commit.
+        existing = subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(mirror),
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                f"refs/tags/{tag}^{{commit}}",
+            ],
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if not existing:
+            run(["git", "--git-dir", str(mirror), "tag", tag, sha])
+        elif existing != sha:
+            raise ReleaseError(f"{tag} already exists at {existing}, not {sha}")
         gitconfig = home / "gitconfig"
         gitconfig.write_text(
             f'[url "file://{mirror}"]\n\tinsteadOf = https://{module}\n'
@@ -701,47 +719,57 @@ def sync_release(
     """Point the one devnet pre-release of the target at this snapshot.
 
     The pre-release is never marked latest, so the latest GitHub release stays
-    the stable one. A newer snapshot of the same target is never replaced by
-    an older one (a re-run of an old commit), and a re-run of the same commit
-    changes nothing. Devnet pre-releases of a target that never shipped and is
-    no longer the target (Unreleased gained a breaking entry) are removed;
-    those of shipped targets stay. Go keeps every snapshot tag, since tags are
-    module versions; Rust and Python move their rolling tag.
+    the stable one. Snapshot timestamps only grow along main, so a devnet
+    pre-release newer than this snapshot, of any target, means this run is
+    stale (a re-run of an old commit, or runs that started out of order) and
+    it changes nothing. A re-run of the same commit creates nothing again.
+    Otherwise the older pre-release of the target is replaced, and older
+    pre-releases of a target that never shipped and is no longer the target
+    (Unreleased gained a breaking entry) are removed; those of shipped targets
+    stay. Go keeps every snapshot tag, since tags are module versions; Rust
+    and Python move their rolling tag.
     """
     pattern = RELEASE_TAG[ecosystem]
     listed = json.loads(gh(["gh", "release", "list", "--limit", "100", "--json", "tagName,name"]))
     cleanup = [] if ecosystem == "go" else ["--cleanup-tag"]
     ours = snapshot_key(p.title)
-    replaced: list[list[str]] = []
-    orphaned: list[list[str]] = []
-    log: list[str] = []
+    devnet = []
     for release in listed:
         tag, name = release["tagName"], release.get("name") or release["tagName"]
         match = pattern.match(tag)
-        if not match:
-            continue
-        if match[1] != p.target:
-            if f"v{match[1]}" not in stable_tags:
-                log.append(f"remove {tag}: {match[1]} never shipped and is no longer the target")
-                orphaned.append(["gh", "release", "delete", tag, "--yes", *cleanup])
-            continue
-        theirs = snapshot_key(name)
-        if theirs > ours:
-            return [f"{tag} already holds the newer {name}; nothing to do"]
-        if theirs == ours:
-            return [f"{tag} already holds {p.title}; nothing to do"]
-        log.append(f"replace {tag} ({name})")
-        replaced.append(["gh", "release", "delete", tag, "--yes", *cleanup])
-    create = ["gh", "release", "create", p.tag, "--prerelease", "--latest=false"]
-    create += ["--title", p.title, "--notes-file", str(notes)]
-    create += ["--verify-tag"] if ecosystem == "go" else ["--target", p.sha]
-    log.append(f"create {p.tag} titled {p.title} at {p.sha}, pre-release, not latest")
-    # Rust and Python reuse the tag name, so the old release goes first. A Go
-    # snapshot has a tag of its own: create it first and leave no gap.
-    if ecosystem == "go":
-        planned = [create, *replaced, *orphaned]
-    else:
-        planned = [*replaced, create, *orphaned]
+        if match:
+            devnet.append((tag, name, match[1], snapshot_key(name)))
+    newer = [(tag, name) for tag, name, _, key in devnet if key > ours]
+    if newer:
+        tag, name = newer[0]
+        return [f"{tag} holds {name}, newer than {p.title}; this run is stale, nothing to do"]
+    log: list[str] = []
+    replaced: list[list[str]] = []
+    orphaned: list[list[str]] = []
+    current = False
+    for tag, name, target, key in devnet:
+        if target == p.target:
+            if key == ours:
+                current = True
+                log.append(f"{tag} already holds {p.title}")
+            else:
+                log.append(f"replace {tag} ({name})")
+                replaced.append(["gh", "release", "delete", tag, "--yes", *cleanup])
+        elif f"v{target}" not in stable_tags:
+            log.append(f"remove {tag}: {target} never shipped and is no longer the target")
+            orphaned.append(["gh", "release", "delete", tag, "--yes", *cleanup])
+    planned: list[list[str]] = []
+    if not current:
+        create = ["gh", "release", "create", p.tag, "--prerelease", "--latest=false"]
+        create += ["--title", p.title, "--notes-file", str(notes)]
+        create += ["--verify-tag"] if ecosystem == "go" else ["--target", p.sha]
+        log.append(f"create {p.tag} titled {p.title} at {p.sha}, pre-release, not latest")
+        # Rust and Python reuse the tag name, so the old release goes first. A
+        # Go snapshot has a tag of its own: create it first and leave no gap.
+        planned = [create, *replaced] if ecosystem == "go" else [*replaced, create]
+    planned += orphaned
+    if not planned:
+        log.append("nothing to do")
     for command in planned:
         log.append(("would run: " if dry_run else "run: ") + " ".join(command))
         if not dry_run:

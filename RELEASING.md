@@ -48,9 +48,11 @@ Every push to `main` runs the devnet path. When `## Unreleased` has no entries
   entries as its notes. It is never marked latest. When a target is abandoned
   (a breaking entry moves `0.32.1` to `0.33.0`) its pre-release is removed;
   pre-releases of versions that shipped stay.
-- **One at a time.** Runs on `main` queue behind each other. A re-run of a
+- **One at a time.** Runs on `main` queue behind each other (`queue: max`),
+  so every push is published in its turn. A re-run of a
   commit whose version crates.io already has skips the upload, and a GitHub
-  pre-release is never moved back to an older build.
+  pre-release is never moved back to an older build: a run older than any
+  devnet pre-release, of any target, changes nothing.
 
 Tags containing `-devnet` never take the stable path: the tag filter excludes
 `v*-devnet*`, and the `route` job sends them nowhere.
