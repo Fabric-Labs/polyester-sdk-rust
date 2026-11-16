@@ -2399,15 +2399,17 @@ good-till-cancelled limit orders.
 - **Ready.** The session subscribes to executions, orders and marketResync and
   sends no command until the server confirms it: wait for
   `TradeSession::ready` or `Event::Ready`. It pings the server; a ping or
-  command left unanswered for `Config::answer_timeout` ends the connection, and
-  the session reconnects with backoff, starting again at `seq` 1.
+  command left unanswered for `Config::answer_timeout` ends the connection, as
+  does a write the server does not take by then, and the session reconnects
+  with backoff, starting again at `seq` 1.
 - **Dead-man switch.** `TradeSession::cancel_all_after` arms, refreshes
   (10 to 120 seconds) or disarms (`Duration::ZERO`) the account's
   cancel-all-after timer. By default (`Config::timer_gate`) a create, modify,
   batch create or batch replace is sent only while the timer acknowledged on
-  this connection is armed past the command's deadline plus a margin; a new
-  connection starts with the gate closed, so arm again after every
-  `Event::Ready`.
+  this connection is armed past the command's deadline plus a margin. Writing
+  a disarm closes the gate at once and writing a refresh bounds it by its own
+  timeout, before their answers arrive. A new connection starts with the gate
+  closed, so arm again after every `Event::Ready`.
 - **Commands.** `create_order`, `cancel_order`, `modify_order` (amend or
   replace, `ModifyBehavior`), `cancel_all_orders`, `batch_create_orders` (up to
   20), `batch_replace_orders` (up to 50 on one pair) and `batch_cancel_orders`

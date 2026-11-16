@@ -9,7 +9,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use ed25519_dalek::{Signature, VerifyingKey};
 use futures_util::{SinkExt, StreamExt};
-use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
 use tokio_tungstenite::tungstenite::http::{HeaderValue, StatusCode};
@@ -57,6 +56,11 @@ struct Script {
     after_ready: Vec<Vec<u8>>,
     /// Close the socket, unanswered, on a frame of this template.
     close_on: Option<u16>,
+    /// Answer every `CancelAllAfter` after the first this much later.
+    delay_later_timers: Option<Duration>,
+    /// Stop reading the socket after the SubscriptionAck, with a small
+    /// receive buffer, so the client's writes back up.
+    stall_after_ready: bool,
 }
 
 fn serve() -> Script {
@@ -72,6 +76,8 @@ fn serve() -> Script {
         reject: None,
         after_ready: Vec::new(),
         close_on: None,
+        delay_later_timers: None,
+        stall_after_ready: false,
     }
 }
 
@@ -269,7 +275,12 @@ fn answer(script: &Script, template: u16, seq: u64, corr: u64, frame: &[u8]) -> 
 // The handshake callback's error type is tungstenite's HTTP response.
 #[allow(clippy::result_large_err)]
 async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let socket = tokio::net::TcpSocket::new_v4().unwrap();
+    if scripts.iter().any(|s| s.stall_after_ready) {
+        socket.set_recv_buffer_size(4096).unwrap();
+    }
+    socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+    let listener = socket.listen(16).unwrap();
     let url = format!("ws://{}/ws/trade.sbe", listener.local_addr().unwrap());
     let record: Record = Arc::new(Mutex::new(Vec::new()));
     let seen = Arc::clone(&record);
@@ -325,6 +336,7 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                 all.len() - 1
             };
             let mut answers = 0;
+            let mut timers = 0;
             while let Some(Ok(msg)) = ws.next().await {
                 let Message::Binary(frame) = msg else {
                     continue;
@@ -342,12 +354,24 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                 let Some(reply) = answer(&current, template, seq, corr, &frame) else {
                     continue;
                 };
+                if template == 10 {
+                    timers += 1;
+                    if timers > 1
+                        && let Some(delay) = current.delay_later_timers
+                    {
+                        tokio::time::sleep(delay).await;
+                    }
+                }
                 if ws.send(Message::Binary(reply.into())).await.is_err() {
                     break;
                 }
                 if template == 6 {
                     for pushed in &current.after_ready {
                         let _ = ws.send(Message::Binary(pushed.clone().into())).await;
+                    }
+                    if current.stall_after_ready {
+                        // Hold the socket open, never reading it again.
+                        std::future::pending::<()>().await;
                     }
                 }
                 if !matches!(template, 1 | 6) {
@@ -1157,4 +1181,113 @@ fn urls_end_in_the_trading_path() {
     );
     assert!(crate::tradews::url("https://api.example.test").is_err());
     assert!(crate::tradews::url("wss://api.example.test/?a=1").is_err());
+}
+
+#[tokio::test]
+async fn a_disarm_closes_the_gate_before_its_answer() {
+    let slow = Script {
+        delay_later_timers: Some(Duration::from_millis(500)),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![slow]).await;
+    let session = start(url).await;
+    ready(&session).await;
+    arm(&session).await;
+    // The disarm is written first; its answer is late. An order behind it
+    // may not rely on the timer it disarms.
+    let behind = order("behind-disarm");
+    let (disarm, create) = tokio::join!(
+        session.cancel_all_after(Duration::ZERO, within(1_000)),
+        session.create_order(&behind, within(500)),
+    );
+    assert_eq!(not_sent(create), NotSent::NotArmed { expires_at: None });
+    assert!(!disarm.unwrap().armed);
+    assert!(
+        !record.lock().unwrap()[0]
+            .frames
+            .iter()
+            .any(|(t, _, _)| *t == 2),
+        "no order was written"
+    );
+}
+
+#[tokio::test]
+async fn a_shorter_refresh_bounds_the_gate_before_its_answer() {
+    let slow = Script {
+        delay_later_timers: Some(Duration::from_millis(500)),
+        timer_expires_in: Duration::from_secs(60),
+        ..serve()
+    };
+    let (url, _) = stand_in(vec![slow]).await;
+    let session = start(url).await;
+    ready(&session).await;
+    session
+        .cancel_all_after(Duration::from_secs(60), within(1_000))
+        .await
+        .unwrap();
+    // Armed for 60 s, a 15 s window fits; refreshed to 10 s, it does not.
+    let behind = order("behind-refresh");
+    let (refresh, create) = tokio::join!(
+        session.cancel_all_after(Duration::from_secs(10), within(1_000)),
+        session.create_order(&behind, within(15_000)),
+    );
+    assert!(matches!(
+        not_sent(create),
+        NotSent::NotArmed {
+            expires_at: Some(_)
+        }
+    ));
+    assert!(refresh.is_ok());
+}
+
+#[tokio::test]
+async fn a_write_the_peer_never_reads_ends_the_connection_in_time() {
+    let stalled = Script {
+        stall_after_ready: true,
+        ..serve()
+    };
+    let (url, _) = stand_in(vec![stalled, serve()]).await;
+    let mut gate_off = config(url);
+    gate_off.timer_gate = None;
+    gate_off.answer_timeout = Duration::from_millis(100);
+    let mut session = connect(gate_off).await.unwrap();
+    ready_on(&mut session, 1).await;
+    let session = Arc::new(session);
+    let batch = |i: usize| {
+        BatchCreateOrders::new((0..20).map(|j| order(&format!("stall-{i}-{j}"))).collect())
+    };
+    let calls: Vec<_> = (0..400)
+        .map(|i| {
+            let session = Arc::clone(&session);
+            let batch = batch(i);
+            tokio::spawn(async move { session.batch_create_orders(&batch, within(60_000)).await })
+        })
+        .collect();
+    let results = tokio::time::timeout(Duration::from_secs(3), async {
+        let mut out = Vec::new();
+        for call in calls {
+            out.push(call.await.unwrap());
+        }
+        out
+    })
+    .await
+    .expect("every command answered although the writes stalled");
+    let unknown = results
+        .iter()
+        .filter(|r| {
+            r.as_ref()
+                .err()
+                .is_some_and(Error::mutation_outcome_unknown)
+        })
+        .count();
+    assert!(unknown > 0, "the written commands are unknown outcomes");
+    assert!(
+        results.iter().all(|r| match r {
+            Err(e) =>
+                e.mutation_outcome_unknown()
+                    || matches!(e, Error::TradeSession(TradeError::NotSent { .. })),
+            Ok(_) => false,
+        }),
+        "never acknowledged, never refused by the server"
+    );
 }

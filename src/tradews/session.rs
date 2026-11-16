@@ -16,12 +16,18 @@
 //! acknowledgement's expiry minus the guard. The server admits a command only
 //! until its deadline and expires the timer at that expiry, both on its own
 //! clock, so every order it admits is admitted before the timer expires and
-//! the expiry's cancel sweeps it, whatever the clocks' skew.
+//! the expiry's cancel sweeps it, whatever the clocks' skew. A timer change
+//! closes or tightens the gate as soon as it is written: a disarm closes it,
+//! and an arm or refresh bounds it by its own timeout from now, until its
+//! acknowledgement shows the timer the server holds.
 //!
 //! **A missing answer ends the connection.** A command or ping unanswered for
 //! [`Config::answer_timeout`], or a frame that does not decode, ends the
 //! connection; every command sent on it without an answer is reported as an
-//! unknown outcome, and the session reconnects with backoff.
+//! unknown outcome, and the session reconnects with backoff. A write that the
+//! peer does not take ends the connection the same way, by the oldest
+//! unanswered frame's answer deadline, and closing the session ends it at
+//! once.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
@@ -200,6 +206,8 @@ struct Cmd {
     command: Command,
     correlation_id: u64,
     deadline: Deadline,
+    /// A `CancelAllAfter`'s timeout.
+    timer: Option<Duration>,
     frame: Vec<u8>,
     answer: oneshot::Sender<Result<Answer>>,
 }
@@ -318,6 +326,18 @@ impl TradeSession {
         deadline: Deadline,
         frame: Vec<u8>,
     ) -> Result<Answer> {
+        self.call_timer(command, correlation_id, deadline, None, frame)
+            .await
+    }
+
+    async fn call_timer(
+        &self,
+        command: Command,
+        correlation_id: u64,
+        deadline: Deadline,
+        timer: Option<Duration>,
+        frame: Vec<u8>,
+    ) -> Result<Answer> {
         let link = *self.shared.link.borrow();
         if link.closed {
             return Err(not_sent(command, NotSent::Closed));
@@ -332,6 +352,7 @@ impl TradeSession {
                 command,
                 correlation_id,
                 deadline,
+                timer,
                 frame,
                 answer,
             })
@@ -430,9 +451,10 @@ impl TradeSession {
 
     /// Arms the account's cancel-all-after timer for `timeout` (10 to 120
     /// whole seconds), refreshes an armed one, or disarms it with
-    /// [`Duration::ZERO`]. The timer covers every pair and side. An armed
-    /// acknowledgement opens this connection's timer gate until its expiry; a
-    /// disarm closes it. A lost answer is [`TradeError::OutcomeUnknown`]:
+    /// [`Duration::ZERO`]. The timer covers every pair and side. Writing a
+    /// disarm closes this connection's timer gate at once, and writing an arm
+    /// or refresh bounds it by `timeout` from now; an armed acknowledgement
+    /// then opens it until the acknowledged expiry. A lost answer is [`TradeError::OutcomeUnknown`]:
     /// resending is safe.
     pub async fn cancel_all_after(
         &self,
@@ -442,7 +464,13 @@ impl TradeSession {
         let correlation_id = new_correlation_id();
         let frame = codec::encode_cancel_all_after(timeout, correlation_id, &deadline)?;
         match self
-            .call(Command::CancelAllAfter, correlation_id, deadline, frame)
+            .call_timer(
+                Command::CancelAllAfter,
+                correlation_id,
+                deadline,
+                Some(timeout),
+                frame,
+            )
             .await?
         {
             Answer::Timer(ack) => Ok(ack),
@@ -714,6 +742,45 @@ impl Conn {
         }
     }
 
+    /// A timer change is about to be written: from now on the gate may not
+    /// rely on a later expiry than the change can give. A disarm closes it;
+    /// an arm or refresh bounds it by now plus its timeout (the clock margin
+    /// covers the server applying it a little earlier on its own clock), so
+    /// a shorter refresh tightens it at once. Only an acknowledgement opens
+    /// it again.
+    fn timer_written(&mut self, timeout: Duration) {
+        self.armed_until_ms = if timeout.is_zero() {
+            None
+        } else {
+            let now = unix_ms(SystemTime::now()).unwrap_or(0);
+            self.armed_until_ms
+                .map(|e| e.min(now.saturating_add(millis(timeout))))
+        };
+    }
+
+    /// The timer state an acknowledgement for `seq` proves. With a later
+    /// timer change still unanswered, it can only narrow the gate.
+    fn timer_acknowledged(&mut self, seq: u64, expires_ms: Option<u64>) {
+        let later = self.in_flight.iter().any(|(s, f)| {
+            *s > seq
+                && matches!(
+                    f.pending,
+                    Pending::Command {
+                        command: Command::CancelAllAfter,
+                        ..
+                    }
+                )
+        });
+        self.armed_until_ms = if later {
+            match (self.armed_until_ms, expires_ms) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                _ => None,
+            }
+        } else {
+            expires_ms
+        };
+    }
+
     fn commands_in_flight(&self) -> usize {
         self.in_flight
             .values()
@@ -978,7 +1045,17 @@ async fn serve(
 
 /// Writes `frame` with the connection's next `seq`; it is in flight from
 /// before the write, so a failed write leaves it unanswered.
-async fn write(ws: &mut Ws, conn: &mut Conn, pending: Pending, mut frame: Vec<u8>) -> Result<u64> {
+async fn write<S>(
+    ws: &mut S,
+    conn: &mut Conn,
+    pending: Pending,
+    mut frame: Vec<u8>,
+    timeout: Duration,
+    stop: &mut watch::Receiver<bool>,
+) -> std::result::Result<u64, Exit>
+where
+    S: futures_util::Sink<Message, Error = tungstenite::Error> + Unpin,
+{
     let seq = conn.next_seq;
     conn.next_seq += 1;
     codec::set_seq(&mut frame, seq);
@@ -989,9 +1066,28 @@ async fn write(ws: &mut Ws, conn: &mut Conn, pending: Pending, mut frame: Vec<u8
             sent: Instant::now(),
         },
     );
-    ws.send(Message::Binary(frame.into()))
-        .await
-        .map_err(|e| Error::realtime(format!("tradews send: {e}")))?;
+    // A peer that stops reading must not hold the writer: the write ends by
+    // the oldest unanswered frame's answer deadline, or when the session is
+    // closed, and the connection's end reports every frame that may have
+    // been written as unanswered.
+    let oldest = conn
+        .in_flight
+        .values()
+        .map(|f| f.sent)
+        .min()
+        .expect("the frame is in flight");
+    let until = tokio::time::Instant::from_std(oldest + timeout);
+    tokio::select! {
+        sent = ws.send(Message::Binary(frame.into())) => {
+            sent.map_err(|e| Exit::Lost(Error::realtime(format!("tradews send: {e}"))))?;
+        }
+        () = stopped(stop) => return Err(Exit::Stop),
+        () = tokio::time::sleep_until(until) => {
+            return Err(Exit::Lost(Error::realtime(format!(
+                "tradews write of seq {seq} did not complete within the answer timeout of {timeout:?}"
+            ))));
+        }
+    }
     Ok(seq)
 }
 
@@ -1003,15 +1099,25 @@ async fn connection(
     events: &mpsc::Sender<Event>,
 ) -> Exit {
     let cfg = &shared.cfg;
-    if let Err(e) = write(ws, conn, Pending::Subscribe, codec::encode_subscribe(0)).await {
-        return Exit::Lost(e);
+    let mut stop = shared.stop.subscribe();
+    let subscribe = codec::encode_subscribe(0);
+    if let Err(exit) = write(
+        ws,
+        conn,
+        Pending::Subscribe,
+        subscribe,
+        cfg.answer_timeout,
+        &mut stop,
+    )
+    .await
+    {
+        return exit;
     }
     let check = (cfg.ping_interval.min(cfg.answer_timeout) / 4).max(Duration::from_millis(5));
     let mut tick = tokio::time::interval(check);
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     tick.tick().await;
     let mut last_ping = Instant::now();
-    let mut stop = shared.stop.subscribe();
     loop {
         tokio::select! {
             () = stopped(&mut stop) => return Exit::Stop,
@@ -1045,8 +1151,8 @@ async fn connection(
                 let pinging = conn.in_flight.values().any(|f| matches!(f.pending, Pending::Ping));
                 if !pinging && last_ping.elapsed() >= cfg.ping_interval {
                     last_ping = Instant::now();
-                    if let Err(e) = write(ws, conn, Pending::Ping, codec::encode_ping(0)).await {
-                        return Exit::Lost(e);
+                    if let Err(exit) = write(ws, conn, Pending::Ping, codec::encode_ping(0), cfg.answer_timeout, &mut stop).await {
+                        return exit;
                     }
                 }
             }
@@ -1056,13 +1162,16 @@ async fn connection(
                     let _ = cmd.answer.send(Err(not_sent(cmd.command, reason)));
                     continue;
                 }
+                if let Some(timeout) = cmd.timer {
+                    conn.timer_written(timeout);
+                }
                 let pending = Pending::Command {
                     command: cmd.command,
                     correlation_id: cmd.correlation_id,
                     answer: cmd.answer,
                 };
-                if let Err(e) = write(ws, conn, pending, cmd.frame).await {
-                    return Exit::Lost(e);
+                if let Err(exit) = write(ws, conn, pending, cmd.frame, cfg.answer_timeout, &mut stop).await {
+                    return exit;
                 }
             }
         }
@@ -1193,7 +1302,7 @@ fn on_answer(conn: &mut Conn, seq: u64, answer: Answer) -> Option<Exit> {
             },
         )))),
         Answer::Timer(ack) => {
-            conn.armed_until_ms = ack.expires_at.and_then(unix_ms);
+            conn.timer_acknowledged(seq, ack.expires_at.and_then(unix_ms));
             Ok(Answer::Timer(ack))
         }
         other => Ok(other),
@@ -1204,4 +1313,152 @@ fn on_answer(conn: &mut Conn, seq: u64, answer: Answer) -> Option<Exit> {
             "tradews refused a frame as SEQUENCE_OUT_OF_ORDER",
         ))
     })
+}
+
+#[cfg(test)]
+mod write_tests {
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    use super::*;
+
+    /// A peer that never takes another byte.
+    struct Stalled;
+
+    impl futures_util::Sink<Message> for Stalled {
+        type Error = tungstenite::Error;
+        fn poll_ready(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Pending
+        }
+        fn start_send(self: Pin<&mut Self>, _: Message) -> std::result::Result<(), Self::Error> {
+            Ok(())
+        }
+        fn poll_flush(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Pending
+        }
+        fn poll_close(
+            self: Pin<&mut Self>,
+            _: &mut Context<'_>,
+        ) -> Poll<std::result::Result<(), Self::Error>> {
+            Poll::Pending
+        }
+    }
+
+    fn command(conn: &mut Conn) -> oneshot::Receiver<Result<Answer>> {
+        let (answer, rx) = oneshot::channel();
+        // An earlier command, written 80 ms ago and unanswered.
+        conn.in_flight.insert(
+            conn.next_seq,
+            InFlight {
+                pending: Pending::Command {
+                    command: Command::CreateOrder,
+                    correlation_id: 7,
+                    answer,
+                },
+                sent: Instant::now() - Duration::from_millis(80),
+            },
+        );
+        conn.next_seq += 1;
+        rx
+    }
+
+    #[tokio::test]
+    async fn a_stalled_write_ends_by_the_oldest_answer_deadline() {
+        let mut conn = Conn::new(1);
+        conn.ready = true;
+        let earlier = command(&mut conn);
+        let (_stop_tx, mut stop) = watch::channel(false);
+        let started = Instant::now();
+        let ended = tokio::time::timeout(
+            Duration::from_secs(2),
+            write(
+                &mut Stalled,
+                &mut conn,
+                Pending::Ping,
+                codec::encode_ping(0),
+                Duration::from_millis(100),
+                &mut stop,
+            ),
+        )
+        .await
+        .expect("the write gives up by the oldest command's answer deadline");
+        assert!(matches!(ended, Err(Exit::Lost(_))));
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "{:?}",
+            started.elapsed()
+        );
+        // The connection's end reports what may have been written as unknown.
+        assert_eq!(conn.fail_in_flight("the write stalled"), [7]);
+        assert!(matches!(
+            earlier.await.unwrap(),
+            Err(Error::TradeSession(TradeError::OutcomeUnknown {
+                correlation_id: 7,
+                ..
+            }))
+        ));
+    }
+
+    #[tokio::test]
+    async fn closing_the_session_ends_a_stalled_write() {
+        let mut conn = Conn::new(1);
+        let (stop_tx, mut stop) = watch::channel(false);
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            stop_tx.send_replace(true);
+        });
+        let ended = tokio::time::timeout(
+            Duration::from_secs(2),
+            write(
+                &mut Stalled,
+                &mut conn,
+                Pending::Ping,
+                codec::encode_ping(0),
+                Duration::from_secs(60),
+                &mut stop,
+            ),
+        )
+        .await
+        .expect("closing ends the write");
+        assert!(matches!(ended, Err(Exit::Stop)));
+    }
+
+    #[test]
+    fn an_older_timer_answer_never_widens_past_a_later_change() {
+        let mut conn = Conn::new(1);
+        let now = unix_ms(SystemTime::now()).unwrap();
+        conn.armed_until_ms = Some(now + 60_000);
+        // A disarm is written (seq 5) while an arm's answer (seq 4) is due.
+        let (answer, _rx) = oneshot::channel();
+        conn.in_flight.insert(
+            5,
+            InFlight {
+                pending: Pending::Command {
+                    command: Command::CancelAllAfter,
+                    correlation_id: 9,
+                    answer,
+                },
+                sent: Instant::now(),
+            },
+        );
+        conn.timer_written(Duration::ZERO);
+        assert_eq!(conn.armed_until_ms, None);
+        conn.timer_acknowledged(4, Some(now + 120_000));
+        assert_eq!(conn.armed_until_ms, None, "the disarm still stands");
+        conn.in_flight.remove(&5);
+        conn.timer_acknowledged(5, None);
+        assert_eq!(conn.armed_until_ms, None);
+        // A refresh to 10 s bounds an armed 60 s gate at once.
+        conn.armed_until_ms = Some(now + 60_000);
+        conn.timer_written(Duration::from_secs(10));
+        assert!(conn.armed_until_ms.unwrap() <= unix_ms(SystemTime::now()).unwrap() + 10_000);
+        conn.timer_acknowledged(6, Some(now + 10_050));
+        assert_eq!(conn.armed_until_ms, Some(now + 10_050));
+    }
 }
