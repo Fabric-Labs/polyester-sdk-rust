@@ -3918,14 +3918,14 @@ async fn l2_connect_json_errors_and_other_json_bodies_keep_their_mapping() {
     })
     .await;
     assert!(
-        matches!(err, Error::Server(_)) && !err.is_retryable(),
+        matches!(err, Error::Server { .. }) && !err.is_retryable(),
         "{err:?}"
     );
     // A non-Connect code on a status other than 401/403 is left to Connect's
     // status mapping.
     let err =
         auth_me_error(|| json_body(503, "application/json", r#"{"code":"MAINTENANCE"}"#)).await;
-    assert!(matches!(err, Error::Server(_)), "{err:?}");
+    assert!(matches!(err, Error::Server { .. }), "{err:?}");
 }
 
 #[tokio::test]
@@ -3958,7 +3958,7 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
         || json_body(501, "application/json", r#"{"message":"Not Implemented"}"#),
     ] {
         let err = auth_me_error(script).await;
-        assert!(matches!(err, Error::Server(_)), "{err:?}");
+        assert!(matches!(err, Error::Server { .. }), "{err:?}");
         assert!(
             !err.is_retryable() && err.mutation_outcome_unknown(),
             "{err:?}"
@@ -3985,7 +3985,7 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
         assert!(err.mutation_outcome_unknown(), "{err:?}");
     }
     let err = auth_me_error(|| json_body(404, "application/json", "{}")).await;
-    assert!(matches!(err, Error::Server(_)), "{err:?}");
+    assert!(matches!(err, Error::Server { .. }), "{err:?}");
 
     // A Connect `not_found` error carried on HTTP 404 is a missing resource,
     // not a missing route.
@@ -4413,7 +4413,7 @@ async fn l2_encoded_failed_responses_keep_their_classification() {
         || encoded_body(501, "application/json", "gzip", "{}"),
     ] {
         let err = auth_me_error(script).await;
-        assert!(matches!(err, Error::Server(_)), "{err:?}");
+        assert!(matches!(err, Error::Server { .. }), "{err:?}");
         assert!(err.mutation_outcome_unknown(), "{err:?}");
     }
     let err = auth_me_error(|| {
@@ -4436,7 +4436,7 @@ async fn l2_encoded_failed_responses_keep_their_classification() {
     }
     // A compressed JSON body that names no code is no more bare than a plain one.
     let err = auth_me_error(|| encoded_body(404, "application/json", "gzip", "{}")).await;
-    assert!(matches!(err, Error::Server(_)), "{err:?}");
+    assert!(matches!(err, Error::Server { .. }), "{err:?}");
     // A compressed Connect not_found stays a resource error.
     let err = auth_me_error(|| {
         encoded_body(
@@ -4894,7 +4894,7 @@ async fn l2_trigger_reads_give_up_after_about_two_seconds() {
         .expect_err("still unavailable");
     let elapsed = started.elapsed();
     assert!(
-        matches!(err, Error::Server(_)) && !err.is_retryable(),
+        matches!(err, Error::Server { .. }) && !err.is_retryable(),
         "{err:?}"
     );
     // 25, 50, 100, 200, 400, 500, 500 ms of backoff: at most eight attempts
@@ -4929,7 +4929,7 @@ async fn l2_trigger_reads_do_not_retry_other_errors() {
         })
         .await
         .expect_err("internal");
-    assert!(matches!(err, Error::Server(_)), "{err:?}");
+    assert!(matches!(err, Error::Server { .. }), "{err:?}");
     assert_eq!(http.requests.load(Ordering::SeqCst), 1);
 }
 
@@ -5149,7 +5149,7 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
         .await
         .expect_err("nothing listens");
     assert!(
-        matches!(&direct, Error::Server(message) if message.contains("HTTP request failed")),
+        matches!(&direct, Error::Server { message, .. } if message.contains("HTTP request failed")),
         "{direct:?}"
     );
 
@@ -6189,7 +6189,7 @@ async fn l2_rest_order_unavailable_classification() {
         assert!(
             matches!(
                 err,
-                Error::Server(_) | Error::AdmissionUnavailable { .. } | Error::Api { .. }
+                Error::Server { .. } | Error::AdmissionUnavailable { .. } | Error::Api { .. }
             ),
             "{code}: {err:?}"
         );
@@ -7713,7 +7713,10 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
         "reconnect snapshot retries must occur"
     );
     let error = sub.err().expect("typed terminal snapshot error");
-    assert!(matches!(error, polyester::Error::Server(_)), "{error:?}");
+    assert!(
+        matches!(error, polyester::Error::Server { .. }),
+        "{error:?}"
+    );
     assert_eq!(
         errors.lock().unwrap().last().unwrap().to_string(),
         error.to_string()

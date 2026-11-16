@@ -64,7 +64,7 @@ pub fn devnet_unavailable(err: &Error) -> bool {
         return true;
     }
     match err {
-        Error::Server(msg) => {
+        Error::Server { message: msg, .. } => {
             let m = msg.to_ascii_lowercase();
             m.contains("temporarily unavailable") || m.contains("unavailable")
         }
@@ -81,7 +81,7 @@ pub fn is_internal_order_error(err: &Error) -> bool {
     match err {
         // Connect maps ErrorCode::Internal → Error::Server with messages like
         // "internal: can't scan into dest[N] ... cannot scan NULL into *int64".
-        Error::Server(msg) => {
+        Error::Server { message: msg, .. } => {
             let m = msg.to_ascii_lowercase();
             m.contains("internal") || m.contains("can't scan") || m.contains("cannot scan")
         }

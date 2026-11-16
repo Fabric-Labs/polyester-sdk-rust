@@ -1896,8 +1896,13 @@ non-retryable, including message-only responses.
 Recognized temporary order admission refusals return `Error::AdmissionUnavailable`,
 including their canonical service code and REST problem when present.
 
-A plain REST gateway 504 returns `Error::GatewayTimeout`: `is_retryable()` is
-false and `mutation_outcome_unknown()` is true. The classifier has no operation
+A REST 504 returns `Error::GatewayTimeout` whatever code its body names, a
+retryable rate-limit or admission code included (only an `*_OUTCOME_UNKNOWN`
+code keeps its `Error::Api`): `is_retryable()` is false and
+`mutation_outcome_unknown()` is true. A temporary failure (503, 502, 504 or
+ConnectRPC `unavailable`) carries the delay its `Retry-After` asked for in
+`retry_after()`, seconds, `None` when none; the SDK's own read retries wait at
+least that long. The classifier has no operation
 context. Reads may retry a 504 explicitly; writes read back first. A client order
 ID supports reconciliation, not exact replay of a single create. Without one,
 read open orders before deciding whether to submit again. The SDK never
@@ -2008,8 +2013,8 @@ contract code at HTTP 501); `Error::RouteNotFound` is the narrower bare HTTP 404
 An HTTP error with no code the contract defines can come from a gateway or an edge, so it doesn't
 prove a request was refused. Only a 401 or 403 is a refusal on its status alone (`Error::Auth` or
 `Error::ApiKeyRejected`). Every other status returns `Error::Server` with
-`mutation_outcome_unknown()` true and `is_retryable()` false, and names any code it did send in its
-message; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
+`mutation_outcome_unknown()` true and `is_retryable()` false, and keeps any code it did send in
+`code`, the HTTP status in `status` and a `Retry-After` delay in `retry_after`; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 

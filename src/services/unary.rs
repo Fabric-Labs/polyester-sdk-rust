@@ -150,10 +150,21 @@ where
     loop {
         match try_auth(factory, procedure, request.clone(), &call).await? {
             Ok(resp) => return Ok(resp),
-            Err(err)
-                if is_real_unavailability(&err) && start.elapsed() + delay <= policy.budget =>
-            {
-                tokio::time::sleep(delay).await;
+            Err(err) if is_real_unavailability(&err) => {
+                // Never sooner than the Retry-After the answer asked for, and
+                // not at all when that would end past the budget.
+                let mapped = Factory::map_error(err);
+                let wait = match mapped.retry_after() {
+                    Some(seconds) if seconds > policy.budget.as_secs_f64() => {
+                        return Err(mapped.for_procedure(procedure));
+                    }
+                    Some(seconds) => delay.max(Duration::from_secs_f64(seconds)),
+                    None => delay,
+                };
+                if start.elapsed() + wait > policy.budget {
+                    return Err(mapped.for_procedure(procedure));
+                }
+                tokio::time::sleep(wait).await;
                 delay = policy.next_delay(delay);
             }
             Err(err) => return Err(Factory::map_error(err).for_procedure(procedure)),

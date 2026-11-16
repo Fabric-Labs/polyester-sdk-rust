@@ -71,6 +71,22 @@ async fn call(
     body: &str,
     fail_for: Option<usize>,
 ) -> (Option<Error>, usize) {
+    call_with_headers(op, status, content_type, body, fail_for, &[]).await
+}
+
+/// [`call`], with these extra response headers on each failure.
+async fn call_with_headers(
+    op: &str,
+    status: u16,
+    content_type: &str,
+    body: &str,
+    fail_for: Option<usize>,
+    extra_headers: &[(&str, &str)],
+) -> (Option<Error>, usize) {
+    let extra_headers: Vec<(String, String)> = extra_headers
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+        .collect();
     let path = if op == "read" { READ_PATH } else { WRITE_PATH };
     let calls = Arc::new(AtomicUsize::new(0));
     let seen = calls.clone();
@@ -90,12 +106,14 @@ async fn call(
                 ..Default::default()
             });
         }
+        let mut headers = vec![
+            ("Content-Type".into(), content_type.clone()),
+            ("Content-Length".into(), body.len().to_string()),
+        ];
+        headers.extend(extra_headers.iter().cloned());
         HttpScript::Raw {
             status,
-            headers: vec![
-                ("Content-Type".into(), content_type.clone()),
-                ("Content-Length".into(), body.len().to_string()),
-            ],
+            headers,
             body: body.as_bytes().to_vec(),
         }
     })
@@ -167,7 +185,7 @@ async fn no_recognised_code_is_a_server_error_with_outcome_unknown() {
                 let case = format!("{status}/{name}/{op}");
                 let (err, calls) = call(op, status, content_type, body, None).await;
                 let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
-                assert!(matches!(err, Error::Server(_)), "{case}: {err:?}");
+                assert!(matches!(err, Error::Server { .. }), "{case}: {err:?}");
                 assert_flags(&err, false, true, &case);
                 // Not unavailable, so a read doesn't retry it either.
                 assert_eq!(calls, 1, "{case}");
@@ -186,7 +204,7 @@ async fn json_404_without_a_code_is_not_a_missing_route() {
             let case = format!("{name}/{op}");
             let (err, calls) = call(op, 404, content_type, body, None).await;
             let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
-            assert!(matches!(err, Error::Server(_)), "{case}: {err:?}");
+            assert!(matches!(err, Error::Server { .. }), "{case}: {err:?}");
             assert!(!err.is_not_implemented(), "{case}: {err:?}");
             assert_flags(&err, false, true, &case);
             assert_eq!(calls, 1, "{case}");
@@ -246,7 +264,7 @@ async fn unavailable_statuses_stay_unknown_send_a_create_once_and_let_reads_retr
             let (err, calls) = call("write", status, content_type, body, None).await;
             let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
             assert!(
-                matches!(err, Error::Server(_) | Error::GatewayTimeout { .. }),
+                matches!(err, Error::Server { .. } | Error::GatewayTimeout { .. }),
                 "{case}: {err:?}"
             );
             assert_flags(&err, false, true, &case);
@@ -291,7 +309,7 @@ async fn rest_503_problems_read_as_connect_unavailable_and_504_stays_unknown() {
         assert!(
             matches!(
                 err,
-                Error::Server(_) | Error::Transport(_) | Error::GatewayTimeout { .. }
+                Error::Server { .. } | Error::Transport(_) | Error::GatewayTimeout { .. }
             ),
             "{case}: {err:?}"
         );
@@ -385,13 +403,13 @@ async fn every_contract_code_keeps_its_meaning_on_a_create() {
                 assert_flags(&err, false, false, &case);
             }
             500 => {
-                assert!(matches!(err, Error::Server(_)), "{case}: {err:?}");
+                assert!(matches!(err, Error::Server { .. }), "{case}: {err:?}");
                 assert_flags(&err, false, true, &case);
             }
             504 => assert_flags(&err, false, true, &case),
             s if s < 500 => {
                 assert!(
-                    !matches!(err, Error::Server(_) | Error::RouteNotFound { .. }),
+                    !matches!(err, Error::Server { .. } | Error::RouteNotFound { .. }),
                     "{case}: {err:?}"
                 );
                 assert!(!err.mutation_outcome_unknown(), "{case}: {err:?}");
@@ -432,7 +450,7 @@ async fn expect_server(op: &str, status: u16, content_type: &str, body: &str, ca
     let (err, calls) = call(op, status, content_type, body, None).await;
     let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
     assert!(
-        matches!(err, Error::Server(_) | Error::GatewayTimeout { .. }),
+        matches!(err, Error::Server { .. } | Error::GatewayTimeout { .. }),
         "{case}: {err:?}"
     );
     assert_flags(&err, false, true, case);
@@ -776,7 +794,7 @@ async fn future_typed_code_does_not_turn_a_server_failure_into_a_refusal() {
             let (err, calls) = call("write", status, JSON, &body, None).await;
             let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
             assert!(!matches!(err, Error::Api { .. }), "{case}: {err:?}");
-            if matches!(err, Error::Server(_)) {
+            if matches!(err, Error::Server { .. }) {
                 assert!(err.to_string().contains("999999"), "{case}: {err}");
             }
             assert_flags(&err, false, true, &case);
@@ -1203,4 +1221,178 @@ async fn trigger_activation_price_not_modifiable_is_final_on_both_transports() {
         OrderErrorCode::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE as i32,
         315
     );
+}
+
+/// A 504 is an unknown outcome whatever retryable code its body names; safe
+/// reads still retry it. At 429 the same codes stay retryable refusals.
+#[tokio::test(flavor = "multi_thread")]
+async fn gateway_timeout_with_a_retryable_code_stays_unknown() {
+    let bodies: [Body; 10] = [
+        (
+            "rate-limit",
+            PROBLEM,
+            r#"{"code":"RATE_LIMIT_EXCEEDED","rateLimit":{"reason":"QUOTA_EXCEEDED","retryAfterMs":"1500"}}"#,
+        ),
+        (
+            "rate-limit-authority",
+            PROBLEM,
+            r#"{"code":"RATE_LIMIT_AUTHORITY_UNAVAILABLE"}"#,
+        ),
+        ("overloaded", PROBLEM, r#"{"code":"OVERLOADED"}"#),
+        (
+            "system-rate-limited",
+            PROBLEM,
+            r#"{"code":"SYSTEM_RATE_LIMITED"}"#,
+        ),
+        ("replay", PROBLEM, r#"{"code":"REPLAY_CAPACITY_EXHAUSTED"}"#),
+        (
+            "auth-replay",
+            PROBLEM,
+            r#"{"code":"AUTH_REPLAY_CAPACITY_EXHAUSTED"}"#,
+        ),
+        (
+            "auth-unavailable",
+            PROBLEM,
+            r#"{"code":"AUTH_TEMPORARILY_UNAVAILABLE"}"#,
+        ),
+        ("skew", PROBLEM, r#"{"code":"TIMESTAMP_SKEW"}"#),
+        (
+            "sequence",
+            PROBLEM,
+            r#"{"code":"ORDER_SEQUENCE_EXHAUSTED"}"#,
+        ),
+        (
+            "connect-resource-exhausted",
+            JSON,
+            r#"{"code":"resource_exhausted","message":"rate limit exceeded, retry later"}"#,
+        ),
+    ];
+    for (case, content_type, body) in bodies {
+        let (err, calls) = call_with_headers(
+            "write",
+            504,
+            content_type,
+            body,
+            None,
+            &[("Retry-After", "2")],
+        )
+        .await;
+        let err = err.expect(case);
+        assert!(
+            matches!(err, Error::GatewayTimeout { .. }),
+            "{case}: {err:?}"
+        );
+        assert_flags(&err, false, true, case);
+        assert_eq!(calls, 1, "{case}");
+        let (err, calls) = call("read", 504, content_type, body, Some(1)).await;
+        assert!(err.is_none(), "{case}: a safe read retries it: {err:?}");
+        assert_eq!(calls, 2, "{case}");
+    }
+    for body in [
+        r#"{"code":"RATE_LIMIT_EXCEEDED","rateLimit":{"reason":"QUOTA_EXCEEDED"}}"#,
+        r#"{"code":"AUTH_REPLAY_CAPACITY_EXHAUSTED"}"#,
+    ] {
+        let (err, calls) = call("write", 429, PROBLEM, body, None).await;
+        let err = err.expect("429");
+        assert!(
+            matches!(err, Error::RateLimit { .. }),
+            "429 {body}: {err:?}"
+        );
+        assert_flags(&err, true, false, body);
+        assert_eq!(calls, 1);
+    }
+    let (err, _) = call(
+        "write",
+        504,
+        PROBLEM,
+        r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN","detail":"d"}"#,
+        None,
+    )
+    .await;
+    let err = err.expect("outcome unknown");
+    assert!(
+        matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"),
+        "{err:?}"
+    );
+    assert!(err.mutation_outcome_unknown());
+}
+
+/// A 503 keeps its code and Retry-After, on a REST problem and a ConnectRPC
+/// unavailable answer.
+#[tokio::test(flavor = "multi_thread")]
+async fn service_unavailable_keeps_its_code_and_retry_after() {
+    let (err, _) = call_with_headers(
+        "write",
+        503,
+        PROBLEM,
+        r#"{"code":"UPSTREAM_ERROR","detail":"upstream_unavailable","status":503}"#,
+        None,
+        &[("Retry-After", "30")],
+    )
+    .await;
+    let err = err.expect("503");
+    assert!(
+        matches!(
+            &err,
+            Error::Server { code: Some(code), status: Some(503), retry_after: Some(seconds), .. }
+                if code == "UPSTREAM_ERROR" && *seconds == 30.0
+        ),
+        "{err:?}"
+    );
+    assert_eq!(err.retry_after(), Some(30.0));
+    assert_flags(&err, false, true, "503");
+    let (err, _) = call_with_headers(
+        "write",
+        503,
+        JSON,
+        r#"{"code":"unavailable","message":"temporarily unavailable"}"#,
+        None,
+        &[("Retry-After", "7")],
+    )
+    .await;
+    let err = err.expect("connect unavailable");
+    assert!(matches!(err, Error::Server { .. }), "{err:?}");
+    assert_eq!(err.retry_after(), Some(7.0), "{err:?}");
+    let (err, _) = call(
+        "write",
+        503,
+        PROBLEM,
+        r#"{"code":"SERVICE_UNAVAILABLE"}"#,
+        None,
+    )
+    .await;
+    assert_eq!(err.expect("no header").retry_after(), None);
+}
+
+/// A safe read waits at least the Retry-After it was asked for, and returns
+/// at once when that would end past its retry budget.
+#[tokio::test(flavor = "multi_thread")]
+async fn read_retry_honours_retry_after() {
+    let body = r#"{"code":"UPSTREAM_ERROR","status":503}"#;
+    let started = std::time::Instant::now();
+    let (err, calls) = call_with_headers(
+        "read",
+        503,
+        PROBLEM,
+        body,
+        Some(1),
+        &[("Retry-After", "30")],
+    )
+    .await;
+    assert!(started.elapsed() < std::time::Duration::from_millis(1500));
+    assert_eq!(calls, 1);
+    assert_eq!(err.expect("past the budget").retry_after(), Some(30.0));
+    let started = std::time::Instant::now();
+    let (err, calls) = call_with_headers(
+        "read",
+        503,
+        PROBLEM,
+        body,
+        Some(1),
+        &[("Retry-After", "0.4")],
+    )
+    .await;
+    assert!(err.is_none(), "{err:?}");
+    assert_eq!(calls, 2);
+    assert!(started.elapsed() >= std::time::Duration::from_millis(400));
 }
