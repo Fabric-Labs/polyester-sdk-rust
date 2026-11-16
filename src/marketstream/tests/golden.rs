@@ -143,6 +143,9 @@ impl Pairs for AnyPairs {
     fn symbol(&self, _: u32) -> Option<String> {
         None
     }
+    fn symbol_id(&self, _: &str) -> Option<u32> {
+        None
+    }
 }
 
 /// Each capture replays through the client's handlers without a protocol

@@ -38,7 +38,7 @@ use crate::types::{Price, Quantity};
 
 pub use backfill::{EpochEnd, HistoryPage, TradeHistory, backfill};
 pub use book::OrderBook;
-pub use client::{Config, MarketStream, Pairs, connect, url};
+pub use client::{Config, LoadedPairs, MarketStream, Pairs, PairsSource, connect, url};
 pub use codec::{SCHEMA_ID, SCHEMA_VERSION};
 
 /// The market-data stream's path on the API's WebSocket host.
@@ -380,6 +380,30 @@ pub enum Event {
         error: crate::Error,
         delay: std::time::Duration,
     },
+    /// The pairs were re-read for a new connection ([`Config::reload`]);
+    /// every pair whose ID changed is listed.
+    PairsReloaded {
+        renumbered: Vec<Renumbered>,
+    },
+    /// Re-reading the pairs failed; the connection subscribes nothing until a
+    /// retry after `delay` succeeds.
+    PairsReloadFailed {
+        error: crate::Error,
+        delay: std::time::Duration,
+    },
+    /// A stream the caller subscribed to ended: `error` says why.
+    Ended {
+        topic: Topic,
+        error: crate::Error,
+    },
+}
+
+/// A pair the server renumbered: the client follows it by symbol.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Renumbered {
+    pub symbol: String,
+    pub from: u32,
+    pub to: u32,
 }
 
 /// Why the market-data stream refused a message.
@@ -408,6 +432,19 @@ pub enum StreamError {
         topic: Topic,
         result: SubscribeResult,
     },
+    /// The pair of a subscribed stream is no longer in the spot config the
+    /// client re-read; the stream ended.
+    #[error("market stream {topic}: pair {} is no longer listed", .symbol.as_deref().unwrap_or("?"))]
+    PairNotListed {
+        topic: Topic,
+        symbol: Option<String>,
+    },
+    /// A trades recovery of pair `symbol_id` answered after its connection
+    /// was replaced. It was read with that connection's catalog, which the
+    /// pairs read since may have replaced, so its trades were dropped:
+    /// recover the gap from the trade history API again if it is needed.
+    #[error("market stream pair {symbol_id}: trades recovery from a replaced connection dropped")]
+    Superseded { symbol_id: u32 },
 }
 
 impl StreamError {

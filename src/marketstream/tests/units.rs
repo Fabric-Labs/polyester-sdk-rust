@@ -844,7 +844,7 @@ async fn backfill_termination_cases() {
         ),
     ];
     for (name, history, gap, want, pages) in cases {
-        let got = backfill_paced(&history, gap, FAST)
+        let got = backfill_paced(&history, None, gap, FAST)
             .await
             .unwrap_or_else(|e| panic!("{name}: {e}"));
         assert_eq!(
@@ -889,7 +889,7 @@ async fn backfill_refuses_a_broken_contract() {
             broken: Some(broken),
             ..FakeHistory::new(span(1, 105), &[], |_| 105)
         };
-        let err = backfill_paced(&history, bounded(100, 105), FAST)
+        let err = backfill_paced(&history, None, bounded(100, 105), FAST)
             .await
             .unwrap_err();
         assert!(matches!(err, Error::ResponseContract { .. }), "{err}");
@@ -913,6 +913,10 @@ impl TradeHistory for Failing {
 #[tokio::test]
 async fn backfill_gives_up_after_repeated_failures() {
     let history = Failing(Mutex::new(0));
-    assert!(backfill_paced(&history, bounded(1, 2), FAST).await.is_err());
+    assert!(
+        backfill_paced(&history, None, bounded(1, 2), FAST)
+            .await
+            .is_err()
+    );
     assert_eq!(*history.0.lock().unwrap(), 10);
 }

@@ -15,6 +15,9 @@ pub const ACCOUNT_ID_ENV: &str = "POLYESTER_ACCOUNT_ID";
 pub const HEADER_KEY_ID: &str = "X-API-KEY-ID";
 pub const HEADER_TIMESTAMP: &str = "X-API-TIMESTAMP";
 pub const HEADER_SIGNATURE: &str = "X-API-SIGNATURE";
+/// The single-use nonce of a signed WebSocket upgrade
+/// ([`Credentials::sign_websocket_upgrade`]).
+pub const HEADER_NONCE: &str = "X-API-NONCE";
 /// The signed receive-window header: the server processes a request only
 /// until its timestamp plus this many milliseconds.
 pub const HEADER_RECV_WINDOW: &str = "X-API-RECV-WINDOW";
@@ -305,6 +308,37 @@ impl Credentials {
             None => self.timestamp_allocator.next_async().await?.to_string(),
         };
         self.signed_headers(ts, method, raw_url, body, recv_window_ms)
+    }
+}
+
+impl Credentials {
+    /// Headers that sign a WebSocket upgrade (`GET`, no body) of `raw_url`.
+    /// The signed payload is [`canonical_signing_string`]'s, then a line
+    /// `ws-nonce:<nonce>`: the nonce is 16 fresh random bytes in lower-case
+    /// hex, sent in [`HEADER_NONCE`], and the server accepts each nonce once.
+    pub async fn sign_websocket_upgrade(&self, raw_url: &str) -> Result<BTreeMap<String, String>> {
+        let ts = self.timestamp_allocator.next_async().await?.to_string();
+        let mut nonce = [0u8; 16];
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut nonce);
+        self.signed_upgrade_headers(ts, raw_url, &hex::encode(nonce))
+    }
+
+    fn signed_upgrade_headers(
+        &self,
+        ts: String,
+        raw_url: &str,
+        nonce: &str,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut canonical = canonical_signing_bytes(&ts, None, "GET", raw_url, b"")?;
+        canonical.extend_from_slice(b"\nws-nonce:");
+        canonical.extend_from_slice(nonce.as_bytes());
+        let sig = self.signing_key.sign(&canonical);
+        let mut headers = BTreeMap::new();
+        headers.insert(HEADER_KEY_ID.to_owned(), self.key_id.clone());
+        headers.insert(HEADER_TIMESTAMP.to_owned(), ts);
+        headers.insert(HEADER_NONCE.to_owned(), nonce.to_owned());
+        headers.insert(HEADER_SIGNATURE.to_owned(), hex::encode(sig.to_bytes()));
+        Ok(headers)
     }
 }
 
