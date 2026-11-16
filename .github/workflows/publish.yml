@@ -1,28 +1,75 @@
 name: Publish
 
-# Publishes polyester-sdk to crates.io when a vX.Y.Z tag is pushed. crates.io
-# trusted publishing trusts this file (publish.yml) and the crates-io
-# environment; the token is minted per run and no registry secret is stored.
+# Publishes polyester-sdk to crates.io. crates.io trusted publishing trusts this
+# file (publish.yml) and the crates-io environment; the token is minted per run
+# and no registry secret is stored. Both release channels live here;
+# RELEASING.md describes them.
+#
+# Stable: pushing a vX.Y.Z tag publishes that version once CI passes and the
+# tag matches Cargo.toml.
+#
+# Devnet: every push to main whose CHANGELOG has entries under ## Unreleased
+# publishes the pre-release <next version>-devnet.<YYYYMMDDHHmmss> (SemVer),
+# which Cargo never selects for a plain version requirement, and moves the one
+# GitHub pre-release of that version to it. scripts/devnet_release.py computes
+# the version. A manual run builds and checks the pre-release; it publishes
+# only from main with dry_run off.
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+      # Devnet tags never take the stable path.
+      - "!v*-devnet*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build and check the devnet pre-release without publishing it
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
+# One publish per ref at a time: each tag, and main, publishes in order. A
+# manual dry run publishes nothing and takes no lock.
 concurrency:
-  group: publish-${{ github.ref }}
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('publish-dry-run-{0}', github.run_id) || format('publish-{0}', github.ref) }}
   cancel-in-progress: false
 
 jobs:
+  route:
+    name: Route stable or devnet
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      channel: ${{ steps.route.outputs.channel }}
+      dry_run: ${{ steps.route.outputs.dry_run }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # A vX.Y.Z tag goes stable, a push to main goes devnet, a devnet tag
+      # goes nowhere. scripts/test_devnet_release.py covers each case.
+      - name: Pick the channel
+        id: route
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python3 scripts/devnet_release.py route --event "$GITHUB_EVENT_NAME" --ref "$GITHUB_REF" --dry-run "$DRY_RUN"
+
   checks:
     name: CI checks
+    needs: route
+    if: needs.route.outputs.channel == 'stable'
     uses: ./.github/workflows/ci.yml
 
   version:
     name: Tag matches Cargo.toml version
+    needs: route
+    if: needs.route.outputs.channel == 'stable'
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out repository
@@ -78,3 +125,145 @@ jobs:
         run: cargo publish --locked
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  devnet-build:
+    name: Build devnet pre-release
+    needs: route
+    if: needs.route.outputs.channel == 'devnet'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      skip: ${{ steps.plan.outputs.skip }}
+      version: ${{ steps.plan.outputs.version }}
+      exists: ${{ steps.exists.outputs.exists }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # Next version from the last vX.Y.Z tag and ## Unreleased, timestamped
+      # with the commit time; skip=true when Unreleased has no entries.
+      - name: Plan the devnet version
+        id: plan
+        run: python3 scripts/devnet_release.py plan --notes devnet-notes.md
+
+      - name: Is the version already on crates.io?
+        id: exists
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python3 scripts/devnet_release.py exists --version "$VERSION"
+
+      - name: Install Rust 1.90 toolchain
+        if: steps.plan.outputs.skip == 'false'
+        uses: dtolnay/rust-toolchain@1.90.0
+
+      # Build time only: the stamped version is never committed, so cargo
+      # packages a dirty tree.
+      - name: Stamp the version into Cargo.toml and Cargo.lock
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python3 scripts/devnet_release.py stamp --version "$VERSION"
+
+      - name: Package the crate
+        if: steps.plan.outputs.skip == 'false'
+        run: cargo package --locked --allow-dirty
+
+      - name: The packaged crate carries the version
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: python3 scripts/devnet_release.py verify --version "$VERSION"
+
+      - name: GitHub pre-release preview
+        if: steps.plan.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/devnet_release.py release --notes devnet-notes.md --dry-run true
+
+      - name: Keep the release notes
+        if: steps.plan.outputs.skip == 'false'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: devnet-notes
+          path: devnet-notes.md
+          if-no-files-found: error
+
+  devnet-ci:
+    name: CI checks
+    needs: devnet-build
+    if: needs.devnet-build.outputs.skip == 'false'
+    uses: ./.github/workflows/ci.yml
+
+  devnet-publish:
+    name: Publish devnet pre-release to crates.io
+    needs: [route, devnet-build, devnet-ci]
+    if: needs.route.outputs.channel == 'devnet' && needs.route.outputs.dry_run == 'false' && needs.devnet-build.outputs.skip == 'false' && needs.devnet-build.outputs.exists == 'false'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    environment: crates-io
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.90 toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+
+      - name: Stamp the version into Cargo.toml and Cargo.lock
+        env:
+          VERSION: ${{ needs.devnet-build.outputs.version }}
+        run: python3 scripts/devnet_release.py stamp --version "$VERSION"
+
+      # No build cache in the release job: the published crate is built from a clean target.
+      - name: Package dry run
+        run: cargo publish --locked --allow-dirty --dry-run
+
+      - name: Authenticate with crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+
+      - name: Publish
+        run: cargo publish --locked --allow-dirty
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  # Runs after a publish, and after a re-run whose version crates.io already has.
+  devnet-release:
+    name: Devnet GitHub pre-release
+    needs: [route, devnet-build, devnet-ci, devnet-publish]
+    if: ${{ !cancelled() && needs.route.outputs.channel == 'devnet' && needs.route.outputs.dry_run == 'false' && needs.devnet-build.outputs.skip == 'false' && needs.devnet-ci.result == 'success' && (needs.devnet-publish.result == 'success' || (needs.devnet-publish.result == 'skipped' && needs.devnet-build.outputs.exists == 'true')) }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install Rust 1.90 toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+
+      - name: Fetch the release notes
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: devnet-notes
+
+      # Waits until the crates.io index lists the version, then checks that
+      # `cargo add polyester-sdk` still picks a stable release.
+      - name: crates.io serves it; the default install stays stable
+        env:
+          VERSION: ${{ needs.devnet-build.outputs.version }}
+        run: python3 scripts/devnet_release.py check-registry --version "$VERSION"
+
+      - name: Move the GitHub pre-release to this snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/devnet_release.py release --notes devnet-notes.md

@@ -153,6 +153,29 @@ cargo test --lib
 Pin the Connect runtime: this crate depends on `connectrpc` / `buffa` **0.8.x**.
 Review upstream notes before upgrading.
 
+## Devnet pre-releases
+
+Stable releases track testnet. While `CHANGELOG.md` has entries under
+`## Unreleased`, every push to `main` also publishes a devnet pre-release of the
+next version to crates.io, `<version>-devnet.<YYYYMMDDHHmmss>` (the commit time,
+UTC), for trying changes before they reach a stable release. Cargo selects a
+pre-release only for a requirement that names one, so `polyester-sdk = "0.32"`
+and `cargo add polyester-sdk` stay on the stable release.
+
+```bash
+cargo add polyester-sdk@=0.33.0-devnet.20261117093000
+```
+
+```toml
+[dependencies]
+polyester-sdk = "=0.33.0-devnet.20261117093000"
+```
+
+The [releases page](https://github.com/Fabric-Labs/polyester-sdk-rust/releases)
+holds one pre-release per upcoming version, pointing at its newest devnet build,
+with the changes it carries. A devnet build can change between snapshots, so
+pin it with `=`. [RELEASING.md](RELEASING.md) describes both channels.
+
 ## Examples
 
 Runnable cookbook examples live in the sibling repo
