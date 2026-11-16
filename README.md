@@ -2326,9 +2326,9 @@ Streams and recovery:
   arrive meanwhile are dropped, a second gap starts no second recovery, and
   every other stream of the connection carries on untouched. The client's own
   requests arrive as `Event::SubscribeResponse` like any other. Only a lost
-  connection, or an unsubscribe of a held stream answered with anything but
-  `SubscribeResult::Ok` or `SubscribeResult::NotSubscribed`
-  (`StreamError::Unsubscribe`), reconnects every stream.
+  connection, or an unsubscribe answered with anything but
+  `SubscribeResult::Ok` or `SubscribeResult::NotSubscribed` for a stream the
+  server holds (`StreamError::Unsubscribe`), reconnects every stream.
 - `MarketStatus` reports a pair whose feed went stale (`FeedState::Stale`): its
   best bid and offer and depth pause until it recovers. A depth book then waits
   for its replacement snapshot, which arrives before the pair is reported live
@@ -2363,7 +2363,12 @@ topic's requests take effect in the order they are made, whether the caller's,
 a resubscription or a depth recovery's: the answer to a request that a later
 request of the same topic overtook is delivered as an
 `Event::SubscribeResponse` but not applied, and the client then brings the
-server to what the caller last asked for. A request that was sent takes effect
+server to what the caller last asked for. What the server holds is followed
+from every answer, applied or not. Every stream is live only once the
+subscription it holds delivered its initial state (snapshot, quote or trades
+baseline): a stream answered `SubscribeResult::AlreadySubscribed` whose
+subscription's initial state the client never took is unsubscribed and
+subscribed again, and its trades meanwhile are dropped. A request that was sent takes effect
 even if the caller stops waiting for its answer, and an Unsubscribe the
 connection drops before answering counts as done.
 

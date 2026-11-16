@@ -398,10 +398,11 @@ pub enum StreamError {
     /// from a fresh baseline.
     #[error("invalid market stream message (template {template_id}): {message}")]
     Frame { template_id: u16, message: String },
-    /// An unsubscribe of a held stream that the server answered with neither
-    /// [`SubscribeResult::Ok`] nor [`SubscribeResult::NotSubscribed`]: whether
-    /// the connection still holds the stream is unknown, so the client
-    /// reconnects, and every stream is resubscribed.
+    /// An unsubscribe that the server answered with neither
+    /// [`SubscribeResult::Ok`] nor [`SubscribeResult::NotSubscribed`] for a
+    /// stream it holds, as its answers show, those to superseded requests
+    /// included: the stream stays held whatever the caller wants, so the
+    /// client reconnects, and every stream it wants is resubscribed.
     #[error("market stream unsubscribe of {topic} answered {result}")]
     Unsubscribe {
         topic: Topic,

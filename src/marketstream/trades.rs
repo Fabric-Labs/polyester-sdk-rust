@@ -35,6 +35,10 @@ pub(crate) struct Tracker {
     pub symbol_id: u32,
     /// Set by the current subscription's baseline.
     started: bool,
+    /// The held subscription's baseline arrived before the stream was held,
+    /// so its trades and skipped ranges are dropped until the next baseline,
+    /// which the stream's resubscription brings.
+    pub missed: bool,
     /// Set once any subscription had a baseline.
     known: bool,
     epoch: u64,
@@ -62,6 +66,7 @@ impl Tracker {
     /// Forgets the subscription, keeping what was accounted for.
     pub fn restart(&mut self) {
         self.started = false;
+        self.missed = false;
     }
 
     fn gap(&self, after: u64, through: u64, tail: u64, cause: GapCause) -> TradesGap {
@@ -136,6 +141,9 @@ impl Tracker {
     /// Applies a TradesSkipped; `last` `None` is the rest of the epoch.
     pub fn skipped(&mut self, epoch: u64, first: u64, last: Option<u64>) -> Result<Gaps, String> {
         if !self.started {
+            if self.missed {
+                return Ok(Vec::new());
+            }
             return Err("trades skipped before the subscription's baseline".into());
         }
         if !in_epoch(first, epoch) || last.is_some_and(|l| !in_epoch(l, epoch) || l < first) {
@@ -174,6 +182,9 @@ impl Tracker {
     /// gaps before them.
     pub fn trades(&mut self, epoch: u64, fills: &[Fill]) -> Result<(Vec<Fill>, Gaps), String> {
         if !self.started {
+            if self.missed {
+                return Ok((Vec::new(), Vec::new()));
+            }
             return Err("trades before the subscription's baseline".into());
         }
         if fills.is_empty() {

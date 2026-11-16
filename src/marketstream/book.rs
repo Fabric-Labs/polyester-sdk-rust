@@ -32,8 +32,6 @@ pub(crate) struct Book {
     /// followed every update since.
     pub synced: bool,
     pub has: bool,
-    /// A snapshot of the connection's current subscription was applied.
-    pub current: bool,
     /// The stream recovers from a gap: snapshots and updates are dropped
     /// until a new subscription is made, whose snapshot replaces the book.
     pub recovering: bool,
@@ -101,7 +99,6 @@ impl Book {
             stream,
             synced: false,
             has: false,
-            current: false,
             recovering: false,
             epoch: 0,
             update_id: 0,

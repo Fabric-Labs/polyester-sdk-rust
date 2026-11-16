@@ -14,20 +14,25 @@ use tokio::sync::mpsc;
 
 use super::client::{ClientMsg, FakeServer, TestPairs, decode_client, dial};
 use super::frames::*;
+use crate::errors::Error;
 use crate::marketstream::client::{
-    depth_book, handle, issue, live_of, offline_stream, settled, wire,
+    depth_book, handle, issue, live_of, offline_stream, reconnect, settled, wire,
 };
 use crate::marketstream::sbe::subscribe_result::SubscribeResult as Wire;
-use crate::marketstream::{Config, Event, FeedState, MarketStream, Stream, Topic};
+use crate::marketstream::{
+    Config, Event, FeedState, MarketStream, Stream, StreamError, SubscribeResult, Topic,
+};
 
 const fn topic(symbol_id: u32, stream: Stream) -> Topic {
     Topic { symbol_id, stream }
 }
 const DEPTH_7: Topic = topic(7, Stream::Depth);
-const TOPICS: [Topic; 3] = [
+const TOPICS: [Topic; 5] = [
     topic(7, Stream::Depth),
     topic(9, Stream::Depth),
     topic(7, Stream::Bbo),
+    topic(9, Stream::Trades),
+    topic(9, Stream::Depth20),
 ];
 
 /// SplitMix64: a small seeded generator, so every run of a seed is the same.
@@ -44,8 +49,10 @@ impl Rng {
 }
 
 /// One connection's server: it holds subscriptions, answers requests in the
-/// order received and sends frames in order. A new depth subscription opens
-/// with a snapshot at the pair's position, a new bbo one with a quote.
+/// order received and sends frames in order. A new subscription opens with
+/// its initial state and nothing more: a depth or depth20 snapshot at the
+/// pair's position, a quote, or the trades baseline. Streams are otherwise
+/// quiet unless a test sends updates.
 struct Sim {
     held: HashSet<Topic>,
     wire: mpsc::UnboundedReceiver<Vec<u8>>,
@@ -54,6 +61,19 @@ struct Sim {
     pos: HashMap<u32, u64>,
     quote: u64,
     log: Vec<String>,
+    /// Topics whose next Unsubscribe is answered LIMIT_EXCEEDED, leaving the
+    /// subscription in place.
+    refuse: HashSet<Topic>,
+    /// Topics whose next Subscribe is answered LIMIT_EXCEEDED, leaving the
+    /// topic not held.
+    refuse_sub: HashSet<Topic>,
+    /// Topics whose last answered request was a Subscribe the server
+    /// refused, which ends the caller's intent for them.
+    refused: HashSet<Topic>,
+    /// Each pair's last trade ID.
+    trade: HashMap<u32, u64>,
+    /// Connections after the first.
+    reconnects: usize,
 }
 
 impl Sim {
@@ -70,6 +90,11 @@ impl Sim {
             pos: HashMap::from([(7, 10), (9, 10)]),
             quote: 1,
             log: Vec::new(),
+            refuse: HashSet::new(),
+            refuse_sub: HashSet::new(),
+            refused: HashSet::new(),
+            trade: HashMap::from([(7, 100), (9, 100)]),
+            reconnects: 0,
         };
         (sim, stream)
     }
@@ -117,7 +142,17 @@ impl Sim {
         let mut results = Vec::new();
         let mut opened = Vec::new();
         for t in &m.topics {
+            self.refused.remove(t);
+            let refused = if m.unsubscribe {
+                self.refuse.remove(t)
+            } else {
+                !self.held.contains(t) && self.refuse_sub.remove(t)
+            };
+            if refused && !m.unsubscribe {
+                self.refused.insert(*t);
+            }
             let r = match (m.unsubscribe, self.held.contains(t)) {
+                _ if refused => Wire::LIMIT_EXCEEDED,
                 (true, false) => Wire::NOT_SUBSCRIBED,
                 (true, true) => {
                     self.held.remove(t);
@@ -142,11 +177,25 @@ impl Sim {
                     let f = self.snapshot(t.symbol_id);
                     self.out.push_back(f);
                 }
+                Stream::Depth20 => {
+                    let p = self.pos[&t.symbol_id];
+                    self.out.push_back(depth_snapshot(
+                        t.symbol_id,
+                        Stream::Depth20,
+                        1,
+                        p,
+                        &[lv(100, p as i64)],
+                        &[],
+                    ));
+                }
                 Stream::Bbo => {
                     let f = self.bbo(t.symbol_id);
                     self.out.push_back(f);
                 }
-                _ => {}
+                Stream::Trades => {
+                    let last = self.trade[&t.symbol_id];
+                    self.out.push_back(trades_through(t.symbol_id, 1, last));
+                }
             }
         }
     }
@@ -181,34 +230,55 @@ impl Sim {
         self.out.push_back(market_status(symbol, FeedState::Live));
     }
 
-    /// Hands the client the oldest frame sent.
+    /// Sends the next trade of a held trades stream.
+    fn trades(&mut self, symbol: u32) {
+        if !self.held.contains(&Topic::new(symbol, Stream::Trades)) {
+            return;
+        }
+        let id = self.trade[&symbol] + 1;
+        self.trade.insert(symbol, id);
+        self.log.push(format!("server trades {symbol}: {id}"));
+        self.out.push_back(trades(symbol, 1, id, &[fill(id)]));
+    }
+
+    /// Replaces the connection: the server holds nothing on the new one and
+    /// what was in flight is gone; the client marks everything stale and
+    /// subscribes what it wants, as its session does.
+    fn reconnect(&mut self, stream: &MarketStream) {
+        self.reconnects += 1;
+        self.log.push("connection replaced".into());
+        self.held.clear();
+        self.inbox.clear();
+        self.out.clear();
+        self.wire = reconnect(stream.shared());
+    }
+
+    /// Hands the client the oldest frame sent. A refused unsubscribe of a
+    /// held stream ends the connection, which the client replaces.
     fn deliver(&mut self, stream: &mut MarketStream) {
         let frame = self.out.pop_front().expect("a frame");
-        if let Err(e) = handle(stream.shared(), &frame) {
-            panic!("client refused a frame: {e}\n{}", self.trace());
+        match handle(stream.shared(), &frame) {
+            Ok(()) => {}
+            Err(e @ Error::MarketStream(StreamError::Unsubscribe { .. })) => {
+                self.log.push(format!("client ends the connection: {e}"));
+                self.reconnect(stream);
+            }
+            Err(e) => panic!("client refused a frame: {e}\n{}", self.trace()),
         }
         stream.queued();
     }
 
-    /// Runs the server and client until neither has anything left to send;
-    /// every held bbo stream then sends a quote, as it does on every change.
+    /// Runs the server and client until neither has anything left to send.
+    /// The streams are quiet: nothing re-sends a topic's initial state.
     fn quiesce(&mut self, stream: &mut MarketStream) {
-        for _ in 0..2 {
-            let mut steps = 0;
-            while self.pending() > 0 || !self.out.is_empty() {
-                steps += 1;
-                assert!(steps < 10_000, "no quiescence\n{}", self.trace());
-                if !self.inbox.is_empty() {
-                    self.process();
-                } else {
-                    self.deliver(stream);
-                }
-            }
-            for symbol in [7, 9] {
-                if self.held.contains(&Topic::new(symbol, Stream::Bbo)) {
-                    let f = self.bbo(symbol);
-                    self.out.push_back(f);
-                }
+        let mut steps = 0;
+        while self.pending() > 0 || !self.out.is_empty() {
+            steps += 1;
+            assert!(steps < 10_000, "no quiescence\n{}", self.trace());
+            if !self.inbox.is_empty() {
+                self.process();
+            } else {
+                self.deliver(stream);
             }
         }
     }
@@ -358,33 +428,118 @@ async fn the_caller_resubscribing_a_recovering_stream_holds_it() {
     }
 }
 
-/// A Subscribe answered OK, superseded by a second Subscribe answered
-/// ALREADY_SUBSCRIBED: the snapshot that followed the OK arrived before the
-/// stream was held, so the stream recovers and goes live.
+/// Two Subscribes of a quiet stream: the first answered OK, superseded by
+/// the second, answered ALREADY_SUBSCRIBED. The initial state that followed
+/// the OK (the trades baseline, a quote, a depth or depth20 snapshot) arrived
+/// before the stream was held and is never sent again, so the stream is
+/// ended and subscribed again, and goes live only with the new
+/// subscription's initial state.
 #[tokio::test]
-async fn a_depth_stream_held_without_its_snapshot_recovers() {
+async fn a_stream_held_without_its_initial_state_is_subscribed_again() {
+    for topic in [
+        topic(7, Stream::Depth),
+        topic(9, Stream::Depth20),
+        topic(7, Stream::Bbo),
+        topic(9, Stream::Trades),
+    ] {
+        let (mut sim, mut stream) = Sim::new();
+        sim.caller(&stream, topic, false);
+        sim.caller(&stream, topic, false);
+        sim.process();
+        sim.process();
+        sim.deliver(&mut stream); // OK, superseded
+        sim.deliver(&mut stream); // the initial state, before the stream is held
+        sim.deliver(&mut stream); // ALREADY_SUBSCRIBED
+        sim.one_request(
+            true,
+            "a stream held without its initial state was not subscribed again",
+        );
+        assert!(
+            !stream.live(topic),
+            "{topic} live without its initial state"
+        );
+        if topic.stream == Stream::Trades {
+            // A trade of the held subscription, whose baseline was missed,
+            // is no protocol error.
+            sim.trades(topic.symbol_id);
+            let trade = sim.out.pop_back().expect("a trade");
+            sim.out.push_front(trade);
+            sim.deliver(&mut stream);
+        }
+        sim.process(); // the Unsubscribe
+        sim.deliver(&mut stream);
+        sim.process(); // the Subscribe: OK, then the initial state
+        sim.deliver(&mut stream);
+        assert!(
+            !stream.live(topic),
+            "{topic} live before the new subscription's initial state"
+        );
+        sim.deliver(&mut stream);
+        assert!(
+            stream.live(topic),
+            "{topic} not live after the new subscription's initial state\n{}",
+            sim.trace()
+        );
+        sim.quiesce(&mut stream);
+        sim.settled(&stream, &HashSet::from([topic]));
+    }
+}
+
+/// A Subscribe answered OK but superseded by an Unsubscribe, which the
+/// server refuses: the server may still hold the stream, so the connection
+/// ends, as for a refused unsubscribe of a held stream.
+#[tokio::test]
+async fn a_refused_unsubscribe_after_a_superseded_subscribe_reconnects() {
+    let trades = topic(9, Stream::Trades);
     let (mut sim, mut stream) = Sim::new();
-    sim.caller(&stream, DEPTH_7, false);
-    sim.caller(&stream, DEPTH_7, false);
+    sim.caller(&stream, trades, false);
+    sim.refuse.insert(trades);
+    sim.caller(&stream, trades, true);
     sim.process();
     sim.process();
     sim.deliver(&mut stream); // OK, superseded
-    sim.deliver(&mut stream); // the snapshot, before the stream is held
-    sim.deliver(&mut stream); // ALREADY_SUBSCRIBED
-    sim.one_request(true, "a stream held without its snapshot did not recover");
+    sim.deliver(&mut stream); // the baseline of a stream no longer wanted
+    let frame = sim.out.pop_front().expect("the refusal");
+    let err = handle(stream.shared(), &frame).expect_err("a refused unsubscribe applied");
+    assert!(
+        matches!(
+            err,
+            Error::MarketStream(StreamError::Unsubscribe {
+                topic,
+                result: SubscribeResult::LimitExceeded,
+            }) if topic == trades
+        ),
+        "{err}"
+    );
+}
+
+/// An unsubscribe of a topic never subscribed that the server answers
+/// otherwise than NOT_SUBSCRIBED leaves nothing unknown: the server never
+/// held it.
+#[tokio::test]
+async fn a_refused_unsubscribe_of_a_never_subscribed_topic_changes_nothing() {
+    let trades = topic(9, Stream::Trades);
+    let (mut sim, mut stream) = Sim::new();
+    sim.refuse.insert(trades);
+    sim.caller(&stream, trades, true);
     sim.quiesce(&mut stream);
-    sim.settled(&stream, &HashSet::from([DEPTH_7]));
+    sim.settled(&stream, &HashSet::new());
 }
 
 /// Caller requests, answers, depth updates, gaps and stale periods in random
 /// orders, seeded and reproducible: at quiescence the server holds exactly
 /// what the caller wants, and every wanted stream is live, depth with the
-/// server's book. POLYESTER_INTERLEAVE_SEED runs one seed.
+/// server's book. POLYESTER_INTERLEAVE_SEED runs one seed,
+/// POLYESTER_INTERLEAVE_SEEDS the first n.
 #[tokio::test]
 async fn random_interleavings_settle_on_the_callers_intent() {
     let seeds: Vec<u64> = match std::env::var("POLYESTER_INTERLEAVE_SEED") {
         Ok(seed) => vec![seed.parse().expect("a seed")],
-        Err(_) => (1..=300).collect(),
+        Err(_) => {
+            let n = std::env::var("POLYESTER_INTERLEAVE_SEEDS")
+                .map_or(300, |n| n.parse().expect("a seed count"));
+            (1..=n).collect()
+        }
     };
     for seed in seeds {
         let mut rng = Rng(seed);
@@ -392,7 +547,7 @@ async fn random_interleavings_settle_on_the_callers_intent() {
         sim.log.push(format!("seed {seed}"));
         let mut intent = HashSet::new();
         for _ in 0..200 {
-            let topic = TOPICS[rng.below(3) as usize];
+            let topic = TOPICS[rng.below(TOPICS.len() as u64) as usize];
             let symbol = [7, 9][rng.below(2) as usize];
             match rng.below(100) {
                 0..12 => {
@@ -413,12 +568,31 @@ async fn random_interleavings_settle_on_the_callers_intent() {
                         sim.deliver(&mut stream);
                     }
                 }
-                75..88 => sim.update(symbol, false),
-                88..96 => sim.update(symbol, true),
+                75..82 => sim.update(symbol, false),
+                82..88 => sim.update(symbol, true),
+                88..93 => sim.trades(symbol),
+                93..95 => {
+                    sim.log.push(format!(
+                        "server will refuse the next unsubscribe of {topic}"
+                    ));
+                    sim.refuse.insert(topic);
+                }
+                95..97 => {
+                    sim.log
+                        .push(format!("server will refuse the next subscribe of {topic}"));
+                    sim.refuse_sub.insert(topic);
+                }
                 _ => sim.stale(symbol),
             }
         }
+        // Refusals not yet used stay out of the settling.
+        sim.refuse.clear();
+        sim.refuse_sub.clear();
         sim.quiesce(&mut stream);
+        // A subscribe the server refused last ends the caller's intent.
+        for t in &sim.refused {
+            intent.remove(t);
+        }
         sim.settled(&stream, &intent);
         assert!(
             sim.log.iter().any(|l| l.starts_with("server answers")),
@@ -469,10 +643,6 @@ async fn concurrent_callers_and_gaps_settle_on_the_callers_intent() {
                                     _ => s.stale(symbol),
                                 }
                             }
-                        }
-                        if s.held.contains(&Topic::new(7, Stream::Bbo)) {
-                            let f = s.bbo(7);
-                            s.out.push_back(f);
                         }
                     }
                 }
