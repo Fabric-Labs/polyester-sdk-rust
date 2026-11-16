@@ -1,0 +1,34 @@
+# Synthetic market-data stream frames derived from captures by the derive_marketstream_fixtures test.
+# Every identifier, price, quantity and time is synthetic. Rows with no file are TODO slots.
+file	direction	message	group	note
+01-client-subscribe.bin	client	Subscribe	client-subscribe	a Subscribe
+02-client-ping.bin	client	Ping	client-ping	a Ping
+03-subscribe-response.bin	server	SubscribeResponse	subscribe-response	the answer to client-subscribe
+04-pong.bin	server	Pong	pong	the answer to client-ping
+05-best-bid-offer.bin	server	BestBidOffer	best-bid-offer	a BestBidOffer
+06-market-status-stale.bin	server	MarketStatus	market-status-stale	MarketStatus STALE
+07-market-status-live.bin	server	MarketStatus	market-status-live	MarketStatus LIVE
+08-trades-through.bin	server	TradesThrough	trades	the pair's baseline
+09-trades.bin	server	Trades	trades	trades after the baseline
+10-trades-skipped-through.bin	server	TradesThrough	trades-skipped	the pair's baseline
+11-trades-skipped.bin	server	TradesSkipped	trades-skipped	trades the subscription will not receive live
+12-depth20-snapshot.bin	server	DepthSnapshot	depth20-snapshot	the depth20 snapshot with the most levels
+13-depth-snapshot.bin	server	DepthSnapshot	depth-snapshot	a depth-stream DepthSnapshot
+14-depth-chain-00.bin	server	DepthSnapshot	depth-chain	the chain's DepthSnapshot
+15-depth-chain-01.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+16-depth-chain-02.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+17-depth-chain-03.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+18-depth-chain-04.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+19-depth-chain-05.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+20-depth-chain-06.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+21-depth-chain-07.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+22-depth-chain-08.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
+23-depth-bridge-00.bin	server	DepthSnapshot	depth-bridge	the DepthSnapshot the bridging range starts after
+24-depth-bridge-01.bin	server	DepthUpdate	depth-bridge	a bridging DepthUpdate: a range without levels
+25-depth-levels-chain-00.bin	server	DepthSnapshot	depth-levels-chain	a depth-stream DepthSnapshot holding levels
+26-depth-levels-chain-01.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+27-depth-levels-chain-02.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+28-depth-levels-chain-03.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+29-depth-levels-chain-04.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+30-depth-levels-chain-05.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+31-depth-levels-chain-06.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate

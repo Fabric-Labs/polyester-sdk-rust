@@ -1,0 +1,13 @@
+{
+  "schemaFile": "sbe/marketstream-v0.xml",
+  "schemaId": 20,
+  "schemaVersion": 0,
+  "sha256": "636459c00081d2bc81eb1a12c3b11b980109289039cdfbd00c8ee1df4ce9d588",
+  "source": "polyester-proto",
+  "manifestBlock": "marketDataWebSocketSbe",
+  "generator": {
+    "tool": "sbe-all",
+    "version": "1.35.6",
+    "sha256": "1b85c37264866bcb83cf82d9a8adcf0d7c5faad2e080e75c0813dc9f13c15783"
+  }
+}
