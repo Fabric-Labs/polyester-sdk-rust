@@ -2383,6 +2383,107 @@ whose layout cannot be read this way ends the connection with
 schema stops the stream with `StreamError::Schema`. No message is ever
 misread.
 
+## Trading WebSocket (SBE)
+
+`polyester::tradews` places and manages post-only limit orders over the trading
+WebSocket's Simple Binary Encoding (`/ws/trade.sbe`), and delivers the
+account's order and execution events. It speaks only post-only,
+good-till-cancelled limit orders.
+
+- **Connect.** `tradews::connect` signs the upgrade with the API key's Ed25519
+  key (`Credentials::sign_websocket_upgrade`, a single-use nonce per upgrade)
+  and opts into cancel-on-disconnect for the whole account
+  (`X-Cancel-On-Disconnect: ACCOUNT`, 15 seconds by default,
+  `Config::cancel_on_disconnect`). A server that accepts the upgrade without
+  echoing the opt-in is refused (`TradeError::NotProtected`).
+- **Ready.** The session subscribes to executions, orders and marketResync and
+  sends no command until the server confirms it: wait for
+  `TradeSession::ready` or `Event::Ready`. It pings the server; a ping or
+  command left unanswered for `Config::answer_timeout` ends the connection, and
+  the session reconnects with backoff, starting again at `seq` 1.
+- **Dead-man switch.** `TradeSession::cancel_all_after` arms, refreshes
+  (10 to 120 seconds) or disarms (`Duration::ZERO`) the account's
+  cancel-all-after timer. By default (`Config::timer_gate`) a create, modify,
+  batch create or batch replace is sent only while the timer acknowledged on
+  this connection is armed past the command's deadline plus a margin; a new
+  connection starts with the gate closed, so arm again after every
+  `Event::Ready`.
+- **Commands.** `create_order`, `cancel_order`, `modify_order` (amend or
+  replace, `ModifyBehavior`), `cancel_all_orders`, `batch_create_orders` (up to
+  20), `batch_replace_orders` (up to 50 on one pair) and `batch_cancel_orders`
+  (up to 50). Every command carries a request `Deadline`: the server does not
+  process it after the deadline, and the session does not send it once the
+  deadline has passed. Prices are `types::Price` ticks and quantities
+  `types::Quantity` at the pair's base quantity scale, exact integers.
+- **Answers.** Each command returns its acknowledgement, or an
+  `Error::TradeSession`: `TradeError::Rejected` with a typed `RejectCode`,
+  `TradeError::NotSent` when nothing reached the server, or
+  `TradeError::OutcomeUnknown` when it was sent and its answer was lost to a
+  disconnect or the answer timeout. `Error::mutation_outcome_unknown` is true
+  for a lost answer, a refusal whose code ends in `_OUTCOME_UNKNOWN`, and a
+  batch refused with `UNAVAILABLE`: read the orders back, and resend a batch,
+  modify or cancel-all with the same `correlation_id`, which the server keeps
+  as its idempotency identity. `Event::Disconnected` lists the correlation IDs
+  a lost connection left unanswered.
+- **Events.** `Event::Order` (with `CancelReason`, including `CancelAllAfter`
+  and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
+  (reconcile the pair through the Orders API).
+
+This example connects, arms the dead-man switch and reads events; `quote`
+shows how an order is placed and is not called.
+
+```rust,no_run
+# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
+use std::time::Duration;
+
+use polyester::auth::Credentials;
+use polyester::tradews::{self, Deadline, Event, PostOnlyOrder, TradeSession};
+
+let credentials = Credentials::load(None, None, true)?.expect("POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY");
+let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
+let mut session = tradews::connect(tradews::Config::new(url, credentials)).await?;
+session.ready().await?;
+let timer = session
+    .cancel_all_after(Duration::from_secs(30), Deadline::within(Duration::from_secs(1))?)
+    .await?;
+println!("cancel-all-after armed until {:?}", timer.expires_at);
+
+while let Some(event) = session.recv().await {
+    match event {
+        Event::Ready { connection } => println!("connection {connection} ready; arm the timer again"),
+        Event::Order(o) => println!("order {} v{} {:?} {:?}", o.order_id, o.version, o.status, o.cancel_reason),
+        Event::Execution(e) => println!("fill {} of order {}: {} @ {}", e.match_id, e.order_id, e.qty.as_scaled(), e.price.format()),
+        Event::MarketResync(r) => eprintln!("pair {} may have missed events; reconcile it", r.symbol_id),
+        Event::Disconnected { error, unanswered, .. } => {
+            eprintln!("disconnected: {error}; unknown outcomes: {unanswered:?}");
+        }
+        _ => {}
+    }
+}
+
+async fn quote(session: &TradeSession, order: &PostOnlyOrder) -> polyester::Result<()> {
+    match session.create_order(order, Deadline::within(Duration::from_millis(500))?).await {
+        Ok(ack) => println!("order {:?} accepted", ack.order_id),
+        Err(e) if e.mutation_outcome_unknown() => {
+            // It may rest on the book: look it up by its client order ID.
+            eprintln!("order {} outcome unknown: {e}", order.client_order_id);
+        }
+        Err(e) => eprintln!("order {} not placed: {e}", order.client_order_id),
+    }
+    Ok(())
+}
+# let _ = quote;
+# Ok(())
+# }
+```
+
+The codecs are generated from the published schema with Real Logic's sbe-tool
+(`sbe/tradews-v<version>.xml`, schema id 7, pinned by `sbe/tradews.lock.json`;
+`scripts/generate_tradews_sbe.sh --check` regenerates and compares them). The
+server speaks exactly one schema version: a message of another schema or
+version stops the session with `TradeError::Schema`, and a message whose bytes
+do not match its layout ends the connection with `TradeError::Frame`.
+
 ## Realtime
 
 Realtime is binary-only. Account orders stream over the private WebSocket;
