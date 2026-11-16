@@ -1196,31 +1196,26 @@ impl LifecycleService {
     /// row's `participation` says which, and `participation` on the request
     /// narrows the list to one side (the server refuses it without a smart
     /// account address). A `page_token` is bound to the request it was
-    /// returned for: only `limit` may change between pages.
+    /// returned for: only `limit` may change between pages. A public read,
+    /// sent unsigned: a client without an API key can call it.
     pub async fn list_flows(
         &self,
         req: crate::proto::chain::lifecycle::v1::ListFlowsRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flows_list_from_proto;
         let client = self.connect_client();
-        let resp = {
-            use super::unary;
-            unary::await_auth(
-                &self.ctx.factory,
-                "/chain.lifecycle.v1.LifecycleReadService/ListFlows",
-                req,
-                |req, opts| client.list_flows_with_options(req, opts),
-            )
+        // "/chain.lifecycle.v1.LifecycleReadService/ListFlows"
+        let resp = super::unary::await_public(client.list_flows(req))
             .await?
-            .into_owned()
-        };
+            .into_owned();
         flows_list_from_proto(&resp)
     }
 
     /// One lifecycle flow a chain transaction started, by flow ID. A flow
     /// settled without one, such as a transfer between Trading accounts or a
     /// Trading withdrawal not yet sent to a chain, is not found: its account
-    /// reads it with [`Self::get_account_flow`].
+    /// reads it with [`Self::get_account_flow`]. A public read, sent
+    /// unsigned: a client without an API key can call it.
     pub async fn get_flow(
         &self,
         flow_id: &str,
@@ -1236,17 +1231,10 @@ impl LifecycleService {
             ..Default::default()
         };
         let client = self.connect_client();
-        let resp = {
-            use super::unary;
-            unary::await_auth(
-                &self.ctx.factory,
-                "/chain.lifecycle.v1.LifecycleReadService/GetFlowById",
-                req,
-                |req, opts| client.get_flow_by_id_with_options(req, opts),
-            )
+        // "/chain.lifecycle.v1.LifecycleReadService/GetFlowById"
+        let resp = super::unary::await_public(client.get_flow_by_id(req))
             .await?
-            .into_owned()
-        };
+            .into_owned();
         flow_from_get_response(&resp)
     }
 
@@ -1333,6 +1321,9 @@ impl LifecycleService {
         account_flow_from_get_response(&resp)
     }
 
+    /// List the lifecycle flows a chain transaction references, one page at
+    /// a time; `limit` 0 asks for 50. A public read, sent unsigned: a client
+    /// without an API key can call it.
     pub async fn list_flows_by_tx(
         &self,
         mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
@@ -1342,17 +1333,10 @@ impl LifecycleService {
             req.limit = 50;
         }
         let client = self.connect_client();
-        let resp = {
-            use super::unary;
-            unary::await_auth(
-                &self.ctx.factory,
-                "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx",
-                req,
-                |req, opts| client.list_flows_by_tx_with_options(req, opts),
-            )
+        // "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx"
+        let resp = super::unary::await_public(client.list_flows_by_tx(req))
             .await?
-            .into_owned()
-        };
+            .into_owned();
         flows_by_tx_list_from_proto(&resp)
     }
 
@@ -1360,6 +1344,7 @@ impl LifecycleService {
     ///
     /// A chain transaction can contain multiple bundled lifecycle flows.
     /// Follow `next_page_token` or call [`Self::list_flows_by_tx`] to paginate.
+    /// A public read, sent unsigned, like [`Self::list_flows_by_tx`].
     pub async fn get_flow_by_tx(
         &self,
         mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
@@ -1369,17 +1354,10 @@ impl LifecycleService {
             req.limit = 50;
         }
         let client = self.connect_client();
-        let resp = {
-            use super::unary;
-            unary::await_auth(
-                &self.ctx.factory,
-                "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx",
-                req,
-                |req, opts| client.list_flows_by_tx_with_options(req, opts),
-            )
+        // "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx"
+        let resp = super::unary::await_public(client.list_flows_by_tx(req))
             .await?
-            .into_owned()
-        };
+            .into_owned();
         flow_from_get_by_tx_response(&resp)
     }
 
