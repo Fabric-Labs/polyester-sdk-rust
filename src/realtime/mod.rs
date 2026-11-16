@@ -95,13 +95,13 @@ fn clear_subscription_error(state: &Arc<Mutex<SubscriptionErrorState>>) {
     lock_unpoisoned(state).last = None;
 }
 
-struct ReconnectBackoff {
+pub(crate) struct ReconnectBackoff {
     failures: u32,
     jitter_state: u64,
 }
 
 impl ReconnectBackoff {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut rng = OsRng;
         Self::with_seed(rng.next_u64())
     }
@@ -117,11 +117,11 @@ impl ReconnectBackoff {
         }
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.failures = 0;
     }
 
-    fn next_delay(&mut self) -> Duration {
+    pub(crate) fn next_delay(&mut self) -> Duration {
         let multiplier = 1u64 << self.failures.min(16);
         let cap_ms = (RECONNECT_INITIAL_CAP.as_millis() as u64)
             .saturating_mul(multiplier)
