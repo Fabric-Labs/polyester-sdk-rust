@@ -553,17 +553,15 @@ fn depth_snapshot_then_exact_base_updates() {
     );
     b.update(1, 15, 20, &[], &[]).unwrap();
     assert_eq!(b.update_id, 20);
-    // An older snapshot never takes the book backwards; a newer replacement
-    // replaces it, whatever it held.
+    // A replacement snapshot replaces the book, whatever it held, an older
+    // one included.
     assert!(
-        !b.snapshot(1, 15, 1000, &[lv(97, 1)], &[]).unwrap(),
-        "an older snapshot replaced the book"
+        b.snapshot(1, 15, 1000, &[lv(97, 1)], &[]).unwrap(),
+        "a depth snapshot always replaces"
     );
-    assert_eq!(b.update_id, 20);
-    assert!(b.snapshot(1, 25, 1000, &[lv(97, 1)], &[]).unwrap());
     assert_eq!(
         (b.update_id, b.bids.clone(), b.asks.len()),
-        (25, vec![lv(97, 1)], 0)
+        (15, vec![lv(97, 1)], 0)
     );
 }
 

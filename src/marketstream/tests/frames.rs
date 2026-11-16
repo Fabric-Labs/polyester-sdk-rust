@@ -120,6 +120,18 @@ pub fn depth_snapshot(
     bids: &[WireLevel],
     asks: &[WireLevel],
 ) -> Vec<u8> {
+    depth_snapshot_window(symbol, stream, epoch, update_id, window(stream), bids, asks)
+}
+
+pub fn depth_snapshot_window(
+    symbol: u32,
+    stream: Stream,
+    epoch: u64,
+    update_id: u64,
+    levels_per_side: u16,
+    bids: &[WireLevel],
+    asks: &[WireLevel],
+) -> Vec<u8> {
     let mut b = buf();
     let mut m = depth_snapshot_codec::DepthSnapshotEncoder::default()
         .wrap(WriteBuf::new(&mut b), HEADER)
@@ -132,7 +144,7 @@ pub fn depth_snapshot(
     m.update_id(update_id);
     m.transact_ts_ns(1);
     m.send_ts_ns(2);
-    m.levels_per_side(window(stream));
+    m.levels_per_side(levels_per_side);
     let mut g = m.bids_encoder(bids.len() as u16, Default::default());
     for l in bids {
         g.advance().unwrap();

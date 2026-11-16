@@ -1210,103 +1210,123 @@ async fn a_response_to_no_request_changes_nothing() {
     );
 }
 
-/// A book keeps its highest (epoch, update) for its whole life: a reconnect
-/// to a replica behind never takes it or its quote backwards.
+/// A depth20 book and a quote keep their newest (epoch, update) across
+/// reconnects: an older state is ignored and stays stale, an equal one
+/// confirms it, a higher epoch replaces it.
 #[tokio::test]
-async fn books_and_quotes_never_go_backwards_across_reconnects() {
-    for s in [Stream::Depth20, Stream::Depth] {
-        let mut server = FakeServer::start().await;
-        let mut stream = dial(&server, |_| {}).await;
-        let mut conn = server.accept().await;
-        answered(
-            &mut conn,
-            stream.subscribe(&[t(7, s), t(7, Stream::Bbo)]),
-            |m| {
-                vec![
-                    respond(m, Wire::OK),
-                    depth_snapshot(7, s, 1, 10, &[lv(100, 1)], &[]),
-                    bbo(7, 1, 10, (100, 1), (101, 1)),
-                ]
-            },
-        )
-        .await;
-        expect(&mut stream, |e| {
-            matches!(e, Event::BestBidOffer(_)).then_some(())
-        })
-        .await;
-        conn.close();
-        expect(&mut stream, |e| {
-            matches!(e, Event::Disconnected { .. }).then_some(())
-        })
-        .await;
+async fn depth20_and_quotes_never_go_backwards_across_reconnects() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(
+        &mut conn,
+        stream.subscribe(&[t(7, Stream::Depth20), t(7, Stream::Bbo)]),
+        |m| {
+            vec![
+                respond(m, Wire::OK),
+                depth_snapshot(7, Stream::Depth20, 1, 10, &[lv(100, 1)], &[]),
+                bbo(7, 1, 10, (100, 1), (101, 1)),
+            ]
+        },
+    )
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
 
-        // The new connection's replica is behind: its state is older.
-        let mut conn = server.accept().await;
-        let resub = conn.request().await;
-        // A status of another pair after them: once it arrives, they are applied.
-        conn.send(&[
-            respond(&resub, Wire::OK),
-            depth_snapshot(7, s, 1, 9, &[lv(99, 1)], &[]),
-            bbo(7, 1, 9, (99, 1), (101, 1)),
-            market_status(9, FeedState::Live),
-        ]);
-        expect(&mut stream, |e| {
-            matches!(e, Event::MarketStatus(m) if m.symbol_id == 9).then_some(())
-        })
-        .await;
-        let book = stream.order_book(7, s, 0).unwrap();
-        assert!(
-            book.update_id == 10 && book.stale && book.bids[0].price.as_ticks() == 100,
-            "{s}: {book:?} after an older snapshot"
-        );
-        let q = stream.best_bid_offer(7).unwrap();
-        assert!(
-            q.update_id == 10 && q.stale,
-            "{s}: {q:?} after an older quote"
-        );
+    let mut conn = server.accept().await;
+    let resub = conn.request().await;
+    conn.send(&[
+        respond(&resub, Wire::OK),
+        depth_snapshot(7, Stream::Depth20, 1, 9, &[lv(99, 1)], &[]),
+        bbo(7, 1, 9, (99, 1), (101, 1)),
+    ]);
+    barrier(&mut stream, &conn).await;
+    let book = stream.order_book(7, Stream::Depth20, 0).unwrap();
+    assert!(
+        book.update_id == 10 && book.stale && book.bids[0].price.as_ticks() == 100,
+        "{book:?} after an older snapshot"
+    );
+    let q = stream.best_bid_offer(7).unwrap();
+    assert!(q.update_id == 10 && q.stale, "{q:?} after an older quote");
+    conn.send(&[
+        depth_snapshot(7, Stream::Depth20, 1, 10, &[lv(100, 1)], &[]),
+        bbo(7, 1, 10, (100, 1), (101, 1)),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth20, 0).unwrap();
+    assert!(
+        !book.stale && book.update_id == 10,
+        "{book:?} not confirmed by an equal snapshot"
+    );
+    let q = stream.best_bid_offer(7).unwrap();
+    assert!(
+        !q.stale && q.update_id == 10,
+        "{q:?} not confirmed by an equal quote"
+    );
+    conn.send(&[depth_snapshot(7, Stream::Depth20, 2, 3, &[lv(50, 1)], &[])]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth20, 0).unwrap();
+    assert!(
+        book.book_epoch == 2 && book.update_id == 3 && !book.stale,
+        "{book:?} after a new epoch"
+    );
+}
 
-        if s == Stream::Depth {
-            // Updates that catch the replica up are skipped; the first at the
-            // book's base resumes it.
-            conn.send(&[
-                depth_update(7, 1, 10, 10, &[lv(99, 0), lv(100, 1)], &[]),
-                depth_update(7, 1, 11, 11, &[lv(100, 4)], &[]),
-            ]);
-            let u = expect(&mut stream, |e| {
-                if let Event::DepthUpdate(u) = e {
-                    Some(u)
-                } else {
-                    None
-                }
-            })
-            .await;
-            assert_eq!(u.first_update_id, 11);
-        } else {
-            // An equal snapshot confirms the kept state.
-            conn.send(&[depth_snapshot(7, s, 1, 10, &[lv(100, 1)], &[])]);
-            expect(&mut stream, |e| {
-                matches!(e, Event::DepthSnapshot(_)).then_some(())
-            })
-            .await;
-        }
-        conn.send(&[bbo(7, 1, 10, (100, 1), (101, 1))]);
-        expect(&mut stream, |e| {
-            matches!(e, Event::BestBidOffer(_)).then_some(())
-        })
-        .await;
-        let book = stream.order_book(7, s, 0).unwrap();
-        assert!(
-            !book.stale && book.update_id >= 10,
-            "{s}: {book:?} not current once the replica caught up"
-        );
-        let q = stream.best_bid_offer(7).unwrap();
-        assert!(
-            !q.stale && q.update_id == 10,
-            "{s}: {q:?} not confirmed by an equal quote"
-        );
+/// Waits until every frame sent before it is applied: a status of another
+/// pair, which always produces an event.
+async fn barrier(stream: &mut MarketStream, conn: &ServerConn) {
+    conn.send(&[market_status(9, FeedState::Live)]);
+    expect(stream, |e| {
+        matches!(e, Event::MarketStatus(m) if m.symbol_id == 9).then_some(())
+    })
+    .await;
+}
 
-        // A higher epoch is a rebuilt book: taken whatever it holds.
-        conn.send(&[depth_snapshot(7, s, 2, 3, &[lv(50, 1)], &[])]);
+/// Every depth snapshot replaces the book, older ones included, within a
+/// session and across reconnects; its levels per side are the window from
+/// then on.
+#[tokio::test]
+async fn every_depth_snapshot_replaces_the_book() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
+        vec![
+            respond(m, Wire::OK),
+            depth_snapshot_window(7, Stream::Depth, 2, 10, 2, &[lv(100, 1), lv(99, 1)], &[]),
+        ]
+    })
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+
+    // Mid-session with no status around it: newer, older, an older epoch and
+    // a newer one each replace.
+    for (epoch, update) in [(2u64, 50u64), (2, 45), (1, 900), (3, 1)] {
+        conn.send(&[depth_snapshot_window(
+            7,
+            Stream::Depth,
+            epoch,
+            update,
+            2,
+            &[lv(update as i64, 1)],
+            &[],
+        )]);
         let snap = expect(&mut stream, |e| {
             if let Event::DepthSnapshot(x) = e {
                 Some(x)
@@ -1315,11 +1335,181 @@ async fn books_and_quotes_never_go_backwards_across_reconnects() {
             }
         })
         .await;
-        assert_eq!(snap.book_epoch, 2);
-        let book = stream.order_book(7, s, 0).unwrap();
+        assert_eq!((snap.book_epoch, snap.update_id), (epoch, update));
+        let book = stream.order_book(7, Stream::Depth, 0).unwrap();
         assert!(
-            book.book_epoch == 2 && book.update_id == 3 && !book.stale,
-            "{s}: {book:?} after a new epoch"
+            book.book_epoch == epoch && book.update_id == update && !book.stale,
+            "{book:?} after a mid-session snapshot at {epoch}/{update}"
         );
     }
+    // A bridging update over a range with no levels advances the position.
+    conn.send(&[
+        depth_update(7, 3, 2, 20, &[], &[]),
+        depth_update(7, 3, 21, 21, &[lv(2, 1)], &[]),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthUpdate(_)).then_some(())
+    })
+    .await;
+    let u = expect(&mut stream, |e| {
+        if let Event::DepthUpdate(u) = e {
+            Some(u)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(u.first_update_id, 21);
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        book.update_id == 21 && !book.stale,
+        "{book:?} after a bridging range"
+    );
+
+    // Across a reconnect: an older snapshot with a wider window replaces the
+    // book and its window.
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    let mut conn = server.accept().await;
+    let resub = conn.request().await;
+    conn.send(&[
+        respond(&resub, Wire::OK),
+        depth_snapshot_window(
+            7,
+            Stream::Depth,
+            3,
+            9,
+            3,
+            &[lv(10, 1), lv(9, 1), lv(8, 1)],
+            &[],
+        ),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        book.update_id == 9 && !book.stale && book.levels_per_side == 3 && book.bids.len() == 3,
+        "{book:?} after an older, wider snapshot"
+    );
+    conn.send(&[depth_update(7, 3, 10, 11, &[lv(11, 1)], &[])]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthUpdate(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        book.bids.len() == 3 && book.bids[0].price.as_ticks() == 11 && book.update_id == 11,
+        "{book:?} in the new window"
+    );
+}
+
+/// A depth update before any snapshot of its connection never makes the book
+/// live: it is a gap, and the book is rebuilt from a snapshot.
+#[tokio::test]
+async fn a_depth_update_before_a_snapshot_after_reconnects_is_a_gap() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
+        vec![
+            respond(m, Wire::OK),
+            depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
+        ]
+    })
+    .await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    for _ in 0..2 {
+        conn.close();
+        expect(&mut stream, |e| {
+            matches!(e, Event::Disconnected { .. }).then_some(())
+        })
+        .await;
+        conn = server.accept().await;
+        let resub = conn.request().await;
+        conn.send(&[
+            respond(&resub, Wire::OK),
+            depth_snapshot(7, Stream::Depth, 1, 9, &[lv(99, 1)], &[]),
+        ]);
+        expect(&mut stream, |e| {
+            matches!(e, Event::DepthSnapshot(_)).then_some(())
+        })
+        .await;
+    }
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    let mut conn = server.accept().await;
+    let resub = conn.request().await;
+    conn.send(&[
+        respond(&resub, Wire::OK),
+        depth_update(7, 1, 10, 10, &[], &[]),
+    ]);
+    let err = expect(&mut stream, |e| {
+        if let Event::Disconnected { error, .. } = e {
+            Some(error)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert!(
+        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
+        "{err}"
+    );
+    assert!(
+        !stream.live(t(7, Stream::Depth)),
+        "depth live without the session's snapshot"
+    );
+}
+
+/// A depth subscription made while the pair is stale gets no snapshot until
+/// the pair recovers: no gap and no error; the book stays stale until the
+/// snapshot, then LIVE.
+#[tokio::test]
+async fn depth_subscribed_while_stale_waits_for_recovery() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
+        vec![respond(m, Wire::OK), market_status(7, FeedState::Stale)]
+    })
+    .await;
+    barrier(&mut stream, &conn).await;
+    assert!(
+        stream.order_book(7, Stream::Depth, 0).is_none(),
+        "a book before any snapshot"
+    );
+    assert!(!stream.live(t(7, Stream::Depth)));
+    conn.send(&[depth_snapshot(7, Stream::Depth, 1, 40, &[lv(100, 1)], &[])]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    assert!(
+        stream.order_book(7, Stream::Depth, 0).unwrap().stale,
+        "book current before LIVE"
+    );
+    conn.send(&[
+        market_status(7, FeedState::Live),
+        depth_update(7, 1, 41, 41, &[lv(100, 2)], &[]),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthUpdate(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        !book.stale && book.update_id == 41 && stream.live(t(7, Stream::Depth)),
+        "{book:?} after recovery"
+    );
 }

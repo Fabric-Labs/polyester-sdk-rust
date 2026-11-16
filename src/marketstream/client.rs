@@ -1059,13 +1059,8 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 let Some(book) = state.books.get_mut(&topic) else {
                     return Ok(());
                 };
-                let applied = book.update(epoch, first, last, &bids, &asks);
-                if matches!(applied, Ok(false)) {
-                    return Ok(());
-                }
-                if let Err(refusal) = applied {
+                if let Err(refusal) = book.update(epoch, first, last, &bids, &asks) {
                     book.synced = false;
-                    book.behind = false;
                     return Err(match refusal {
                         Refusal::Gap(message) => {
                             Error::MarketStream(StreamError::BookGap { symbol_id, message })

@@ -2316,7 +2316,8 @@ Streams and recovery:
   (`MarketStream::best_bid_offer`, `MarketStream::order_book`).
 - `Stream::Depth` opens with a `DepthSnapshot`, then each `DepthUpdate` applies
   only to a book at exactly its base: each level is set, and a level with
-  quantity 0 is deleted. After each update, each side is truncated to the live
+  quantity 0 is deleted; an update with no levels over a range only advances
+  the book's position. After each update, each side is truncated to the live
   window the snapshot names (`DepthSnapshot::levels_per_side`). An update the
   book cannot apply is never patched over: the client reconnects and the new
   subscription's snapshot replaces the book.
@@ -2329,12 +2330,14 @@ The moment a connection is lost, everything it fed is stale, before the
 `Event::Disconnected` arrives: `OrderBook::stale` and `BestBidOffer::stale` are
 set and `MarketStream::live` reports false for every topic. A topic is live
 again once the new connection delivers its snapshot, quote or trades baseline,
-and, for a pair the server reports stale, once it reports the pair live. Books
-and quotes never go backwards: each keeps the newest state it has held, by book
-epoch and update, across connections. A newer connection's older snapshot or
-quote is ignored and the kept state stays stale until one at least as new
-confirms or replaces it; a depth book also resumes with the first update at its
-own position. A higher book epoch, a rebuilt book, always replaces it.
+and, for a pair the server reports stale, once it reports the pair live. Every
+depth snapshot replaces the book, whenever it arrives, whatever the book held:
+within a connection (after a slow read or a source refresh, with no status
+around it) and across reconnects, its window (`DepthSnapshot::levels_per_side`)
+included. Depth20 books and quotes never go backwards: each keeps the newest
+state it has held, by book epoch and update, across connections; an older one is
+ignored and the kept state stays stale until one at least as new confirms or
+replaces it.
 
 The client pings every 15 seconds and reconnects when a pong is late or the
 connection drops, with jittered backoff, and resubscribes every topic the
