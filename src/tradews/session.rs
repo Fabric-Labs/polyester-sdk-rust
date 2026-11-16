@@ -194,6 +194,9 @@ struct Link {
 
 struct Shared {
     cfg: Config,
+    /// Commands for the writer. The session keeps a sender of its own, so
+    /// the queue stays open however many [`TradeSender`]s are dropped.
+    commands: mpsc::Sender<Cmd>,
     link: watch::Sender<Link>,
     stop: watch::Sender<bool>,
     err: Mutex<Option<Error>>,
@@ -217,14 +220,46 @@ struct Cmd {
 /// and execution events and the connection's lifecycle. Dropping it closes
 /// it: with cancel-on-disconnect, the account's orders are cancelled after
 /// the grace period unless another opted-in session is connected.
+///
+/// [`Self::recv`] takes `&mut self` and every command `&self`, so one value
+/// cannot drain events while commands await their answers. To do both from
+/// separate tasks, [`Self::split`] it into a [`TradeSender`], which any
+/// number of tasks may clone and send with, and the [`TradeEvents`] that one
+/// task drains.
 pub struct TradeSession {
+    sender: TradeSender,
+    events: TradeEvents,
+}
+
+/// The command half of a [`TradeSession`] ([`TradeSession::split`]): every
+/// command method, cheap to clone and shared by any number of tasks, each
+/// command awaiting its own answer. Dropping every sender ends no
+/// connection: the session runs, and delivers events, until its
+/// [`TradeEvents`] is dropped or [`Self::close`] is called.
+#[derive(Clone)]
+pub struct TradeSender {
+    shared: Arc<Shared>,
+}
+
+/// The event half of a [`TradeSession`] ([`TradeSession::split`]): the
+/// account's order and execution events and the connection's lifecycle, in
+/// order. Drain it promptly: a consumer that falls behind by more than
+/// [`Config::queue_size`] events stops the session with
+/// [`Error::QueueOverflow`].
+///
+/// It owns the session's life. Dropping it closes the session as
+/// [`TradeSession::close`] does: the connection ends, every command already
+/// sent and unanswered is answered [`TradeError::OutcomeUnknown`], and every
+/// command after it [`NotSent::Closed`]. With cancel-on-disconnect, the
+/// account's orders are cancelled after the grace period unless another
+/// opted-in session is connected.
+pub struct TradeEvents {
     rx: mpsc::Receiver<Event>,
-    commands: mpsc::Sender<Cmd>,
     shared: Arc<Shared>,
     task: JoinHandle<()>,
 }
 
-impl Drop for TradeSession {
+impl Drop for TradeEvents {
     fn drop(&mut self) {
         self.shared.stop.send_replace(true);
     }
@@ -263,16 +298,17 @@ pub async fn connect(mut config: Config) -> Result<TradeSession> {
     let (stop, _) = watch::channel(false);
     let shared = Arc::new(Shared {
         cfg: config,
+        commands,
         link,
         stop,
         err: Mutex::new(None),
     });
     let task = tokio::spawn(run(shared.clone(), ws, cmd_rx, events));
     Ok(TradeSession {
-        rx,
-        commands,
-        shared,
-        task,
+        sender: TradeSender {
+            shared: shared.clone(),
+        },
+        events: TradeEvents { rx, shared, task },
     })
 }
 
@@ -281,12 +317,134 @@ fn closed_error() -> Error {
 }
 
 impl TradeSession {
+    /// Splits the session into its command half, which any number of tasks
+    /// may clone and send with, and its event half, which one task drains,
+    /// as a WebSocket stream splits into its sink and stream. The session
+    /// lives until the [`TradeEvents`] is dropped or either half closes it.
+    pub fn split(self) -> (TradeSender, TradeEvents) {
+        (self.sender, self.events)
+    }
+
+    /// The next event, in order. `None` once the session has stopped: after
+    /// [`Self::close`], or a terminal error that [`Self::err`] reports.
+    pub async fn recv(&mut self) -> Option<Event> {
+        self.events.recv().await
+    }
+
+    /// [`TradeSender::ready`].
+    pub async fn ready(&self) -> Result<u64> {
+        self.sender.ready().await
+    }
+
+    /// [`TradeSender::err`].
+    pub fn err(&self) -> Option<Error> {
+        self.sender.err()
+    }
+
+    /// Whether the background task still runs.
+    pub fn is_alive(&self) -> bool {
+        self.events.is_alive()
+    }
+
+    /// Closes the socket and stops the session; queued events stay readable.
+    pub fn close(&self) {
+        self.sender.close();
+    }
+
+    /// [`TradeSender::create_order`].
+    pub async fn create_order(
+        &self,
+        order: &PostOnlyOrder,
+        deadline: Deadline,
+    ) -> Result<OrderAck> {
+        self.sender.create_order(order, deadline).await
+    }
+
+    /// [`TradeSender::cancel_order`].
+    pub async fn cancel_order(
+        &self,
+        symbol_id: u32,
+        order: &OrderRef,
+        deadline: Deadline,
+    ) -> Result<OrderAck> {
+        self.sender.cancel_order(symbol_id, order, deadline).await
+    }
+
+    /// [`TradeSender::modify_order`].
+    pub async fn modify_order(&self, modify: &ModifyOrder, deadline: Deadline) -> Result<OrderAck> {
+        self.sender.modify_order(modify, deadline).await
+    }
+
+    /// [`TradeSender::cancel_all_orders`].
+    pub async fn cancel_all_orders(
+        &self,
+        cancel: &CancelAllOrders,
+        deadline: Deadline,
+    ) -> Result<CancelAllAck> {
+        self.sender.cancel_all_orders(cancel, deadline).await
+    }
+
+    /// [`TradeSender::cancel_all_after`].
+    pub async fn cancel_all_after(
+        &self,
+        timeout: Duration,
+        deadline: Deadline,
+    ) -> Result<TimerAck> {
+        self.sender.cancel_all_after(timeout, deadline).await
+    }
+
+    /// [`TradeSender::batch_create_orders`].
+    pub async fn batch_create_orders(
+        &self,
+        batch: &BatchCreateOrders,
+        deadline: Deadline,
+    ) -> Result<BatchCreateAck> {
+        self.sender.batch_create_orders(batch, deadline).await
+    }
+
+    /// [`TradeSender::batch_replace_orders`].
+    pub async fn batch_replace_orders(
+        &self,
+        batch: &BatchReplaceOrders,
+        deadline: Deadline,
+    ) -> Result<BatchReplaceAck> {
+        self.sender.batch_replace_orders(batch, deadline).await
+    }
+
+    /// [`TradeSender::batch_cancel_orders`].
+    pub async fn batch_cancel_orders(
+        &self,
+        batch: &BatchCancelOrders,
+        deadline: Deadline,
+    ) -> Result<BatchCancelAck> {
+        self.sender.batch_cancel_orders(batch, deadline).await
+    }
+}
+
+impl TradeEvents {
     /// The next event, in order. `None` once the session has stopped: after
     /// [`Self::close`], or a terminal error that [`Self::err`] reports.
     pub async fn recv(&mut self) -> Option<Event> {
         self.rx.recv().await
     }
 
+    /// [`TradeSender::err`].
+    pub fn err(&self) -> Option<Error> {
+        lock_unpoisoned(&self.shared.err).clone()
+    }
+
+    /// Whether the background task still runs.
+    pub fn is_alive(&self) -> bool {
+        !self.task.is_finished()
+    }
+
+    /// Closes the socket and stops the session; queued events stay readable.
+    pub fn close(&self) {
+        self.shared.stop.send_replace(true);
+    }
+}
+
+impl TradeSender {
     /// Waits until a connection's subscription is confirmed and returns the
     /// connection's number; commands are sent on it from then on. Fails once
     /// the session has stopped.
@@ -309,9 +467,9 @@ impl TradeSession {
         lock_unpoisoned(&self.shared.err).clone()
     }
 
-    /// Whether the background task still runs.
+    /// Whether the session still runs.
     pub fn is_alive(&self) -> bool {
-        !self.task.is_finished()
+        !self.shared.link.borrow().closed
     }
 
     /// Closes the socket and stops the session; queued events stay readable.
@@ -346,7 +504,8 @@ impl TradeSession {
             return Err(not_sent(command, NotSent::NotReady));
         }
         let (answer, rx) = oneshot::channel();
-        self.commands
+        self.shared
+            .commands
             .try_send(Cmd {
                 connection: link.connection,
                 command,

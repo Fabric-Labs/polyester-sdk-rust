@@ -61,6 +61,9 @@ struct Script {
     /// Stop reading the socket after the SubscriptionAck, with a small
     /// receive buffer, so the client's writes back up.
     stall_after_ready: bool,
+    /// Order events pushed after every command's answer, as fills and
+    /// cancels follow commands.
+    events_per_answer: u64,
 }
 
 fn serve() -> Script {
@@ -78,6 +81,7 @@ fn serve() -> Script {
         close_on: None,
         delay_later_timers: None,
         stall_after_ready: false,
+        events_per_answer: 0,
     }
 }
 
@@ -375,6 +379,12 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                     }
                 }
                 if !matches!(template, 1 | 6) {
+                    for i in 0..current.events_per_answer {
+                        let event = order_event(seq * 100 + i, 1);
+                        if ws.send(Message::Binary(event.into())).await.is_err() {
+                            break;
+                        }
+                    }
                     answers += 1;
                     if current.close_after == Some(answers) {
                         let _ = ws.close(None).await;
@@ -1290,4 +1300,169 @@ async fn a_write_the_peer_never_reads_ends_the_connection_in_time() {
         }),
         "never acknowledged, never refused by the server"
     );
+}
+
+/// Command tasks and an event-draining task share one session under load.
+const WRITERS: u64 = 4;
+const COMMANDS_EACH: u64 = 150;
+const EVENTS_PER_ANSWER: u64 = 4;
+
+async fn loaded(queue_size: usize) -> (TradeSession, Record) {
+    let script = Script {
+        events_per_answer: EVENTS_PER_ANSWER,
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![script]).await;
+    let mut cfg = config(url);
+    cfg.queue_size = queue_size;
+    cfg.ping_interval = Duration::from_secs(60);
+    let session = connect(cfg).await.unwrap();
+    ready(&session).await;
+    (session, record)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn commands_in_flight_while_events_drain_under_load() {
+    // A small event queue: the drain must keep up while every writer keeps
+    // a command in flight.
+    let (session, record) = loaded(64).await;
+    let (sender, mut events) = session.split();
+    let total = WRITERS * COMMANDS_EACH * EVENTS_PER_ANSWER;
+    let drain = tokio::spawn(async move {
+        let mut orders = 0;
+        while orders < total {
+            match events.recv().await {
+                Some(Event::Order(_)) => orders += 1,
+                Some(_) => {}
+                None => break,
+            }
+        }
+        (orders, events)
+    });
+    let writers: Vec<_> = (0..WRITERS)
+        .map(|w| {
+            let sender = sender.clone();
+            tokio::spawn(async move {
+                for i in 0..COMMANDS_EACH {
+                    sender
+                        .cancel_order(7, &OrderRef::Id(w * 10_000 + i + 1), within(5_000))
+                        .await
+                        .expect("answered");
+                }
+            })
+        })
+        .collect();
+    let started = std::time::Instant::now();
+    let (orders, events) = tokio::time::timeout(Duration::from_secs(20), async {
+        for w in writers {
+            w.await.unwrap();
+        }
+        drain.await.unwrap()
+    })
+    .await
+    .expect("no stall");
+    assert_eq!(orders, total);
+    assert!(events.err().is_none(), "no overflow");
+    assert!(events.is_alive() && sender.is_alive());
+    let cancels = record.lock().unwrap()[0]
+        .frames
+        .iter()
+        .filter(|(t, _, _)| *t == 3)
+        .count() as u64;
+    assert_eq!(cancels, WRITERS * COMMANDS_EACH);
+    eprintln!(
+        "{} commands and {total} events in {:?}",
+        WRITERS * COMMANDS_EACH,
+        started.elapsed()
+    );
+}
+
+fn assert_send_sync_clone<T: Send + Sync + Clone + 'static>() {}
+
+#[test]
+fn the_sender_is_shared_across_tasks() {
+    assert_send_sync_clone::<crate::tradews::TradeSender>();
+    fn send<T: Send + 'static>() {}
+    send::<crate::tradews::TradeEvents>();
+}
+
+#[tokio::test]
+async fn dropping_the_events_ends_the_connection_and_its_commands_are_unknown() {
+    let silent = Script {
+        answer_commands: false,
+        ..serve()
+    };
+    let (url, _) = stand_in(vec![silent]).await;
+    let mut cfg = config(url);
+    cfg.answer_timeout = Duration::from_secs(30);
+    let session = connect(cfg).await.unwrap();
+    ready(&session).await;
+    let (sender, events) = session.split();
+    let in_flight = {
+        let sender = sender.clone();
+        tokio::spawn(async move {
+            sender
+                .cancel_order(7, &OrderRef::Id(1), within(5_000))
+                .await
+        })
+    };
+    // The cancel is written and awaits its answer.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    drop(events);
+    let result = tokio::time::timeout(WAIT, in_flight)
+        .await
+        .expect("answered once the events are dropped")
+        .unwrap();
+    assert!(matches!(
+        trade_error(result),
+        TradeError::OutcomeUnknown {
+            command: Command::CancelOrder,
+            ..
+        }
+    ));
+    tokio::time::timeout(WAIT, async {
+        while sender.is_alive() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the session stops");
+    assert_eq!(
+        not_sent(sender.cancel_order(7, &OrderRef::Id(2), within(500)).await),
+        NotSent::Closed
+    );
+}
+
+#[tokio::test]
+async fn dropping_every_sender_keeps_the_events_coming() {
+    let script = Script {
+        events_per_answer: 3,
+        ..serve()
+    };
+    let (url, _) = stand_in(vec![script]).await;
+    let session = connect(config(url)).await.unwrap();
+    ready(&session).await;
+    let (sender, mut events) = session.split();
+    sender
+        .cancel_order(7, &OrderRef::Id(1), within(500))
+        .await
+        .unwrap();
+    drop(sender);
+    let mut orders = 0;
+    while orders < 3 {
+        let event = tokio::time::timeout(WAIT, events.recv()).await.unwrap();
+        if let Some(Event::Order(_)) = event {
+            orders += 1;
+        }
+    }
+    // Pings still flow: the connection is up.
+    let pong = tokio::time::timeout(WAIT, async {
+        loop {
+            if let Some(Event::Pong { .. }) = events.recv().await {
+                return;
+            }
+        }
+    })
+    .await;
+    assert!(pong.is_ok() && events.is_alive());
 }
