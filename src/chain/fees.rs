@@ -190,11 +190,17 @@ mod tests {
             "0".repeat(64),
         ] {
             assert!(
-                matches!(address_from_eth_call_result(&raw), Err(Error::Transport(_))),
+                matches!(
+                    address_from_eth_call_result(&raw),
+                    Err(Error::Transport { .. })
+                ),
                 "address {raw:?}"
             );
             assert!(
-                matches!(u256_from_eth_call_result(&raw), Err(Error::Transport(_))),
+                matches!(
+                    u256_from_eth_call_result(&raw),
+                    Err(Error::Transport { .. })
+                ),
                 "uint256 {raw:?}"
             );
         }

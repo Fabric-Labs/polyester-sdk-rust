@@ -1925,8 +1925,13 @@ non-retryable, including message-only responses.
 Recognized temporary order admission refusals return `Error::AdmissionUnavailable`,
 including their canonical service code and REST problem when present.
 
-A plain REST gateway 504 returns `Error::GatewayTimeout`: `is_retryable()` is
-false and `mutation_outcome_unknown()` is true. The classifier has no operation
+A REST 504 returns `Error::GatewayTimeout` whatever code its body names, a
+retryable rate-limit or admission code included (only an `*_OUTCOME_UNKNOWN`
+code keeps its `Error::Api`): `is_retryable()` is false and
+`mutation_outcome_unknown()` is true. Every error that comes from an answer
+carries its answer in `answer()` (the HTTP status and the delay its
+`Retry-After` asked for) and the delay in `retry_after()`, seconds,
+`None` when none; the SDK's own read retries wait at least that long. The classifier has no operation
 context. Reads may retry a 504 explicitly; writes read back first. A client order
 ID supports reconciliation, not exact replay of a single create. Without one,
 read open orders before deciding whether to submit again. The SDK never
@@ -2037,8 +2042,8 @@ contract code at HTTP 501); `Error::RouteNotFound` is the narrower bare HTTP 404
 An HTTP error with no code the contract defines can come from a gateway or an edge, so it doesn't
 prove a request was refused. Only a 401 or 403 is a refusal on its status alone (`Error::Auth` or
 `Error::ApiKeyRejected`). Every other status returns `Error::Server` with
-`mutation_outcome_unknown()` true and `is_retryable()` false, and names any code it did send in its
-message; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
+`mutation_outcome_unknown()` true and `is_retryable()` false, and keeps any code it did send in
+`code`, and its answer's HTTP status and `Retry-After` delay in `answer()`; read back before sending a mutation again. Trigger reads retry 429, 502, 503 and 504 for you; retry other reads yourself if you want to. A
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 
@@ -2663,11 +2668,29 @@ if let Some(snapshot) = book.updates().recv().await {
 # }
 ```
 
-`orderbook.get` takes the snapshot depths 1, 5, 10, 20, 50, 100, 200, 500 and 1000.
-Any other depth up to 1000 requests the smallest of them that covers it, 20 for
-`Some(11)`, and `None` or `Some(0)` means 50; the result's `depth` is the depth
-requested (`polyester::codecs::decode::orderbook_snapshot_depth`). A depth above
-1000 is an `Error::Validation` before any request.
+`orderbook.get` takes any level count per side from 1 to the `max_depth` every
+snapshot reports (5,000 levels by default) and sends it as given; `None` or
+`Some(0)` asks for the default of 50, and the result's `depth` is the depth
+requested, 50 for the default. A depth above `max_depth` is refused by the server
+with `invalid_argument` (`Error::Api` with code `InvalidArgument`), never
+truncated: ask for at most `max_depth`. A snapshot also carries `book_epoch`, the
+epoch of its `book_seq`: order snapshots by `(book_epoch, book_seq)` with
+`polyester::codecs::decode::compare_snapshots`, since a new epoch may restart
+`book_seq`, and keep only the newest. A snapshot is a frozen view at its own
+position: never apply stream updates to it, and fetch it again to refresh it.
+
+```rust,no_run
+# async fn example(client: polyester::Client) -> polyester::Result<()> {
+use polyester::codecs::decode::compare_snapshots;
+
+let first = client.orderbook.get("BTC-USDT", Some(2500)).await?;
+let again = client.orderbook.get("BTC-USDT", Some(first.max_depth)).await?;
+let newest = if compare_snapshots(&again, &first)?.is_ge() { again } else { first };
+println!("epoch {} seq {}", newest.book_epoch, newest.book_seq);
+# Ok(())
+# }
+```
+
 The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
 (`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
 subscribe at any other depth and then sends nothing on it, so the SDK does not
@@ -2682,7 +2705,9 @@ subscribe there:
   decimal places, such as `"0.01"`; any other bucket is `Error::Validation` before
   connecting, and `set_bucket` returns it and keeps the current bucket. A depth above
   500, or `Some(0)`, is `Error::Validation` before connecting; for more than 500
-  levels, read a snapshot with `orderbook.get`.
+  levels, read a snapshot with `orderbook.get`. A managed view is not a snapshot:
+  its `book_epoch` is empty and its `max_depth` 0, since the stream carries no
+  epoch.
 - `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
   only a published depth and returns `Error::Validation` for any other.
 

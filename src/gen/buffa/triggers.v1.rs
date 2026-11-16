@@ -3302,7 +3302,7 @@ pub mod trigger_market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitGtc {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3455,7 +3455,7 @@ pub const __TRIGGER_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitIoc {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -3583,7 +3583,7 @@ pub const __TRIGGER_LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = :
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TriggerLimitFok {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -4118,7 +4118,7 @@ pub mod conditional_child_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ConditionalTrigger {
-    /// Trigger threshold in quote units scaled by 1e9.
+    /// Positive trigger threshold in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -4128,7 +4128,7 @@ pub struct ConditionalTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Child order side.
+    /// Child order side. Required.
     ///
     /// Field 2: `side`
     #[serde(
@@ -4137,7 +4137,7 @@ pub struct ConditionalTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Child execution.
+    /// Child execution. Required.
     ///
     /// Field 3: `child`
     #[serde(
@@ -4359,7 +4359,7 @@ pub const __CONDITIONAL_TRIGGER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TrailingStopTrigger {
-    /// Optional activation price in quote units scaled by 1e9.
+    /// Optional positive activation price in quote units scaled by 1e9.
     ///
     /// Field 3: `activation_price_ticks`
     #[serde(
@@ -4369,7 +4369,7 @@ pub struct TrailingStopTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub activation_price_ticks: i64,
-    /// Child order side.
+    /// Child order side. Required.
     ///
     /// Field 6: `side`
     #[serde(
@@ -4378,12 +4378,12 @@ pub struct TrailingStopTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
-    /// the most its child pays per unit. Required when `side` is BUY and set
-    /// aside for it with the child's fee; at least the activation price, or at
-    /// least the price it watches (trigger_price_source) when no activation price
-    /// is set. A rise that fires above it still fires, and the child fills only
-    /// at or below it. Must be unset when `side` is SELL. Fixed at create.
+    /// Positive maximum price of a trailing stop that buys, in quote units scaled
+    /// by 1e9: the most its child pays per unit. Required when `side` is BUY and
+    /// set aside for it with the child's fee; at least the activation price, or
+    /// at least the price it watches (trigger_price_source) when no activation
+    /// price is set. A rise that fires above it still fires, and the child fills
+    /// only at or below it. Must be unset when `side` is SELL. Fixed at create.
     ///
     /// Field 7: `limit_price_ticks`
     #[serde(
@@ -5219,7 +5219,7 @@ pub mod twap_market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TwapLimitGtc {
-    /// Slice limit price in quote units scaled by 1e9.
+    /// Positive slice limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -5345,7 +5345,7 @@ pub const __TWAP_LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct TwapTrigger {
-    /// Child side.
+    /// Child side. Required.
     ///
     /// Field 1: `side`
     #[serde(
@@ -5769,7 +5769,7 @@ pub mod twap_trigger {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LadderTrigger {
-    /// Child side.
+    /// Child side. Required.
     ///
     /// Field 1: `side`
     #[serde(
@@ -5778,7 +5778,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Minimum generated level price in quote units scaled by 1e9.
+    /// Positive minimum generated level price in quote units scaled by 1e9.
     ///
     /// Field 2: `price_min_ticks`
     #[serde(
@@ -5788,7 +5788,8 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_min_ticks: i64,
-    /// Maximum generated level price in quote units scaled by 1e9.
+    /// Maximum generated level price in quote units scaled by 1e9; must be
+    /// greater than price_min_ticks.
     ///
     /// Field 3: `price_max_ticks`
     #[serde(
@@ -5798,7 +5799,7 @@ pub struct LadderTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_max_ticks: i64,
-    /// Number of linearly distributed levels.
+    /// Number of linearly distributed levels, from 2 to 100.
     ///
     /// Field 4: `levels`
     #[serde(
@@ -6013,7 +6014,7 @@ pub struct TriggerIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Total quantity scaled by the pair's base_quantity_scale.
+    /// Positive total quantity scaled by the pair's base_quantity_scale.
     ///
     /// Field 2: `qty_scaled`
     #[serde(
@@ -6023,7 +6024,11 @@ pub struct TriggerIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub qty_scaled: i64,
-    /// Fee asset for BUY children. SELL children must use QUOTE.
+    /// Asset charged for the children's fees, for every strategy. Defaults to
+    /// QUOTE. A trigger whose children BUY may select BASE only on a pair whose
+    /// allow_buy_fee_from_base is true in GetSpotConfig; a trigger whose
+    /// children SELL must use QUOTE. Otherwise the create is refused with
+    /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
     ///
     /// Field 3: `fee_asset`
     #[serde(
@@ -6057,8 +6062,9 @@ pub struct TriggerIntent {
     /// client_trigger_id, instead of retrying the create. After a create fails
     /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
-    /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
-    /// with INVALID_ARGUMENT.
+    /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
+    /// are rejected with INVALID_ARGUMENT and
+    /// ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
     ///
     /// Field 5: `client_trigger_id`
     #[serde(
@@ -6753,7 +6759,7 @@ pub struct CreateTriggerRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Trigger to admit.
+    /// Trigger to admit. Required.
     ///
     /// Field 2: `trigger`
     #[serde(
@@ -7137,7 +7143,7 @@ pub const __CREATE_TRIGGER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct OcoLeg {
-    /// Trigger price in quote units scaled by 1e9.
+    /// Positive trigger price in quote units scaled by 1e9. Required.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -7148,7 +7154,7 @@ pub struct OcoLeg {
     )]
     pub trigger_price_ticks: i64,
     /// The order the leg places when its trigger price is reached: a market
-    /// order (IOC) or a resting limit order (GTC).
+    /// order (IOC) or a resting limit order (GTC). Required.
     ///
     /// Field 2: `child`
     #[serde(
@@ -7365,7 +7371,7 @@ pub struct OcoIntent {
     )]
     pub symbol_id: u32,
     /// The side both legs trade: SELL protects a held base position, BUY spends
-    /// held quote.
+    /// held quote. Required.
     ///
     /// Field 2: `side`
     #[serde(
@@ -7374,8 +7380,8 @@ pub struct OcoIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub side: ::buffa::EnumValue<super::super::orders::v1::Side>,
-    /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
-    /// multiple of the pair's quantity step.
+    /// Positive quantity both legs trade, scaled by the pair's
+    /// base_quantity_scale; a multiple of the pair's quantity step.
     ///
     /// Field 3: `qty_scaled`
     #[serde(
@@ -7416,7 +7422,7 @@ pub struct OcoIntent {
     )]
     pub client_list_id: ::buffa::alloc::string::String,
     /// The take-profit leg. Its trigger price must be above the stop-loss's for
-    /// a SELL OCO and below it for a BUY OCO.
+    /// a SELL OCO and below it for a BUY OCO. Required.
     ///
     /// Field 6: `take_profit`
     #[serde(
@@ -7425,7 +7431,7 @@ pub struct OcoIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub take_profit: ::buffa::MessageField<OcoLeg>,
-    /// The stop-loss leg.
+    /// The stop-loss leg. Required.
     ///
     /// Field 7: `stop_loss`
     #[serde(
@@ -7696,7 +7702,7 @@ pub struct CreateOcoRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// OCO to admit.
+    /// OCO to admit. Required.
     ///
     /// Field 2: `oco`
     #[serde(
@@ -8907,7 +8913,7 @@ pub struct ListTriggersRequest {
     pub limit: u32,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
     /// bound to the authenticated account, sub-account scope, filters, and newest
-    /// first sort order.
+    /// first sort order. At most 512 characters.
     ///
     /// Field 12: `page_token`
     #[serde(
@@ -9463,7 +9469,7 @@ pub struct ListTriggerEventsRequest {
     pub event_type: ::buffa::EnumValue<TriggerEventType>,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
     /// bound to the authenticated account, trigger, sub-account scope, event
-    /// filter, and newest-first sort order.
+    /// filter, and newest-first sort order. At most 512 characters.
     ///
     /// Field 5: `page_token`
     #[serde(
@@ -11141,6 +11147,8 @@ pub struct BatchCancelTriggersRequest {
     /// trigger_ids within 2 minutes returns the original results and cancels
     /// nothing again. The same request_id with other trigger_ids rejects every
     /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -12018,7 +12026,7 @@ pub struct ModifyTriggerRequest {
     pub symbol_id: u32,
     /// Patch fields for safe price, trailing-distance, and slippage edits.
     /// For stop/take-profit:
-    /// Updated trigger price in quote units scaled by 1e9.
+    /// Positive updated trigger price in quote units scaled by 1e9.
     ///
     /// Field 10: `trigger_price_ticks`
     #[serde(
@@ -16873,7 +16881,7 @@ pub mod __buffa {
         /// TriggerLimitGtc configures a resting limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -17125,7 +17133,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -17173,7 +17181,7 @@ pub mod __buffa {
         /// TriggerLimitIoc configures an immediate-or-cancel limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -17404,7 +17412,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -17445,7 +17453,7 @@ pub mod __buffa {
         /// TriggerLimitFok configures a fill-or-kill limit child.
         #[derive(Clone, Debug, Default)]
         pub struct TriggerLimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -17676,7 +17684,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -18263,15 +18271,15 @@ pub mod __buffa {
         /// ConditionalTrigger configures a standalone stop-loss or take-profit.
         #[derive(Clone, Debug, Default)]
         pub struct ConditionalTriggerView<'a> {
-            /// Trigger threshold in quote units scaled by 1e9.
+            /// Positive trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Child order side.
+            /// Child order side. Required.
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Child execution.
+            /// Child execution. Required.
             ///
             /// Field 3: `child`
             pub child: ::buffa::MessageFieldView<
@@ -18630,14 +18638,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger threshold in quote units scaled by 1e9.
+            /// Positive trigger threshold in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Child order side.
+            /// Child order side. Required.
             ///
             /// Field 2: `side`
             #[must_use]
@@ -18646,7 +18654,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Child execution.
+            /// Child execution. Required.
             ///
             /// Field 3: `child`
             #[must_use]
@@ -18715,20 +18723,20 @@ pub mod __buffa {
         /// trailing stops may use either side, opposite their parent order.
         #[derive(Clone, Debug, Default)]
         pub struct TrailingStopTriggerView<'a> {
-            /// Optional activation price in quote units scaled by 1e9.
+            /// Optional positive activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             pub activation_price_ticks: i64,
-            /// Child order side.
+            /// Child order side. Required.
             ///
             /// Field 6: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
-            /// the most its child pays per unit. Required when `side` is BUY and set
-            /// aside for it with the child's fee; at least the activation price, or at
-            /// least the price it watches (trigger_price_source) when no activation price
-            /// is set. A rise that fires above it still fires, and the child fills only
-            /// at or below it. Must be unset when `side` is SELL. Fixed at create.
+            /// Positive maximum price of a trailing stop that buys, in quote units scaled
+            /// by 1e9: the most its child pays per unit. Required when `side` is BUY and
+            /// set aside for it with the child's fee; at least the activation price, or
+            /// at least the price it watches (trigger_price_source) when no activation
+            /// price is set. A rise that fires above it still fires, and the child fills
+            /// only at or below it. Must be unset when `side` is SELL. Fixed at create.
             ///
             /// Field 7: `limit_price_ticks`
             pub limit_price_ticks: i64,
@@ -19253,14 +19261,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional activation price in quote units scaled by 1e9.
+            /// Optional positive activation price in quote units scaled by 1e9.
             ///
             /// Field 3: `activation_price_ticks`
             #[must_use]
             pub fn activation_price_ticks(&self) -> i64 {
                 self.0.reborrow().activation_price_ticks
             }
-            /// Child order side.
+            /// Child order side. Required.
             ///
             /// Field 6: `side`
             #[must_use]
@@ -19269,12 +19277,12 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Maximum price of a trailing stop that buys, in quote units scaled by 1e9:
-            /// the most its child pays per unit. Required when `side` is BUY and set
-            /// aside for it with the child's fee; at least the activation price, or at
-            /// least the price it watches (trigger_price_source) when no activation price
-            /// is set. A rise that fires above it still fires, and the child fills only
-            /// at or below it. Must be unset when `side` is SELL. Fixed at create.
+            /// Positive maximum price of a trailing stop that buys, in quote units scaled
+            /// by 1e9: the most its child pays per unit. Required when `side` is BUY and
+            /// set aside for it with the child's fee; at least the activation price, or
+            /// at least the price it watches (trigger_price_source) when no activation
+            /// price is set. A rise that fires above it still fires, and the child fills
+            /// only at or below it. Must be unset when `side` is SELL. Fixed at create.
             ///
             /// Field 7: `limit_price_ticks`
             #[must_use]
@@ -19694,7 +19702,7 @@ pub mod __buffa {
         /// slice is canceled before the next interval.
         #[derive(Clone, Debug, Default)]
         pub struct TwapLimitGtcView<'a> {
-            /// Slice limit price in quote units scaled by 1e9.
+            /// Positive slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -19923,7 +19931,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Slice limit price in quote units scaled by 1e9.
+            /// Positive slice limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -19964,7 +19972,7 @@ pub mod __buffa {
         /// TwapTrigger configures a proven TWAP execution mode.
         #[derive(Clone, Debug, Default)]
         pub struct TwapTriggerView<'a> {
-            /// Child side.
+            /// Child side. Required.
             ///
             /// Field 1: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
@@ -20407,7 +20415,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Child side.
+            /// Child side. Required.
             ///
             /// Field 1: `side`
             #[must_use]
@@ -20475,19 +20483,20 @@ pub mod __buffa {
         /// are admitted immediately and may rest concurrently.
         #[derive(Clone, Debug, Default)]
         pub struct LadderTriggerView<'a> {
-            /// Child side.
+            /// Child side. Required.
             ///
             /// Field 1: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Minimum generated level price in quote units scaled by 1e9.
+            /// Positive minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             pub price_min_ticks: i64,
-            /// Maximum generated level price in quote units scaled by 1e9.
+            /// Maximum generated level price in quote units scaled by 1e9; must be
+            /// greater than price_min_ticks.
             ///
             /// Field 3: `price_max_ticks`
             pub price_max_ticks: i64,
-            /// Number of linearly distributed levels.
+            /// Number of linearly distributed levels, from 2 to 100.
             ///
             /// Field 4: `levels`
             pub levels: i32,
@@ -20810,7 +20819,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Child side.
+            /// Child side. Required.
             ///
             /// Field 1: `side`
             #[must_use]
@@ -20819,21 +20828,22 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Minimum generated level price in quote units scaled by 1e9.
+            /// Positive minimum generated level price in quote units scaled by 1e9.
             ///
             /// Field 2: `price_min_ticks`
             #[must_use]
             pub fn price_min_ticks(&self) -> i64 {
                 self.0.reborrow().price_min_ticks
             }
-            /// Maximum generated level price in quote units scaled by 1e9.
+            /// Maximum generated level price in quote units scaled by 1e9; must be
+            /// greater than price_min_ticks.
             ///
             /// Field 3: `price_max_ticks`
             #[must_use]
             pub fn price_max_ticks(&self) -> i64 {
                 self.0.reborrow().price_max_ticks
             }
-            /// Number of linearly distributed levels.
+            /// Number of linearly distributed levels, from 2 to 100.
             ///
             /// Field 4: `levels`
             #[must_use]
@@ -20885,11 +20895,15 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Total quantity scaled by the pair's base_quantity_scale.
+            /// Positive total quantity scaled by the pair's base_quantity_scale.
             ///
             /// Field 2: `qty_scaled`
             pub qty_scaled: i64,
-            /// Fee asset for BUY children. SELL children must use QUOTE.
+            /// Asset charged for the children's fees, for every strategy. Defaults to
+            /// QUOTE. A trigger whose children BUY may select BASE only on a pair whose
+            /// allow_buy_fee_from_base is true in GetSpotConfig; a trigger whose
+            /// children SELL must use QUOTE. Otherwise the create is refused with
+            /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
             ///
             /// Field 3: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<
@@ -20913,8 +20927,9 @@ pub mod __buffa {
             /// client_trigger_id, instead of retrying the create. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
-            /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
-            /// with INVALID_ARGUMENT.
+            /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
+            /// are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
             ///
             /// Field 5: `client_trigger_id`
             pub client_trigger_id: &'a str,
@@ -21604,14 +21619,18 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Total quantity scaled by the pair's base_quantity_scale.
+            /// Positive total quantity scaled by the pair's base_quantity_scale.
             ///
             /// Field 2: `qty_scaled`
             #[must_use]
             pub fn qty_scaled(&self) -> i64 {
                 self.0.reborrow().qty_scaled
             }
-            /// Fee asset for BUY children. SELL children must use QUOTE.
+            /// Asset charged for the children's fees, for every strategy. Defaults to
+            /// QUOTE. A trigger whose children BUY may select BASE only on a pair whose
+            /// allow_buy_fee_from_base is true in GetSpotConfig; a trigger whose
+            /// children SELL must use QUOTE. Otherwise the create is refused with
+            /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
             ///
             /// Field 3: `fee_asset`
             #[must_use]
@@ -21643,8 +21662,9 @@ pub mod __buffa {
             /// client_trigger_id, instead of retrying the create. After a create fails
             /// with INTERNAL_ERROR, the ID may already be used: a retry then returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID and needs a new client trigger ID.
-            /// At most 36 bytes in UTF-8 (36 ASCII characters); longer IDs are rejected
-            /// with INVALID_ARGUMENT.
+            /// 1 to 36 bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs
+            /// are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_TRIGGER_ID_INVALID.
             ///
             /// Field 5: `client_trigger_id`
             #[must_use]
@@ -21704,7 +21724,7 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Trigger to admit.
+            /// Trigger to admit. Required.
             ///
             /// Field 2: `trigger`
             pub trigger: ::buffa::MessageFieldView<
@@ -22000,7 +22020,7 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Trigger to admit.
+            /// Trigger to admit. Required.
             ///
             /// Field 2: `trigger`
             #[must_use]
@@ -22474,12 +22494,12 @@ pub mod __buffa {
         /// order it then places for the OCO's whole remaining quantity.
         #[derive(Clone, Debug, Default)]
         pub struct OcoLegView<'a> {
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9. Required.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
             /// The order the leg places when its trigger price is reached: a market
-            /// order (IOC) or a resting limit order (GTC).
+            /// order (IOC) or a resting limit order (GTC). Required.
             ///
             /// Field 2: `child`
             pub child: ::buffa::MessageFieldView<
@@ -22803,7 +22823,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9. Required.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
@@ -22811,7 +22831,7 @@ pub mod __buffa {
                 self.0.reborrow().trigger_price_ticks
             }
             /// The order the leg places when its trigger price is reached: a market
-            /// order (IOC) or a resting limit order (GTC).
+            /// order (IOC) or a resting limit order (GTC). Required.
             ///
             /// Field 2: `child`
             #[must_use]
@@ -22892,12 +22912,12 @@ pub mod __buffa {
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
             /// The side both legs trade: SELL protects a held base position, BUY spends
-            /// held quote.
+            /// held quote. Required.
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
-            /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
-            /// multiple of the pair's quantity step.
+            /// Positive quantity both legs trade, scaled by the pair's
+            /// base_quantity_scale; a multiple of the pair's quantity step.
             ///
             /// Field 3: `qty_scaled`
             pub qty_scaled: i64,
@@ -22920,13 +22940,13 @@ pub mod __buffa {
             /// Field 5: `client_list_id`
             pub client_list_id: &'a str,
             /// The take-profit leg. Its trigger price must be above the stop-loss's for
-            /// a SELL OCO and below it for a BUY OCO.
+            /// a SELL OCO and below it for a BUY OCO. Required.
             ///
             /// Field 6: `take_profit`
             pub take_profit: ::buffa::MessageFieldView<
                 super::super::__buffa::view::OcoLegView<'a>,
             >,
-            /// The stop-loss leg.
+            /// The stop-loss leg. Required.
             ///
             /// Field 7: `stop_loss`
             pub stop_loss: ::buffa::MessageFieldView<
@@ -23367,7 +23387,7 @@ pub mod __buffa {
                 self.0.reborrow().symbol_id
             }
             /// The side both legs trade: SELL protects a held base position, BUY spends
-            /// held quote.
+            /// held quote. Required.
             ///
             /// Field 2: `side`
             #[must_use]
@@ -23376,8 +23396,8 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::super::super::orders::v1::Side> {
                 self.0.reborrow().side
             }
-            /// Quantity both legs trade, scaled by the pair's base_quantity_scale; a
-            /// multiple of the pair's quantity step.
+            /// Positive quantity both legs trade, scaled by the pair's
+            /// base_quantity_scale; a multiple of the pair's quantity step.
             ///
             /// Field 3: `qty_scaled`
             #[must_use]
@@ -23411,7 +23431,7 @@ pub mod __buffa {
                 self.0.reborrow().client_list_id
             }
             /// The take-profit leg. Its trigger price must be above the stop-loss's for
-            /// a SELL OCO and below it for a BUY OCO.
+            /// a SELL OCO and below it for a BUY OCO. Required.
             ///
             /// Field 6: `take_profit`
             #[must_use]
@@ -23422,7 +23442,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().take_profit
             }
-            /// The stop-loss leg.
+            /// The stop-loss leg. Required.
             ///
             /// Field 7: `stop_loss`
             #[must_use]
@@ -23479,7 +23499,7 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// OCO to admit.
+            /// OCO to admit. Required.
             ///
             /// Field 2: `oco`
             pub oco: ::buffa::MessageFieldView<
@@ -23775,7 +23795,7 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// OCO to admit.
+            /// OCO to admit. Required.
             ///
             /// Field 2: `oco`
             #[must_use]
@@ -25709,7 +25729,7 @@ pub mod __buffa {
             pub limit: u32,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, and newest
-            /// first sort order.
+            /// first sort order. At most 512 characters.
             ///
             /// Field 12: `page_token`
             pub page_token: &'a str,
@@ -26228,7 +26248,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, and newest
-            /// first sort order.
+            /// first sort order. At most 512 characters.
             ///
             /// Field 12: `page_token`
             #[must_use]
@@ -26627,7 +26647,7 @@ pub mod __buffa {
             pub event_type: ::buffa::EnumValue<super::super::TriggerEventType>,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, trigger, sub-account scope, event
-            /// filter, and newest-first sort order.
+            /// filter, and newest-first sort order. At most 512 characters.
             ///
             /// Field 5: `page_token`
             pub page_token: &'a str,
@@ -26985,7 +27005,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, trigger, sub-account scope, event
-            /// filter, and newest-first sort order.
+            /// filter, and newest-first sort order. At most 512 characters.
             ///
             /// Field 5: `page_token`
             #[must_use]
@@ -29117,6 +29137,8 @@ pub mod __buffa {
             /// trigger_ids within 2 minutes returns the original results and cancels
             /// nothing again. The same request_id with other trigger_ids rejects every
             /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
@@ -29437,6 +29459,8 @@ pub mod __buffa {
             /// trigger_ids within 2 minutes returns the original results and cancels
             /// nothing again. The same request_id with other trigger_ids rejects every
             /// item with ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             #[must_use]
@@ -30436,7 +30460,7 @@ pub mod __buffa {
             pub symbol_id: u32,
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e9.
+            /// Positive updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             pub trigger_price_ticks: ::core::option::Option<i64>,
@@ -31017,7 +31041,7 @@ pub mod __buffa {
             }
             /// Patch fields for safe price, trailing-distance, and slippage edits.
             /// For stop/take-profit:
-            /// Updated trigger price in quote units scaled by 1e9.
+            /// Positive updated trigger price in quote units scaled by 1e9.
             ///
             /// Field 10: `trigger_price_ticks`
             #[must_use]
@@ -36997,6 +37021,7 @@ pub mod __buffa {
         pub mod conditional_child_execution {
             #[allow(unused_imports)]
             use super::*;
+            /// Required child execution: exactly one variant.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Execution {
                 MarketIoc(
@@ -37085,7 +37110,8 @@ pub mod __buffa {
         pub mod trailing_stop_trigger {
             #[allow(unused_imports)]
             use super::*;
-            /// Required trailing distance.
+            /// Required trailing distance. A missing distance, or one out of range, is
+            /// rejected with ERROR_CODE_TRAILING_DISTANCE_INVALID.
             #[derive(Clone, PartialEq, Debug)]
             pub enum TrailingDistance {
                 TrailingDistanceTicks(i64),
@@ -37191,7 +37217,7 @@ pub mod __buffa {
         pub mod twap_trigger {
             #[allow(unused_imports)]
             use super::*;
-            /// Proven slice execution behavior.
+            /// Proven slice execution behavior. Required: exactly one variant.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Execution {
                 MarketIoc(

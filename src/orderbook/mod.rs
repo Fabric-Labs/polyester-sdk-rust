@@ -231,7 +231,8 @@ fn side_to_levels(
     Ok(levels)
 }
 
-/// Render the current in-memory book as [`OrderbookData`].
+/// Render the current in-memory book as [`OrderbookData`]. A rendered view is
+/// not a snapshot: its `book_epoch` is empty and its `max_depth` 0.
 #[allow(clippy::too_many_arguments)]
 pub fn build_orderbook_data(
     symbol: &str,
@@ -248,6 +249,8 @@ pub fn build_orderbook_data(
         symbol: symbol.to_owned(),
         depth,
         book_seq: book_seq.to_string(),
+        book_epoch: String::new(),
+        max_depth: 0,
         bids: side_to_levels(bids, "bids", limit, bucket_ticks, symbol, quantity_scale)?,
         asks: side_to_levels(asks, "asks", limit, bucket_ticks, symbol, quantity_scale)?,
         available,

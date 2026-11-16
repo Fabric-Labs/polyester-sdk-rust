@@ -168,7 +168,7 @@ async fn statement_export_refuses_a_missing_period_or_key_without_sending() {
         .export(statement_options())
         .await
         .unwrap_err();
-    assert!(matches!(err, Error::Auth(_)), "{err:?}");
+    assert!(matches!(err, Error::Auth { .. }), "{err:?}");
     assert!(seen.lock().unwrap().is_empty());
 }
 

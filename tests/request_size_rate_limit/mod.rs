@@ -156,7 +156,7 @@ const RATE_LIMIT_PROBLEM_TAIL: &str = r#""status":429,"title":"Rate limit exceed
 
 fn rate_limit_problem(rate_limit: serde_json::Value) -> String {
     format!(
-        r#"{{"code":"RATE_LIMIT_EXCEEDED","detail":"Rate limit exceeded","rate_limit":{rate_limit},{RATE_LIMIT_PROBLEM_TAIL}"#
+        r#"{{"code":"RATE_LIMIT_EXCEEDED","detail":"Rate limit exceeded","rateLimit":{rate_limit},{RATE_LIMIT_PROBLEM_TAIL}"#
     )
 }
 
@@ -191,9 +191,9 @@ async fn rate_limit_problem_carries_its_detail() {
         (
             "service quota",
             rate_limit_problem(json!({
-                "reason": "QUOTA_EXCEEDED", "limit": "30", "remaining": "0", "retry_after_ms": "1409",
-                "policy_version": "5", "operation_id": "auth.wallet_challenge", "policy_class": "AUTH_PUBLIC",
-                "scope": "AUTH_SUBJECT", "refill_model": "CONTINUOUS"
+                "reason": "QUOTA_EXCEEDED", "limit": "30", "remaining": "0", "retryAfterMs": "1409",
+                "policyVersion": "5", "operationId": "auth.wallet_challenge", "policyClass": "AUTH_PUBLIC",
+                "scope": "AUTH_SUBJECT", "refillModel": "CONTINUOUS"
             })),
             vec![
                 ("Retry-After", "2"),
@@ -236,7 +236,7 @@ async fn rate_limit_problem_carries_its_detail() {
         (
             "numbers and a newer enum value",
             rate_limit_problem(
-                json!({"reason": "SOME_NEW_REASON", "limit": 30, "retry_after_ms": 250}),
+                json!({"reason": "SOME_NEW_REASON", "limit": 30, "retryAfterMs": 250}),
             ),
             vec![],
             RateLimitDetail {
@@ -274,11 +274,44 @@ async fn rate_limit_problem_carries_its_detail() {
             Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
             "{name}"
         );
-        assert_eq!(detail.as_deref(), Some(&want), "{name}: rate_limit detail");
+        assert_eq!(detail.as_deref(), Some(&want), "{name}: rateLimit detail");
         assert_eq!(err.retry_after(), retry_after, "{name}");
         assert!(err.is_retryable(), "{name}");
         assert!(!err.mutation_outcome_unknown(), "{name}");
     }
+}
+
+/// The detail is the problem body's `rateLimit` with camelCase fields; the
+/// `rate_limit` member and snake_case fields of earlier API versions are not
+/// read, so the delay falls back to Retry-After.
+#[tokio::test]
+async fn rate_limit_problem_reads_only_the_camel_case_member() {
+    let snake_member = format!(
+        r#"{{"code":"RATE_LIMIT_EXCEEDED","detail":"Rate limit exceeded","rate_limit":{{"reason":"QUOTA_EXCEEDED","scope":"CLIENT_IP"}},{RATE_LIMIT_PROBLEM_TAIL}"#
+    );
+    let err =
+        me_error(move || response(429, PROBLEM, &snake_member, &[("Retry-After", "2")])).await;
+    let Error::RateLimit { detail, .. } = &err else {
+        panic!("{err:?}");
+    };
+    assert_eq!(detail.as_deref(), None);
+    assert_eq!(err.retry_after(), Some(2.0));
+
+    let snake_fields = rate_limit_problem(json!({
+        "reason": "QUOTA_EXCEEDED", "retry_after_ms": "1409", "operation_id": "orders.create"
+    }));
+    let err =
+        me_error(move || response(429, PROBLEM, &snake_fields, &[("Retry-After", "2")])).await;
+    let Error::RateLimit { detail, .. } = &err else {
+        panic!("{err:?}");
+    };
+    let detail = detail.as_deref().expect("rateLimit detail");
+    assert_eq!(detail.reason, "QUOTA_EXCEEDED");
+    assert_eq!(
+        (detail.retry_after_ms, detail.operation_id.as_str()),
+        (None, "")
+    );
+    assert_eq!(err.retry_after(), Some(2.0));
 }
 
 /// AUTH_RESOURCE_EXHAUSTED is a capacity refusal that waiting does not
@@ -422,6 +455,7 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
         code: code.into(),
         metadata: Vec::new(),
         violations: Vec::new(),
+        answer: None,
     };
     assert!(!api("PAYLOAD_TOO_LARGE").is_request_too_large());
     assert!(
@@ -432,6 +466,7 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
             detail: None,
             cause_code: None,
             level_index: None,
+            answer: None,
         }
         .is_request_too_large()
     );
@@ -454,7 +489,7 @@ async fn rate_limit_problem_ignores_an_unreadable_integer() {
         "+5",
     ] {
         let body = rate_limit_problem(json!({
-            "reason": "QUOTA_EXCEEDED", "scope": "CLIENT_IP", "limit": value, "retry_after_ms": value
+            "reason": "QUOTA_EXCEEDED", "scope": "CLIENT_IP", "limit": value, "retryAfterMs": value
         }));
         let err = me_error(move || response(429, PROBLEM, &body, &[("Retry-After", "2")])).await;
         let Error::RateLimit { code, detail, .. } = &err else {

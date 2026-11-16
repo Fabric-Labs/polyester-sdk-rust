@@ -118,12 +118,22 @@ impl JsonRpcClient {
         let allow_http = self.url.starts_with("http://");
         let client = http_client(allow_http).await?;
         let timeout = self.timeout;
-        let (status, bytes) = tokio::time::timeout(timeout, async {
+        // A failed answer's metadata, read from its headers as soon as they
+        // arrive: every error from that answer carries it, one its body
+        // causes (cut short, too large, or still arriving at the deadline)
+        // included. The client never follows a redirect: it is a failed
+        // answer too.
+        let mut failed_answer = None;
+        let (status, bytes, answer) = tokio::time::timeout(timeout, async {
             let resp = client
                 .request(req)
                 .await
                 .map_err(|e| Error::transport(format!("jsonrpc HTTP request failed: {e}")))?;
             let status = resp.status();
+            let answer = crate::errors::answer_from_headers(status.as_u16(), resp.headers());
+            if !status.is_success() {
+                failed_answer = Some(answer.clone());
+            }
             if content_length_exceeds_limit(resp.headers(), MAX_JSONRPC_RESPONSE_BYTES) {
                 return Err(Error::transport(format!(
                     "jsonrpc response exceeds {MAX_JSONRPC_RESPONSE_BYTES} bytes"
@@ -134,17 +144,27 @@ impl JsonRpcClient {
                 .await
                 .map_err(|e| Error::transport(format!("jsonrpc read body: {e}")))?
                 .to_bytes();
-            Ok::<_, Error>((status, bytes))
+            Ok::<_, Error>((status, bytes, answer))
         })
         .await
-        .map_err(|_| Error::transport(format!("jsonrpc timeout calling {method}")))??;
+        .unwrap_or_else(|_| {
+            Err(Error::transport(format!(
+                "jsonrpc timeout calling {method}"
+            )))
+        })
+        .map_err(|err| match failed_answer.take() {
+            Some(answer) => err.with_answer(answer),
+            None => err,
+        })?;
 
         if !status.is_success() {
+            // The endpoint's failed answer: its status and delay ride along.
             return Err(Error::transport(format!(
                 "jsonrpc HTTP {}: {}",
                 status.as_u16(),
                 String::from_utf8_lossy(&bytes)
-            )));
+            ))
+            .with_answer(answer));
         }
 
         let body: Value = serde_json::from_slice(&bytes)
@@ -220,6 +240,99 @@ pub fn parse_jsonrpc_result(body: &Value, expected_id: u64, method: &str) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A JSON-RPC endpoint's failed answer keeps its status and Retry-After.
+    #[tokio::test]
+    async fn failed_answer_carries_its_metadata() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            if let Ok((mut stream, _)) = listener.accept().await {
+                let mut buf = vec![0u8; 16 * 1024];
+                let _ = stream.read(&mut buf).await;
+                let _ = stream
+                    .write_all(
+                        b"HTTP/1.1 503 Busy\r\nRetry-After: 30\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbusy",
+                    )
+                    .await;
+            }
+        });
+        let client =
+            JsonRpcClient::new_insecure(format!("http://{addr}"), Duration::from_secs(5)).unwrap();
+        let err = client.request("eth_chainId", json!([])).await.unwrap_err();
+        assert!(err.to_string().contains("jsonrpc HTTP 503"), "{err:?}");
+        assert_eq!(
+            err.answer()
+                .map(|answer| (answer.status, answer.retry_after)),
+            Some((503, Some(30.0))),
+            "{err:?}"
+        );
+    }
+
+    /// A failed answer's metadata is read from its headers before its body: a
+    /// body cut short, too large or still arriving at the deadline, and a
+    /// redirect the client never follows (a valid or a malformed `Location`),
+    /// all leave an error carrying the answer's status and Retry-After, after
+    /// one request. A refused connection carries no answer.
+    #[tokio::test]
+    async fn body_failures_and_redirects_carry_their_answer() {
+        use crate::answer_test_server::{
+            Answer, AnswerBody, MALFORMED_LOCATION, answering, counting_target,
+        };
+        let (target, target_hits) = counting_target().await;
+        let too_large = MAX_JSONRPC_RESPONSE_BYTES + 1;
+        let cases = [
+            ("truncated", Answer::unavailable(AnswerBody::Truncated)),
+            (
+                "oversized",
+                Answer::unavailable(AnswerBody::Sized(too_large)),
+            ),
+            (
+                "oversized-chunked",
+                Answer::unavailable(AnswerBody::Chunked(too_large)),
+            ),
+            ("body-deadline", Answer::unavailable(AnswerBody::Stalled)),
+            ("redirect", Answer::redirect(format!("http://{target}/"))),
+            (
+                "redirect-malformed",
+                Answer::redirect(MALFORMED_LOCATION.to_owned()),
+            ),
+        ];
+        for (name, answer) in cases {
+            let status = answer.status;
+            let (host, requests) = answering(answer, false).await;
+            let client =
+                JsonRpcClient::new_insecure(format!("http://{host}"), Duration::from_millis(400))
+                    .unwrap();
+            let started = std::time::Instant::now();
+            let err = client
+                .request("eth_chainId", json!([]))
+                .await
+                .expect_err(name);
+            assert!(started.elapsed() < Duration::from_secs(3), "{name}");
+            assert_eq!(requests.load(Ordering::SeqCst), 1, "{name}: {err:?}");
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((status, Some(30.0))),
+                "{name}: {err:?}"
+            );
+        }
+        assert_eq!(
+            target_hits.load(Ordering::SeqCst),
+            0,
+            "a redirect was followed"
+        );
+        // Port 1 on the loopback refuses the connection: no answer at all.
+        let client =
+            JsonRpcClient::new_insecure("http://127.0.0.1:1", Duration::from_millis(400)).unwrap();
+        let err = client
+            .request("eth_chainId", json!([]))
+            .await
+            .expect_err("refused");
+        assert!(err.answer().is_none(), "{err:?}");
+    }
 
     #[test]
     fn envelope_rejects_both_result_and_error() {

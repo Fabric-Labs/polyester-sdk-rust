@@ -83,7 +83,7 @@ async fn quote_zipper_fee_refuses_malformed_results_without_panicking() {
             let result = outcome
                 .unwrap_or_else(|panic| panic!("call {bad_call} result {bad:?} panicked: {panic}"));
             match result {
-                Err(Error::Transport(message)) => {
+                Err(Error::Transport { message, .. }) => {
                     assert!(message.contains("eth_call"), "{message}")
                 }
                 other => panic!("call {bad_call} result {bad:?}: {other:?}"),

@@ -464,7 +464,8 @@ pub enum FeeAsset {
     FEE_ASSET_UNSPECIFIED = 0i32,
     /// Fees are charged in the quote asset. SELL fees always use quote asset.
     QUOTE = 1i32,
-    /// BUY-only option: fees are deducted from the received base asset.
+    /// BUY-only option: fees are deducted from the received base asset. Only on
+    /// a pair whose allow_buy_fee_from_base is true in GetSpotConfig.
     BASE = 2i32,
 }
 impl FeeAsset {
@@ -980,9 +981,10 @@ pub enum ErrorCode {
     ERROR_CODE_PERMISSION_DENIED = 12i32,
     /// Requested order or resource was not found.
     ERROR_CODE_NOT_FOUND = 13i32,
-    /// Upstream dependency returned an error.
+    /// A temporary server-side failure stopped the request. Retry later.
     ERROR_CODE_UPSTREAM_ERROR = 14i32,
-    /// Requested fee asset is not allowed for this order.
+    /// Requested fee asset is not allowed for this order or trigger: BASE on a
+    /// SELL, or BASE on a BUY where the pair's allow_buy_fee_from_base is false.
     ERROR_CODE_FEE_ASSET_NOT_ALLOWED = 15i32,
     /// Pair is disabled and does not accept orders.
     ERROR_CODE_PAIR_DISABLED = 16i32,
@@ -993,7 +995,8 @@ pub enum ErrorCode {
     /// Sub-account is present but not in an active state (disabled, deleted,
     /// etc.).
     ERROR_CODE_SUBACCOUNT_INACTIVE = 19i32,
-    /// Sub-account policy prevented trading on this market (e.g. pair mask).
+    /// The sub-account policy limits spot trading to an allowlist of markets
+    /// (spot_market_scope ALLOWLIST), and this market is not on it.
     ERROR_CODE_POLICY_MARKET_DENY = 20i32,
     /// Sub-account policy max order notional exceeded.
     ERROR_CODE_POLICY_MAX_NOTIONAL = 21i32,
@@ -1015,8 +1018,7 @@ pub enum ErrorCode {
     /// The API key has no policy, so it has no permissions: attach a policy to
     /// the API key that grants what it needs.
     ERROR_CODE_API_KEY_POLICY_REQUIRED = 27i32,
-    /// API key referenced in the request could not be resolved by the Orders
-    /// service.
+    /// The API key in the request, or its policy, could not be found.
     ERROR_CODE_API_KEY_UNKNOWN = 28i32,
     /// API key policy does not allow trading this market, even though the
     /// sub-account policy does.
@@ -1061,9 +1063,19 @@ pub enum ErrorCode {
     ERROR_CODE_POST_ONLY_CROSS = 58i32,
     /// Reduce-only policy blocked the order.
     ERROR_CODE_REDUCE_ONLY_BLOCKED = 59i32,
-    /// Price band guard rejected the order.
+    /// The order falls outside the pair's price band (PairConfig.price_band from
+    /// GetSpotConfig): a buy priced above the band's upper limit or a sell priced
+    /// below its lower limit, a fill-or-kill order the band would stop before it
+    /// fills, or any new order while no price tick lies inside the band, a market
+    /// order included. The band spans a set number of basis points around its
+    /// reference price. The reference price starts at the last trade, or at the
+    /// pair's listing reference price when the pair has not traded, and afterwards
+    /// moves only in two ways: to a newer last trade, at most once per reference
+    /// window, or by the index guard, which sets it to the index price when a
+    /// current index price exists and the reference price lies outside the band
+    /// around it. Only the side that would trade is checked.
     ERROR_CODE_PRICE_BAND_VIOLATION = 60i32,
-    /// Market-cap guard rejected the order.
+    /// The order exceeded a market-wide limit. Not currently returned.
     ERROR_CODE_MARKET_CAP_VIOLATION = 61i32,
     /// Market order could not execute due to empty book.
     ERROR_CODE_EMPTY_BOOK = 62i32,
@@ -1072,7 +1084,10 @@ pub enum ErrorCode {
     /// The order has already ended (filled, canceled or expired).
     ERROR_CODE_ORDER_ALREADY_TERMINAL = 64i32,
     /// Trigger-specific error codes (40-49 range).
-    /// Trigger price is invalid (e.g., TP below current price for long).
+    /// The trigger price is invalid: for example not positive, an attached
+    /// take-profit or stop-loss at or past its limit parent's price (for a buy
+    /// parent, a take-profit at or below it or a stop-loss at or above it), or
+    /// a one-cancels-the-other take-profit that crosses its stop-loss.
     ERROR_CODE_TRIGGER_PRICE_INVALID = 40i32,
     /// Trigger price source not supported (e.g., INDEX_PRICE before it's
     /// available).
@@ -1095,7 +1110,10 @@ pub enum ErrorCode {
     /// trailing stops, on create and on modify; for example, a 10000 bps cap on a
     /// market order or trailing stop that sells.
     ERROR_CODE_MAX_SLIPPAGE_INVALID = 48i32,
-    /// Client reference price is stale compared to server-side BBO/drift policy.
+    /// The market order's client reference price differs from the market price
+    /// (the best ask for a buy or the best bid for a sell, otherwise the last
+    /// trade price) by more than the pair's max_client_ref_drift_bps from
+    /// GetSpotConfig.
     ERROR_CODE_STALE_QUOTE = 65i32,
     /// Request failed structural or cross-field validation.
     ERROR_CODE_VALIDATION_ERROR = 66i32,
@@ -1116,7 +1134,9 @@ pub enum ErrorCode {
     ERROR_CODE_POLICY_SPOT_READ_DENY = 71i32,
     /// API key policy does not allow reading spot data.
     ERROR_CODE_API_KEY_SPOT_READ_DENY = 72i32,
-    /// The cancel request exceeded its bounded internal replay window.
+    /// The cancel-all request arrived after its acceptance window of about two
+    /// minutes had passed, so nothing was canceled. Send a new request with a
+    /// fresh request_id.
     ERROR_CODE_CANCEL_REQUEST_EXPIRED = 73i32,
     /// Quantity is above the pair maximum: the market-order maximum for MARKET
     /// orders, the limit-order maximum otherwise (base units).
@@ -1128,20 +1148,18 @@ pub enum ErrorCode {
     /// quantity: the order ended at its filled quantity and no replacement order
     /// was created.
     ERROR_CODE_QTY_AT_OR_BELOW_FILLED = 76i32,
-    /// The trading gateway that took the request is misconfigured for the order
-    /// service behind it. An operator must correct it; retrying does not help.
+    /// The endpoint that took the request is misconfigured. Retrying does not
+    /// help; contact support. Not currently returned.
     ERROR_CODE_GATEWAY_MISCONFIGURED = 77i32,
     /// The order identifier or the replacement order identifier is not valid.
     ERROR_CODE_INVALID_ORDER_ID = 80i32,
     /// The quantity of a trigger's child order or a ladder order can't be raised
     /// above its planned quantity. Nothing changed.
     ERROR_CODE_CHILD_QTY_RAISE_NOT_ALLOWED = 81i32,
-    /// Attached take-profit, stop-loss or trailing legs can't be applied here:
-    /// this market takes none, an attached trailing stop isn't offered yet, the
-    /// modify changes them together with the order's price, quantity, client
-    /// order ID or a replace, or the order was placed by a triggered take-profit,
-    /// stop-loss or trailing-stop leg, which can't carry legs of its own. Nothing
-    /// changed.
+    /// Attached take-profit, stop-loss or trailing legs can't be applied to this
+    /// order: it was placed by a triggered take-profit, stop-loss or
+    /// trailing-stop leg, or replaces such an order, and it can't carry legs of
+    /// its own. Nothing changed.
     ERROR_CODE_ATTACHED_RISK_NOT_SUPPORTED = 82i32,
     /// The account has too many filled or ended orders whose settlement has not
     /// completed yet. Nothing changed; the request is accepted again once settlement
@@ -5209,8 +5227,8 @@ impl ::buffa::Enumeration for BatchReplaceItemAdmissionStatus {
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct MarketIoc {
-    /// Optional client reference price in quote units scaled by 1e9. When
-    /// omitted, admission uses server-side reference pricing.
+    /// Optional positive client reference price in quote units scaled by 1e9.
+    /// When omitted, admission uses server-side reference pricing.
     ///
     /// Field 3: `client_ref_price_ticks`
     #[serde(
@@ -5503,7 +5521,7 @@ pub mod market_ioc {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtc {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -5513,8 +5531,8 @@ pub struct LimitGtc {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub price_ticks: i64,
-    /// Reject the order instead of taking liquidity. Post-only is available only
-    /// on this resting limit-order variant.
+    /// Reject the order instead of taking liquidity. Post-only is available on
+    /// GTC and GTD limit orders; IOC, FOK and market orders cannot be post-only.
     ///
     /// Field 2: `post_only`
     #[serde(
@@ -5699,7 +5717,7 @@ pub const __LIMIT_GTC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitGtd {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -5719,9 +5737,9 @@ pub struct LimitGtd {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub post_only: bool,
-    /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
-    /// after validation time. The order cannot execute when the current time equals
-    /// this value.
+    /// Required exact expiry time in UTC. It must be at least 1 second and at
+    /// most 30 days after validation time. The order cannot execute when the
+    /// current time equals this value.
     ///
     /// Field 3: `expire_at`
     #[serde(
@@ -5929,7 +5947,7 @@ pub const __LIMIT_GTD_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitIoc {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -6055,7 +6073,7 @@ pub const __LIMIT_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct LimitFok {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -6357,7 +6375,7 @@ pub struct OrderIntent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Order side.
+    /// Order side. Required.
     ///
     /// Field 2: `side`
     #[serde(
@@ -6370,7 +6388,8 @@ pub struct OrderIntent {
     /// While this identifier is retained, reuse returns
     /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
     /// same payload. This identifier enables GetOrder reconciliation after a
-    /// timeout; it does not provide exact replay.
+    /// timeout; it does not provide exact replay. At most 36 ASCII characters
+    /// using letters, digits, period, underscore, colon, slash, or hyphen.
     ///
     /// Field 20: `client_order_id`
     #[serde(
@@ -6381,7 +6400,9 @@ pub struct OrderIntent {
     )]
     pub client_order_id: ::buffa::alloc::string::String,
     /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
-    /// orders; SELL orders must use QUOTE.
+    /// orders on a pair whose allow_buy_fee_from_base is true in GetSpotConfig;
+    /// SELL orders must use QUOTE. Otherwise the order is refused with
+    /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
     ///
     /// Field 21: `fee_asset`
     #[serde(
@@ -7334,7 +7355,7 @@ pub struct CreateOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Order to admit.
+    /// Order to admit. Required.
     ///
     /// Field 2: `order`
     #[serde(
@@ -7939,7 +7960,7 @@ pub struct PreviewOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Order intent to evaluate without submitting it.
+    /// Order intent to evaluate without submitting it. Required.
     ///
     /// Field 2: `order`
     #[serde(
@@ -9691,7 +9712,7 @@ pub const __RISK_MARKET_IOC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct RiskLimitGtc {
-    /// Limit price in quote units scaled by 1e9.
+    /// Positive limit price in quote units scaled by 1e9.
     ///
     /// Field 1: `price_ticks`
     #[serde(
@@ -10096,7 +10117,7 @@ pub mod risk_execution {
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TakeProfitPolicy {
-    /// Trigger price in quote units scaled by 1e9.
+    /// Positive trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -10106,7 +10127,7 @@ pub struct TakeProfitPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Child execution when the threshold is crossed.
+    /// Required child execution when the threshold is crossed.
     ///
     /// Field 2: `child`
     #[serde(
@@ -10300,7 +10321,7 @@ pub const __TAKE_PROFIT_POLICY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct StopLossPolicy {
-    /// Trigger price in quote units scaled by 1e9.
+    /// Positive trigger price in quote units scaled by 1e9.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -10310,7 +10331,7 @@ pub struct StopLossPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Child execution when the threshold is crossed.
+    /// Required child execution when the threshold is crossed.
     ///
     /// Field 2: `child`
     #[serde(
@@ -10533,12 +10554,12 @@ pub struct TrailingStopPolicy {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub trigger_price_source: ::buffa::EnumValue<TriggerPriceSource>,
-    /// Maximum price of a trailing stop that buys back, in quote units scaled by
-    /// 1e9: the most its exit pays per unit, at which the quote it may spend is
-    /// reserved with the exit's fee. Required when the parent order sells, so
-    /// the trailing stop buys; must be unset when the parent order buys. A rise
-    /// that fires above it still fires, and the exit fills only at or below it.
-    /// Changing it with ModifyOrder replaces the leg.
+    /// Positive maximum price of a trailing stop that buys back, in quote units
+    /// scaled by 1e9: the most its exit pays per unit, at which the quote it may
+    /// spend is reserved with the exit's fee. Required when the parent order
+    /// sells, so the trailing stop buys; must be unset when the parent order
+    /// buys. A rise that fires above it still fires, and the exit fills only at
+    /// or below it. Changing it with ModifyOrder replaces the leg.
     ///
     /// Field 4: `limit_price_ticks`
     #[serde(
@@ -11524,6 +11545,8 @@ pub struct CancelAllOrdersRequest {
     /// Idempotency key (required). Reuse the same key and criteria for retries.
     /// Completed results are retained for at least two minutes. Use a fresh key
     /// for a new cancellation; do not reuse a key after its replay window.
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 6: `request_id`
     #[serde(
@@ -12692,6 +12715,8 @@ pub struct CancelAllAfterRequest {
     )]
     pub side: ::buffa::EnumValue<Side>,
     /// Idempotency/trace key from caller (required).
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 5: `request_id`
     #[serde(
@@ -14346,6 +14371,8 @@ pub struct BatchCreateOrdersRequest {
     /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
     /// is a new request and can place its orders again, so read the items back
     /// instead of repeating an older batch.
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -14355,7 +14382,7 @@ pub struct BatchCreateOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Orders to create (max 20). client_order_id is optional per item. For a new
+    /// Orders to create, 1 to 20. client_order_id is optional per item. For a new
     /// request_id, a reused client_order_id rejects only that item with
     /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
     ///
@@ -14796,6 +14823,8 @@ pub struct ModifyOrderRequest {
     pub subaccount_id: ::core::option::Option<u64>,
     /// Idempotency key (required). Outstanding modifications retain this key;
     /// identical retries replay the final result for 60 seconds after the answer.
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 4: `request_id`
     #[serde(
@@ -14805,8 +14834,10 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Patch fields (presence-based).
-    /// New limit price in quote units scaled by 1e9. Required for price changes.
+    /// Patch fields (presence-based): set at least one of new_price_ticks,
+    /// new_qty_scaled or new_attached_risk.
+    /// Positive new limit price in quote units scaled by 1e9. Required for price
+    /// changes.
     ///
     /// Field 5: `new_price_ticks`
     #[serde(
@@ -14816,8 +14847,8 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub new_price_ticks: ::core::option::Option<i64>,
-    /// Target total quantity after modify/replace, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
+    /// Positive target total quantity after modify/replace, scaled by the
+    /// pair's base_quantity_scale from GetSpotConfig.
     ///
     /// Field 6: `new_qty_scaled`
     #[serde(
@@ -14849,7 +14880,9 @@ pub struct ModifyOrderRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub behavior: ::buffa::EnumValue<ModifyBehavior>,
-    /// Optional new client order id when replace path is taken.
+    /// Optional new client order id when replace path is taken: at most 36 ASCII
+    /// characters using letters, digits, period, underscore, colon, slash, or
+    /// hyphen.
     ///
     /// Field 9: `new_client_order_id`
     #[serde(
@@ -15835,7 +15868,9 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct BatchReplaceOrderItem {
-    /// New limit price in quote units scaled by 1e9.
+    /// Patch fields (presence-based): set at least one of new_price_ticks,
+    /// new_qty_scaled or new_attached_risk.
+    /// Positive new limit price in quote units scaled by 1e9.
     ///
     /// Field 3: `new_price_ticks`
     #[serde(
@@ -15845,8 +15880,8 @@ pub struct BatchReplaceOrderItem {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub new_price_ticks: ::core::option::Option<i64>,
-    /// Target total quantity after modify/replace, scaled by the pair's
-    /// base_quantity_scale from GetSpotConfig.
+    /// Positive target total quantity after modify/replace, scaled by the
+    /// pair's base_quantity_scale from GetSpotConfig.
     ///
     /// Field 4: `new_qty_scaled`
     #[serde(
@@ -15866,7 +15901,8 @@ pub struct BatchReplaceOrderItem {
     )]
     pub new_attached_risk: ::buffa::MessageField<RiskPolicy>,
     /// Optional client order ID for the successor. A value other than the order's
-    /// client order ID makes the item a replacement.
+    /// client order ID makes the item a replacement. At most 36 ASCII characters
+    /// using letters, digits, period, underscore, colon, slash, or hyphen.
     ///
     /// Field 6: `new_client_order_id`
     #[serde(
@@ -16668,6 +16704,8 @@ pub struct BatchReplaceOrdersRequest {
     )]
     pub symbol_id: u32,
     /// Client idempotency key (required).
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 3: `request_id`
     #[serde(
@@ -16677,7 +16715,7 @@ pub struct BatchReplaceOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Replacement items.
+    /// Replacement items, 1 to 50, each targeting a different order.
     ///
     /// Field 4: `items`
     #[serde(
@@ -17182,7 +17220,9 @@ pub struct BatchCancelItem {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub order_id: u64,
-    /// Client order ID. Exactly one of order_id or client_order_id.
+    /// Client order ID: 1 to 36 ASCII characters using letters, digits, period,
+    /// underscore, colon, slash, or hyphen. Exactly one of order_id or
+    /// client_order_id.
     ///
     /// Field 2: `client_order_id`
     #[serde(
@@ -17761,6 +17801,8 @@ pub struct BatchCancelOrdersRequest {
     )]
     pub subaccount_id: ::core::option::Option<u64>,
     /// Idempotency key (required).
+    /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+    /// slash, or hyphen.
     ///
     /// Field 2: `request_id`
     #[serde(
@@ -17770,7 +17812,7 @@ pub struct BatchCancelOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
-    /// Orders to cancel (max 50).
+    /// Orders to cancel, 1 to 50.
     ///
     /// Field 3: `items`
     #[serde(
@@ -21408,7 +21450,15 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub fee_total: ::buffa::MessageField<OrderFeeTotal>,
-    /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
+    /// Price in quote units scaled by 1e9. For a LIMIT order, its limit price.
+    /// For a MARKET order, whatever placed it, its protection price: the worst
+    /// price it may fill at, a BUY at or below it and a SELL at or above it. It
+    /// is the order's reference price moved by its maximum slippage, or by the
+    /// pair's default market slippage for its side (200 basis points if none is
+    /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+    /// trailing stop's market order takes the price that fired it as its
+    /// reference; a buy stop's is never above the protection price at its
+    /// trigger price.
     ///
     /// Field 15: `price_ticks`
     #[serde(
@@ -21493,8 +21543,10 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub market_client_ref_price_ticks: i64,
-    /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
-    /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+    /// MARKET maximum absolute price delta the order carries, in Q9
+    /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
+    /// set this cap; zero when it did not, for example because it set
+    /// market_max_slippage_bps instead.
     ///
     /// Field 24: `market_max_slippage_ticks`
     #[serde(
@@ -23391,7 +23443,8 @@ pub struct GetOpenOrdersRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Optional filter by symbol_id values. Empty means all symbols.
+    /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+    /// Empty means all symbols.
     ///
     /// Field 2: `symbol_id`
     #[serde(
@@ -23421,7 +23474,7 @@ pub struct GetOpenOrdersRequest {
     pub limit: ::core::option::Option<u32>,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
     /// bound to the authenticated account, sub-account scope, filters, and sort
-    /// order.
+    /// order. At most 512 characters.
     ///
     /// Field 11: `page_token`
     #[serde(
@@ -23948,7 +24001,8 @@ pub struct GetOrderHistoryRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Optional filter by symbol_id values. Empty means all symbols.
+    /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+    /// Empty means all symbols.
     ///
     /// Field 2: `symbol_id`
     #[serde(
@@ -23987,7 +24041,8 @@ pub struct GetOrderHistoryRequest {
     )]
     pub start_ts_ns: ::core::option::Option<u64>,
     /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-    /// Omit for no upper bound; an explicit zero returns an empty page.
+    /// Omit for no upper bound; an explicit zero returns an empty page. Any
+    /// other value must not be earlier than start_ts_ns when both are set.
     ///
     /// Field 11: `end_ts_ns`
     #[serde(
@@ -24008,7 +24063,7 @@ pub struct GetOrderHistoryRequest {
     pub limit: ::core::option::Option<u32>,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
     /// bound to the authenticated account, sub-account scope, filters, time range,
-    /// and sort order.
+    /// and sort order. At most 512 characters.
     ///
     /// Field 13: `page_token`
     #[serde(
@@ -24608,7 +24663,7 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub subaccount_id: ::core::option::Option<u64>,
-    /// Optional filter by symbol_id.
+    /// Optional filter by symbol_id. Required with after_match_id.
     ///
     /// Field 2: `symbol_id`
     #[serde(
@@ -24638,7 +24693,8 @@ pub struct GetUserTradesRequest {
     )]
     pub start_ts_ns: ::core::option::Option<u64>,
     /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-    /// Omit for no upper bound; an explicit zero returns an empty page.
+    /// Omit for no upper bound; an explicit zero returns an empty page. Any
+    /// other value must not be earlier than start_ts_ns when both are set.
     ///
     /// Field 11: `end_ts_ns`
     #[serde(
@@ -24659,7 +24715,7 @@ pub struct GetUserTradesRequest {
     pub limit: ::core::option::Option<u32>,
     /// Opaque keyset cursor from a previous response. The cursor is exclusive and
     /// bound to the authenticated account, sub-account scope, filters, time range,
-    /// and sort order.
+    /// and sort order. At most 512 characters.
     ///
     /// Field 13: `page_token`
     #[serde(
@@ -24672,6 +24728,7 @@ pub struct GetUserTradesRequest {
     /// Return only durable fills whose per-symbol match ID is greater than this
     /// value. Subscribe to the execution WebSocket before calling this method and
     /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+    /// Must be positive and requires symbol_id, because match IDs are per symbol.
     ///
     /// Field 14: `after_match_id`
     #[serde(
@@ -24681,7 +24738,7 @@ pub struct GetUserTradesRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub after_match_id: ::core::option::Option<u64>,
-    /// Inclusive generation ceiling; requires lineage_id.
+    /// Positive inclusive generation ceiling; requires lineage_id.
     /// Does not freeze an actively filling generation.
     ///
     /// Field 17: `through_generation`
@@ -25643,6 +25700,7 @@ pub struct GetOrderRequest {
     pub limit: ::core::option::Option<u32>,
     /// Execution cursor from this order's previous response. Use order_id rather
     /// than a reused client_order_id to keep the requested generation stable.
+    /// At most 512 characters.
     ///
     /// Field 14: `page_token`
     #[serde(
@@ -27221,8 +27279,8 @@ pub mod __buffa {
         /// immediate-or-cancel and therefore cannot rest or be post-only.
         #[derive(Clone, Debug, Default)]
         pub struct MarketIocView<'a> {
-            /// Optional client reference price in quote units scaled by 1e9. When
-            /// omitted, admission uses server-side reference pricing.
+            /// Optional positive client reference price in quote units scaled by 1e9.
+            /// When omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
             pub client_ref_price_ticks: i64,
@@ -27548,8 +27606,8 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional client reference price in quote units scaled by 1e9. When
-            /// omitted, admission uses server-side reference pricing.
+            /// Optional positive client reference price in quote units scaled by 1e9.
+            /// When omitted, admission uses server-side reference pricing.
             ///
             /// Field 3: `client_ref_price_ticks`
             #[must_use]
@@ -27599,12 +27657,12 @@ pub mod __buffa {
         /// LimitGtc configures a good-til-canceled limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
-            /// Reject the order instead of taking liquidity. Post-only is available only
-            /// on this resting limit-order variant.
+            /// Reject the order instead of taking liquidity. Post-only is available on
+            /// GTC and GTD limit orders; IOC, FOK and market orders cannot be post-only.
             ///
             /// Field 2: `post_only`
             pub post_only: bool,
@@ -27887,15 +27945,15 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
             pub fn price_ticks(&self) -> i64 {
                 self.0.reborrow().price_ticks
             }
-            /// Reject the order instead of taking liquidity. Post-only is available only
-            /// on this resting limit-order variant.
+            /// Reject the order instead of taking liquidity. Post-only is available on
+            /// GTC and GTD limit orders; IOC, FOK and market orders cannot be post-only.
             ///
             /// Field 2: `post_only`
             #[must_use]
@@ -27958,7 +28016,7 @@ pub mod __buffa {
         /// exact expiry time.
         #[derive(Clone, Debug, Default)]
         pub struct LimitGtdView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -27966,9 +28024,9 @@ pub mod __buffa {
             ///
             /// Field 2: `post_only`
             pub post_only: bool,
-            /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
-            /// after validation time. The order cannot execute when the current time equals
-            /// this value.
+            /// Required exact expiry time in UTC. It must be at least 1 second and at
+            /// most 30 days after validation time. The order cannot execute when the
+            /// current time equals this value.
             ///
             /// Field 3: `expire_at`
             pub expire_at: ::buffa::MessageFieldView<
@@ -28308,7 +28366,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -28322,9 +28380,9 @@ pub mod __buffa {
             pub fn post_only(&self) -> bool {
                 self.0.reborrow().post_only
             }
-            /// Exact expiry time in UTC. It must be at least 1 second and at most 30 days
-            /// after validation time. The order cannot execute when the current time equals
-            /// this value.
+            /// Required exact expiry time in UTC. It must be at least 1 second and at
+            /// most 30 days after validation time. The order cannot execute when the
+            /// current time equals this value.
             ///
             /// Field 3: `expire_at`
             #[must_use]
@@ -28390,7 +28448,7 @@ pub mod __buffa {
         /// LimitIoc configures an immediate-or-cancel limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitIocView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -28610,7 +28668,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -28651,7 +28709,7 @@ pub mod __buffa {
         /// LimitFok configures a fill-or-kill limit order.
         #[derive(Clone, Debug, Default)]
         pub struct LimitFokView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -28871,7 +28929,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -29224,7 +29282,7 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Order side.
+            /// Order side. Required.
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
@@ -29232,12 +29290,15 @@ pub mod __buffa {
             /// While this identifier is retained, reuse returns
             /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
             /// same payload. This identifier enables GetOrder reconciliation after a
-            /// timeout; it does not provide exact replay.
+            /// timeout; it does not provide exact replay. At most 36 ASCII characters
+            /// using letters, digits, period, underscore, colon, slash, or hyphen.
             ///
             /// Field 20: `client_order_id`
             pub client_order_id: &'a str,
             /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
-            /// orders; SELL orders must use QUOTE.
+            /// orders on a pair whose allow_buy_fee_from_base is true in GetSpotConfig;
+            /// SELL orders must use QUOTE. Otherwise the order is refused with
+            /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
             ///
             /// Field 21: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
@@ -30187,7 +30248,7 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Order side.
+            /// Order side. Required.
             ///
             /// Field 2: `side`
             #[must_use]
@@ -30198,7 +30259,8 @@ pub mod __buffa {
             /// While this identifier is retained, reuse returns
             /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID for every new submission, even with the
             /// same payload. This identifier enables GetOrder reconciliation after a
-            /// timeout; it does not provide exact replay.
+            /// timeout; it does not provide exact replay. At most 36 ASCII characters
+            /// using letters, digits, period, underscore, colon, slash, or hyphen.
             ///
             /// Field 20: `client_order_id`
             #[must_use]
@@ -30206,7 +30268,9 @@ pub mod __buffa {
                 self.0.reborrow().client_order_id
             }
             /// Asset charged for fees. Defaults to QUOTE. BASE is available only for BUY
-            /// orders; SELL orders must use QUOTE.
+            /// orders on a pair whose allow_buy_fee_from_base is true in GetSpotConfig;
+            /// SELL orders must use QUOTE. Otherwise the order is refused with
+            /// ERROR_CODE_FEE_ASSET_NOT_ALLOWED.
             ///
             /// Field 21: `fee_asset`
             #[must_use]
@@ -30311,7 +30375,7 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Order to admit.
+            /// Order to admit. Required.
             ///
             /// Field 2: `order`
             pub order: ::buffa::MessageFieldView<
@@ -30607,7 +30671,7 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Order to admit.
+            /// Order to admit. Required.
             ///
             /// Field 2: `order`
             #[must_use]
@@ -31315,7 +31379,7 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Order intent to evaluate without submitting it.
+            /// Order intent to evaluate without submitting it. Required.
             ///
             /// Field 2: `order`
             pub order: ::buffa::MessageFieldView<
@@ -31611,7 +31675,7 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Order intent to evaluate without submitting it.
+            /// Order intent to evaluate without submitting it. Required.
             ///
             /// Field 2: `order`
             #[must_use]
@@ -34094,7 +34158,7 @@ pub mod __buffa {
         /// child. Attached risk legs do not support post-only.
         #[derive(Clone, Debug, Default)]
         pub struct RiskLimitGtcView<'a> {
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             pub price_ticks: i64,
@@ -34323,7 +34387,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Limit price in quote units scaled by 1e9.
+            /// Positive limit price in quote units scaled by 1e9.
             ///
             /// Field 1: `price_ticks`
             #[must_use]
@@ -34768,11 +34832,11 @@ pub mod __buffa {
         /// parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct TakeProfitPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Child execution when the threshold is crossed.
+            /// Required child execution when the threshold is crossed.
             ///
             /// Field 2: `child`
             pub child: ::buffa::MessageFieldView<
@@ -35107,14 +35171,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Child execution when the threshold is crossed.
+            /// Required child execution when the threshold is crossed.
             ///
             /// Field 2: `child`
             #[must_use]
@@ -35176,11 +35240,11 @@ pub mod __buffa {
         /// parent fills, and submits the selected child.
         #[derive(Clone, Debug, Default)]
         pub struct StopLossPolicyView<'a> {
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Child execution when the threshold is crossed.
+            /// Required child execution when the threshold is crossed.
             ///
             /// Field 2: `child`
             pub child: ::buffa::MessageFieldView<
@@ -35515,14 +35579,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Trigger price in quote units scaled by 1e9.
+            /// Positive trigger price in quote units scaled by 1e9.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Child execution when the threshold is crossed.
+            /// Required child execution when the threshold is crossed.
             ///
             /// Field 2: `child`
             #[must_use]
@@ -35603,12 +35667,12 @@ pub mod __buffa {
             pub trigger_price_source: ::buffa::EnumValue<
                 super::super::TriggerPriceSource,
             >,
-            /// Maximum price of a trailing stop that buys back, in quote units scaled by
-            /// 1e9: the most its exit pays per unit, at which the quote it may spend is
-            /// reserved with the exit's fee. Required when the parent order sells, so
-            /// the trailing stop buys; must be unset when the parent order buys. A rise
-            /// that fires above it still fires, and the exit fills only at or below it.
-            /// Changing it with ModifyOrder replaces the leg.
+            /// Positive maximum price of a trailing stop that buys back, in quote units
+            /// scaled by 1e9: the most its exit pays per unit, at which the quote it may
+            /// spend is reserved with the exit's fee. Required when the parent order
+            /// sells, so the trailing stop buys; must be unset when the parent order
+            /// buys. A rise that fires above it still fires, and the exit fills only at
+            /// or below it. Changing it with ModifyOrder replaces the leg.
             ///
             /// Field 4: `limit_price_ticks`
             pub limit_price_ticks: i64,
@@ -36121,12 +36185,12 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::TriggerPriceSource> {
                 self.0.reborrow().trigger_price_source
             }
-            /// Maximum price of a trailing stop that buys back, in quote units scaled by
-            /// 1e9: the most its exit pays per unit, at which the quote it may spend is
-            /// reserved with the exit's fee. Required when the parent order sells, so
-            /// the trailing stop buys; must be unset when the parent order buys. A rise
-            /// that fires above it still fires, and the exit fills only at or below it.
-            /// Changing it with ModifyOrder replaces the leg.
+            /// Positive maximum price of a trailing stop that buys back, in quote units
+            /// scaled by 1e9: the most its exit pays per unit, at which the quote it may
+            /// spend is reserved with the exit's fee. Required when the parent order
+            /// sells, so the trailing stop buys; must be unset when the parent order
+            /// buys. A rise that fires above it still fires, and the exit fills only at
+            /// or below it. Changing it with ModifyOrder replaces the leg.
             ///
             /// Field 4: `limit_price_ticks`
             #[must_use]
@@ -36776,6 +36840,8 @@ pub mod __buffa {
             /// Idempotency key (required). Reuse the same key and criteria for retries.
             /// Completed results are retained for at least two minutes. Use a fresh key
             /// for a new cancellation; do not reuse a key after its replay window.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 6: `request_id`
             pub request_id: &'a str,
@@ -37156,6 +37222,8 @@ pub mod __buffa {
             /// Idempotency key (required). Reuse the same key and criteria for retries.
             /// Completed results are retained for at least two minutes. Use a fresh key
             /// for a new cancellation; do not reuse a key after its replay window.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 6: `request_id`
             #[must_use]
@@ -38240,6 +38308,8 @@ pub mod __buffa {
             /// Field 4: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
             /// Idempotency/trace key from caller (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 5: `request_id`
             pub request_id: &'a str,
@@ -38596,6 +38666,8 @@ pub mod __buffa {
                 self.0.reborrow().side
             }
             /// Idempotency/trace key from caller (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 5: `request_id`
             #[must_use]
@@ -40804,10 +40876,12 @@ pub mod __buffa {
             /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
             /// is a new request and can place its orders again, so read the items back
             /// instead of repeating an older batch.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
-            /// Orders to create (max 20). client_order_id is optional per item. For a new
+            /// Orders to create, 1 to 20. client_order_id is optional per item. For a new
             /// request_id, a reused client_order_id rejects only that item with
             /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
             ///
@@ -41121,13 +41195,15 @@ pub mod __buffa {
             /// CONFLICT_IDEMPOTENCY_KEY_REUSE. After 15 minutes the ID is free: a repeat
             /// is a new request and can place its orders again, so read the items back
             /// instead of repeating an older batch.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Orders to create (max 20). client_order_id is optional per item. For a new
+            /// Orders to create, 1 to 20. client_order_id is optional per item. For a new
             /// request_id, a reused client_order_id rejects only that item with
             /// CONFLICT_DUPLICATE_CLIENT_ORDER_ID; other valid items continue.
             ///
@@ -41672,16 +41748,20 @@ pub mod __buffa {
             pub subaccount_id: ::core::option::Option<u64>,
             /// Idempotency key (required). Outstanding modifications retain this key;
             /// identical retries replay the final result for 60 seconds after the answer.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 4: `request_id`
             pub request_id: &'a str,
-            /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e9. Required for price changes.
+            /// Patch fields (presence-based): set at least one of new_price_ticks,
+            /// new_qty_scaled or new_attached_risk.
+            /// Positive new limit price in quote units scaled by 1e9. Required for price
+            /// changes.
             ///
             /// Field 5: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
-            /// Target total quantity after modify/replace, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Positive target total quantity after modify/replace, scaled by the
+            /// pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 6: `new_qty_scaled`
             pub new_qty_scaled: ::core::option::Option<i64>,
@@ -41699,7 +41779,9 @@ pub mod __buffa {
             ///
             /// Field 8: `behavior`
             pub behavior: ::buffa::EnumValue<super::super::ModifyBehavior>,
-            /// Optional new client order id when replace path is taken.
+            /// Optional new client order id when replace path is taken: at most 36 ASCII
+            /// characters using letters, digits, period, underscore, colon, slash, or
+            /// hyphen.
             ///
             /// Field 9: `new_client_order_id`
             pub new_client_order_id: &'a str,
@@ -42236,22 +42318,26 @@ pub mod __buffa {
             }
             /// Idempotency key (required). Outstanding modifications retain this key;
             /// identical retries replay the final result for 60 seconds after the answer.
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 4: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Patch fields (presence-based).
-            /// New limit price in quote units scaled by 1e9. Required for price changes.
+            /// Patch fields (presence-based): set at least one of new_price_ticks,
+            /// new_qty_scaled or new_attached_risk.
+            /// Positive new limit price in quote units scaled by 1e9. Required for price
+            /// changes.
             ///
             /// Field 5: `new_price_ticks`
             #[must_use]
             pub fn new_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().new_price_ticks
             }
-            /// Target total quantity after modify/replace, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Positive target total quantity after modify/replace, scaled by the
+            /// pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 6: `new_qty_scaled`
             #[must_use]
@@ -42280,7 +42366,9 @@ pub mod __buffa {
             pub fn behavior(&self) -> ::buffa::EnumValue<super::super::ModifyBehavior> {
                 self.0.reborrow().behavior
             }
-            /// Optional new client order id when replace path is taken.
+            /// Optional new client order id when replace path is taken: at most 36 ASCII
+            /// characters using letters, digits, period, underscore, colon, slash, or
+            /// hyphen.
             ///
             /// Field 9: `new_client_order_id`
             #[must_use]
@@ -42923,12 +43011,14 @@ pub mod __buffa {
         /// force a replacement, use ModifyOrder with REPLACE_ONLY.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrderItemView<'a> {
-            /// New limit price in quote units scaled by 1e9.
+            /// Patch fields (presence-based): set at least one of new_price_ticks,
+            /// new_qty_scaled or new_attached_risk.
+            /// Positive new limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             pub new_price_ticks: ::core::option::Option<i64>,
-            /// Target total quantity after modify/replace, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Positive target total quantity after modify/replace, scaled by the
+            /// pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 4: `new_qty_scaled`
             pub new_qty_scaled: ::core::option::Option<i64>,
@@ -42939,7 +43029,8 @@ pub mod __buffa {
                 super::super::__buffa::view::RiskPolicyView<'a>,
             >,
             /// Optional client order ID for the successor. A value other than the order's
-            /// client order ID makes the item a replacement.
+            /// client order ID makes the item a replacement. At most 36 ASCII characters
+            /// using letters, digits, period, underscore, colon, slash, or hyphen.
             ///
             /// Field 6: `new_client_order_id`
             pub new_client_order_id: &'a str,
@@ -43367,15 +43458,17 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// New limit price in quote units scaled by 1e9.
+            /// Patch fields (presence-based): set at least one of new_price_ticks,
+            /// new_qty_scaled or new_attached_risk.
+            /// Positive new limit price in quote units scaled by 1e9.
             ///
             /// Field 3: `new_price_ticks`
             #[must_use]
             pub fn new_price_ticks(&self) -> ::core::option::Option<i64> {
                 self.0.reborrow().new_price_ticks
             }
-            /// Target total quantity after modify/replace, scaled by the pair's
-            /// base_quantity_scale from GetSpotConfig.
+            /// Positive target total quantity after modify/replace, scaled by the
+            /// pair's base_quantity_scale from GetSpotConfig.
             ///
             /// Field 4: `new_qty_scaled`
             #[must_use]
@@ -43394,7 +43487,8 @@ pub mod __buffa {
                 &self.0.reborrow().new_attached_risk
             }
             /// Optional client order ID for the successor. A value other than the order's
-            /// client order ID makes the item a replacement.
+            /// client order ID makes the item a replacement. At most 36 ASCII characters
+            /// using letters, digits, period, underscore, colon, slash, or hyphen.
             ///
             /// Field 6: `new_client_order_id`
             #[must_use]
@@ -44053,10 +44147,12 @@ pub mod __buffa {
             /// Field 2: `symbol_id`
             pub symbol_id: u32,
             /// Client idempotency key (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 3: `request_id`
             pub request_id: &'a str,
-            /// Replacement items.
+            /// Replacement items, 1 to 50, each targeting a different order.
             ///
             /// Field 4: `items`
             pub items: ::buffa::RepeatedView<
@@ -44394,13 +44490,15 @@ pub mod __buffa {
                 self.0.reborrow().symbol_id
             }
             /// Client idempotency key (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 3: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Replacement items.
+            /// Replacement items, 1 to 50, each targeting a different order.
             ///
             /// Field 4: `items`
             #[must_use]
@@ -45013,7 +45111,9 @@ pub mod __buffa {
             ///
             /// Field 1: `order_id`
             pub order_id: u64,
-            /// Client order ID. Exactly one of order_id or client_order_id.
+            /// Client order ID: 1 to 36 ASCII characters using letters, digits, period,
+            /// underscore, colon, slash, or hyphen. Exactly one of order_id or
+            /// client_order_id.
             ///
             /// Field 2: `client_order_id`
             pub client_order_id: &'a str,
@@ -45298,7 +45398,9 @@ pub mod __buffa {
             pub fn order_id(&self) -> u64 {
                 self.0.reborrow().order_id
             }
-            /// Client order ID. Exactly one of order_id or client_order_id.
+            /// Client order ID: 1 to 36 ASCII characters using letters, digits, period,
+            /// underscore, colon, slash, or hyphen. Exactly one of order_id or
+            /// client_order_id.
             ///
             /// Field 2: `client_order_id`
             #[must_use]
@@ -45799,10 +45901,12 @@ pub mod __buffa {
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
             /// Idempotency key (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             pub request_id: &'a str,
-            /// Orders to cancel (max 50).
+            /// Orders to cancel, 1 to 50.
             ///
             /// Field 3: `items`
             pub items: ::buffa::RepeatedView<
@@ -46107,13 +46211,15 @@ pub mod __buffa {
                 self.0.reborrow().subaccount_id
             }
             /// Idempotency key (required).
+            /// 1 to 64 ASCII characters using letters, digits, period, underscore, colon,
+            /// slash, or hyphen.
             ///
             /// Field 2: `request_id`
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
             }
-            /// Orders to cancel (max 50).
+            /// Orders to cancel, 1 to 50.
             ///
             /// Field 3: `items`
             #[must_use]
@@ -49975,7 +50081,15 @@ pub mod __buffa {
             pub fee_total: ::buffa::MessageFieldView<
                 super::super::__buffa::view::OrderFeeTotalView<'a>,
             >,
-            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
+            /// Price in quote units scaled by 1e9. For a LIMIT order, its limit price.
+            /// For a MARKET order, whatever placed it, its protection price: the worst
+            /// price it may fill at, a BUY at or below it and a SELL at or above it. It
+            /// is the order's reference price moved by its maximum slippage, or by the
+            /// pair's default market slippage for its side (200 basis points if none is
+            /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+            /// trailing stop's market order takes the price that fired it as its
+            /// reference; a buy stop's is never above the protection price at its
+            /// trigger price.
             ///
             /// Field 15: `price_ticks`
             pub price_ticks: i64,
@@ -50019,8 +50133,10 @@ pub mod __buffa {
             ///
             /// Field 23: `market_client_ref_price_ticks`
             pub market_client_ref_price_ticks: i64,
-            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
-            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+            /// MARKET maximum absolute price delta the order carries, in Q9
+            /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
+            /// set this cap; zero when it did not, for example because it set
+            /// market_max_slippage_bps instead.
             ///
             /// Field 24: `market_max_slippage_ticks`
             pub market_max_slippage_ticks: i64,
@@ -51615,7 +51731,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().fee_total
             }
-            /// Limit price in quote units scaled by 1e9. Zero for MARKET orders.
+            /// Price in quote units scaled by 1e9. For a LIMIT order, its limit price.
+            /// For a MARKET order, whatever placed it, its protection price: the worst
+            /// price it may fill at, a BUY at or below it and a SELL at or above it. It
+            /// is the order's reference price moved by its maximum slippage, or by the
+            /// pair's default market slippage for its side (200 basis points if none is
+            /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+            /// trailing stop's market order takes the price that fired it as its
+            /// reference; a buy stop's is never above the protection price at its
+            /// trigger price.
             ///
             /// Field 15: `price_ticks`
             #[must_use]
@@ -51689,8 +51813,10 @@ pub mod __buffa {
             pub fn market_client_ref_price_ticks(&self) -> i64 {
                 self.0.reborrow().market_client_ref_price_ticks
             }
-            /// Non-negative MARKET maximum absolute price delta in Q9 execution-price ticks
-            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+            /// MARKET maximum absolute price delta the order carries, in Q9
+            /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
+            /// set this cap; zero when it did not, for example because it set
+            /// market_max_slippage_bps instead.
             ///
             /// Field 24: `market_max_slippage_ticks`
             #[must_use]
@@ -53505,7 +53631,8 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Optional filter by symbol_id values. Empty means all symbols.
+            /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+            /// Empty means all symbols.
             ///
             /// Field 2: `symbol_id`
             pub symbol_id: ::buffa::RepeatedView<'a, u32>,
@@ -53519,7 +53646,7 @@ pub mod __buffa {
             pub limit: ::core::option::Option<u32>,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, and sort
-            /// order.
+            /// order. At most 512 characters.
             ///
             /// Field 11: `page_token`
             pub page_token: &'a str,
@@ -53955,7 +54082,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Optional filter by symbol_id values. Empty means all symbols.
+            /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+            /// Empty means all symbols.
             ///
             /// Field 2: `symbol_id`
             #[must_use]
@@ -53978,7 +54106,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, and sort
-            /// order.
+            /// order. At most 512 characters.
             ///
             /// Field 11: `page_token`
             #[must_use]
@@ -54378,7 +54506,8 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Optional filter by symbol_id values. Empty means all symbols.
+            /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+            /// Empty means all symbols.
             ///
             /// Field 2: `symbol_id`
             pub symbol_id: ::buffa::RepeatedView<'a, u32>,
@@ -54395,7 +54524,8 @@ pub mod __buffa {
             /// Field 10: `start_ts_ns`
             pub start_ts_ns: ::core::option::Option<u64>,
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-            /// Omit for no upper bound; an explicit zero returns an empty page.
+            /// Omit for no upper bound; an explicit zero returns an empty page. Any
+            /// other value must not be earlier than start_ts_ns when both are set.
             ///
             /// Field 11: `end_ts_ns`
             pub end_ts_ns: ::core::option::Option<u64>,
@@ -54405,7 +54535,7 @@ pub mod __buffa {
             pub limit: ::core::option::Option<u32>,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, time range,
-            /// and sort order.
+            /// and sort order. At most 512 characters.
             ///
             /// Field 13: `page_token`
             pub page_token: &'a str,
@@ -54910,7 +55040,8 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Optional filter by symbol_id values. Empty means all symbols.
+            /// Optional filter by symbol_id values: at most 100 distinct positive IDs.
+            /// Empty means all symbols.
             ///
             /// Field 2: `symbol_id`
             #[must_use]
@@ -54939,7 +55070,8 @@ pub mod __buffa {
                 self.0.reborrow().start_ts_ns
             }
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-            /// Omit for no upper bound; an explicit zero returns an empty page.
+            /// Omit for no upper bound; an explicit zero returns an empty page. Any
+            /// other value must not be earlier than start_ts_ns when both are set.
             ///
             /// Field 11: `end_ts_ns`
             #[must_use]
@@ -54955,7 +55087,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, time range,
-            /// and sort order.
+            /// and sort order. At most 512 characters.
             ///
             /// Field 13: `page_token`
             #[must_use]
@@ -55366,7 +55498,7 @@ pub mod __buffa {
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
-            /// Optional filter by symbol_id.
+            /// Optional filter by symbol_id. Required with after_match_id.
             ///
             /// Field 2: `symbol_id`
             pub symbol_id: u32,
@@ -55379,7 +55511,8 @@ pub mod __buffa {
             /// Field 10: `start_ts_ns`
             pub start_ts_ns: ::core::option::Option<u64>,
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-            /// Omit for no upper bound; an explicit zero returns an empty page.
+            /// Omit for no upper bound; an explicit zero returns an empty page. Any
+            /// other value must not be earlier than start_ts_ns when both are set.
             ///
             /// Field 11: `end_ts_ns`
             pub end_ts_ns: ::core::option::Option<u64>,
@@ -55389,17 +55522,18 @@ pub mod __buffa {
             pub limit: ::core::option::Option<u32>,
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, time range,
-            /// and sort order.
+            /// and sort order. At most 512 characters.
             ///
             /// Field 13: `page_token`
             pub page_token: &'a str,
             /// Return only durable fills whose per-symbol match ID is greater than this
             /// value. Subscribe to the execution WebSocket before calling this method and
             /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+            /// Must be positive and requires symbol_id, because match IDs are per symbol.
             ///
             /// Field 14: `after_match_id`
             pub after_match_id: ::core::option::Option<u64>,
-            /// Inclusive generation ceiling; requires lineage_id.
+            /// Positive inclusive generation ceiling; requires lineage_id.
             /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
@@ -55935,7 +56069,7 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().subaccount_id
             }
-            /// Optional filter by symbol_id.
+            /// Optional filter by symbol_id. Required with after_match_id.
             ///
             /// Field 2: `symbol_id`
             #[must_use]
@@ -55957,7 +56091,8 @@ pub mod __buffa {
                 self.0.reborrow().start_ts_ns
             }
             /// Inclusive end of the time range, in nanoseconds since epoch (UTC).
-            /// Omit for no upper bound; an explicit zero returns an empty page.
+            /// Omit for no upper bound; an explicit zero returns an empty page. Any
+            /// other value must not be earlier than start_ts_ns when both are set.
             ///
             /// Field 11: `end_ts_ns`
             #[must_use]
@@ -55973,7 +56108,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous response. The cursor is exclusive and
             /// bound to the authenticated account, sub-account scope, filters, time range,
-            /// and sort order.
+            /// and sort order. At most 512 characters.
             ///
             /// Field 13: `page_token`
             #[must_use]
@@ -55983,13 +56118,14 @@ pub mod __buffa {
             /// Return only durable fills whose per-symbol match ID is greater than this
             /// value. Subscribe to the execution WebSocket before calling this method and
             /// de-duplicate overlapping results by (symbol_id, match_id, order_id).
+            /// Must be positive and requires symbol_id, because match IDs are per symbol.
             ///
             /// Field 14: `after_match_id`
             #[must_use]
             pub fn after_match_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().after_match_id
             }
-            /// Inclusive generation ceiling; requires lineage_id.
+            /// Positive inclusive generation ceiling; requires lineage_id.
             /// Does not freeze an actively filling generation.
             ///
             /// Field 17: `through_generation`
@@ -56467,6 +56603,7 @@ pub mod __buffa {
             pub limit: ::core::option::Option<u32>,
             /// Execution cursor from this order's previous response. Use order_id rather
             /// than a reused client_order_id to keep the requested generation stable.
+            /// At most 512 characters.
             ///
             /// Field 14: `page_token`
             pub page_token: &'a str,
@@ -56928,6 +57065,7 @@ pub mod __buffa {
             }
             /// Execution cursor from this order's previous response. Use order_id rather
             /// than a reused client_order_id to keep the requested generation stable.
+            /// At most 512 characters.
             ///
             /// Field 14: `page_token`
             #[must_use]
@@ -59254,6 +59392,7 @@ pub mod __buffa {
         pub mod risk_execution {
             #[allow(unused_imports)]
             use super::*;
+            /// Required child execution: exactly one variant.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Execution {
                 MarketIoc(
@@ -59487,7 +59626,7 @@ pub mod __buffa {
         pub mod modify_order_request {
             #[allow(unused_imports)]
             use super::*;
-            /// Target key.
+            /// Target key: exactly one of order_id or client_order_id is required.
             #[derive(Clone, PartialEq, Debug)]
             pub enum Key {
                 OrderId(u64),

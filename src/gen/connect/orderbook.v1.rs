@@ -91,7 +91,8 @@ pub const ORDERBOOK_SERVICE_GET_ORDER_BOOK_SPEC: ::connectrpc::Spec = ::connectr
 #[allow(clippy::type_complexity)]
 pub trait OrderbookService: Send + Sync + 'static {
     /// Retrieve a spot order book depth snapshot for a symbol.
-    /// Supports selectable depth per side and returns best bid/ask levels.
+    /// Supports a selectable depth per side, up to the max_depth each response
+    /// reports, and returns best bid/ask levels.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

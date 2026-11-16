@@ -17545,7 +17545,7 @@ pub struct SubaccountInvite {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub grantee_root_smart_account_address: ::buffa::alloc::string::String,
-    /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires MFA enrollment and fresh step-up.
+    /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires an enrolled MFA factor and a recently MFA-elevated session.
     ///
     /// Field 14: `require_member_mfa`
     #[serde(
@@ -38710,7 +38710,7 @@ pub enum AuthErrorCode {
     AUTH_MFA_ELEVATION_REQUIRED = 38i32,
     /// At least one active MFA factor must remain enrolled.
     AUTH_MFA_LAST_FACTOR_REQUIRED = 39i32,
-    /// An unexpected internal failure prevented the auth mutation from completing.
+    /// An unexpected server error stopped the request from completing.
     AUTH_INTERNAL_ERROR = 40i32,
     /// The caller has not accepted the terms required for this action.
     AUTH_TERMS_NOT_ACCEPTED = 41i32,
@@ -74788,7 +74788,7 @@ pub mod __buffa {
             ///
             /// Field 13: `grantee_root_smart_account_address`
             pub grantee_root_smart_account_address: &'a str,
-            /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires MFA enrollment and fresh step-up.
+            /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires an enrolled MFA factor and a recently MFA-elevated session.
             ///
             /// Field 14: `require_member_mfa`
             pub require_member_mfa: bool,
@@ -75510,7 +75510,7 @@ pub mod __buffa {
             pub fn grantee_root_smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().grantee_root_smart_account_address
             }
-            /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires MFA enrollment and fresh step-up.
+            /// Current delegated-member MFA requirement on the target sub-account. If true, accepting the invite requires an enrolled MFA factor and a recently MFA-elevated session.
             ///
             /// Field 14: `require_member_mfa`
             #[must_use]

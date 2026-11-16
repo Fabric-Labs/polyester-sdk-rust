@@ -637,7 +637,7 @@ impl Client {
             )
             .await
             .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
-            .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
+            .map_err(|e| upgrade_error(format!("ws connect: {e}"), &e))?;
             if response
                 .headers()
                 .get(SEC_WEBSOCKET_PROTOCOL)
@@ -1082,6 +1082,19 @@ where
     }
 }
 
+/// A WebSocket connect failure as [`Error::Realtime`]; a refused upgrade is an
+/// answer, so its error carries the answer's status and delay. A connect that
+/// got no answer, such as a refused connection, carries none.
+pub(crate) fn upgrade_error(message: String, err: &tokio_tungstenite::tungstenite::Error) -> Error {
+    let error = Error::realtime(message);
+    match err {
+        tokio_tungstenite::tungstenite::Error::Http(response) => error.with_answer(
+            crate::errors::answer_from_headers(response.status().as_u16(), response.headers()),
+        ),
+        _ => error,
+    }
+}
+
 fn centrifugo_protocol_error_message(error: &protocol::ProtoError) -> String {
     format!(
         "centrifugo error {}: {}{}",
@@ -1123,8 +1136,215 @@ mod tests {
             Err(err) => err,
             Ok(_) => panic!("private subscribe without credentials must fail"),
         };
-        assert!(matches!(err, Error::Auth(_)));
+        assert!(matches!(err, Error::Auth { .. }));
         assert!(err.to_string().contains("without API-key credentials"));
+    }
+
+    /// Accepts the WebSocket upgrade, if `upgrade`, and answers every other
+    /// request with `status`, `body` and `Retry-After: 30`.
+    async fn answering_server(status: u16, body: &'static str, upgrade: bool) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut head = [0u8; 64];
+                    let n = stream.peek(&mut head).await.unwrap_or(0);
+                    if upgrade && head[..n].starts_with(b"GET /connection/websocket") {
+                        // Echo the requested subprotocol, as the server does.
+                        let echo = |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+                                    mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                            if let Some(protocol) = request.headers().get("sec-websocket-protocol") {
+                                response
+                                    .headers_mut()
+                                    .insert("sec-websocket-protocol", protocol.clone());
+                            }
+                            Ok(response)
+                        };
+                        if let Ok(mut ws) = tokio_tungstenite::accept_hdr_async(stream, echo).await
+                        {
+                            use futures_util::StreamExt;
+                            while ws.next().await.is_some() {}
+                        }
+                        return;
+                    }
+                    let mut buf = vec![0u8; 16 * 1024];
+                    let _ = stream.read(&mut buf).await;
+                    let head = format!(
+                        "HTTP/1.1 {status} Answer\r\nContent-Type: application/json\r\nRetry-After: 30\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(head.as_bytes()).await;
+                    let _ = stream.write_all(body.as_bytes()).await;
+                });
+            }
+        });
+        addr.to_string()
+    }
+
+    async fn subscribe_error(host: &str) -> Error {
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        let creds = Credentials::new("key_answer", &secret_hex).unwrap();
+        let client = Client::new(
+            format!("ws://{host}/connection/websocket"),
+            format!("http://{host}"),
+            Some(creds),
+            None,
+        );
+        match tokio::time::timeout(
+            Duration::from_secs(10),
+            client.subscribe_raw("private:spot:trades:acct:proto"),
+        )
+        .await
+        {
+            Ok(Err(err)) => err,
+            Ok(Ok(_)) => panic!("the answer refuses the subscription"),
+            Err(_) => panic!("the subscription neither failed nor succeeded"),
+        }
+    }
+
+    /// A realtime token answer becomes an error that carries the answer: a
+    /// temporary failure (`Error::Realtime`) and an auth or permission refusal
+    /// alike, through `subscribe_raw`.
+    #[tokio::test]
+    async fn token_answers_carry_their_metadata_through_subscribe_raw() {
+        for (status, body) in [
+            (
+                503u16,
+                r#"{"code":"AUTH_TEMPORARILY_UNAVAILABLE","status":503}"#,
+            ),
+            (
+                401,
+                r#"{"code":"unauthenticated","message":"bad signature"}"#,
+            ),
+            (403, r#"{"code":"permission_denied","message":"refused"}"#),
+        ] {
+            let err = subscribe_error(&answering_server(status, body, true).await).await;
+            if status == 503 {
+                assert!(
+                    matches!(&err, Error::Realtime { message, .. } if message.contains("HTTP 503")),
+                    "{err:?}"
+                );
+            }
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((status, Some(30.0))),
+                "{status}: {err:?}"
+            );
+            assert_eq!(err.retry_after(), Some(30.0), "{status}: {err:?}");
+        }
+    }
+
+    /// A refused WebSocket upgrade is an answer too.
+    #[tokio::test]
+    async fn refused_upgrade_carries_its_answer_through_subscribe_raw() {
+        let err = subscribe_error(&answering_server(503, "busy", false).await).await;
+        assert!(
+            matches!(&err, Error::Realtime { message, .. } if message.starts_with("ws connect")),
+            "{err:?}"
+        );
+        assert_eq!(
+            err.answer()
+                .map(|answer| (answer.status, answer.retry_after)),
+            Some((503, Some(30.0))),
+            "{err:?}"
+        );
+    }
+
+    /// A token answer's metadata is read from its headers before its body: a
+    /// body cut short, too large or still arriving at the deadline, and a
+    /// redirect the SDK never follows (a valid or a malformed `Location`), all
+    /// leave an error carrying the answer's status and Retry-After, after one
+    /// request and at once. A refused connection carries no answer.
+    #[tokio::test]
+    async fn token_body_failures_and_redirects_carry_their_answer_through_subscribe_raw() {
+        use crate::answer_test_server::{
+            Answer, AnswerBody, MALFORMED_LOCATION, answering, counting_target,
+        };
+        let (target, target_hits) = counting_target().await;
+        let too_large = auth::MAX_TOKEN_RESPONSE_BYTES + 1;
+        let cases = [
+            ("truncated", Answer::unavailable(AnswerBody::Truncated)),
+            (
+                "oversized",
+                Answer::unavailable(AnswerBody::Sized(too_large)),
+            ),
+            (
+                "oversized-chunked",
+                Answer::unavailable(AnswerBody::Chunked(too_large)),
+            ),
+            ("body-deadline", Answer::unavailable(AnswerBody::Stalled)),
+            (
+                "redirect",
+                Answer::redirect(format!("http://{target}/v1/rt/token")),
+            ),
+            (
+                "redirect-malformed",
+                Answer::redirect(MALFORMED_LOCATION.to_owned()),
+            ),
+        ];
+        for (name, answer) in cases {
+            let status = answer.status;
+            let (host, requests) = answering(answer, true).await;
+            let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+            let client = Client::with_timeout(
+                format!("ws://{host}/connection/websocket"),
+                format!("http://{host}"),
+                Some(Credentials::new("key_answer", &secret_hex).unwrap()),
+                None,
+                Duration::from_millis(400),
+            );
+            let started = std::time::Instant::now();
+            let err = match tokio::time::timeout(
+                Duration::from_secs(10),
+                client.subscribe_raw("private:spot:trades:acct:proto"),
+            )
+            .await
+            {
+                Ok(Err(err)) => err,
+                Ok(Ok(_)) => panic!("{name}: the answer refuses the subscription"),
+                Err(_) => panic!("{name}: the subscription neither failed nor succeeded"),
+            };
+            assert!(
+                started.elapsed() < Duration::from_secs(3),
+                "{name}: {:?}",
+                started.elapsed()
+            );
+            assert_eq!(requests.load(Ordering::SeqCst), 1, "{name}: {err:?}");
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((status, Some(30.0))),
+                "{name}: {err:?}"
+            );
+        }
+        assert_eq!(
+            target_hits.load(Ordering::SeqCst),
+            0,
+            "a redirect was followed"
+        );
+        // Port 1 on the loopback refuses the connection: no answer at all.
+        let host = "127.0.0.1:1";
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        let client = Client::with_timeout(
+            format!("ws://{host}/connection/websocket"),
+            format!("http://{host}"),
+            Some(Credentials::new("key_answer", &secret_hex).unwrap()),
+            None,
+            Duration::from_millis(400),
+        );
+        let err = tokio::time::timeout(
+            Duration::from_secs(10),
+            client.subscribe_raw("private:spot:trades:acct:proto"),
+        )
+        .await
+        .expect("a refused connection fails at once");
+        let Err(err) = err else {
+            panic!("no server, no subscription");
+        };
+        assert!(err.answer().is_none(), "{err:?}");
     }
 
     #[test]

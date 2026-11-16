@@ -375,7 +375,7 @@ fn assert_typed_money_error(err: &Error, label: &str) {
     match err {
         Error::Api { code, .. }
             if code.starts_with("ERROR_CODE_") || code.starts_with("UNKNOWN_ERROR_CODE") => {}
-        Error::Auth(_) | Error::PermissionDenied { .. } => {}
+        Error::Auth { .. } | Error::PermissionDenied { .. } => {}
         Error::RouteNotFound { .. } | Error::NotImplemented { .. } => {
             panic!("{label} not mounted on API host: {err}");
         }

@@ -49,7 +49,8 @@ pub enum ErrorCode {
     ERROR_CODE_IDEMPOTENCY_CONFLICT = 20i32,
     /// The funds lock conflicts with an existing or finalized reservation.
     ERROR_CODE_FUNDS_LOCK_CONFLICT = 21i32,
-    /// The authoritative capital view is not ready or is stale.
+    /// The account's available balance cannot be confirmed right now. Retry
+    /// later.
     ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE = 22i32,
     /// Funds movement for this account is temporarily unavailable. Retry later.
     ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE = 23i32,

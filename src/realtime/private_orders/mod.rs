@@ -141,7 +141,7 @@ impl Transport for LiveTransport {
             )
             .await
             .map_err(|_| Error::realtime("private WebSocket connect timed out"))?
-            .map_err(|e| Error::realtime(format!("private WebSocket connect: {e}")))?;
+            .map_err(|e| super::upgrade_error(format!("private WebSocket connect: {e}"), &e))?;
             if response
                 .headers()
                 .get(SEC_WEBSOCKET_PROTOCOL)
@@ -486,7 +486,7 @@ fn backoff(attempt: u32, jitter: &mut u64) -> Duration {
 fn is_terminal_token_error(error: &Error) -> bool {
     matches!(
         error,
-        Error::Auth(_)
+        Error::Auth { .. }
             | Error::ApiKeyRejected { .. }
             | Error::PermissionDenied { .. }
             | Error::Validation(_)
@@ -1200,6 +1200,7 @@ impl Actor {
             code,
             metadata: Vec::new(),
             violations: Vec::new(),
+            answer: None,
         };
         let account = request
             .map(|request| request.account)

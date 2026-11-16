@@ -7422,9 +7422,6 @@ impl ::buffa::Enumeration for HeatmapInterval {
     }
 }
 /// HeatmapDepth controls top-N levels included per side in each heatmap bucket.
-///
-/// Values intentionally mirror orderbook.v1.Depth for FE ergonomics, while
-/// keeping this contract decoupled from orderbook service protos.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum HeatmapDepth {

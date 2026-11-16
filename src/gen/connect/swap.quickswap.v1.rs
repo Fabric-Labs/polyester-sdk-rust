@@ -2100,10 +2100,14 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListVaultBalances reads current balances for this broker's own vaults.
-    /// All broker roles and the broker's API keys can read, without step-up.
-    /// Errors: NOT_FOUND for an unknown broker or vault; UNAVAILABLE when a
-    /// balance cannot be read. No partial page is returned on a read failure.
+    /// ListVaultBalances reads the current balances of the broker's vaults.
+    /// Covers the default vault and every affiliate vault. Every broker role
+    /// and the broker's API keys can read, without step-up.
+    /// Errors:
+    /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another broker or vault filter, or
+    /// malformed.
+    /// - UNAVAILABLE: a balance cannot be read; no partial page is returned.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2126,8 +2130,10 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListMyBrokers lists the brokers the caller is a member of and the
-    /// invites addressed to the caller. Session token only.
+    /// ListMyBrokers lists the caller's broker memberships and pending invites.
+    /// Session token only.
+    /// Errors:
+    /// - PERMISSION_DENIED: ACTION_DENIED for a broker API key.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2299,10 +2305,10 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// TransferOwnership makes another member the Owner; the caller, the
-    /// current Owner, becomes an Admin in the same change, and the caller's
-    /// pending invites that an Admin may not grant (Finance) are cancelled.
-    /// Session token and step-up proof only.
+    /// TransferOwnership makes another member the Owner of the broker.
+    /// The caller, the current Owner, becomes an Admin in the same change, and
+    /// the caller's pending invites that an Admin may not grant (Finance) are
+    /// cancelled. Session token and step-up proof only.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or MEMBER_NOT_FOUND.
     /// - PERMISSION_DENIED: ACTION_DENIED or STEP_UP_REQUIRED.
@@ -2551,12 +2557,12 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListQuickSwaps lists the broker's QuickSwaps, newest first, filtered by
-    /// vault, status and creation time.
+    /// ListQuickSwaps lists the broker's QuickSwaps.
+    /// Newest first, filtered by vault, status and creation time.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND.
-    /// - INVALID_ARGUMENT: a page_token from another broker, other filters or
-    /// malformed.
+    /// - INVALID_ARGUMENT: vault_account_id is not a public sub-account ID, or
+    /// a page_token from another broker, other filters or malformed.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2579,11 +2585,12 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetQuickSwap returns the full detail of one of the broker's QuickSwaps,
-    /// including its addresses, quote, progress, requested and charged fees.
-    /// Every broker member role can read it with a session token.
+    /// GetQuickSwap returns the full detail of one of the broker's QuickSwaps.
+    /// The detail includes its addresses, quote, progress, and requested and
+    /// charged fees. Every broker member role can read it with a session token.
     /// Errors:
-    /// - NOT_FOUND: BROKER_NOT_FOUND or SWAP_NOT_FOUND, including another broker's swap.
+    /// - NOT_FOUND: BROKER_NOT_FOUND, or SWAP_NOT_FOUND, including another
+    /// broker's QuickSwap.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2606,10 +2613,12 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetFeeTotals totals the broker and affiliate fees charged to the
-    /// broker's QuickSwaps in a window, per asset, by vault, day or month.
+    /// GetFeeTotals totals the broker and affiliate fees charged in a window.
+    /// Fees charged to the broker's QuickSwaps, per asset, grouped by vault, day
+    /// or month.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: vault_account_id is not a public sub-account ID.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2632,9 +2641,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetBrokerStats reads the broker's QuickSwap activity in a window, per UTC
-    /// day or month: QuickSwaps created by status, deposits credited and
-    /// payouts delivered per asset, and the service, broker, affiliate and
+    /// GetBrokerStats reads the broker's QuickSwap activity in a window.
+    /// Per UTC day or month: QuickSwaps created by status, deposits credited
+    /// and payouts delivered per asset, and the service, broker, affiliate and
     /// referral fees charged per asset.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND.
@@ -2662,9 +2671,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListPayouts lists the payout runs of the broker's vaults, newest first,
-    /// filtered by vault, status and scheduled slot. Every broker role and the
-    /// broker's API keys can read, without step-up.
+    /// ListPayouts lists the payout runs of the broker's vaults.
+    /// Newest first, filtered by vault, status and scheduled slot. Every broker
+    /// role and the broker's API keys can read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND, or VAULT_NOT_FOUND for a vault that is
     /// not the broker's.
@@ -2693,9 +2702,9 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetPayout reads one payout run of the broker's vaults, for a detail view
-    /// or a link from a ledger entry. Every broker role and the broker's API
-    /// keys can read, without step-up.
+    /// GetPayout reads one payout run of the broker's vaults.
+    /// For a detail view or a link from a ledger entry. Every broker role and
+    /// the broker's API keys can read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND, or PAYOUT_NOT_FOUND, including a run of
     /// another broker's vault.
@@ -2722,11 +2731,11 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListUpcomingPayouts previews the next payout run of each of the
-    /// broker's vaults from its balances now: when it starts, whether it would
-    /// pay, and per asset what it would pay, what would stay and why, and the
-    /// expected network fee. Every broker role and the broker's API keys can
-    /// read, without step-up.
+    /// ListUpcomingPayouts previews the next payout run of each vault.
+    /// The preview uses the vault's balances now: when the run starts, whether
+    /// it would pay, and per asset what it would pay, what would stay and why,
+    /// and the expected network fee. Every broker role and the broker's API keys
+    /// can read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
     /// - INVALID_ARGUMENT: a page_token from another broker or vault filter, or
@@ -2754,10 +2763,10 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListVaultPayoutRules reads the payout rule of each of the broker's
-    /// vaults, and the assets each vault holds or was credited in that its rule
-    /// pays no destination for. Every broker role and the broker's API keys can
-    /// read, without step-up; only Owner and Finance members change rules.
+    /// ListVaultPayoutRules reads the payout rule of each of the broker's vaults.
+    /// Each vault also lists the assets it holds or was credited in that its
+    /// rule pays no destination for. Every broker role and the broker's API keys
+    /// can read, without step-up; only Owner and Finance members change rules.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
     /// - INVALID_ARGUMENT: a page_token from another broker or vault filter, or
@@ -2786,8 +2795,8 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListVaultLedger lists the movements of the broker's vaults' funds,
-    /// newest first: each fee a QuickSwap credited, each payout that left a
+    /// ListVaultLedger lists the movements of the broker's vaults' funds.
+    /// Newest first: each fee a QuickSwap credited, each payout that left a
     /// vault with how it ended, and each refund of a rejected payout to the
     /// vault's smart account. It carries no running balance; read the current
     /// balance with ListVaultBalances. Every broker role and the broker's API
@@ -2820,10 +2829,11 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListVaultAllowlist reads one vault's payout address allowlist: the
-    /// destinations its payouts and withdrawals may pay, each with when it
-    /// becomes payable. A destination is payable 24 hours after it is listed.
-    /// Every broker role and the broker's API keys can read, without step-up.
+    /// ListVaultAllowlist reads one vault's payout address allowlist.
+    /// The allowlist holds the destinations the vault's payouts and withdrawals
+    /// may pay, each with when it becomes payable. A destination is payable 24
+    /// hours after it is listed. Every broker role and the broker's API keys can
+    /// read, without step-up.
     /// Errors:
     /// - NOT_FOUND: BROKER_NOT_FOUND or VAULT_NOT_FOUND.
     /// - UNAVAILABLE: the allowlist or the vault's payout rule cannot be read;
@@ -2879,11 +2889,11 @@ pub trait QuickSwapBrokerService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// RequestVaultAllowlistChange asks to add one destination to, or remove
-    /// one from, a vault's payout address allowlist. Only Owner and Finance
-    /// members can, each change with its own fresh step-up proof. The change
-    /// is returned PENDING; ListVaultAllowlistChanges shows how it ends. A
-    /// vault has at most one pending change. An added
+    /// RequestVaultAllowlistChange adds a payout address to a vault's allowlist,
+    /// or removes one.
+    /// Only Owner and Finance members can, each change with its own fresh
+    /// step-up proof. The change is returned PENDING; ListVaultAllowlistChanges
+    /// shows how it ends. A vault has at most one pending change. An added
     /// destination becomes payable 24 hours after it is listed
     /// (VaultAllowlistEntry.payable_from).
     /// Errors:
@@ -6353,10 +6363,10 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC: ::connectrpc
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// QuickSwapReferralService is a referral partner's own record, over
-/// ConnectRPC. A referral partner shares a link with their code; Quick Swaps
-/// made through it on Polyester's own Quick Swap app give the user a discount
+/// ConnectRPC. A referral partner shares a link with their code; QuickSwaps
+/// made through it on Polyester's own QuickSwap app give the user a discount
 /// and pay the partner a commission, both out of the broker fee (see
-/// ReferralProgram). Referrals never apply to Quick Swaps through other
+/// ReferralProgram). Referrals never apply to QuickSwaps through other
 /// brokers or the API.
 /// Every RPC takes the caller's interactive session token and acts only on
 /// the caller's own partner record; a broker API key is refused with
@@ -6364,10 +6374,10 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC: ::connectrpc
 /// NOT_FOUND / REFERRAL_PARTNER_NOT_FOUND from every RPC but
 /// EnrollReferralPartner.
 /// A partner's code can be changed while it is not disabled, up to 9 times.
-/// The old code is retired and never given to anyone again; Quick Swaps
+/// The old code is retired and never given to anyone again; QuickSwaps
 /// already referred keep their partner.
-/// A partner reads the Quick Swaps it referred with ListReferredQuickSwaps
-/// and GetReferredQuickSwap, never another partner's or a Quick Swap without
+/// A partner reads the QuickSwaps it referred with ListReferredQuickSwaps
+/// and GetReferredQuickSwap, never another partner's or a QuickSwap without
 /// its referral. They return no identity of the person who swapped and no
 /// account, address, memo, transaction hash or flow ID; amounts are exact and
 /// times are rounded down to the minute.
@@ -6536,9 +6546,9 @@ pub trait QuickSwapReferralService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// ListReferredQuickSwaps lists the Quick Swaps the caller referred, newest
-    /// first, filtered by status and creation time, with their rates and the
-    /// commission credited so far.
+    /// ListReferredQuickSwaps lists the QuickSwaps the caller referred.
+    /// Newest first, filtered by status and creation time. Each QuickSwap
+    /// carries its rates and the commission credited so far.
     /// Errors:
     /// - NOT_FOUND: REFERRAL_PARTNER_NOT_FOUND.
     /// - INVALID_ARGUMENT: a page_token from another partner, other filters or
@@ -6565,12 +6575,13 @@ pub trait QuickSwapReferralService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// GetReferredQuickSwap returns one Quick Swap the caller referred, in
-    /// progress or done, with the breakdown of its fee and the commission:
-    /// rates, every credit and the commission's current US dollar value.
+    /// GetReferredQuickSwap returns one QuickSwap the caller referred.
+    /// The QuickSwap can be in progress or done. Its breakdown shows the fee
+    /// and commission rates, every commission credit and the commission's
+    /// current US dollar value.
     /// Errors:
-    /// - NOT_FOUND: REFERRAL_PARTNER_NOT_FOUND, or SWAP_NOT_FOUND for a Quick
-    /// Swap the caller did not refer.
+    /// - NOT_FOUND: REFERRAL_PARTNER_NOT_FOUND, or SWAP_NOT_FOUND for a
+    /// QuickSwap the caller did not refer.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
