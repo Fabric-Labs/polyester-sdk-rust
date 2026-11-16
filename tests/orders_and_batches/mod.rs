@@ -468,11 +468,25 @@ async fn twap_market_slippage_caps_by_side() {
         (CreateSide::Buy, 50, None),
         (CreateSide::Buy, 9_999, None),
         (CreateSide::Buy, 10_000, None),
-        (CreateSide::Buy, 10_001, Some("between 1 and")),
+        // Outside 1 to 10000 is SLIPPAGE_BPS_INVALID; 10000 on a selling
+        // slice, which leaves it no price, is MAX_SLIPPAGE_INVALID.
+        (
+            CreateSide::Buy,
+            10_001,
+            Some(("ERROR_CODE_SLIPPAGE_BPS_INVALID", "between 1 and")),
+        ),
         (CreateSide::Sell, 50, None),
         (CreateSide::Sell, 9_999, None),
-        (CreateSide::Sell, 10_000, Some("between 1 and 9999")),
-        (CreateSide::Sell, 10_001, Some("between 1 and")),
+        (
+            CreateSide::Sell,
+            10_000,
+            Some(("ERROR_CODE_MAX_SLIPPAGE_INVALID", "between 1 and 9999")),
+        ),
+        (
+            CreateSide::Sell,
+            10_001,
+            Some(("ERROR_CODE_SLIPPAGE_BPS_INVALID", "between 1 and")),
+        ),
     ];
     for (side, bps, refusal) in cases {
         let (client, seen, _http) = client_answering(
@@ -502,13 +516,14 @@ async fn twap_market_slippage_caps_by_side() {
                 result.unwrap_or_else(|err| panic!("{side:?} {bps}: {err}"));
                 assert_eq!(sent, 1, "{side:?} {bps}");
             }
-            Some(refusal) => {
+            Some((code, refusal)) => {
                 let Err(err) = result else {
                     panic!("{side:?} {bps}: a refused cap was accepted");
                 };
                 assert!(
-                    matches!(err, Error::Validation(_)) && err.to_string().contains(refusal),
-                    "{side:?} {bps}: {err}"
+                    matches!(&err, Error::Api { code: got, .. } if got == code)
+                        && err.to_string().contains(refusal),
+                    "{side:?} {bps}: {err:?}"
                 );
                 assert_eq!(sent, 0, "{side:?} {bps}: a refused cap was sent");
             }

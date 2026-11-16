@@ -317,8 +317,28 @@ pub struct OrderbookLevel {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderbookData {
     pub symbol: String,
+    /// Levels per side requested: the `depth` passed to `orderbook.get`, or 50
+    /// when it was 0 or `None`; the depth a managed subscription was created
+    /// with.
     pub depth: u32,
+    /// Book sequence as a decimal u64, monotonic within one `book_epoch`;
+    /// compare it only with sequences of the same epoch.
     pub book_seq: String,
+    /// Epoch of `book_seq` as a decimal u64, set on `orderbook.get` snapshots
+    /// only. Order snapshots by `(book_epoch, book_seq)` with
+    /// [`crate::codecs::decode::compare_snapshots`]: a higher epoch is newer
+    /// whatever its `book_seq`, and a new epoch may restart `book_seq`. "0"
+    /// while `available` is false. A managed [`crate::orderbook::Subscription`]
+    /// view leaves it empty: its delta stream carries no epoch.
+    ///
+    /// A snapshot is a frozen view at its own `(book_epoch, book_seq)`: keep it
+    /// apart from a live book and never apply stream updates to it.
+    pub book_epoch: String,
+    /// Largest depth per side the server accepts, as it reported it in an
+    /// `orderbook.get` snapshot, available or not (5,000 by default). A deeper
+    /// request is refused with `invalid_argument`, never truncated. 0 on a
+    /// managed subscription view, and from a server that predates the field.
+    pub max_depth: u32,
     pub bids: Vec<OrderbookLevel>,
     pub asks: Vec<OrderbookLevel>,
     /// True when the book is current: `bids` and `asks` are its levels, and

@@ -1,7 +1,8 @@
-# Every field of the messages the 0.93.3 contract added or changed that this
-# SDK wraps: the request fields its calls set, and the reply fields its
-# models expose. A guard test walks the generated messages and fails when a
-# field is missing here or listed but gone.
+# Every field of the messages the 0.93.3 contract (1945423) and the 0.93.4
+# contract (5c2119f) added or changed that this SDK wraps: the request
+# fields its calls set, and the reply fields its models expose. A guard
+# test walks the generated messages and fails when a field is missing here
+# or listed but gone.
 #
 # covered: the SDK parameter that sets the field, or the model field that
 # exposes it.
@@ -68,6 +69,16 @@ ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
 ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
 ledger.read.v1.StatementExport.status	covered	StatementExport.status
 ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
+orderbook.v1.GetOrderBookRequest.depth	covered	OrderbookService::get depth (sent as given; None sends 0, the default 50)
+orderbook.v1.GetOrderBookRequest.symbol_id	covered	OrderbookService::get symbol (resolved from the catalog)
+orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks
+orderbook.v1.GetOrderBookResponse.available	covered	OrderbookData.available
+orderbook.v1.GetOrderBookResponse.bids	covered	OrderbookData.bids
+orderbook.v1.GetOrderBookResponse.book_epoch	covered	OrderbookData.book_epoch
+orderbook.v1.GetOrderBookResponse.book_seq	covered	OrderbookData.book_seq
+orderbook.v1.GetOrderBookResponse.max_depth	covered	OrderbookData.max_depth
+orderbook.v1.GetOrderBookResponse.symbol_id	covered	OrderbookData.symbol (the symbol the caller passed)
+orderbook.v1.GetOrderBookResponse.ts	omitted	a best-effort snapshot time, unchanged by this contract and not exposed; order snapshots by (book_epoch, book_seq)
 orders.v1.ErrorDetail.cause_code	covered	Error::cause_code
 orders.v1.ErrorDetail.code	covered	Error::Api.code / Error::RateLimit.code
 orders.v1.ErrorDetail.existing_order_id	covered	Error::existing_order_id

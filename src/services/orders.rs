@@ -605,9 +605,13 @@ impl OrdersService {
             FeeAsset::Quote => ProtoFeeAsset::Quote.into(),
             FeeAsset::Base if matches!(params.side, CreateSide::Buy) => ProtoFeeAsset::Base.into(),
             FeeAsset::Base => {
-                return Err(Error::validation(
-                    "fee_asset=base is only valid for BUY orders",
-                ));
+                // The server's code for the same refusal.
+                return Err(Error::Api {
+                    message: "fee_asset=base is only valid for BUY orders".to_owned(),
+                    code: "ERROR_CODE_FEE_ASSET_NOT_ALLOWED".to_owned(),
+                    metadata: Vec::new(),
+                    violations: Vec::new(),
+                });
             }
         };
         intent.self_trade_prevention_mode = match params
@@ -3430,6 +3434,18 @@ mod tests {
             intent.self_trade_prevention_mode.as_known(),
             Some(SelfTradePreventionMode::ExpireBoth)
         );
+        // A sell pays its fee in quote: base is refused with the server's code.
+        let mut sell = params.clone();
+        sell.side = CreateSide::Sell;
+        match client.orders.encode_create_params(&sell) {
+            Err(Error::Api {
+                code, violations, ..
+            }) => {
+                assert_eq!(code, "ERROR_CODE_FEE_ASSET_NOT_ALLOWED");
+                assert!(violations.is_empty());
+            }
+            other => panic!("expected FEE_ASSET_NOT_ALLOWED, got {other:?}"),
+        }
         let Some(order_intent::Execution::MarketIoc(market)) = intent.execution.as_ref() else {
             panic!("expected market execution");
         };

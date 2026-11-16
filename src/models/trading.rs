@@ -36,6 +36,16 @@ pub struct Order {
     /// when it was accepted; zero for an original order. `cum_qty` minus
     /// this is what this generation executed itself.
     pub inherited_cum_qty: Option<Quantity>,
+    /// For a LIMIT order, its limit price. For a MARKET order, its protection
+    /// price: the worst price it may fill at, whatever placed it (a direct
+    /// market order, or the market order of a stop-loss, take-profit, attached
+    /// risk leg, TWAP or trailing stop). A BUY fills at or below it and a SELL
+    /// at or above it. It is the order's reference price moved by its maximum
+    /// slippage (`market_max_slippage_bps` or `market_max_slippage`), or
+    /// by the pair's default market slippage for its side, on the pair's tick
+    /// grid; a triggered market order takes the price that fired it as its
+    /// reference. `None` when the server sent no price. Tell a market order
+    /// from a limit order by `order_type`, never by its price.
     pub price: Option<Price>,
     /// Average execution price in 1e9 price ticks, rounded down. Prefer
     /// [`Order::avg_price`], which is exact.

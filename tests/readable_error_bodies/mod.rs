@@ -258,6 +258,61 @@ async fn unavailable_statuses_stay_unknown_send_a_create_once_and_let_reads_retr
     }
 }
 
+/// A temporary failure answers REST 503 with its problem `code` (it was 502
+/// or 504 on many routes): it reads as ConnectRPC `unavailable` does, and a
+/// 503 whose code names a deadline as ConnectRPC `deadline_exceeded` does.
+/// Either way a create is sent once and its outcome is unknown, and a read
+/// is retried. A 504, whatever its body, stays an unknown outcome.
+#[tokio::test(flavor = "multi_thread")]
+async fn rest_503_problems_read_as_connect_unavailable_and_504_stays_unknown() {
+    let connect_unavailable = r#"{"code":"unavailable","message":"m"}"#;
+    let connect_deadline = r#"{"code":"deadline_exceeded","message":"m"}"#;
+    let cases = [
+        (503, "SERVICE_UNAVAILABLE", connect_unavailable),
+        (503, "UPSTREAM_ERROR", connect_unavailable),
+        (503, "WALLET_RESOLUTION_UNAVAILABLE", connect_unavailable),
+        (503, "DEADLINE_EXCEEDED", connect_deadline),
+        (503, "deadline_exceeded", connect_deadline),
+        (504, "SERVICE_UNAVAILABLE", connect_deadline),
+        (504, "UPSTREAM_ERROR", connect_deadline),
+    ];
+    for (status, code, connect_body) in cases {
+        let case = format!("{status}/{code}");
+        let body = json!({
+            "type": "https://polyester.dev/problems/service-unavailable",
+            "title": "Service Unavailable",
+            "status": status,
+            "code": code,
+            "detail": "request_deadline_exceeded: d",
+        })
+        .to_string();
+        let (err, calls) = call("write", status, PROBLEM, &body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+        assert!(
+            matches!(
+                err,
+                Error::Server(_) | Error::Transport(_) | Error::GatewayTimeout { .. }
+            ),
+            "{case}: {err:?}"
+        );
+        assert_flags(&err, false, true, &case);
+        assert_eq!(calls, 1, "{case}: a create is sent once");
+        let (connect_err, _) = call("write", status, JSON, connect_body, None).await;
+        let connect_err = connect_err.expect("connect error");
+        assert_eq!(
+            (err.is_retryable(), err.mutation_outcome_unknown()),
+            (
+                connect_err.is_retryable(),
+                connect_err.mutation_outcome_unknown()
+            ),
+            "{case}: reads as {connect_err:?}"
+        );
+        let (err, calls) = call("read", status, PROBLEM, &body, Some(2)).await;
+        assert!(err.is_none(), "{case}: {err:?}");
+        assert_eq!(calls, 3, "{case}: a read succeeds on its third request");
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn well_formed_unrecognised_429_stays_a_known_refusal() {
     for code in ["FUTURE_CAPACITY", "NOPE_NOT_A_CODE"] {

@@ -2,8 +2,9 @@
 //!
 //! The server here behaves like the public stream contract: it accepts a subscribe
 //! at any depth, but publishes only on the tiers 1, 20, 50, 200 and 500, each as a
-//! SET diff of that tier's own top-N view. Snapshots answer at any depth the
-//! snapshot enum names, up to 1000.
+//! SET diff of that tier's own top-N view. Snapshots answer at any depth from 1
+//! to the max_depth they report, 0 meaning 50, and refuse a deeper one with
+//! invalid_argument.
 
 use super::centrifugo::{Centrifugo, centrifugo_publication};
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
@@ -22,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 const TIERS: [u32; 5] = [1, 20, 50, 200, 500];
-const SNAPSHOT_DEPTHS: [u32; 9] = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+const MAX_DEPTH: u32 = 5000;
 const UNIT: i64 = 1_000_000_000; // One quote unit, in price ticks.
 const BEST_BID: i64 = 2000 * UNIT;
 const BEST_ASK: i64 = 2001 * UNIT;
@@ -93,6 +94,8 @@ struct Book {
     seq: u64,
     available: bool,
     snapshots: Vec<u32>,
+    wire_depths: Vec<u32>,
+    epoch: u64,
     published: HashMap<u32, Published>,
 }
 
@@ -117,12 +120,22 @@ impl Book {
             seq: 100,
             available: true,
             snapshots: Vec::new(),
+            wire_depths: Vec::new(),
+            epoch: 3,
             published,
         }
     }
 
-    fn snapshot(&mut self, request: &GetOrderBookRequest) -> GetOrderBookResponse {
-        let depth = SNAPSHOT_DEPTHS[usize::try_from(request.depth.to_i32() - 1).unwrap()];
+    fn snapshot(&mut self, request: &GetOrderBookRequest) -> Option<GetOrderBookResponse> {
+        self.wire_depths.push(request.depth);
+        if request.depth > MAX_DEPTH {
+            return None;
+        }
+        let depth = if request.depth == 0 {
+            50
+        } else {
+            request.depth
+        };
         self.snapshots.push(depth);
         let (bids, asks) = if self.available {
             (
@@ -132,14 +145,16 @@ impl Book {
         } else {
             (Vec::new(), Vec::new())
         };
-        GetOrderBookResponse {
+        Some(GetOrderBookResponse {
             symbol_id: 1,
             book_seq: self.seq,
+            book_epoch: if self.available { self.epoch } else { 0 },
+            max_depth: MAX_DEPTH,
             available: self.available,
             bids,
             asks,
             ..Default::default()
-        }
+        })
     }
 }
 
@@ -158,7 +173,17 @@ impl Market {
         let http = MockHttpServer::spawn(move |request| {
             if request.method == "POST" && request.path.ends_with("/GetOrderBook") {
                 let message = GetOrderBookRequest::decode_from_slice(&request.body).unwrap();
-                connect_proto_ok(&answering.lock().unwrap().snapshot(&message))
+                match answering.lock().unwrap().snapshot(&message) {
+                    Some(snapshot) => connect_proto_ok(&snapshot),
+                    None => HttpScript::Json {
+                        status: 400,
+                        body: format!(
+                            r#"{{"code":"invalid_argument","message":"depth {} is above max_depth {MAX_DEPTH}"}}"#,
+                            message.depth
+                        )
+                        .into_bytes(),
+                    },
+                }
             } else {
                 HttpScript::NotFound
             }
@@ -204,6 +229,10 @@ impl Market {
 
     fn snapshots(&self) -> Vec<u32> {
         self.book.lock().unwrap().snapshots.clone()
+    }
+
+    fn wire_depths(&self) -> Vec<u32> {
+        self.book.lock().unwrap().wire_depths.clone()
     }
 
     fn connections(&self) -> usize {
@@ -412,9 +441,13 @@ async fn each_tier_uses_itself_for_channel_snapshot_and_view() {
         market.await_subscribed(tier).await;
         let view = next_view(&mut sub, "first view").await;
         assert_eq!(market.snapshots(), [tier]);
+        assert_eq!(market.wire_depths(), [tier], "the snapshot rides the tier");
         assert_eq!(view.depth, tier);
         assert_eq!(view.bids.len(), tier as usize);
         assert_eq!(view.asks.len(), tier as usize);
+        // A managed view is not a snapshot: the stream carries no epoch.
+        assert_eq!(view.book_epoch, "");
+        assert_eq!(view.max_depth, 0);
         market.publish(|book| {
             book.asks.insert(BEST_ASK, 9);
         });
@@ -774,46 +807,44 @@ async fn raw_deltas_at_an_unpublished_depth_are_refused() {
 }
 
 #[tokio::test]
-async fn raw_snapshot_serves_every_enum_depth() {
-    for depth in SNAPSHOT_DEPTHS {
-        let market = Market::spawn(1100).await;
+async fn raw_snapshot_serves_any_depth_up_to_the_reported_maximum() {
+    // Bids stay above zero for 1999 levels below the best bid.
+    const LEVELS: u32 = 1999;
+    for depth in [1, 2, 7, 50, 1000, 1001, LEVELS, 2500, MAX_DEPTH] {
+        let market = Market::spawn(i64::from(LEVELS)).await;
         let client = market.client();
         let snapshot = client.orderbook.get("BTC-USDT", Some(depth)).await.unwrap();
-        assert_eq!(market.snapshots(), [depth]);
+        assert_eq!(market.wire_depths(), [depth], "sent as is");
         assert_eq!(snapshot.depth, depth);
-        assert_eq!(snapshot.bids.len(), depth as usize);
-        assert_eq!(snapshot.asks.len(), depth as usize);
+        assert_eq!(snapshot.bids.len(), depth.min(LEVELS) as usize);
+        assert_eq!(snapshot.asks.len(), depth.min(LEVELS) as usize);
+        assert_eq!(snapshot.max_depth, MAX_DEPTH);
+        assert_eq!(snapshot.book_epoch, "3");
+        assert_eq!(snapshot.book_seq, "100");
         assert_eq!(market.connections(), 0);
     }
 }
 
-// POLY-8586: a snapshot reports the depth it requested on the wire. A depth
-// between snapshot depths rides the smallest one covering it, `None` and 0 are
-// the default 50, and a depth above 1000 is refused before any request.
+// A snapshot sends its depth as given and reports it; `None` and 0 are sent as
+// 0, the server's default of 50, and report 50.
 #[tokio::test]
-async fn snapshot_reports_the_depth_requested_on_the_wire() {
-    for (depth, want) in [
-        (Some(1), 1),
-        (Some(2), 5),
-        (Some(5), 5),
-        (Some(10), 10),
-        (Some(11), 20),
-        (Some(15), 20),
-        (Some(20), 20),
-        (None, 50),
-        (Some(0), 50),
-        (Some(21), 50),
-        (Some(101), 200),
-        (Some(501), 1000),
-        (Some(1000), 1000),
+async fn snapshot_sends_the_depth_as_given() {
+    for (depth, wire, want) in [
+        (Some(1), 1, 1),
+        (Some(2), 2, 2),
+        (Some(15), 15, 15),
+        (None, 0, 50),
+        (Some(0), 0, 50),
+        (Some(21), 21, 21),
+        (Some(501), 501, 501),
     ] {
         let market = Market::spawn(1100).await;
         let client = market.client();
         let snapshot = client.orderbook.get("BTC-USDT", depth).await.unwrap();
-        assert_eq!(market.snapshots(), [want], "depth {depth:?}");
+        assert_eq!(market.wire_depths(), [wire], "depth {depth:?}");
         assert_eq!(snapshot.depth, want, "depth {depth:?}");
         assert_eq!(snapshot.bids.len(), want as usize, "depth {depth:?}");
-        // POLY-8588 parity: snapshot levels keep the market they were read for.
+        // Snapshot levels keep the market they were read for.
         let price = snapshot.bids[0].price.as_ref().unwrap();
         assert_eq!(price.symbol(), Some("BTC-USDT"));
         assert_eq!(
@@ -821,17 +852,37 @@ async fn snapshot_reports_the_depth_requested_on_the_wire() {
             Some("BTC-USDT")
         );
     }
-    for depth in [1001, 5000, u32::MAX] {
+}
+
+// The maximum is the server's: the SDK sends a deeper request, and the
+// server's invalid_argument comes back as an error, never a truncated book.
+#[tokio::test]
+async fn depth_above_the_reported_maximum_is_refused_by_the_server() {
+    for depth in [MAX_DEPTH + 1, u32::MAX] {
         let market = Market::spawn(10).await;
         let client = market.client();
         let refused = client.orderbook.get("BTC-USDT", Some(depth)).await;
         assert!(
-            matches!(refused, Err(Error::Validation(_))),
+            matches!(&refused, Err(Error::Api { code, message, .. })
+                if code == "InvalidArgument" && message.contains("max_depth")),
             "depth {depth}: {refused:?}"
         );
-        assert!(
-            market.snapshots().is_empty(),
-            "depth {depth} reached the server"
-        );
+        assert_eq!(market.wire_depths(), [depth], "depth {depth} was sent");
     }
+}
+
+// A snapshot of an unavailable book has epoch 0 and still reports max_depth.
+#[tokio::test]
+async fn unavailable_snapshot_reports_epoch_zero_and_max_depth() {
+    let market = Market::spawn(10).await;
+    market.update(|book| book.available = false);
+    let snapshot = market
+        .client()
+        .orderbook
+        .get("BTC-USDT", Some(20))
+        .await
+        .unwrap();
+    assert!(!snapshot.available);
+    assert_eq!(snapshot.book_epoch, "0");
+    assert_eq!(snapshot.max_depth, MAX_DEPTH);
 }

@@ -358,10 +358,10 @@ fn inventory_lists_every_reply_id_field() {
     );
 }
 
-/// The messages of the 0.93.3 contract additions whose every field the SDK
+/// The messages of the 0.93.3 and 0.93.4 contract changes whose every field the SDK
 /// sets from a parameter or exposes on a model, unless the inventory says
 /// why not.
-const FIELD_INVENTORY_MESSAGES: [&str; 35] = [
+const FIELD_INVENTORY_MESSAGES: [&str; 37] = [
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.GetStatementExportRequest",
     "ledger.read.v1.ListStatementExportsRequest",
@@ -397,6 +397,8 @@ const FIELD_INVENTORY_MESSAGES: [&str; 35] = [
     "chain.lifecycle.v1.GetAccountFlowResponse",
     "orders.v1.ErrorDetail",
     "auth.v1.AuthErrorDetail",
+    "orderbook.v1.GetOrderBookRequest",
+    "orderbook.v1.GetOrderBookResponse",
 ];
 
 /// Every proto field of `message` as `<message>.<field>`, a oneof's members

@@ -323,9 +323,10 @@ async fn create_oco_sends_both_legs_and_a_retry_sends_the_same_request() {
     }
 }
 
-/// A create the SDK can refuse is refused with `Error::Validation` before
-/// anything is sent: a missing client OCO ID, a limit leg without its limit
-/// price, a price source label trigger reads do not use.
+/// A create the SDK can refuse is refused before anything is sent: a missing
+/// client OCO ID or a price source label trigger reads do not use with
+/// `Error::Validation`, and a limit leg without its limit price with
+/// `Error::Api` carrying the server's code for it, `ERROR_CODE_BAD_PRICE`.
 #[tokio::test]
 async fn create_oco_refuses_invalid_params_before_sending() {
     for wire in WIRES {
@@ -336,10 +337,10 @@ async fn create_oco_refuses_invalid_params_before_sending() {
         no_id.client_list_id = String::new();
         let mut no_limit = sell_oco();
         no_limit.take_profit.limit_price = None;
-        for (params, want) in [
-            (unknown_source, "trigger_price_source"),
-            (no_id, "client_list_id"),
-            (no_limit, "limit_price"),
+        for (params, want, code) in [
+            (unknown_source, "trigger_price_source", None),
+            (no_id, "client_list_id", None),
+            (no_limit, "limit_price", Some("ERROR_CODE_BAD_PRICE")),
         ] {
             let err = s
                 .client
@@ -347,7 +348,13 @@ async fn create_oco_refuses_invalid_params_before_sending() {
                 .create_oco(params)
                 .await
                 .expect_err("refused");
-            assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
+            match code {
+                None => assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}"),
+                Some(code) => assert!(
+                    matches!(&err, Error::Api { code: got, .. } if got == code),
+                    "{wire:?}: {err:?}"
+                ),
+            }
             assert!(err.to_string().contains(want), "{wire:?}: {err}");
         }
         assert_eq!(s.sent(), 0, "{wire:?}: a refused create must send nothing");

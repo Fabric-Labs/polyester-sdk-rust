@@ -2,7 +2,6 @@
 
 use buffa::Enumeration;
 
-use crate::codecs::decode::covering_snapshot_depth;
 use crate::errors::{Error, Result};
 use crate::proto::marketdata::v1::{HeatmapDepth, HeatmapInterval, HeatmapQuantityMode};
 
@@ -39,12 +38,24 @@ pub fn heatmap_interval_channel_name(value: &str) -> Result<&'static str> {
     })
 }
 
-/// The heatmap depth requested for `depth`, by the rule of
-/// [`crate::codecs::decode::orderbook_snapshot_depth`]: `depth` itself when it is
-/// a supported depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else the smallest
+/// Depths a heatmap can request, ascending: the `HeatmapDepth` values.
+pub const HEATMAP_DEPTHS: [u32; 9] = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+
+/// The heatmap depth requested for `depth`: `depth` itself when it is a
+/// supported depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else the smallest
 /// one covering it. 0 is the default 50. A depth above 1000 is a validation error.
 pub fn heatmap_depth_for_levels(depth: u32) -> Result<HeatmapDepth> {
-    Ok(match covering_snapshot_depth(depth, "heatmap depth")? {
+    let depth = if depth == 0 { 50 } else { depth };
+    let covering = HEATMAP_DEPTHS
+        .into_iter()
+        .find(|supported| *supported >= depth)
+        .ok_or_else(|| {
+            Error::validation(format!(
+                "heatmap depth {depth} is above the deepest heatmap depth ({})",
+                HEATMAP_DEPTHS[HEATMAP_DEPTHS.len() - 1]
+            ))
+        })?;
+    Ok(match covering {
         1 => HeatmapDepth::DEPTH_1,
         5 => HeatmapDepth::DEPTH_5,
         10 => HeatmapDepth::DEPTH_10,

@@ -1,5 +1,5 @@
 use super::ServiceContext;
-use super::correlation_id::{require_client_list_id, require_client_style_id};
+use super::correlation_id::require_client_list_id;
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -32,7 +32,7 @@ use crate::proto::triggers::v1::{
     TwapTrigger, conditional_child_execution, modify_trigger_request, trailing_stop_trigger,
     trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
-use crate::types::{resolve_price_ticks, resolve_qty_scaled};
+use crate::types::resolve_qty_scaled;
 
 const MAX_BPS: i32 = 10_000;
 /// Most triggers one batch cancel takes.
@@ -54,21 +54,118 @@ const TWAP_SLICE_INTERVAL_MS_MIN: i64 = 100;
 /// state this range, so a test pins the literal values.
 const LADDER_LEVELS_MIN: i32 = 2;
 const LADDER_LEVELS_MAX: i32 = 100;
+/// Longest client trigger ID the contract takes, in UTF-8 bytes: the
+/// `string.max_bytes` rule on `TriggerIntent.client_trigger_id`, whose
+/// `min_len` is 1 and which has no character set. A test pins it to the
+/// generated field docs.
+const CLIENT_TRIGGER_ID_MAX_BYTES: usize = 36;
 
-fn validate_bps(field: &str, bps: i32, allow_clear: bool) -> Result<()> {
-    validate_bps_at_most(field, bps, allow_clear, MAX_BPS)
+/// Codes of the Triggers API's field refusals: a trigger or OCO field the SDK
+/// refuses before sending carries the code the server answers for the same
+/// mistake, so a pre-checked request and a server refusal read alike.
+mod refusal_codes {
+    pub const BAD_PRICE: &str = "ERROR_CODE_BAD_PRICE";
+    pub const BAD_QTY: &str = "ERROR_CODE_BAD_QTY";
+    pub const CLIENT_TRIGGER_ID_INVALID: &str = "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID";
+    pub const FEE_ASSET_NOT_ALLOWED: &str = "ERROR_CODE_FEE_ASSET_NOT_ALLOWED";
+    pub const LADDER_LEVELS_INVALID: &str = "ERROR_CODE_LADDER_LEVELS_INVALID";
+    pub const MAX_SLIPPAGE_INVALID: &str = "ERROR_CODE_MAX_SLIPPAGE_INVALID";
+    pub const SLIPPAGE_BPS_INVALID: &str = "ERROR_CODE_SLIPPAGE_BPS_INVALID";
+    pub const SLIPPAGE_TICKS_INVALID: &str = "ERROR_CODE_SLIPPAGE_TICKS_INVALID";
+    pub const TRAILING_DISTANCE_INVALID: &str = "ERROR_CODE_TRAILING_DISTANCE_INVALID";
+    pub const TRIGGER_ACTIVATION_PRICE_INVALID: &str =
+        "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID";
+    pub const TRIGGER_PRICE_INVALID: &str = "ERROR_CODE_TRIGGER_PRICE_INVALID";
+    pub const TRIGGER_QTY_INVALID: &str = "ERROR_CODE_TRIGGER_QTY_INVALID";
+    pub const TWAP_DURATION_INVALID: &str = "ERROR_CODE_TWAP_DURATION_INVALID";
+    pub const TWAP_INTERVAL_INVALID: &str = "ERROR_CODE_TWAP_INTERVAL_INVALID";
+}
+use refusal_codes as codes;
+
+/// A trigger or OCO field refused before sending, as [`Error::Api`] with the
+/// server's code for the same mistake and no violation.
+fn field_refusal(code: &str, message: impl Into<String>) -> Error {
+    Error::Api {
+        message: message.into(),
+        code: code.to_owned(),
+        metadata: Vec::new(),
+        violations: Vec::new(),
+    }
 }
 
-fn validate_bps_at_most(field: &str, bps: i32, allow_clear: bool, max: i32) -> Result<()> {
+/// A basis-point cap or distance: outside 1 to 10000 (0 clears when
+/// `allow_clear`) is `range_code`; within it but above `max`, a slippage cap
+/// that would leave a sell no positive price, is `MAX_SLIPPAGE_INVALID`.
+fn validate_bps(field: &str, bps: i32, allow_clear: bool, range_code: &str) -> Result<()> {
+    validate_bps_at_most(field, bps, allow_clear, MAX_BPS, range_code)
+}
+
+fn validate_bps_at_most(
+    field: &str,
+    bps: i32,
+    allow_clear: bool,
+    max: i32,
+    range_code: &str,
+) -> Result<()> {
     if allow_clear && bps == 0 {
         return Ok(());
     }
-    if !(1..=max).contains(&bps) {
-        return Err(Error::validation(format!(
-            "{field} must be between 1 and {max}"
-        )));
+    if !(1..=MAX_BPS).contains(&bps) {
+        return Err(field_refusal(
+            range_code,
+            format!("{field} must be between 1 and {max}"),
+        ));
+    }
+    if bps > max {
+        return Err(field_refusal(
+            codes::MAX_SLIPPAGE_INVALID,
+            format!("{field} must be between 1 and {max}"),
+        ));
     }
     Ok(())
+}
+
+/// A price for `symbol` (or any market when `None`) in ticks. A negative price,
+/// and 0 unless `allow_zero`, is refused with `code`.
+fn coded_price_ticks(
+    price: &crate::Price,
+    symbol: Option<&str>,
+    field: &str,
+    allow_zero: bool,
+    code: &str,
+) -> Result<i64> {
+    price.compatible_with(symbol)?;
+    let ticks = price.as_ticks();
+    if ticks < 0 || (ticks == 0 && !allow_zero) {
+        return Err(field_refusal(
+            code,
+            if allow_zero {
+                format!("{field} must not be negative")
+            } else {
+                format!("{field} must be positive")
+            },
+        ));
+    }
+    Ok(ticks)
+}
+
+/// A trigger or OCO quantity: one that is not positive is refused with `code`.
+fn coded_qty_scaled(
+    qty: &crate::Quantity,
+    market: &crate::catalogs::Market,
+    code: &str,
+) -> Result<i64> {
+    match resolve_qty_scaled(
+        qty,
+        market.base_quantity_scale,
+        Some(&market.symbol),
+        Some(market.symbol_id),
+    ) {
+        Err(Error::Validation(message)) if qty.as_scaled() <= 0 => {
+            Err(field_refusal(code, message))
+        }
+        other => other,
+    }
 }
 
 // The flat public helper must not silently discard fields when it selects a
@@ -397,19 +494,29 @@ impl TriggersService {
             };
             &canonical
         };
-        let qty = resolve_qty_scaled(
-            &params.qty,
-            market.base_quantity_scale,
-            Some(&market.symbol),
-            Some(market.symbol_id),
-        )?;
+        let qty = coded_qty_scaled(&params.qty, &market, codes::TRIGGER_QTY_INVALID)?;
         let mut intent = TriggerIntent {
             symbol_id: market.symbol_id,
             qty_scaled: qty,
             ..Default::default()
         };
-        intent.client_trigger_id =
-            require_client_style_id(&params.client_trigger_id, "client_trigger_id")?;
+        // The contract's rule is 1 to 36 bytes of UTF-8, with no character
+        // set: the ID is sent exactly as given.
+        if params.client_trigger_id.is_empty() {
+            return Err(field_refusal(
+                codes::CLIENT_TRIGGER_ID_INVALID,
+                "client_trigger_id is required and must remain stable across retries",
+            ));
+        }
+        if params.client_trigger_id.len() > CLIENT_TRIGGER_ID_MAX_BYTES {
+            return Err(field_refusal(
+                codes::CLIENT_TRIGGER_ID_INVALID,
+                format!(
+                    "client_trigger_id must be 1 to {CLIENT_TRIGGER_ID_MAX_BYTES} bytes of UTF-8"
+                ),
+            ));
+        }
+        intent.client_trigger_id = params.client_trigger_id.clone();
         if let Some(asset) = params.fee_asset {
             intent.fee_asset = Self::fee_asset(asset, params.side)?.into();
         }
@@ -441,11 +548,21 @@ impl TriggersService {
                 let trigger_price_ticks = params
                     .trigger_price
                     .as_ref()
-                    .ok_or_else(|| Error::validation("stop/take-profit requires trigger_price"))
-                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
-                if trigger_price_ticks <= 0 {
-                    return Err(Error::validation("trigger_price must be positive"));
-                }
+                    .ok_or_else(|| {
+                        field_refusal(
+                            codes::TRIGGER_PRICE_INVALID,
+                            "stop/take-profit requires trigger_price",
+                        )
+                    })
+                    .and_then(|price| {
+                        coded_price_ticks(
+                            price,
+                            Some(&params.symbol),
+                            "trigger_price",
+                            false,
+                            codes::TRIGGER_PRICE_INVALID,
+                        )
+                    })?;
                 let mut cond = ConditionalTrigger {
                     trigger_price_ticks,
                     side: side.into(),
@@ -470,9 +587,11 @@ impl TriggersService {
                 };
                 match (params.side, params.limit_price.as_ref()) {
                     (CreateSide::Buy, Some(max_price)) => {
-                        let ticks = self.resolve_catalog_price(max_price, &params.symbol)?;
+                        max_price.compatible_with(Some(&params.symbol))?;
+                        let ticks = max_price.as_ticks();
                         if ticks <= 0 {
-                            return Err(Error::validation(
+                            return Err(field_refusal(
+                                codes::BAD_PRICE,
                                 "a buy trailing_stop limit_price (its maximum price) must be positive",
                             ));
                         }
@@ -490,8 +609,16 @@ impl TriggersService {
                     }
                     (CreateSide::Sell, None) => {}
                 }
+                if params.trailing_distance_ticks.is_none()
+                    && params.trailing_distance_bps.is_none()
+                {
+                    return Err(field_refusal(
+                        codes::TRAILING_DISTANCE_INVALID,
+                        "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps",
+                    ));
+                }
                 if params.trailing_distance_ticks.is_some()
-                    == params.trailing_distance_bps.is_some()
+                    && params.trailing_distance_bps.is_some()
                 {
                     return Err(Error::validation(
                         "trailing_stop requires exactly one of trailing_distance_ticks or trailing_distance_bps",
@@ -504,24 +631,36 @@ impl TriggersService {
                 }
                 if let Some(ticks) = params.trailing_distance_ticks {
                     if ticks <= 0 {
-                        return Err(Error::validation(
+                        return Err(field_refusal(
+                            codes::TRAILING_DISTANCE_INVALID,
                             "trailing_distance_ticks must be positive",
                         ));
                     }
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceTicks(ticks));
                 } else if let Some(bps) = params.trailing_distance_bps {
-                    validate_bps("trailing_distance_bps", bps, false)?;
+                    validate_bps(
+                        "trailing_distance_bps",
+                        bps,
+                        false,
+                        codes::TRAILING_DISTANCE_INVALID,
+                    )?;
                     trailing.trailing_distance =
                         Some(trailing_stop_trigger::TrailingDistance::TrailingDistanceBps(bps));
                 } else {
-                    return Err(Error::validation(
+                    return Err(field_refusal(
+                        codes::TRAILING_DISTANCE_INVALID,
                         "trailing_stop requires trailing_distance_ticks or trailing_distance_bps",
                     ));
                 }
                 if let Some(price) = params.activation_price.as_ref() {
-                    trailing.activation_price_ticks =
-                        self.resolve_catalog_price(price, &params.symbol)?;
+                    trailing.activation_price_ticks = coded_price_ticks(
+                        price,
+                        Some(&params.symbol),
+                        "activation_price",
+                        true,
+                        codes::TRIGGER_ACTIVATION_PRICE_INVALID,
+                    )?;
                 }
                 // A buy that arms at the activation price must be allowed to
                 // pay at least that much.
@@ -535,37 +674,59 @@ impl TriggersService {
                 }
                 if let Some(ticks) = params.max_slippage_ticks {
                     if ticks <= 0 {
-                        return Err(Error::validation("max_slippage_ticks must be positive"));
+                        return Err(field_refusal(
+                            codes::SLIPPAGE_TICKS_INVALID,
+                            "max_slippage_ticks must be positive",
+                        ));
                     }
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageTicks(ticks));
                 } else if let Some(bps) = params.max_slippage_bps {
-                    validate_bps_at_most("max_slippage_bps", bps, false, MAX_SELLING_SLIPPAGE_BPS)?;
+                    validate_bps_at_most(
+                        "max_slippage_bps",
+                        bps,
+                        false,
+                        MAX_SELLING_SLIPPAGE_BPS,
+                        codes::SLIPPAGE_BPS_INVALID,
+                    )?;
                     trailing.max_slippage =
                         Some(trailing_stop_trigger::MaxSlippage::MaxSlippageBps(bps));
                 }
                 trigger_intent::Strategy::TrailingStop(Box::new(trailing))
             }
             CreateTriggerType::Twap => {
-                let duration_ms = params
-                    .twap_duration_ms
-                    .ok_or_else(|| Error::validation("twap_duration_ms is required for a twap"))?;
+                let duration_ms = params.twap_duration_ms.ok_or_else(|| {
+                    field_refusal(
+                        codes::TWAP_DURATION_INVALID,
+                        "twap_duration_ms is required for a twap",
+                    )
+                })?;
                 if duration_ms < TWAP_DURATION_MS_MIN {
-                    return Err(Error::validation(format!(
-                        "twap_duration_ms {duration_ms} is below the minimum {TWAP_DURATION_MS_MIN}"
-                    )));
+                    return Err(field_refusal(
+                        codes::TWAP_DURATION_INVALID,
+                        format!(
+                            "twap_duration_ms {duration_ms} is below the minimum {TWAP_DURATION_MS_MIN}"
+                        ),
+                    ));
                 }
                 let slice_interval_ms = params.twap_slice_interval_ms.ok_or_else(|| {
-                    Error::validation("twap_slice_interval_ms is required for a twap")
+                    field_refusal(
+                        codes::TWAP_INTERVAL_INVALID,
+                        "twap_slice_interval_ms is required for a twap",
+                    )
                 })?;
                 if slice_interval_ms < TWAP_SLICE_INTERVAL_MS_MIN {
-                    return Err(Error::validation(format!(
-                        "twap_slice_interval_ms {slice_interval_ms} is below the minimum \
-                         {TWAP_SLICE_INTERVAL_MS_MIN}"
-                    )));
+                    return Err(field_refusal(
+                        codes::TWAP_INTERVAL_INVALID,
+                        format!(
+                            "twap_slice_interval_ms {slice_interval_ms} is below the minimum \
+                             {TWAP_SLICE_INTERVAL_MS_MIN}"
+                        ),
+                    ));
                 }
                 if slice_interval_ms > duration_ms {
-                    return Err(Error::validation(
+                    return Err(field_refusal(
+                        codes::TWAP_INTERVAL_INVALID,
                         "twap_slice_interval_ms must not exceed twap_duration_ms",
                     ));
                 }
@@ -586,7 +747,8 @@ impl TriggersService {
                             }
                             (Some(ticks), None) => {
                                 if ticks <= 0 {
-                                    return Err(Error::validation(
+                                    return Err(field_refusal(
+                                        codes::SLIPPAGE_TICKS_INVALID,
                                         "max_slippage_ticks must be positive",
                                     ));
                                 }
@@ -600,7 +762,13 @@ impl TriggersService {
                                     CreateSide::Sell => MAX_SELLING_SLIPPAGE_BPS,
                                     CreateSide::Buy => MAX_BPS,
                                 };
-                                validate_bps_at_most("max_slippage_bps", bps, false, max)?;
+                                validate_bps_at_most(
+                                    "max_slippage_bps",
+                                    bps,
+                                    false,
+                                    max,
+                                    codes::SLIPPAGE_BPS_INVALID,
+                                )?;
                                 ioc.max_slippage =
                                     Some(twap_market_ioc::MaxSlippage::MaxSlippageBps(bps));
                             }
@@ -610,10 +778,16 @@ impl TriggersService {
                     }
                     CreateOrderType::Limit => {
                         let price = params.limit_price.as_ref().ok_or_else(|| {
-                            Error::validation("twap limit slices require limit_price")
+                            field_refusal(codes::BAD_PRICE, "twap limit slices require limit_price")
                         })?;
                         twap_trigger::Execution::LimitGtc(Box::new(TwapLimitGtc {
-                            price_ticks: self.resolve_catalog_price(price, &params.symbol)?,
+                            price_ticks: coded_price_ticks(
+                                price,
+                                Some(&params.symbol),
+                                "limit_price",
+                                true,
+                                codes::BAD_PRICE,
+                            )?,
                             ..Default::default()
                         }))
                     }
@@ -629,26 +803,42 @@ impl TriggersService {
                         ));
                     }
                 }
-                let price_min_ticks = params
-                    .ladder_price_min
-                    .as_ref()
-                    .ok_or_else(|| Error::validation("ladder requires ladder_price_min"))
-                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
-                let price_max_ticks = params
-                    .ladder_price_max
-                    .as_ref()
-                    .ok_or_else(|| Error::validation("ladder requires ladder_price_max"))
-                    .and_then(|price| self.resolve_catalog_price(price, &params.symbol))?;
-                let levels = params
-                    .ladder_levels
-                    .ok_or_else(|| Error::validation("ladder_levels is required for a ladder"))?;
+                let ladder_price = |price: Option<&crate::Price>, field: &str| {
+                    let price = price.ok_or_else(|| {
+                        field_refusal(
+                            codes::TRIGGER_PRICE_INVALID,
+                            format!("ladder requires {field}"),
+                        )
+                    })?;
+                    coded_price_ticks(
+                        price,
+                        Some(&params.symbol),
+                        field,
+                        true,
+                        codes::TRIGGER_PRICE_INVALID,
+                    )
+                };
+                let price_min_ticks =
+                    ladder_price(params.ladder_price_min.as_ref(), "ladder_price_min")?;
+                let price_max_ticks =
+                    ladder_price(params.ladder_price_max.as_ref(), "ladder_price_max")?;
+                let levels = params.ladder_levels.ok_or_else(|| {
+                    field_refusal(
+                        codes::LADDER_LEVELS_INVALID,
+                        "ladder_levels is required for a ladder",
+                    )
+                })?;
                 if !(LADDER_LEVELS_MIN..=LADDER_LEVELS_MAX).contains(&levels) {
-                    return Err(Error::validation(format!(
-                        "ladder_levels {levels} is outside {LADDER_LEVELS_MIN}..={LADDER_LEVELS_MAX}"
-                    )));
+                    return Err(field_refusal(
+                        codes::LADDER_LEVELS_INVALID,
+                        format!(
+                            "ladder_levels {levels} is outside {LADDER_LEVELS_MIN}..={LADDER_LEVELS_MAX}"
+                        ),
+                    ));
                 }
                 if price_min_ticks <= 0 || price_max_ticks <= price_min_ticks {
-                    return Err(Error::validation(
+                    return Err(field_refusal(
+                        codes::TRIGGER_PRICE_INVALID,
                         "ladder prices must be positive and max must exceed min",
                     ));
                 }
@@ -669,10 +859,6 @@ impl TriggersService {
         };
         *req.trigger.get_or_insert_default() = intent;
         Ok(req)
-    }
-
-    fn resolve_catalog_price(&self, price: &crate::Price, symbol: &str) -> Result<i64> {
-        resolve_price_ticks(price, Some(symbol))
     }
 
     /// Map flat (`order_type`, `time_in_force`, `limit_price`, `post_only`) params
@@ -696,15 +882,19 @@ impl TriggersService {
                     }
                     (Some(ticks), None) => {
                         if ticks <= 0 {
-                            return Err(Error::validation("max_slippage_ticks must be positive"));
+                            return Err(field_refusal(
+                                codes::SLIPPAGE_TICKS_INVALID,
+                                "max_slippage_ticks must be positive",
+                            ));
                         }
                         Some(trigger_market_ioc::MaxSlippage::MaxSlippageTicks(ticks))
                     }
                     (None, Some(bps)) => {
-                        validate_bps("max_slippage_bps", bps, false)?;
+                        validate_bps("max_slippage_bps", bps, false, codes::SLIPPAGE_BPS_INVALID)?;
                         // A 100% cap would leave a sell no positive price to sell at.
                         if bps == MAX_BPS && matches!(params.side, CreateSide::Sell) {
-                            return Err(Error::validation(
+                            return Err(field_refusal(
+                                codes::MAX_SLIPPAGE_INVALID,
                                 "max_slippage_bps of a sell market child must be below 10000",
                             ));
                         }
@@ -723,11 +913,16 @@ impl TriggersService {
                         "max_slippage_ticks and max_slippage_bps are only valid for a market child; a limit child is bounded by its limit_price",
                     ));
                 }
-                let price = params
-                    .limit_price
-                    .as_ref()
-                    .ok_or_else(|| Error::validation("limit trigger requires limit_price"))?;
-                let price_ticks = self.resolve_catalog_price(price, &params.symbol)?;
+                let price = params.limit_price.as_ref().ok_or_else(|| {
+                    field_refusal(codes::BAD_PRICE, "limit trigger requires limit_price")
+                })?;
+                let price_ticks = coded_price_ticks(
+                    price,
+                    Some(&params.symbol),
+                    "limit_price",
+                    true,
+                    codes::BAD_PRICE,
+                )?;
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
                         if params.post_only {
@@ -777,12 +972,7 @@ impl TriggersService {
         // Resolve the market once: the ID sent, the quantity scale and the
         // legs' price checks use the catalog's market, not the caller's text.
         let market = self.ctx.catalogs.require_market(&params.symbol)?;
-        let qty = resolve_qty_scaled(
-            &params.qty,
-            market.base_quantity_scale,
-            Some(&market.symbol),
-            Some(market.symbol_id),
-        )?;
+        let qty = coded_qty_scaled(&params.qty, &market, codes::BAD_QTY)?;
         let take_profit =
             self.encode_oco_leg(&params.take_profit, "take_profit", &market.symbol)?;
         let stop_loss = self.encode_oco_leg(&params.stop_loss, "stop_loss", &market.symbol)?;
@@ -822,12 +1012,13 @@ impl TriggersService {
     /// Map one flat [`OcoLegParams`] onto the leg's trigger price, source and
     /// child [`RiskExecution`]: a market IOC or a limit GTC order.
     fn encode_oco_leg(&self, leg: &OcoLegParams, field: &str, symbol: &str) -> Result<OcoLeg> {
-        let trigger_price_ticks = self.resolve_catalog_price(&leg.trigger_price, symbol)?;
-        if trigger_price_ticks <= 0 {
-            return Err(Error::validation(format!(
-                "{field} trigger_price must be positive"
-            )));
-        }
+        let trigger_price_ticks = coded_price_ticks(
+            &leg.trigger_price,
+            Some(symbol),
+            &format!("{field} trigger_price"),
+            false,
+            codes::TRIGGER_PRICE_INVALID,
+        )?;
         let execution = match (leg.order_type, leg.limit_price.as_ref()) {
             (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
             (CreateOrderType::Market, Some(_)) => {
@@ -837,14 +1028,21 @@ impl TriggersService {
             }
             (CreateOrderType::Limit, Some(price)) => {
                 risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
-                    price_ticks: self.resolve_catalog_price(price, symbol)?,
+                    price_ticks: coded_price_ticks(
+                        price,
+                        Some(symbol),
+                        &format!("{field} limit_price"),
+                        true,
+                        codes::BAD_PRICE,
+                    )?,
                     ..Default::default()
                 }))
             }
             (CreateOrderType::Limit, None) => {
-                return Err(Error::validation(format!(
-                    "{field} limit leg requires limit_price"
-                )));
+                return Err(field_refusal(
+                    codes::BAD_PRICE,
+                    format!("{field} limit leg requires limit_price"),
+                ));
             }
         };
         // The labels trigger reads use. The contract does not support
@@ -961,10 +1159,22 @@ impl TriggersService {
             )));
         }
         if let Some(price) = params.trigger_price.as_ref() {
-            req.trigger_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
+            req.trigger_price_ticks = Some(coded_price_ticks(
+                price,
+                market.as_deref(),
+                "trigger_price",
+                true,
+                codes::TRIGGER_PRICE_INVALID,
+            )?);
         }
         if let Some(price) = params.activation_price.as_ref() {
-            req.activation_price_ticks = Some(resolve_price_ticks(price, market.as_deref())?);
+            req.activation_price_ticks = Some(coded_price_ticks(
+                price,
+                market.as_deref(),
+                "activation_price",
+                true,
+                codes::TRIGGER_ACTIVATION_PRICE_INVALID,
+            )?);
         }
         if params.trailing_distance_ticks.is_some() && params.trailing_distance_bps.is_some() {
             return Err(Error::validation(
@@ -978,27 +1188,36 @@ impl TriggersService {
         }
         if let Some(ticks) = params.trailing_distance_ticks {
             if ticks <= 0 {
-                return Err(Error::validation(
+                return Err(field_refusal(
+                    codes::TRAILING_DISTANCE_INVALID,
                     "trailing_distance_ticks must be positive",
                 ));
             }
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceTicks(ticks));
         } else if let Some(bps) = params.trailing_distance_bps {
-            validate_bps("trailing_distance_bps", bps, false)?;
+            validate_bps(
+                "trailing_distance_bps",
+                bps,
+                false,
+                codes::TRAILING_DISTANCE_INVALID,
+            )?;
             req.trailing_distance =
                 Some(modify_trigger_request::TrailingDistance::TrailingDistanceBps(bps));
         }
         if let Some(ticks) = params.max_slippage_ticks {
             if ticks < 0 {
-                return Err(Error::validation("max_slippage_ticks must be non-negative"));
+                return Err(field_refusal(
+                    codes::SLIPPAGE_TICKS_INVALID,
+                    "max_slippage_ticks must be non-negative",
+                ));
             }
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageTicks(ticks));
         } else if let Some(bps) = params.max_slippage_bps {
             // 0 clears; up to 10000 for a buy stop-loss or take-profit market
             // child, as at creation. The server refuses 10000 for a trailing
             // stop and a sell one with MAX_SLIPPAGE_INVALID.
-            validate_bps("max_slippage_bps", bps, true)?;
+            validate_bps("max_slippage_bps", bps, true, codes::SLIPPAGE_BPS_INVALID)?;
             req.max_slippage = Some(modify_trigger_request::MaxSlippage::MaxSlippageBps(bps));
         }
         Ok(req)
@@ -1008,7 +1227,8 @@ impl TriggersService {
         match (asset, side) {
             (FeeAsset::Quote, _) => Ok(ProtoFeeAsset::Quote),
             (FeeAsset::Base, CreateSide::Buy) => Ok(ProtoFeeAsset::Base),
-            (FeeAsset::Base, CreateSide::Sell) => Err(Error::validation(
+            (FeeAsset::Base, CreateSide::Sell) => Err(field_refusal(
+                codes::FEE_ASSET_NOT_ALLOWED,
                 "fee_asset=base is only valid for BUY triggers",
             )),
         }
@@ -1930,7 +2150,7 @@ mod tests {
         );
 
         let mut missing_id = base.clone();
-        missing_id.client_trigger_id = " ".into();
+        missing_id.client_trigger_id = String::new();
         assert!(client.triggers.encode_create_params(&missing_id).is_err());
 
         let mut missing_trigger_price = base.clone();
@@ -2557,17 +2777,27 @@ mod tests {
         params
     }
 
-    fn expect_validation(
+    /// A create refused before sending with the server's `code` for the same
+    /// mistake, as [`Error::Api`] without violations.
+    fn expect_refusal(
         client: &crate::Client,
         params: &CreateTriggerParams,
+        code: &str,
         mention: &str,
         label: &str,
     ) {
         match client.triggers.encode_create_params(params) {
-            Err(Error::Validation(message)) => {
-                assert!(message.contains(mention), "{label}: {message}")
+            Err(Error::Api {
+                code: got,
+                message,
+                violations,
+                ..
+            }) => {
+                assert_eq!(got, code, "{label}: {message}");
+                assert!(message.contains(mention), "{label}: {message}");
+                assert!(violations.is_empty(), "{label}: {violations:?}");
             }
-            other => panic!("{label}: expected a validation error, got {other:?}"),
+            other => panic!("{label}: expected {code}, got {other:?}"),
         }
     }
 
@@ -2597,10 +2827,51 @@ mod tests {
         );
     }
 
-    /// The contract's `LadderTrigger.levels` validate rule is `gte: 2, lte:
-    /// 100`. The generated docs do not state it, so the values are pinned here.
+    /// A client trigger ID is 1 to 36 bytes of UTF-8, with no character set:
+    /// the contract's rule, which the generated field docs state. It is sent
+    /// exactly as given, never trimmed.
     #[test]
-    fn ladder_levels_limits_are_the_contract_rule() {
+    fn client_trigger_id_follows_the_contract_rule_and_is_sent_as_given() {
+        let docs = include_str!("../gen/buffa/triggers.v1.rs");
+        let rule = format!(
+            "/// 1 to {CLIENT_TRIGGER_ID_MAX_BYTES} bytes in UTF-8 (up to 36 ASCII characters); empty or longer IDs\n"
+        );
+        assert!(
+            docs.contains(&rule),
+            "client_trigger_id docs changed: {rule}"
+        );
+        let client = client();
+        for id in [
+            "x".repeat(36),
+            " padded ".to_owned(),
+            " ".to_owned(),
+            "tp #1 \u{e9}t\u{e9}".to_owned(),
+            "\u{6b62}".repeat(12),
+        ] {
+            let mut params = market_stop(CreateSide::Sell);
+            params.client_trigger_id = id.clone();
+            let wire = client
+                .triggers
+                .encode_create_params(&params)
+                .unwrap_or_else(|err| panic!("{id:?}: {err}"));
+            assert_eq!(wire.trigger.as_option().unwrap().client_trigger_id, id);
+        }
+    }
+
+    /// The contract's `LadderTrigger.levels` validate rule is `gte: 2, lte:
+    /// 100`, which the generated field docs state: a contract change that
+    /// regenerates them breaks this.
+    #[test]
+    fn ladder_levels_limits_match_the_generated_contract_docs() {
+        let docs = include_str!("../gen/buffa/triggers.v1.rs");
+        let levels = format!(
+            "/// Number of linearly distributed levels, from {LADDER_LEVELS_MIN} to \
+             {LADDER_LEVELS_MAX}.\n"
+        );
+        assert!(
+            docs.contains(&levels),
+            "ladder levels docs changed: {levels}"
+        );
         assert_eq!((LADDER_LEVELS_MIN, LADDER_LEVELS_MAX), (2, 100));
     }
 
@@ -2610,21 +2881,35 @@ mod tests {
     #[test]
     fn twap_refuses_values_outside_the_contract() {
         let client = client();
-        for (duration, interval, mention) in [
-            (500, 100, "twap_duration_ms"),
-            (0, 100, "twap_duration_ms"),
-            (-1000, 100, "twap_duration_ms"),
-            (999, 100, "twap_duration_ms"),
-            (60_000, 0, "twap_slice_interval_ms"),
-            (60_000, -5, "twap_slice_interval_ms"),
-            (60_000, 99, "twap_slice_interval_ms"),
-            (1_000, 1_001, "must not exceed"),
+        const DURATION: &str = "ERROR_CODE_TWAP_DURATION_INVALID";
+        const INTERVAL: &str = "ERROR_CODE_TWAP_INTERVAL_INVALID";
+        for (duration, interval, code, mention) in [
+            (500, 100, DURATION, "twap_duration_ms"),
+            (0, 100, DURATION, "twap_duration_ms"),
+            (-1000, 100, DURATION, "twap_duration_ms"),
+            (999, 100, DURATION, "twap_duration_ms"),
+            (60_000, 0, INTERVAL, "twap_slice_interval_ms"),
+            (60_000, -5, INTERVAL, "twap_slice_interval_ms"),
+            (60_000, 99, INTERVAL, "twap_slice_interval_ms"),
+            (1_000, 1_001, INTERVAL, "must not exceed"),
         ] {
             let mut params = twap_create(CreateOrderType::Market);
             params.twap_duration_ms = Some(duration);
             params.twap_slice_interval_ms = Some(interval);
-            expect_validation(&client, &params, mention, &format!("{duration}/{interval}"));
+            expect_refusal(
+                &client,
+                &params,
+                code,
+                mention,
+                &format!("{duration}/{interval}"),
+            );
         }
+        let mut params = twap_create(CreateOrderType::Market);
+        params.twap_duration_ms = None;
+        expect_refusal(&client, &params, DURATION, "required", "no duration");
+        let mut params = twap_create(CreateOrderType::Market);
+        params.twap_slice_interval_ms = None;
+        expect_refusal(&client, &params, INTERVAL, "required", "no interval");
         for (duration, interval) in [
             (60_000, 1_000),
             (1_000, 100),
@@ -2648,6 +2933,276 @@ mod tests {
         }
     }
 
+    /// A trigger field refused before sending carries the code the Triggers
+    /// API answers for the same mistake, without a violation, so a pre-checked
+    /// request and a server refusal read alike. Shape refusals stay
+    /// validation errors.
+    #[test]
+    fn trigger_field_refusals_carry_the_server_codes() {
+        let client = client();
+        let btc =
+            |text: &str| crate::Price::from_decimal_str(text, Some("BTC-USDT".into())).unwrap();
+        let zero_price = || crate::Price::from_ticks(0, Some("BTC-USDT".into())).unwrap();
+        let mut cases: Vec<(&str, CreateTriggerParams, &str)> = Vec::new();
+
+        let mut p = market_stop(CreateSide::Sell);
+        p.client_trigger_id = String::new();
+        cases.push((
+            "empty client_trigger_id",
+            p,
+            "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID",
+        ));
+        let mut p = market_stop(CreateSide::Sell);
+        p.client_trigger_id = "x".repeat(37);
+        cases.push((
+            "long client_trigger_id",
+            p,
+            "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID",
+        ));
+        let mut p = market_stop(CreateSide::Sell);
+        // 13 three-byte characters: 39 bytes.
+        p.client_trigger_id = "\u{6b62}".repeat(13);
+        cases.push((
+            "39-byte client_trigger_id",
+            p,
+            "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID",
+        ));
+        let mut p = market_stop(CreateSide::Sell);
+        p.qty = crate::Quantity::from_scaled(
+            0,
+            Some(8),
+            crate::types::QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(7),
+        )
+        .unwrap();
+        cases.push(("zero qty", p, "ERROR_CODE_TRIGGER_QTY_INVALID"));
+        let mut p = market_stop(CreateSide::Sell);
+        p.fee_asset = Some(FeeAsset::Base);
+        cases.push(("sell with base fee", p, "ERROR_CODE_FEE_ASSET_NOT_ALLOWED"));
+        let mut p = trailing_create(None);
+        p.fee_asset = Some(FeeAsset::Base);
+        cases.push((
+            "sell trailing with base fee",
+            p,
+            "ERROR_CODE_FEE_ASSET_NOT_ALLOWED",
+        ));
+        let mut p = twap_create(CreateOrderType::Market);
+        p.fee_asset = Some(FeeAsset::Base);
+        cases.push((
+            "sell twap with base fee",
+            p,
+            "ERROR_CODE_FEE_ASSET_NOT_ALLOWED",
+        ));
+        let mut p = market_stop(CreateSide::Sell);
+        p.trigger_price = None;
+        cases.push(("no trigger price", p, "ERROR_CODE_TRIGGER_PRICE_INVALID"));
+        let mut p = market_stop(CreateSide::Sell);
+        p.trigger_price = Some(zero_price());
+        cases.push(("zero trigger price", p, "ERROR_CODE_TRIGGER_PRICE_INVALID"));
+        let mut p = market_stop(CreateSide::Sell);
+        p.order_type = CreateOrderType::Limit;
+        cases.push(("limit child without price", p, "ERROR_CODE_BAD_PRICE"));
+        let mut p = market_stop(CreateSide::Sell);
+        p.max_slippage_ticks = Some(0);
+        cases.push((
+            "zero child tick cap",
+            p,
+            "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+        ));
+        let mut p = market_stop(CreateSide::Buy);
+        p.max_slippage_bps = Some(10_001);
+        cases.push((
+            "child bps above 10000",
+            p,
+            "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+        ));
+        let mut p = market_stop(CreateSide::Buy);
+        p.max_slippage_bps = Some(0);
+        cases.push(("zero child bps", p, "ERROR_CODE_SLIPPAGE_BPS_INVALID"));
+        let mut p = market_stop(CreateSide::Sell);
+        p.max_slippage_bps = Some(10_000);
+        cases.push(("sell child bps 10000", p, "ERROR_CODE_MAX_SLIPPAGE_INVALID"));
+        let mut p = trailing_create(None);
+        p.trailing_distance_bps = None;
+        cases.push((
+            "no trailing distance",
+            p,
+            "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+        ));
+        let mut p = trailing_create(None);
+        p.trailing_distance_bps = Some(10_001);
+        cases.push((
+            "trailing bps above 10000",
+            p,
+            "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+        ));
+        let mut p = trailing_create(None);
+        p.trailing_distance_bps = None;
+        p.trailing_distance_ticks = Some(0);
+        cases.push((
+            "zero trailing ticks",
+            p,
+            "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+        ));
+        cases.push((
+            "trailing bps cap 10000",
+            trailing_create(Some(10_000)),
+            "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+        ));
+        cases.push((
+            "trailing bps cap 10001",
+            trailing_create(Some(10_001)),
+            "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+        ));
+        let mut p = trailing_create(None);
+        p.max_slippage_ticks = Some(-1);
+        cases.push((
+            "negative trailing tick cap",
+            p,
+            "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+        ));
+        let mut p = trailing_create(None);
+        p.side = CreateSide::Buy;
+        p.limit_price = Some(zero_price());
+        cases.push(("zero buy trailing maximum", p, "ERROR_CODE_BAD_PRICE"));
+        let mut p = twap_create(CreateOrderType::Market);
+        p.max_slippage_bps = Some(10_000);
+        cases.push((
+            "selling twap bps 10000",
+            p,
+            "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+        ));
+        let mut p = twap_create(CreateOrderType::Limit);
+        p.limit_price = None;
+        cases.push(("twap limit slice without price", p, "ERROR_CODE_BAD_PRICE"));
+        let mut p = ladder_create();
+        p.ladder_price_max = Some(btc("48000"));
+        cases.push((
+            "ladder max not above min",
+            p,
+            "ERROR_CODE_TRIGGER_PRICE_INVALID",
+        ));
+        let mut p = ladder_create();
+        p.ladder_price_min = None;
+        cases.push(("ladder without min", p, "ERROR_CODE_TRIGGER_PRICE_INVALID"));
+        let mut p = ladder_create();
+        p.ladder_price_min = Some(zero_price());
+        cases.push(("ladder zero min", p, "ERROR_CODE_TRIGGER_PRICE_INVALID"));
+        let mut p = ladder_create();
+        p.ladder_levels = None;
+        cases.push((
+            "ladder without levels",
+            p,
+            "ERROR_CODE_LADDER_LEVELS_INVALID",
+        ));
+        for (label, params, code) in cases {
+            expect_refusal(&client, &params, code, "", label);
+        }
+
+        // Shape refusals keep Error::Validation.
+        let mut p = trailing_create(None);
+        p.trailing_distance_ticks = Some(5);
+        let mut both = p;
+        both.trailing_distance_bps = Some(5);
+        let mut buy_without_maximum = trailing_create(None);
+        buy_without_maximum.side = CreateSide::Buy;
+        let mut sell_with_maximum = trailing_create(None);
+        sell_with_maximum.limit_price = Some(btc("50000"));
+        for (label, params) in [
+            ("both trailing distances", both),
+            ("buy trailing without maximum", buy_without_maximum),
+            ("sell trailing with maximum", sell_with_maximum),
+        ] {
+            let err = client.triggers.encode_create_params(&params).unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{label}: {err:?}");
+        }
+
+        // A buy may select the base fee asset; the pair's
+        // allow_buy_fee_from_base is the server's to check.
+        let mut buy = market_stop(CreateSide::Buy);
+        buy.fee_asset = Some(FeeAsset::Base);
+        client.triggers.encode_create_params(&buy).unwrap();
+    }
+
+    /// A modify refuses the same fields with the same codes; its caps may be
+    /// 0, which clears them.
+    #[test]
+    fn trigger_modify_refusals_carry_the_server_codes() {
+        let client = client();
+        let base = ModifyTriggerParams {
+            trigger_id: "2".into(),
+            subaccount_id: SubAccountScope::Default,
+            symbol: Some("BTC-USDT".into()),
+            symbol_id: None,
+            trigger_price: None,
+            activation_price: None,
+            trailing_distance_ticks: None,
+            trailing_distance_bps: None,
+            max_slippage_ticks: None,
+            max_slippage_bps: None,
+        };
+        for (label, params, code) in [
+            (
+                "zero trailing ticks",
+                ModifyTriggerParams {
+                    trailing_distance_ticks: Some(0),
+                    ..base.clone()
+                },
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                "zero trailing bps",
+                ModifyTriggerParams {
+                    trailing_distance_bps: Some(0),
+                    ..base.clone()
+                },
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                "negative tick cap",
+                ModifyTriggerParams {
+                    max_slippage_ticks: Some(-1),
+                    ..base.clone()
+                },
+                "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+            ),
+            (
+                "bps cap above 10000",
+                ModifyTriggerParams {
+                    max_slippage_bps: Some(10_001),
+                    ..base.clone()
+                },
+                "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+            ),
+            (
+                "negative bps cap",
+                ModifyTriggerParams {
+                    max_slippage_bps: Some(-1),
+                    ..base.clone()
+                },
+                "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+            ),
+        ] {
+            match client.triggers.encode_modify_params(&params) {
+                Err(Error::Api {
+                    code: got,
+                    violations,
+                    ..
+                }) => {
+                    assert_eq!(got, code, "{label}");
+                    assert!(violations.is_empty(), "{label}");
+                }
+                other => panic!("{label}: expected {code}, got {other:?}"),
+            }
+        }
+        let cleared = ModifyTriggerParams {
+            max_slippage_ticks: Some(0),
+            ..base
+        };
+        client.triggers.encode_modify_params(&cleared).unwrap();
+    }
+
     /// Ladder levels the contract refuses (outside 2..=100) are refused
     /// before sending.
     #[test]
@@ -2656,7 +3211,13 @@ mod tests {
         for levels in [1, 0, 101, -3, i32::MAX] {
             let mut params = ladder_create();
             params.ladder_levels = Some(levels);
-            expect_validation(&client, &params, "ladder_levels", &levels.to_string());
+            expect_refusal(
+                &client,
+                &params,
+                "ERROR_CODE_LADDER_LEVELS_INVALID",
+                "ladder_levels",
+                &levels.to_string(),
+            );
         }
         for levels in [2, 3, 99, 100] {
             let mut params = ladder_create();
@@ -2740,14 +3301,13 @@ mod tests {
         for ticks in [-5, 0] {
             let mut params = twap_create(CreateOrderType::Market);
             params.max_slippage_ticks = Some(ticks);
-            match client.triggers.encode_create_params(&params) {
-                Err(Error::Validation(message)) => {
-                    assert!(message.contains("max_slippage_ticks"), "{ticks}: {message}")
-                }
-                other => {
-                    panic!("max_slippage_ticks={ticks}: expected a validation error, got {other:?}")
-                }
-            }
+            expect_refusal(
+                &client,
+                &params,
+                "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+                "max_slippage_ticks",
+                &format!("max_slippage_ticks={ticks}"),
+            );
         }
 
         let mut params = twap_create(CreateOrderType::Market);
@@ -3076,6 +3636,19 @@ mod tests {
             assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
             assert!(err.to_string().contains(want), "{want}: {err}");
         };
+        // A field the server refuses with its own code carries that code.
+        let coded = |params: CreateOcoParams, code: &str, want: &str| {
+            let err = client
+                .triggers
+                .encode_create_oco_params(&params)
+                .unwrap_err();
+            assert!(
+                matches!(&err, Error::Api { code: got, violations, .. }
+                    if got == code && violations.is_empty()),
+                "{want}: {err:?}"
+            );
+            assert!(err.to_string().contains(want), "{want}: {err}");
+        };
 
         let mut p = sell_oco();
         p.client_list_id = String::new();
@@ -3089,13 +3662,31 @@ mod tests {
 
         let mut p = sell_oco();
         p.take_profit.limit_price = None;
-        refused(p, "take_profit limit leg requires limit_price");
+        coded(
+            p,
+            "ERROR_CODE_BAD_PRICE",
+            "take_profit limit leg requires limit_price",
+        );
+        let mut p = sell_oco();
+        p.qty = crate::Quantity::from_scaled(
+            0,
+            Some(8),
+            crate::types::QuantityDomain::OrderBase,
+            Some("BTC-USDT".into()),
+            Some(7),
+        )
+        .unwrap();
+        coded(p, "ERROR_CODE_BAD_QTY", "qty must be positive");
         let mut p = sell_oco();
         p.stop_loss.limit_price = Some(btc_price("48990"));
         refused(p, "stop_loss market leg must not set limit_price");
         let mut p = sell_oco();
         p.stop_loss.trigger_price = crate::Price::from_ticks(0, None).unwrap();
-        refused(p, "stop_loss trigger_price must be positive");
+        coded(
+            p,
+            "ERROR_CODE_TRIGGER_PRICE_INVALID",
+            "stop_loss trigger_price must be positive",
+        );
 
         let mut p = sell_oco();
         p.take_profit.trigger_price_source = Some("oracle".into());

@@ -173,7 +173,7 @@ pub enum Error {
         retry_after: Option<f64>,
         /// Structured `polyester.ratelimit.v1.RateLimitDetail` when attached:
         /// ConnectRPC details, an in-band order rejection, or the
-        /// `rate_limit` object of a REST `RATE_LIMIT_EXCEEDED` problem, whose
+        /// `rateLimit` object of a REST `RATE_LIMIT_EXCEEDED` problem, whose
         /// fields are all optional. The gateway's own refusal names only
         /// `reason` and `scope` (`CLIENT_IP`, no `operation_id`); a service's
         /// also names the operation, the policy class and the remaining quota.
@@ -1657,21 +1657,22 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     mapped.redacted()
 }
 
-/// The `rate_limit` object of a REST rate-limit problem. Every field is
-/// optional: the gateway's own refusal sends only `reason` and `scope`.
-/// Integers arrive as JSON strings or numbers; enum names are kept as sent,
-/// including ones newer than this SDK. Anything that is not an object reads as
-/// no detail, and a field of the wrong type reads as absent.
+/// The `rateLimit` object of a REST rate-limit problem, with camelCase fields.
+/// Every field is optional: the gateway's own refusal sends only `reason` and
+/// `scope`. Integers arrive as decimal strings (problem bodies) or JSON
+/// numbers; enum names are kept as sent, including ones newer than this SDK.
+/// Anything that is not an object reads as no detail, and a field of the wrong
+/// type reads as absent.
 fn rate_limit_detail_from_json(value: &serde_json::Value) -> Option<RateLimitDetail> {
     let fields = value.as_object()?;
-    let field = |snake: &str, camel: &str| fields.get(snake).or_else(|| fields.get(camel));
-    let text = |snake: &str, camel: &str| {
-        field(snake, camel)
+    let text = |name: &str| {
+        fields
+            .get(name)
             .and_then(serde_json::Value::as_str)
             .unwrap_or_default()
             .to_owned()
     };
-    let integer = |snake: &str, camel: &str| match field(snake, camel)? {
+    let integer = |name: &str| match fields.get(name)? {
         serde_json::Value::Number(number) => number.as_u64(),
         // Only ASCII digits within uint64: `str::parse` also accepts a `+`.
         serde_json::Value::String(text) => {
@@ -1683,15 +1684,15 @@ fn rate_limit_detail_from_json(value: &serde_json::Value) -> Option<RateLimitDet
         _ => None,
     };
     Some(RateLimitDetail {
-        reason: text("reason", "reason"),
-        limit: integer("limit", "limit"),
-        remaining: integer("remaining", "remaining"),
-        retry_after_ms: integer("retry_after_ms", "retryAfterMs"),
-        policy_version: integer("policy_version", "policyVersion"),
-        operation_id: text("operation_id", "operationId"),
-        policy_class: text("policy_class", "policyClass"),
-        scope: text("scope", "scope"),
-        refill_model: text("refill_model", "refillModel"),
+        reason: text("reason"),
+        limit: integer("limit"),
+        remaining: integer("remaining"),
+        retry_after_ms: integer("retryAfterMs"),
+        policy_version: integer("policyVersion"),
+        operation_id: text("operationId"),
+        policy_class: text("policyClass"),
+        scope: text("scope"),
+        refill_model: text("refillModel"),
     })
 }
 
@@ -2626,6 +2627,27 @@ mod tests {
             ConnectError::new(connect_code, "order error")
                 .with_detail(ErrorDetail::from_message("orders.v1.ErrorDetail", &detail)),
         )
+    }
+
+    /// Orders and triggers answer insufficient funds with `failed_precondition`
+    /// (it was `invalid_argument`): the same typed refusal either way, an
+    /// account-state refusal that is neither retryable nor of unknown outcome.
+    #[test]
+    fn insufficient_funds_reads_the_same_at_either_connect_code() {
+        for connect_code in [ErrorCode::FailedPrecondition, ErrorCode::InvalidArgument] {
+            let mapped = map_order(OrderErrorCode::ERROR_CODE_INSUFFICIENT_FUNDS, connect_code);
+            match &mapped {
+                Error::Api {
+                    code, violations, ..
+                } => {
+                    assert_eq!(code, "ERROR_CODE_INSUFFICIENT_FUNDS", "{connect_code:?}");
+                    assert!(violations.is_empty(), "{connect_code:?}");
+                }
+                other => panic!("{connect_code:?}: {other:?}"),
+            }
+            assert!(!mapped.is_retryable(), "{connect_code:?}");
+            assert!(!mapped.mutation_outcome_unknown(), "{connect_code:?}");
+        }
     }
 
     #[test]

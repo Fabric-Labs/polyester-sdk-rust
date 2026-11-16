@@ -824,8 +824,8 @@ async fn l2_invalid_client_order_and_trigger_ids_fail_closed_without_hitting_con
         .await
         .expect_err("oversized client_trigger_id must fail locally");
     assert!(
-        matches!(trigger_err, Error::Validation(_)),
-        "want Validation, got {trigger_err:?}"
+        matches!(&trigger_err, Error::Api { code, .. } if code == "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID"),
+        "want CLIENT_TRIGGER_ID_INVALID, got {trigger_err:?}"
     );
 
     assert_eq!(

@@ -399,7 +399,7 @@ pub(crate) const PERMISSION_REFUSAL_TYPE: &str = "polyester.sdk.PermissionRefusa
 pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 
 /// Type URL of the SDK-local Connect error detail that carries the
-/// `rate_limit` object of a REST rate-limit problem, as sent, in `debug`.
+/// `rateLimit` object of a REST rate-limit problem, as sent, in `debug`.
 /// [`crate::errors::map_connect_error`] reads it into the error's detail.
 pub(crate) const RATE_LIMIT_PROBLEM_TYPE: &str = "polyester.sdk.rate_limit_problem";
 
@@ -546,6 +546,7 @@ fn classify_failed_response_inner(
         detail: Option<String>,
         message: Option<String>,
         details: Option<Vec<BodyDetail>>,
+        #[serde(rename = "rateLimit")]
         rate_limit: Option<serde_json::Value>,
     }
     let parsed = is_json
@@ -655,7 +656,7 @@ fn classify_failed_response_inner(
                     },
                 ));
             if let Some(rate_limit) = rate_limit {
-                // A rate-limit problem's `rate_limit`, whichever side refused.
+                // A rate-limit problem's `rateLimit`, whichever side refused.
                 err = err.with_detail(ErrorDetail {
                     type_url: RATE_LIMIT_PROBLEM_TYPE.into(),
                     value: None,
