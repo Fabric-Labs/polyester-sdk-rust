@@ -2325,7 +2325,10 @@ Streams and recovery:
   again, and the new subscription's snapshot replaces the book. Updates that
   arrive meanwhile are dropped, a second gap starts no second recovery, and
   every other stream of the connection carries on untouched. The client's own
-  requests arrive as `Event::SubscribeResponse` like any other.
+  requests arrive as `Event::SubscribeResponse` like any other. Only a lost
+  connection, or an unsubscribe of a held stream answered with anything but
+  `SubscribeResult::Ok` or `SubscribeResult::NotSubscribed`
+  (`StreamError::Unsubscribe`), reconnects every stream.
 - `MarketStatus` reports a pair whose feed went stale (`FeedState::Stale`): its
   best bid and offer and depth pause until it recovers. A depth book then waits
   for its replacement snapshot, which arrives before the pair is reported live
@@ -2355,10 +2358,14 @@ stream with `Error::QueueOverflow` instead of losing messages.
 every stream of one pair. Each topic's result is `SubscribeResult::Ok` when its
 stream ended or `SubscribeResult::NotSubscribed` when it was not held. The
 client stops resubscribing them at once and drops their books, quotes and trade
-tracking, so subscribing again starts from a fresh snapshot or baseline. A
-request that was sent takes effect even if the caller stops waiting for its
-answer, and an Unsubscribe the connection drops before answering counts as
-done.
+tracking, so subscribing again starts from a fresh snapshot or baseline. Each
+topic's requests take effect in the order they are made, whether the caller's,
+a resubscription or a depth recovery's: the answer to a request that a later
+request of the same topic overtook is delivered as an
+`Event::SubscribeResponse` but not applied, and the client then brings the
+server to what the caller last asked for. A request that was sent takes effect
+even if the caller stops waiting for its answer, and an Unsubscribe the
+connection drops before answering counts as done.
 
 Decoders are generated from the published schema with Real Logic's sbe-tool
 (`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the

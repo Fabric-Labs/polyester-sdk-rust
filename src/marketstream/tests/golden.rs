@@ -7,13 +7,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use super::frames::window;
-use crate::errors::Error;
 use crate::marketstream::client::{
-    depth_book, feed_of, force_feed, handle, offline, record_subscribe, recovering,
+    depth_book, feed_of, handle, offline, record_subscribe, recovering,
 };
 use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::{ReadBuf, message_header_codec, ping_codec, subscribe_codec};
-use crate::marketstream::{Config, Event, FeedState, Pairs, Stream, StreamError, Topic};
+use crate::marketstream::{Config, Event, FeedState, Pairs, Stream, Topic};
 
 struct Frame {
     file: String,
@@ -160,7 +159,6 @@ fn golden_captures_replay() {
         // A capture may keep only some frames of a template: trades of a pair
         // whose baseline it did not keep are not replayed.
         let mut baseline = HashSet::new();
-        let mut old_order = false;
         for f in &frames {
             if f.direction == "client" {
                 // The captured client's requests, recorded as this client
@@ -195,17 +193,6 @@ fn golden_captures_replay() {
                 _ => {}
             }
             if let Err(err) = handle(&shared, &f.data) {
-                // A capture taken while the server sent LIVE before the depth
-                // book's replacement snapshot: the client refuses that order
-                // and recovers by reconnecting. A capture of the server's
-                // current order replays through.
-                if let (true, Error::MarketStream(StreamError::BookGap { symbol_id, .. })) =
-                    (matches!(msg, Msg::MarketStatus { .. }), &err)
-                {
-                    old_order = true;
-                    force_feed(&shared, *symbol_id, FeedState::Live);
-                    continue;
-                }
                 panic!("{capture}/{}: {err}", f.file);
             }
             match msg {
@@ -253,10 +240,5 @@ fn golden_captures_replay() {
             gaps, 0,
             "{capture}: trade gaps in a capture without lost trades"
         );
-        if old_order {
-            eprintln!(
-                "{capture} holds LIVE before a replacement snapshot, refused as the old order"
-            );
-        }
     }
 }

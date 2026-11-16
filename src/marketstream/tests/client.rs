@@ -36,14 +36,14 @@ impl Pairs for TestPairs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct ClientMsg {
-    ping: bool,
-    unsubscribe: bool,
-    request_id: u64,
-    topics: Vec<Topic>,
+pub(super) struct ClientMsg {
+    pub ping: bool,
+    pub unsubscribe: bool,
+    pub request_id: u64,
+    pub topics: Vec<Topic>,
 }
 
-fn decode_client(frame: &[u8]) -> ClientMsg {
+pub(super) fn decode_client(frame: &[u8]) -> ClientMsg {
     let h = message_header_codec::MessageHeaderDecoder::default().wrap(ReadBuf::new(frame), 0);
     let template = h.template_id();
     let mut out = ClientMsg {
@@ -82,13 +82,13 @@ fn decode_client(frame: &[u8]) -> ClientMsg {
     out
 }
 
-struct ServerConn {
+pub(super) struct ServerConn {
     tx: mpsc::UnboundedSender<Option<Vec<u8>>>,
-    rx: mpsc::UnboundedReceiver<ClientMsg>,
+    pub(super) rx: mpsc::UnboundedReceiver<ClientMsg>,
 }
 
 impl ServerConn {
-    fn send(&self, frames: &[Vec<u8>]) {
+    pub(super) fn send(&self, frames: &[Vec<u8>]) {
         for f in frames {
             let _ = self.tx.send(Some(f.clone()));
         }
@@ -119,14 +119,14 @@ impl ServerConn {
     }
 }
 
-struct FakeServer {
+pub(super) struct FakeServer {
     url: String,
     conns: mpsc::UnboundedReceiver<ServerConn>,
-    count: Arc<AtomicUsize>,
+    pub(super) count: Arc<AtomicUsize>,
 }
 
 impl FakeServer {
-    async fn start() -> Self {
+    pub(super) async fn start() -> Self {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("ws://{}{PATH}", listener.local_addr().unwrap());
         let (conn_tx, conns) = mpsc::unbounded_channel();
@@ -172,7 +172,7 @@ impl FakeServer {
         Self { url, conns, count }
     }
 
-    async fn accept(&mut self) -> ServerConn {
+    pub(super) async fn accept(&mut self) -> ServerConn {
         tokio::time::timeout(Duration::from_secs(5), self.conns.recv())
             .await
             .expect("a connection")
@@ -187,7 +187,7 @@ fn config(server: &FakeServer) -> Config {
     cfg
 }
 
-async fn dial(server: &FakeServer, f: impl FnOnce(&mut Config)) -> MarketStream {
+pub(super) async fn dial(server: &FakeServer, f: impl FnOnce(&mut Config)) -> MarketStream {
     let mut cfg = config(server);
     f(&mut cfg);
     connect(cfg).await.expect("connects")
@@ -1513,7 +1513,11 @@ async fn a_refused_recovery_unsubscribe_reconnects() {
     })
     .await;
     assert!(
-        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
+        matches!(
+            err,
+            Error::MarketStream(StreamError::Unsubscribe { topic, .. })
+                if topic == Topic::new(7, Stream::Depth)
+        ),
         "{err}"
     );
     let mut conn = server.accept().await;

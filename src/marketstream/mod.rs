@@ -398,12 +398,15 @@ pub enum StreamError {
     /// from a fresh baseline.
     #[error("invalid market stream message (template {template_id}): {message}")]
     Frame { template_id: u16, message: String },
-    /// A depth book could not follow the stream: an update not at its base,
-    /// or the pair live again before the book's replacement snapshot. The
-    /// client reconnects, and the new subscription's snapshot replaces the
-    /// book.
-    #[error("market stream depth book gap on pair {symbol_id}: {message}")]
-    BookGap { symbol_id: u32, message: String },
+    /// An unsubscribe of a held stream that the server answered with neither
+    /// [`SubscribeResult::Ok`] nor [`SubscribeResult::NotSubscribed`]: whether
+    /// the connection still holds the stream is unknown, so the client
+    /// reconnects, and every stream is resubscribed.
+    #[error("market stream unsubscribe of {topic} answered {result}")]
+    Unsubscribe {
+        topic: Topic,
+        result: SubscribeResult,
+    },
 }
 
 impl StreamError {
