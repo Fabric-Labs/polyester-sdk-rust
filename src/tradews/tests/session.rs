@@ -1466,3 +1466,114 @@ async fn dropping_every_sender_keeps_the_events_coming() {
     .await;
     assert!(pong.is_ok() && events.is_alive());
 }
+
+/// How a test ends the session.
+#[derive(Clone, Copy, Debug)]
+enum CloseBy {
+    DroppingEvents,
+    EventsHalf,
+    SenderHalf,
+}
+
+/// A command made right after the session is closed, without yielding, is
+/// refused as closed and never written.
+async fn commands_after_close_are_never_written(how: CloseBy) {
+    for round in 0..48 {
+        let (url, record) = stand_in(vec![serve()]).await;
+        let session = start(url).await;
+        ready(&session).await;
+        let (sender, events) = session.split();
+        let other = sender.clone();
+        match how {
+            CloseBy::DroppingEvents => drop(events),
+            CloseBy::EventsHalf => {
+                events.close();
+                std::mem::forget(events);
+            }
+            CloseBy::SenderHalf => {
+                sender.close();
+                std::mem::forget(events);
+            }
+        }
+        let result = other
+            .cancel_order(7, &OrderRef::Id(round + 1), within(500))
+            .await;
+        assert_eq!(not_sent(result), NotSent::Closed, "{how:?} round {round}");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(
+            !record.lock().unwrap()[0]
+                .frames
+                .iter()
+                .any(|(t, _, _)| *t == 3),
+            "{how:?} round {round}: a cancel reached the server after the close"
+        );
+    }
+}
+
+#[tokio::test]
+async fn commands_after_the_events_are_dropped_are_never_written() {
+    commands_after_close_are_never_written(CloseBy::DroppingEvents).await;
+}
+
+#[tokio::test]
+async fn commands_after_the_events_close_are_never_written() {
+    commands_after_close_are_never_written(CloseBy::EventsHalf).await;
+}
+
+#[tokio::test]
+async fn commands_after_a_sender_closes_are_never_written() {
+    commands_after_close_are_never_written(CloseBy::SenderHalf).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn queued_commands_at_close_are_refused_or_unknown_never_written_after() {
+    let silent = Script {
+        answer_commands: false,
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![silent]).await;
+    let mut cfg = config(url);
+    cfg.answer_timeout = Duration::from_secs(30);
+    let session = connect(cfg).await.unwrap();
+    ready(&session).await;
+    let (sender, events) = session.split();
+    let calls: Vec<_> = (1..=300u64)
+        .map(|i| {
+            let sender = sender.clone();
+            tokio::spawn(async move {
+                let mut batch = BatchCancelOrders::new(vec![CancelItem {
+                    symbol_id: 7,
+                    order: OrderRef::Id(i),
+                }]);
+                batch.correlation_id = i;
+                (i, sender.batch_cancel_orders(&batch, within(5_000)).await)
+            })
+        })
+        .collect();
+    // Some are written, the rest wait behind them.
+    tokio::time::sleep(Duration::from_millis(2)).await;
+    drop(events);
+    let mut closed = Vec::new();
+    for call in calls {
+        let (i, result) = tokio::time::timeout(WAIT, call).await.unwrap().unwrap();
+        match trade_error(result) {
+            TradeError::NotSent {
+                reason: NotSent::Closed,
+                ..
+            } => closed.push(i),
+            TradeError::OutcomeUnknown { .. } => {}
+            other => panic!("{i}: {other:?}"),
+        }
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let written: Vec<u64> = record.lock().unwrap()[0]
+        .frames
+        .iter()
+        .filter(|(t, _, _)| *t == 9)
+        .map(|(_, _, corr)| *corr)
+        .collect();
+    assert!(
+        closed.iter().all(|i| !written.contains(i)),
+        "a command refused as closed reached the server"
+    );
+}

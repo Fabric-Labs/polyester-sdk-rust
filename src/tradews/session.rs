@@ -30,6 +30,7 @@
 //! once.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -200,6 +201,24 @@ struct Shared {
     link: watch::Sender<Link>,
     stop: watch::Sender<bool>,
     err: Mutex<Option<Error>>,
+    /// The shutdown fence: set once, synchronously, when either half closes
+    /// the session or its events are dropped, before any of the session's
+    /// own work runs. A command is refused as [`NotSent::Closed`] once it is
+    /// set, at admission and again right before its frame is written, so no
+    /// command made or still queued after a close reaches the socket.
+    closed: AtomicBool,
+}
+
+impl Shared {
+    /// Closes the session: the fence first, then the worker's stop signal.
+    fn shutdown(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        self.stop.send_replace(true);
+    }
+
+    fn is_closed(&self) -> bool {
+        self.closed.load(Ordering::SeqCst)
+    }
 }
 
 /// A command for the writer, bound to the connection that was ready when it
@@ -250,7 +269,9 @@ pub struct TradeSender {
 /// It owns the session's life. Dropping it closes the session as
 /// [`TradeSession::close`] does: the connection ends, every command already
 /// sent and unanswered is answered [`TradeError::OutcomeUnknown`], and every
-/// command after it [`NotSent::Closed`]. With cancel-on-disconnect, the
+/// command after it [`NotSent::Closed`]. The close is a fence for every
+/// handle, set before the drop returns: a command made through any
+/// [`TradeSender`] afterwards, or still queued, is never written. With cancel-on-disconnect, the
 /// account's orders are cancelled after the grace period unless another
 /// opted-in session is connected.
 pub struct TradeEvents {
@@ -261,7 +282,7 @@ pub struct TradeEvents {
 
 impl Drop for TradeEvents {
     fn drop(&mut self) {
-        self.shared.stop.send_replace(true);
+        self.shared.shutdown();
     }
 }
 
@@ -302,6 +323,7 @@ pub async fn connect(mut config: Config) -> Result<TradeSession> {
         link,
         stop,
         err: Mutex::new(None),
+        closed: AtomicBool::new(false),
     });
     let task = tokio::spawn(run(shared.clone(), ws, cmd_rx, events));
     Ok(TradeSession {
@@ -440,7 +462,7 @@ impl TradeEvents {
 
     /// Closes the socket and stops the session; queued events stay readable.
     pub fn close(&self) {
-        self.shared.stop.send_replace(true);
+        self.shared.shutdown();
     }
 }
 
@@ -474,7 +496,7 @@ impl TradeSender {
 
     /// Closes the socket and stops the session; queued events stay readable.
     pub fn close(&self) {
-        self.shared.stop.send_replace(true);
+        self.shared.shutdown();
     }
 
     async fn call(
@@ -496,6 +518,9 @@ impl TradeSender {
         timer: Option<Duration>,
         frame: Vec<u8>,
     ) -> Result<Answer> {
+        if self.shared.is_closed() {
+            return Err(not_sent(command, NotSent::Closed));
+        }
         let link = *self.shared.link.borrow();
         if link.closed {
             return Err(not_sent(command, NotSent::Closed));
@@ -1127,11 +1152,13 @@ async fn wait(shared: &Shared, cmds: &mut mpsc::Receiver<Cmd>, delay: Duration) 
     let mut stop = shared.stop.subscribe();
     loop {
         tokio::select! {
-            () = &mut sleep => return true,
+            biased;
             () = stopped(&mut stop) => return false,
+            () = &mut sleep => return true,
             cmd = cmds.recv() => match cmd {
                 Some(c) => {
-                    let _ = c.answer.send(Err(not_sent(c.command, NotSent::Stale)));
+                    let reason = if shared.is_closed() { NotSent::Closed } else { NotSent::Stale };
+                    let _ = c.answer.send(Err(not_sent(c.command, reason)));
                 }
                 None => return false,
             },
@@ -1211,10 +1238,22 @@ async fn write<S>(
     mut frame: Vec<u8>,
     timeout: Duration,
     stop: &mut watch::Receiver<bool>,
+    closed: &AtomicBool,
 ) -> std::result::Result<u64, Exit>
 where
     S: futures_util::Sink<Message, Error = tungstenite::Error> + Unpin,
 {
+    // The fence, right before the wire: a command the session was closed
+    // before is refused, never written.
+    if closed.load(Ordering::SeqCst) {
+        if let Pending::Command {
+            command, answer, ..
+        } = pending
+        {
+            let _ = answer.send(Err(not_sent(command, NotSent::Closed)));
+        }
+        return Err(Exit::Stop);
+    }
     let seq = conn.next_seq;
     conn.next_seq += 1;
     codec::set_seq(&mut frame, seq);
@@ -1237,10 +1276,11 @@ where
         .expect("the frame is in flight");
     let until = tokio::time::Instant::from_std(oldest + timeout);
     tokio::select! {
+        biased;
+        () = stopped(stop) => return Err(Exit::Stop),
         sent = ws.send(Message::Binary(frame.into())) => {
             sent.map_err(|e| Exit::Lost(Error::realtime(format!("tradews send: {e}"))))?;
         }
-        () = stopped(stop) => return Err(Exit::Stop),
         () = tokio::time::sleep_until(until) => {
             return Err(Exit::Lost(Error::realtime(format!(
                 "tradews write of seq {seq} did not complete within the answer timeout of {timeout:?}"
@@ -1267,6 +1307,7 @@ async fn connection(
         subscribe,
         cfg.answer_timeout,
         &mut stop,
+        &shared.closed,
     )
     .await
     {
@@ -1279,6 +1320,7 @@ async fn connection(
     let mut last_ping = Instant::now();
     loop {
         tokio::select! {
+            biased;
             () = stopped(&mut stop) => return Exit::Stop,
             frame = ws.next() => match frame {
                 Some(Ok(Message::Binary(bytes))) => match codec::decode(&bytes) {
@@ -1310,13 +1352,17 @@ async fn connection(
                 let pinging = conn.in_flight.values().any(|f| matches!(f.pending, Pending::Ping));
                 if !pinging && last_ping.elapsed() >= cfg.ping_interval {
                     last_ping = Instant::now();
-                    if let Err(exit) = write(ws, conn, Pending::Ping, codec::encode_ping(0), cfg.answer_timeout, &mut stop).await {
+                    if let Err(exit) = write(ws, conn, Pending::Ping, codec::encode_ping(0), cfg.answer_timeout, &mut stop, &shared.closed).await {
                         return exit;
                     }
                 }
             }
             cmd = cmds.recv() => {
                 let Some(cmd) = cmd else { return Exit::Stop };
+                if shared.is_closed() {
+                    let _ = cmd.answer.send(Err(not_sent(cmd.command, NotSent::Closed)));
+                    return Exit::Stop;
+                }
                 if let Some(reason) = conn.refusal(&cmd, cfg.timer_gate) {
                     let _ = cmd.answer.send(Err(not_sent(cmd.command, reason)));
                     continue;
@@ -1329,7 +1375,7 @@ async fn connection(
                     correlation_id: cmd.correlation_id,
                     answer: cmd.answer,
                 };
-                if let Err(exit) = write(ws, conn, pending, cmd.frame, cfg.answer_timeout, &mut stop).await {
+                if let Err(exit) = write(ws, conn, pending, cmd.frame, cfg.answer_timeout, &mut stop, &shared.closed).await {
                     return exit;
                 }
             }
@@ -1543,6 +1589,7 @@ mod write_tests {
                 codec::encode_ping(0),
                 Duration::from_millis(100),
                 &mut stop,
+                &AtomicBool::new(false),
             ),
         )
         .await
@@ -1581,6 +1628,7 @@ mod write_tests {
                 codec::encode_ping(0),
                 Duration::from_secs(60),
                 &mut stop,
+                &AtomicBool::new(false),
             ),
         )
         .await
@@ -1619,5 +1667,120 @@ mod write_tests {
         assert!(conn.armed_until_ms.unwrap() <= unix_ms(SystemTime::now()).unwrap() + 10_000);
         conn.timer_acknowledged(6, Some(now + 10_050));
         assert_eq!(conn.armed_until_ms, Some(now + 10_050));
+    }
+
+    /// One command is mid-write on a peer that takes nothing, three wait in
+    /// the queue behind it, and the session is closed: the worker ends the
+    /// write and the session as it does on any stop.
+    #[tokio::test]
+    async fn a_close_behind_a_stalled_write_refuses_the_queue() {
+        let credentials = crate::auth::Credentials::new(
+            "1",
+            "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+        )
+        .unwrap();
+        let (commands, mut cmds) = mpsc::channel(8);
+        let (link, _) = watch::channel(Link::default());
+        let (stop, _) = watch::channel(false);
+        let shared = Arc::new(Shared {
+            cfg: Config::new("ws://127.0.0.1:9/ws/trade.sbe", credentials),
+            commands,
+            link,
+            stop,
+            err: Mutex::new(None),
+            closed: AtomicBool::new(false),
+        });
+        let mut stop = shared.stop.subscribe();
+        let mut conn = Conn::new(1);
+        conn.ready = true;
+        let deadline = Deadline::within(Duration::from_secs(5)).unwrap();
+        let queued: Vec<_> = (2..=4)
+            .map(|correlation_id| {
+                let (answer, rx) = oneshot::channel();
+                shared
+                    .commands
+                    .try_send(Cmd {
+                        connection: 1,
+                        command: Command::CancelOrder,
+                        correlation_id,
+                        deadline,
+                        timer: None,
+                        frame: codec::encode_ping(0),
+                        answer,
+                    })
+                    .unwrap();
+                rx
+            })
+            .collect();
+        let (answer, mid_write) = oneshot::channel();
+        let closer = shared.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            closer.shutdown();
+        });
+        let ended = tokio::time::timeout(
+            Duration::from_secs(2),
+            write(
+                &mut Stalled,
+                &mut conn,
+                Pending::Command {
+                    command: Command::CancelOrder,
+                    correlation_id: 1,
+                    answer,
+                },
+                codec::encode_ping(0),
+                Duration::from_secs(60),
+                &mut stop,
+                &shared.closed,
+            ),
+        )
+        .await
+        .expect("the close ends the stalled write");
+        assert!(matches!(ended, Err(Exit::Stop)));
+        // What the worker does on a stop: the connection's unanswered frames,
+        // then the session's queue.
+        assert_eq!(conn.fail_in_flight("the session was closed"), [1]);
+        finish(&shared, &mut cmds, None);
+        assert!(matches!(
+            mid_write.await.unwrap(),
+            Err(Error::TradeSession(TradeError::OutcomeUnknown {
+                correlation_id: 1,
+                ..
+            }))
+        ));
+        for rx in queued {
+            assert!(matches!(
+                rx.await.unwrap(),
+                Err(Error::TradeSession(TradeError::NotSent {
+                    reason: NotSent::Closed,
+                    ..
+                }))
+            ));
+        }
+        // A write the session was closed before is refused, never written.
+        let (answer, late) = oneshot::channel();
+        let refused = write(
+            &mut Stalled,
+            &mut conn,
+            Pending::Command {
+                command: Command::CancelOrder,
+                correlation_id: 5,
+                answer,
+            },
+            codec::encode_ping(0),
+            Duration::from_secs(60),
+            &mut stop,
+            &shared.closed,
+        )
+        .await;
+        assert!(matches!(refused, Err(Exit::Stop)));
+        assert!(conn.in_flight.is_empty());
+        assert!(matches!(
+            late.await.unwrap(),
+            Err(Error::TradeSession(TradeError::NotSent {
+                reason: NotSent::Closed,
+                ..
+            }))
+        ));
     }
 }
