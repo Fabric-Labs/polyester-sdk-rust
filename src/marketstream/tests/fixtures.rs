@@ -7,12 +7,11 @@
 use std::sync::Arc;
 
 use super::derive::fixtures_dir;
-use crate::errors::Error;
-use crate::marketstream::client::{handle, offline_stream, record_subscribe};
+use crate::marketstream::client::{handle, offline_stream, record_subscribe, recovery_requested};
 use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::{ReadBuf, message_header_codec, ping_codec, subscribe_codec};
 use crate::marketstream::{
-    Config, Event, FeedState, GapCause, MarketStream, Pairs, Stream, StreamError, Topic, TradesGap,
+    Config, Event, FeedState, GapCause, MarketStream, Pairs, Stream, Topic, TradesGap,
 };
 
 struct Fixture {
@@ -286,7 +285,8 @@ async fn fixture_trades_after_their_baseline() {
 }
 
 /// A stale pair recovers in the server's order: its replacement snapshot,
-/// then LIVE; LIVE before the snapshot is a recovery error.
+/// then LIVE. LIVE before the snapshot is a gap of the depth stream: it alone
+/// recovers.
 #[tokio::test]
 async fn fixture_recovery_order() {
     let (frames, _) = load();
@@ -301,10 +301,11 @@ async fn fixture_recovery_order() {
     assert_eq!(stream.feed(symbol_id), FeedState::Live);
     assert!(stream.live(Topic::new(symbol_id, Stream::Depth)));
     let other = subscribed(&frames);
-    replay(&other, &[snapshot, stale]);
+    replay(&other, &[snapshot, stale, live]);
+    let topic = Topic::new(symbol_id, Stream::Depth);
     assert!(
-        handle(other.shared(), &live.data).is_err(),
-        "LIVE before the replacement snapshot accepted"
+        recovery_requested(other.shared(), topic) && !other.live(topic),
+        "LIVE before the replacement snapshot did not start the depth stream's recovery"
     );
 }
 
@@ -396,30 +397,39 @@ async fn fixture_depth_with_levels() {
     );
 }
 
-/// An update missing from the chain is a gap: the book is stale, and the
-/// connection is ended so a new subscription's snapshot replaces it.
+/// An update missing from the chain is a gap: the book is stale and not live,
+/// the depth stream alone recovers by an Unsubscribe, and further updates are
+/// dropped meanwhile.
 #[tokio::test]
 async fn fixture_depth_gap_marks_the_book_stale() {
     let (frames, _) = load();
     let stream = subscribed(&frames);
     let chain = group(&frames, "depth-levels-chain");
     replay(&stream, &chain[..2]);
-    let err =
-        handle(stream.shared(), &chain[3].data).expect_err("an update past a missing one applied");
-    assert!(
-        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
-        "{err}"
-    );
+    handle(stream.shared(), &chain[3].data).expect("a gap ended the connection");
     let Msg::DepthSnapshot { symbol_id, .. } = decode(chain[0]) else {
         panic!("not a snapshot")
     };
+    let topic = Topic::new(symbol_id, Stream::Depth);
     assert!(
         stream
             .order_book(symbol_id, Stream::Depth, 0)
             .expect("a book")
             .stale
     );
-    assert!(!stream.live(Topic::new(symbol_id, Stream::Depth)));
+    assert!(!stream.live(topic));
+    assert!(
+        recovery_requested(stream.shared(), topic),
+        "no Unsubscribe of the depth stream after its gap"
+    );
+    handle(stream.shared(), &chain[4].data).expect("an update during the recovery");
+    assert!(
+        stream
+            .order_book(symbol_id, Stream::Depth, 0)
+            .expect("a book")
+            .stale,
+        "an update applied during the recovery"
+    );
 }
 
 /// TradesSkipped after the pair's baseline names exactly the trades the

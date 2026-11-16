@@ -402,84 +402,6 @@ async fn delivers_every_stream() {
 }
 
 #[tokio::test]
-async fn rebuilds_the_book_after_a_gap_and_reconciles_trades() {
-    let mut server = FakeServer::start().await;
-    let mut stream = dial(&server, |_| {}).await;
-    let mut conn = server.accept().await;
-    answered(
-        &mut conn,
-        stream.subscribe(&[t(7, Stream::Depth), t(7, Stream::Trades)]),
-        |m| {
-            vec![
-                respond(m, Wire::OK),
-                depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
-                trades_through(7, 1, 100),
-                depth_update(7, 1, 11, 11, &[lv(100, 2)], &[]),
-                trades(7, 1, 11, &[fill(101)]),
-                depth_update(7, 1, 13, 13, &[lv(100, 3)], &[]),
-            ]
-        },
-    )
-    .await;
-    let err = expect(&mut stream, |e| {
-        if let Event::Disconnected { error, .. } = e {
-            Some(error)
-        } else {
-            None
-        }
-    })
-    .await;
-    assert!(
-        matches!(
-            err,
-            Error::MarketStream(StreamError::BookGap { symbol_id: 7, .. })
-        ),
-        "{err}"
-    );
-    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
-    assert!(book.stale && book.update_id == 11);
-
-    let mut conn = server.accept().await;
-    expect(&mut stream, |e| {
-        matches!(e, Event::Connected { reconnect: true }).then_some(())
-    })
-    .await;
-    let resub = conn.request().await;
-    assert_eq!(
-        resub.topics,
-        vec![t(7, Stream::Depth), t(7, Stream::Trades)]
-    );
-    conn.send(&[
-        respond(&resub, Wire::OK),
-        depth_snapshot(7, Stream::Depth, 1, 20, &[lv(100, 9)], &[]),
-        trades_through(7, 1, 105),
-    ]);
-    let s = expect(&mut stream, |e| {
-        if let Event::DepthSnapshot(x) = e {
-            Some(x)
-        } else {
-            None
-        }
-    })
-    .await;
-    assert_eq!(s.update_id, 20);
-    let g = expect(&mut stream, |e| {
-        if let Event::TradesGap(x) = e {
-            Some(x)
-        } else {
-            None
-        }
-    })
-    .await;
-    assert_eq!(
-        (g.after_trade_id, g.through_trade_id, g.cause),
-        (101, 105, GapCause::Reconnect)
-    );
-    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
-    assert!(!book.stale && book.update_id == 20 && book.bids[0].qty.as_scaled() == 9);
-}
-
-#[tokio::test]
 async fn refused_topics_are_not_resubscribed() {
     let mut server = FakeServer::start().await;
     let stream = dial(&server, |_| {}).await;
@@ -843,46 +765,6 @@ async fn depth_recovers_with_a_snapshot_before_live() {
     .await;
     let book = stream.order_book(7, Stream::Depth, 0).unwrap();
     assert!(!book.stale && book.update_id == 41 && book.bids[0].qty.as_scaled() == 2);
-}
-
-#[tokio::test]
-async fn depth_recovery_out_of_order_is_recovered() {
-    for frames in [
-        vec![
-            market_status(7, FeedState::Stale),
-            market_status(7, FeedState::Live),
-        ],
-        vec![
-            market_status(7, FeedState::Stale),
-            depth_update(7, 1, 11, 11, &[], &[]),
-        ],
-    ] {
-        let mut server = FakeServer::start().await;
-        let mut stream = dial(&server, |_| {}).await;
-        let mut conn = server.accept().await;
-        answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
-            vec![
-                respond(m, Wire::OK),
-                depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
-            ]
-        })
-        .await;
-        conn.send(&frames);
-        let err = expect(&mut stream, |e| {
-            if let Event::Disconnected { error, .. } = e {
-                Some(error)
-            } else {
-                None
-            }
-        })
-        .await;
-        assert!(
-            matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
-            "{err}"
-        );
-        let mut conn = server.accept().await;
-        assert_eq!(conn.request().await.topics, vec![t(7, Stream::Depth)]);
-    }
 }
 
 #[tokio::test]
@@ -1408,70 +1290,6 @@ async fn every_depth_snapshot_replaces_the_book() {
     );
 }
 
-/// A depth update before any snapshot of its connection never makes the book
-/// live: it is a gap, and the book is rebuilt from a snapshot.
-#[tokio::test]
-async fn a_depth_update_before_a_snapshot_after_reconnects_is_a_gap() {
-    let mut server = FakeServer::start().await;
-    let mut stream = dial(&server, |_| {}).await;
-    let mut conn = server.accept().await;
-    answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
-        vec![
-            respond(m, Wire::OK),
-            depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
-        ]
-    })
-    .await;
-    expect(&mut stream, |e| {
-        matches!(e, Event::DepthSnapshot(_)).then_some(())
-    })
-    .await;
-    for _ in 0..2 {
-        conn.close();
-        expect(&mut stream, |e| {
-            matches!(e, Event::Disconnected { .. }).then_some(())
-        })
-        .await;
-        conn = server.accept().await;
-        let resub = conn.request().await;
-        conn.send(&[
-            respond(&resub, Wire::OK),
-            depth_snapshot(7, Stream::Depth, 1, 9, &[lv(99, 1)], &[]),
-        ]);
-        expect(&mut stream, |e| {
-            matches!(e, Event::DepthSnapshot(_)).then_some(())
-        })
-        .await;
-    }
-    conn.close();
-    expect(&mut stream, |e| {
-        matches!(e, Event::Disconnected { .. }).then_some(())
-    })
-    .await;
-    let mut conn = server.accept().await;
-    let resub = conn.request().await;
-    conn.send(&[
-        respond(&resub, Wire::OK),
-        depth_update(7, 1, 10, 10, &[], &[]),
-    ]);
-    let err = expect(&mut stream, |e| {
-        if let Event::Disconnected { error, .. } = e {
-            Some(error)
-        } else {
-            None
-        }
-    })
-    .await;
-    assert!(
-        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
-        "{err}"
-    );
-    assert!(
-        !stream.live(t(7, Stream::Depth)),
-        "depth live without the session's snapshot"
-    );
-}
-
 /// A depth subscription made while the pair is stale gets no snapshot until
 /// the pair recovers: no gap and no error; the book stays stale until the
 /// snapshot, then LIVE.
@@ -1511,5 +1329,330 @@ async fn depth_subscribed_while_stale_waits_for_recovery() {
     assert!(
         !book.stale && book.update_id == 41 && stream.live(t(7, Stream::Depth)),
         "{book:?} after recovery"
+    );
+}
+
+// A depth stream recovers from a gap on its own connection: it alone goes
+// stale, is unsubscribed and subscribed again, and the new subscription's
+// snapshot replaces its book.
+
+/// Subscribes depth, trades and bbo of pair 7, delivers a healthy state for
+/// each, then a depth update past a missing one.
+async fn recovery_start() -> (MarketStream, FakeServer, ServerConn) {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(
+        &mut conn,
+        stream.subscribe(&[t(7, Stream::Depth), t(7, Stream::Trades), t(7, Stream::Bbo)]),
+        |m| {
+            vec![
+                respond(m, Wire::OK),
+                depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
+                trades_through(7, 1, 100),
+                bbo(7, 1, 10, (100, 1), (101, 1)),
+                depth_update(7, 1, 11, 11, &[lv(100, 2)], &[]),
+                trades(7, 1, 11, &[fill(101)]),
+            ]
+        },
+    )
+    .await;
+    expect(&mut stream, |e| matches!(e, Event::Trades(_)).then_some(())).await;
+    conn.send(&[depth_update(7, 1, 13, 13, &[lv(100, 3)], &[])]); // 12 is missing
+    (stream, server, conn)
+}
+
+/// The client's next Subscribe or Unsubscribe; it must be for pair 7's depth
+/// stream alone.
+async fn next_request(conn: &mut ServerConn, unsubscribe: bool) -> ClientMsg {
+    let m = conn.request().await;
+    assert!(
+        m.unsubscribe == unsubscribe && m.topics == vec![t(7, Stream::Depth)],
+        "client sent {m:?}, want an {} of pair 7's depth alone",
+        if unsubscribe {
+            "Unsubscribe"
+        } else {
+            "Subscribe"
+        }
+    );
+    m
+}
+
+async fn no_request(conn: &mut ServerConn) {
+    while let Some(m) = conn.quiet(Duration::from_millis(30)).await {
+        assert!(m.ping, "client sent {m:?}");
+    }
+}
+
+fn no_disconnect(stream: &mut MarketStream) {
+    for e in stream.queued() {
+        if let Event::Disconnected { error, .. } = e {
+            panic!("disconnected by {error}");
+        }
+    }
+}
+
+/// A gap on the depth stream recovers that stream alone: trades and bbo keep
+/// their state and stay live, updates and old snapshots arriving while it
+/// recovers are dropped, a second gap starts nothing more, and the new
+/// snapshot makes the book current again.
+#[tokio::test]
+async fn a_depth_gap_recovers_only_that_stream() {
+    let (mut stream, server, mut conn) = recovery_start().await;
+    let unsub = next_request(&mut conn, true).await;
+    barrier(&mut stream, &conn).await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        book.stale && book.update_id == 11,
+        "{book:?} during recovery"
+    );
+    assert!(!stream.live(t(7, Stream::Depth)));
+    assert!(
+        stream.live(t(7, Stream::Trades)) && stream.live(t(7, Stream::Bbo)),
+        "other streams not live while depth recovers"
+    );
+    let q = stream.best_bid_offer(7).unwrap();
+    assert!(!q.stale && q.update_id == 10);
+
+    conn.send(&[
+        depth_update(7, 1, 14, 14, &[lv(100, 9)], &[]),
+        depth_snapshot(7, Stream::Depth, 1, 12, &[lv(99, 9)], &[]),
+        depth_update(7, 1, 40, 40, &[], &[]),
+        trades(7, 1, 12, &[fill(102)]),
+    ]);
+    let tr = expect(&mut stream, |e| {
+        if let Event::Trades(x) = e {
+            Some(x)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(tr.trades[0].trade_id, 102);
+    no_request(&mut conn).await;
+
+    conn.send(&[
+        respond(&unsub, Wire::OK),
+        depth_update(7, 1, 15, 15, &[lv(100, 8)], &[]),
+    ]);
+    let sub = next_request(&mut conn, false).await;
+    barrier(&mut stream, &conn).await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        book.stale && book.update_id == 11 && book.bids[0].qty.as_scaled() == 2,
+        "{book:?} changed by updates during recovery"
+    );
+
+    conn.send(&[
+        respond(&sub, Wire::OK),
+        depth_snapshot(7, Stream::Depth, 1, 30, &[lv(100, 5)], &[]),
+        depth_update(7, 1, 31, 31, &[lv(100, 6)], &[]),
+    ]);
+    let u = expect(&mut stream, |e| {
+        if let Event::DepthUpdate(u) = e {
+            Some(u)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(u.first_update_id, 31);
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        !book.stale
+            && book.update_id == 31
+            && book.bids[0].qty.as_scaled() == 6
+            && stream.live(t(7, Stream::Depth)),
+        "{book:?} after recovery"
+    );
+    no_disconnect(&mut stream);
+    assert_eq!(
+        server.count.load(Ordering::SeqCst),
+        1,
+        "the recovery reconnected"
+    );
+}
+
+/// NOT_SUBSCRIBED answers the recovery's Unsubscribe when the server no
+/// longer held the stream: the recovery goes on with the Subscribe.
+#[tokio::test]
+async fn a_recovery_unsubscribe_answered_not_subscribed_goes_on() {
+    let (mut stream, _server, mut conn) = recovery_start().await;
+    let unsub = next_request(&mut conn, true).await;
+    conn.send(&[respond(&unsub, Wire::NOT_SUBSCRIBED)]);
+    let sub = next_request(&mut conn, false).await;
+    conn.send(&[
+        respond(&sub, Wire::OK),
+        depth_snapshot(7, Stream::Depth, 1, 30, &[lv(100, 5)], &[]),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::DepthSnapshot(_)).then_some(())
+    })
+    .await;
+    let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+    assert!(
+        !book.stale && book.update_id == 30,
+        "{book:?} after recovery"
+    );
+    no_disconnect(&mut stream);
+}
+
+/// An Unsubscribe answered otherwise leaves the stream in a state the client
+/// cannot know: the connection ends and every stream is resubscribed.
+#[tokio::test]
+async fn a_refused_recovery_unsubscribe_reconnects() {
+    let (mut stream, mut server, mut conn) = recovery_start().await;
+    let unsub = next_request(&mut conn, true).await;
+    conn.send(&[respond(&unsub, Wire::LIMIT_EXCEEDED)]);
+    let err = expect(&mut stream, |e| {
+        if let Event::Disconnected { error, .. } = e {
+            Some(error)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert!(
+        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
+        "{err}"
+    );
+    let mut conn = server.accept().await;
+    assert_eq!(conn.request().await.topics.len(), 3);
+}
+
+/// A lost transport still reconnects everything, a recovery in progress
+/// included: every wanted stream is resubscribed and rebuilt.
+#[tokio::test]
+async fn reconnect_during_a_recovery_restores_every_stream() {
+    let (mut stream, mut server, mut conn) = recovery_start().await;
+    next_request(&mut conn, true).await;
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    let mut conn = server.accept().await;
+    let resub = conn.request().await;
+    assert_eq!(resub.topics.len(), 3);
+    conn.send(&[
+        respond(&resub, Wire::OK),
+        depth_snapshot(7, Stream::Depth, 1, 50, &[lv(100, 7)], &[]),
+        trades_through(7, 1, 101),
+        bbo(7, 1, 50, (100, 1), (101, 1)),
+    ]);
+    expect(&mut stream, |e| {
+        matches!(e, Event::BestBidOffer(_)).then_some(())
+    })
+    .await;
+    for topic in [t(7, Stream::Depth), t(7, Stream::Trades), t(7, Stream::Bbo)] {
+        assert!(stream.live(topic), "{topic} not live after the reconnect");
+    }
+    assert_eq!(
+        stream.order_book(7, Stream::Depth, 0).unwrap().update_id,
+        50
+    );
+    conn.send(&[depth_update(7, 1, 51, 51, &[], &[])]);
+    let u = expect(&mut stream, |e| {
+        if let Event::DepthUpdate(u) = e {
+            Some(u)
+        } else {
+            None
+        }
+    })
+    .await;
+    assert_eq!(u.last_update_id, 51);
+}
+
+/// A stale pair reported live before its depth book's replacement snapshot,
+/// and an update while stale, are gaps of the depth stream alone.
+#[tokio::test]
+async fn depth_recovery_out_of_order_recovers_the_stream() {
+    for frames in [
+        vec![
+            market_status(7, FeedState::Stale),
+            market_status(7, FeedState::Live),
+        ],
+        vec![
+            market_status(7, FeedState::Stale),
+            depth_update(7, 1, 11, 11, &[], &[]),
+        ],
+    ] {
+        let mut server = FakeServer::start().await;
+        let mut stream = dial(&server, |_| {}).await;
+        let mut conn = server.accept().await;
+        answered(
+            &mut conn,
+            stream.subscribe(&[t(7, Stream::Depth), t(7, Stream::Bbo)]),
+            |m| {
+                vec![
+                    respond(m, Wire::OK),
+                    depth_snapshot(7, Stream::Depth, 1, 10, &[lv(100, 1)], &[]),
+                ]
+            },
+        )
+        .await;
+        conn.send(&frames);
+        let unsub = next_request(&mut conn, true).await;
+        conn.send(&[respond(&unsub, Wire::OK)]);
+        let sub = next_request(&mut conn, false).await;
+        conn.send(&[
+            respond(&sub, Wire::OK),
+            depth_snapshot(7, Stream::Depth, 1, 20, &[lv(100, 2)], &[]),
+            market_status(7, FeedState::Live),
+        ]);
+        expect(&mut stream, |e| {
+            matches!(e, Event::DepthSnapshot(x) if x.update_id == 20).then_some(())
+        })
+        .await;
+        barrier(&mut stream, &conn).await;
+        let book = stream.order_book(7, Stream::Depth, 0).unwrap();
+        assert!(
+            !book.stale && book.update_id == 20,
+            "{book:?} after recovery"
+        );
+        no_disconnect(&mut stream);
+    }
+}
+
+/// An update before any snapshot of a connection's depth subscription is a
+/// gap: the stream recovers on that connection and is not live meanwhile.
+#[tokio::test]
+async fn a_depth_update_before_a_snapshot_recovers_the_stream() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    answered(&mut conn, stream.subscribe(&[t(7, Stream::Depth)]), |m| {
+        vec![respond(m, Wire::OK), depth_update(7, 1, 10, 10, &[], &[])]
+    })
+    .await;
+    next_request(&mut conn, true).await;
+    assert!(!stream.live(t(7, Stream::Depth)));
+    no_disconnect(&mut stream);
+}
+
+/// The caller's Unsubscribe while a stream recovers ends it: the recovery
+/// does not subscribe it again.
+#[tokio::test]
+async fn unsubscribe_during_a_recovery_ends_the_stream() {
+    let (stream, _server, mut conn) = recovery_start().await;
+    let recovery_unsub = next_request(&mut conn, true).await;
+    let topics = [t(7, Stream::Depth)];
+    let user = async {
+        let m = next_request(&mut conn, true).await;
+        conn.send(&[
+            respond(&recovery_unsub, Wire::OK),
+            respond(&m, Wire::NOT_SUBSCRIBED),
+        ]);
+    };
+    let (results, _) = tokio::join!(
+        tokio::time::timeout(Duration::from_secs(5), stream.unsubscribe(&topics)),
+        user
+    );
+    let results = results.expect("answered").expect("unsubscribed");
+    assert_eq!(results[0].result, SubscribeResult::NotSubscribed);
+    no_request(&mut conn).await;
+    assert!(
+        stream.order_book(7, Stream::Depth, 0).is_none(),
+        "book kept after the caller's Unsubscribe"
     );
 }

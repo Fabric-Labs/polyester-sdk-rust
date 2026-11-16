@@ -16,7 +16,7 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
 
 use super::backfill::{Pacing, TradeHistory, backfill_paced};
-use super::book::{Book, OrderBook, Refusal};
+use super::book::{Book, OrderBook, Recovery, Refusal};
 use super::codec::{self, Msg, WireLevel};
 use super::sbe;
 use super::trades::Tracker;
@@ -185,6 +185,9 @@ struct Inner {
 /// A Subscribe or Unsubscribe sent on the current connection.
 struct Sent {
     unsubscribe: bool,
+    /// The client's own Unsubscribe and Subscribe of a depth stream
+    /// recovering from a gap.
+    recovery: bool,
     topics: Vec<Topic>,
 }
 
@@ -472,12 +475,62 @@ impl Shared {
         state.feeds.clear();
         for b in state.books.values_mut() {
             b.synced = false;
+            b.recovery = Recovery::None;
         }
         for q in state.quotes.values_mut() {
             q.stale = true;
         }
         for t in state.trackers.values_mut() {
             t.restart();
+        }
+    }
+
+    /// Records and sends a request no caller waits for. Without a connection
+    /// it is only recorded; the connection's end drops the record.
+    fn send(&self, unsubscribe: bool, recovery: bool, topics: Vec<Topic>) {
+        let id = self.ids.fetch_add(1, Ordering::SeqCst) + 1;
+        let frame = if unsubscribe {
+            codec::encode_unsubscribe(id, &topics)
+        } else {
+            codec::encode_subscribe(id, &topics)
+        };
+        let mut inner = lock_unpoisoned(&self.inner);
+        inner.sent.insert(
+            id,
+            Sent {
+                unsubscribe,
+                recovery,
+                topics,
+            },
+        );
+        if let Some(out) = &inner.out {
+            // A connection that is gone reconnects everything.
+            let _ = out.send(frame);
+        }
+    }
+
+    /// Begins a depth stream's recovery after a gap: the stream alone is
+    /// unsubscribed, then subscribed again, and the new subscription's
+    /// snapshot replaces its book. Every other stream is untouched. A gap
+    /// while the stream recovers starts nothing more.
+    fn start_recovery(&self, topic: Topic) {
+        let start = {
+            let mut state = write_unpoisoned(&self.state);
+            let active = state.active.contains(&topic);
+            match state.books.get_mut(&topic) {
+                Some(book) => {
+                    book.synced = false;
+                    let start = active && book.recovery == Recovery::None;
+                    if start {
+                        book.recovery = Recovery::Unsubscribing;
+                    }
+                    start
+                }
+                None => false,
+            }
+        };
+        if start {
+            self.send(true, true, vec![topic]);
         }
     }
 
@@ -540,6 +593,7 @@ impl Shared {
                 id,
                 Sent {
                     unsubscribe,
+                    recovery: false,
                     topics: topics.to_vec(),
                 },
             );
@@ -726,6 +780,7 @@ async fn session(
             id,
             Sent {
                 unsubscribe: false,
+                recovery: false,
                 topics: chunk.to_vec(),
             },
         );
@@ -1019,10 +1074,21 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 let Some(book) = state.books.get_mut(&topic) else {
                     return Ok(());
                 };
-                book.snapshot(epoch, update_id, levels_per_side, &bids, &asks)
+                // While the stream recovers, only the new subscription's
+                // snapshot counts.
+                if matches!(
+                    book.recovery,
+                    Recovery::Unsubscribing | Recovery::Subscribing
+                ) {
+                    return Ok(());
+                }
+                let changed = book
+                    .snapshot(epoch, update_id, levels_per_side, &bids, &asks)
                     .map_err(|m| {
                         StreamError::frame(sbe::depth_snapshot_codec::SBE_TEMPLATE_ID, m)
-                    })?
+                    })?;
+                book.recovery = Recovery::None;
+                changed
             };
             if changed {
                 shared.emit(Event::DepthSnapshot(DepthSnapshot {
@@ -1051,7 +1117,9 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
             asks,
         } => {
             let topic = Topic::new(symbol_id, Stream::Depth);
-            {
+            // An update the book cannot apply is a gap: the stream alone
+            // recovers. Updates arriving while it recovers are dropped.
+            let refused = {
                 let mut state = write_unpoisoned(&shared.state);
                 if !state.active.contains(&topic) {
                     return Ok(());
@@ -1059,17 +1127,27 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 let Some(book) = state.books.get_mut(&topic) else {
                     return Ok(());
                 };
-                if let Err(refusal) = book.update(epoch, first, last, &bids, &asks) {
-                    book.synced = false;
-                    return Err(match refusal {
-                        Refusal::Gap(message) => {
-                            Error::MarketStream(StreamError::BookGap { symbol_id, message })
-                        }
-                        Refusal::Invalid(message) => {
-                            StreamError::frame(sbe::depth_update_codec::SBE_TEMPLATE_ID, message)
-                        }
-                    });
+                if book.recovery != Recovery::None {
+                    return Ok(());
                 }
+                let refused = book.update(epoch, first, last, &bids, &asks).err();
+                if refused.is_some() {
+                    book.synced = false;
+                }
+                refused
+            };
+            match refused {
+                Some(Refusal::Gap(_)) => {
+                    shared.start_recovery(topic);
+                    return Ok(());
+                }
+                Some(Refusal::Invalid(message)) => {
+                    return Err(StreamError::frame(
+                        sbe::depth_update_codec::SBE_TEMPLATE_ID,
+                        message,
+                    ));
+                }
+                None => {}
             }
             shared.emit(Event::DepthUpdate(DepthUpdate {
                 symbol_id,
@@ -1165,6 +1243,18 @@ fn on_subscribe_response(
             },
         })
         .collect();
+    if let Some(Sent {
+        recovery: true,
+        unsubscribe,
+        topics,
+    }) = &sent
+    {
+        shared.emit(Event::SubscribeResponse(SubscribeResponse {
+            request_id,
+            results: results.clone(),
+        }));
+        return on_recovery_response(shared, *unsubscribe, topics[0], &results);
+    }
     match &sent {
         // No request of this connection: delivered, never applied.
         None => {}
@@ -1242,10 +1332,98 @@ fn on_subscribe_response(
     Ok(())
 }
 
+/// Advances a depth stream's recovery. The Unsubscribe answered OK, or
+/// NOT_SUBSCRIBED when the server no longer held the stream, is followed by
+/// the Subscribe; any other answer leaves the stream in a state the client
+/// cannot know, so the connection ends and every stream is resubscribed. The
+/// Subscribe answered OK waits for the snapshot; refused, it ends the stream
+/// as a refused Subscribe does.
+fn on_recovery_response(
+    shared: &Shared,
+    unsubscribe: bool,
+    topic: Topic,
+    results: &[TopicResult],
+) -> Result<()> {
+    let result = results
+        .iter()
+        .find(|r| r.topic == Some(topic))
+        .map_or(SubscribeResult::Unknown, |r| r.result);
+    let wanted = lock_unpoisoned(&shared.inner).wanted.contains(&topic);
+    enum Next {
+        Nothing,
+        Subscribe,
+        Drop,
+        DropRefused,
+        Unsubscribe,
+        Reconnect,
+    }
+    let next = {
+        let mut state = write_unpoisoned(&shared.state);
+        match state.books.get_mut(&topic) {
+            // The caller ended the stream meanwhile.
+            None => Next::Nothing,
+            Some(book) if unsubscribe => {
+                if book.recovery != Recovery::Unsubscribing {
+                    Next::Nothing
+                } else if !matches!(result, SubscribeResult::Ok | SubscribeResult::NotSubscribed) {
+                    Next::Reconnect
+                } else if !wanted {
+                    Next::Drop
+                } else {
+                    book.recovery = Recovery::Subscribing;
+                    Next::Subscribe
+                }
+            }
+            Some(book) => {
+                if book.recovery != Recovery::Subscribing {
+                    Next::Nothing
+                } else if !result.subscribed() {
+                    Next::DropRefused
+                } else {
+                    book.recovery = Recovery::Snapshot;
+                    state.active.insert(topic);
+                    // The caller unsubscribed while the stream recovered.
+                    if wanted {
+                        Next::Nothing
+                    } else {
+                        Next::Unsubscribe
+                    }
+                }
+            }
+        }
+    };
+    match next {
+        Next::Nothing => Ok(()),
+        Next::Subscribe => {
+            shared.send(false, true, vec![topic]);
+            Ok(())
+        }
+        Next::Drop => {
+            shared.drop_topics(&[topic]);
+            Ok(())
+        }
+        Next::DropRefused => {
+            lock_unpoisoned(&shared.inner)
+                .wanted
+                .retain(|w| *w != topic);
+            shared.drop_topics(&[topic]);
+            Ok(())
+        }
+        Next::Unsubscribe => {
+            shared.send(true, false, vec![topic]);
+            Ok(())
+        }
+        Next::Reconnect => Err(Error::MarketStream(StreamError::BookGap {
+            symbol_id: topic.symbol_id,
+            message: format!("the depth stream's recovery Unsubscribe was answered {result}"),
+        })),
+    }
+}
+
 /// Records a pair's feed state. A stale pair's depth book waits for a
 /// replacement snapshot, which the server sends before the pair is live
-/// again: LIVE while the book still waits is a gap, recovered by
-/// reconnecting.
+/// again: LIVE while the book still waits is a gap, and the depth stream
+/// alone recovers.
 fn on_market_status(
     shared: &Shared,
     symbol_id: u32,
@@ -1275,10 +1453,7 @@ fn on_market_status(
         }
     };
     if feed == FeedState::Live && waiting {
-        return Err(Error::MarketStream(StreamError::BookGap {
-            symbol_id,
-            message: "feed live again before the depth book's replacement snapshot".into(),
-        }));
+        shared.start_recovery(topic);
     }
     shared.emit(Event::MarketStatus(MarketStatus {
         symbol_id,
@@ -1286,6 +1461,24 @@ fn on_market_status(
         send_ts_ns: send_ns,
     }));
     Ok(())
+}
+
+/// Whether the client recorded its recovery Unsubscribe of `topic`.
+#[cfg(test)]
+pub(crate) fn recovery_requested(shared: &Shared, topic: Topic) -> bool {
+    lock_unpoisoned(&shared.inner)
+        .sent
+        .values()
+        .any(|s| s.recovery && s.unsubscribe && s.topics == [topic])
+}
+
+/// Whether a depth stream is recovering.
+#[cfg(test)]
+pub(crate) fn recovering(shared: &Shared, topic: Topic) -> bool {
+    read_unpoisoned(&shared.state)
+        .books
+        .get(&topic)
+        .is_some_and(|b| b.recovery != Recovery::None)
 }
 
 /// Records a Subscribe as sent on the current connection, as the client does
@@ -1296,6 +1489,7 @@ pub(crate) fn record_subscribe(shared: &Shared, request_id: u64, topics: Vec<Top
         request_id,
         Sent {
             unsubscribe: false,
+            recovery: false,
             topics,
         },
     );

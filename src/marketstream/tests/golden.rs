@@ -9,7 +9,7 @@ use std::sync::Arc;
 use super::frames::window;
 use crate::errors::Error;
 use crate::marketstream::client::{
-    depth_book, feed_of, force_feed, handle, offline, record_subscribe,
+    depth_book, feed_of, force_feed, handle, offline, record_subscribe, recovering,
 };
 use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::{ReadBuf, message_header_codec, ping_codec, subscribe_codec};
@@ -226,6 +226,13 @@ fn golden_captures_replay() {
             }
         }
         for (symbol_id, last) in &last_depth {
+            if recovering(&shared, Topic::new(*symbol_id, Stream::Depth)) {
+                // A capture of the server's old order (LIVE before the
+                // replacement snapshot) leaves the stream recovering; the
+                // capture has no answer to its requests.
+                eprintln!("{capture} leaves pair {symbol_id}'s depth stream recovering");
+                continue;
+            }
             let (synced, at) =
                 depth_book(&shared, Topic::new(*symbol_id, Stream::Depth)).expect("a depth book");
             // A capture that ends stale leaves the book waiting for its

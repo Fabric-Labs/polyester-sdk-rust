@@ -32,6 +32,8 @@ pub(crate) struct Book {
     /// followed every update since.
     pub synced: bool,
     pub has: bool,
+    /// The stream's resubscription after a gap, if one runs.
+    pub recovery: Recovery,
     pub epoch: u64,
     pub update_id: u64,
     /// The snapshot's levels per side: each side is truncated to it after
@@ -39,6 +41,22 @@ pub(crate) struct Book {
     pub window: u16,
     pub bids: Vec<WireLevel>,
     pub asks: Vec<WireLevel>,
+}
+
+/// Where a depth stream's resubscription after a gap stands: the stream alone
+/// is unsubscribed and subscribed again, and the new subscription's snapshot
+/// replaces the book.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum Recovery {
+    #[default]
+    None,
+    /// The Unsubscribe is sent, its answer awaited.
+    Unsubscribing,
+    /// The Subscribe is sent, its answer awaited.
+    Subscribing,
+    /// Subscribed again: the next snapshot replaces the book and ends the
+    /// recovery.
+    Snapshot,
 }
 
 /// What an update or snapshot the book could not take is.
@@ -96,6 +114,7 @@ impl Book {
             stream,
             synced: false,
             has: false,
+            recovery: Recovery::None,
             epoch: 0,
             update_id: 0,
             window: 0,
