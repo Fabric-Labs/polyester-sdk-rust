@@ -3,7 +3,7 @@
   "schemaId": 20,
   "schemaVersion": 0,
   "sha256": "636459c00081d2bc81eb1a12c3b11b980109289039cdfbd00c8ee1df4ce9d588",
-  "source": "unpublished",
+  "source": "polyester-proto",
   "manifestBlock": "marketDataWebSocketSbe",
   "generator": {
     "tool": "sbe-all",
