@@ -3,6 +3,7 @@
 //! trade recovery through the real `MarketDataService` both use the catalog of
 //! the connection they belong to.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -75,9 +76,10 @@ fn zipper() -> GetDepositWithdrawConfigResponse {
 
 /// Every trade of a pair after `after` through 110, each of quantity 1500
 /// (scaled).
-fn trades_after(symbol_id: u32, after: u64) -> GetTradesResponse {
+fn trades_after(symbol_id: u32, after: u64, page: u64) -> GetTradesResponse {
+    let last = (after + page).min(110);
     GetTradesResponse {
-        trades: (after + 1..=110)
+        trades: (after + 1..=last)
             .map(|id| MarketTrade {
                 symbol_id,
                 match_id: id,
@@ -89,7 +91,7 @@ fn trades_after(symbol_id: u32, after: u64) -> GetTradesResponse {
             })
             .collect(),
         complete_through_trade_id: 110,
-        next_after_trade_id: 110,
+        next_after_trade_id: last,
         ..Default::default()
     }
 }
@@ -101,6 +103,8 @@ struct Api {
     reset: watch::Sender<bool>,
     trades: watch::Sender<bool>,
     asked: Arc<Mutex<Vec<(u32, u64)>>>,
+    /// The most trades one history call returns.
+    page: Arc<AtomicU64>,
 }
 
 impl Api {
@@ -111,6 +115,8 @@ impl Api {
         let (trades, trades_rx) = watch::channel(true);
         let asked = Arc::new(Mutex::new(Vec::new()));
         let log = asked.clone();
+        let page = Arc::new(AtomicU64::new(1_000));
+        let pages = page.clone();
         tokio::spawn(async move {
             while let Ok((stream, _)) = listener.accept().await {
                 tokio::spawn(serve(
@@ -118,6 +124,7 @@ impl Api {
                     reset_rx.clone(),
                     trades_rx.clone(),
                     log.clone(),
+                    pages.clone(),
                 ));
             }
         });
@@ -126,6 +133,7 @@ impl Api {
             reset,
             trades,
             asked,
+            page,
         }
     }
 
@@ -157,6 +165,7 @@ async fn serve(
     reset: watch::Receiver<bool>,
     mut trades: watch::Receiver<bool>,
     asked: Arc<Mutex<Vec<(u32, u64)>>>,
+    page: Arc<AtomicU64>,
 ) {
     let Some((path, body)) = read_request(&mut stream).await else {
         return;
@@ -171,7 +180,7 @@ async fn serve(
             if trades.wait_for(|open| *open).await.is_err() {
                 return;
             }
-            trades_after(req.symbol_id, after).encode_to_vec()
+            trades_after(req.symbol_id, after, page.load(Ordering::SeqCst)).encode_to_vec()
         }
         _ => return,
     };
@@ -353,4 +362,116 @@ async fn a_recovery_that_straddles_a_reset_is_dropped() {
         b.trades
     );
     drop(conn);
+}
+
+/// Loses `conn` and waits for the stream's next connection to read its pairs.
+async fn lose(server: &mut FakeServer, stream: &mut MarketStream, conn: ServerConn) -> ServerConn {
+    conn.close();
+    expect(stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    let conn = server.accept().await;
+    expect(stream, |e| {
+        matches!(e, Event::PairsReloaded { .. }).then_some(())
+    })
+    .await;
+    conn
+}
+
+async fn subscribed(stream: &mut MarketStream, conn: &mut ServerConn, topic: Topic) {
+    let topics = [topic];
+    let (results, _) = tokio::join!(stream.subscribe(&topics), async {
+        let m = conn.request().await;
+        conn.send(&[respond(&m, Wire::OK)]);
+    });
+    assert!(results.unwrap()[0].result.subscribed());
+}
+
+#[tokio::test]
+async fn two_streams_of_one_client_each_follow_their_own_pair_across_a_reset() {
+    let api = Api::spawn().await;
+    let mut server = FakeServer::start().await;
+    let client = api.client(&server);
+    // A follows BTC-USDC (7), B follows ETH-USDC (9).
+    let mut a = open(&client).await;
+    let mut a_conn = server.accept().await;
+    subscribed(&mut a, &mut a_conn, Topic::new(7, Stream::Bbo)).await;
+    let mut b = open(&client).await;
+    let mut b_conn = server.accept().await;
+    subscribed(&mut b, &mut b_conn, Topic::new(9, Stream::Bbo)).await;
+
+    api.reset.send_replace(true);
+    // B reconnects first and refreshes the client's catalog...
+    let mut b_conn = lose(&mut server, &mut b, b_conn).await;
+    let m = b_conn.request().await;
+    assert_eq!(m.topics, [Topic::new(7, Stream::Bbo)], "ETH-USDC is 7 now");
+    // ...then A, whose subscription is BTC-USDC whatever B did.
+    let mut a_conn = lose(&mut server, &mut a, a_conn).await;
+    let m = a_conn.request().await;
+    assert_eq!(
+        m.topics,
+        [Topic::new(12, Stream::Bbo)],
+        "BTC-USDC is 12 now"
+    );
+}
+
+#[tokio::test]
+async fn a_recovery_is_not_changed_by_another_streams_reload() {
+    let api = Api::spawn().await;
+    api.trades.send_replace(false);
+    api.page.store(2, Ordering::SeqCst);
+    let mut server = FakeServer::start().await;
+    let client = api.client(&server);
+    let mut a = open(&client).await;
+    let mut a_conn = server.accept().await;
+    let mut b = open(&client).await;
+    let b_conn = server.accept().await;
+
+    // A recovers BTC-USDC's gap on 7, two trades a call; the first call
+    // answers only after B has read the reset's pairs, where 7 is ETH-USDC.
+    trades_with_gap(&mut a, &mut a_conn, 7).await;
+    api.trades_asked().await;
+    api.reset.send_replace(true);
+    let _b_conn = lose(&mut server, &mut b, b_conn).await;
+    api.trades.send_replace(true);
+    let recovered = backfill(&mut a)
+        .await
+        .trades
+        .expect("A's connection is current");
+    assert_eq!(
+        recovered.iter().map(|t| t.trade_id).collect::<Vec<_>>(),
+        [101, 102, 103, 104]
+    );
+    assert!(
+        recovered.iter().all(|t| t.qty.scale() == Some(3)),
+        "every page at A's connection's scale: {recovered:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_stream_opened_after_a_reset_cannot_retarget_an_older_one() {
+    let api = Api::spawn().await;
+    let mut server = FakeServer::start().await;
+    let client = api.client(&server);
+    let mut a = open(&client).await;
+    let mut a_conn = server.accept().await;
+    subscribed(&mut a, &mut a_conn, Topic::new(7, Stream::Bbo)).await;
+
+    // B opens after the reset: its first read refreshes the client's
+    // catalog while A still holds BTC-USDC as 7.
+    api.reset.send_replace(true);
+    let _b = open(&client).await;
+    let _b_conn = server.accept().await;
+    assert_eq!(
+        client.catalogs.symbol_for_symbol_id(7).as_deref(),
+        Some("ETH-USDC")
+    );
+    let mut a_conn = lose(&mut server, &mut a, a_conn).await;
+    let m = a_conn.request().await;
+    assert_eq!(
+        m.topics,
+        [Topic::new(12, Stream::Bbo)],
+        "A still follows BTC-USDC"
+    );
 }

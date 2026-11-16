@@ -251,6 +251,10 @@ struct Inner {
     /// every topic's owner moves the server toward. A topic leaves it when the
     /// caller unsubscribes or the server refuses it.
     wanted: Vec<Topic>,
+    /// The pair each wanted topic was asked for, by symbol: the caller's
+    /// intent. A topic's pair ID is only the current connection's mapping
+    /// of it, and a new connection maps it again from its own catalog.
+    symbols: HashMap<Topic, String>,
     waiting: HashMap<u64, oneshot::Sender<Result<SubscribeResponse>>>,
     /// Every Subscribe and Unsubscribe sent on the current connection, by
     /// request ID: its kind and topics. A response is matched to it by ID
@@ -628,8 +632,15 @@ impl Shared {
         let mut renumbered: Vec<Renumbered> = Vec::new();
         let mut ended = Vec::new();
         let mut wanted: Vec<Topic> = Vec::new();
+        let mut symbols = HashMap::new();
         for topic in &inner.wanted {
-            let symbol = old.symbol(topic.symbol_id);
+            // The caller's intent, else what the connection's own catalog
+            // named the pair.
+            let symbol = inner
+                .symbols
+                .get(topic)
+                .cloned()
+                .or_else(|| old.symbol(topic.symbol_id));
             let Some(id) = symbol.as_deref().and_then(|s| pairs.symbol_id(s)) else {
                 ended.push((*topic, symbol));
                 continue;
@@ -647,6 +658,9 @@ impl Shared {
             let moved = Topic::new(id, topic.stream);
             if !wanted.contains(&moved) {
                 wanted.push(moved);
+            }
+            if let Some(symbol) = pairs.symbol(id) {
+                symbols.insert(moved, symbol);
             }
         }
         let changed: Vec<u32> = {
@@ -682,6 +696,7 @@ impl Shared {
             }
         }
         inner.wanted = wanted;
+        inner.symbols = symbols;
         inner.paused = false;
         *write_unpoisoned(&self.pairs) = current;
         let mut events = vec![Event::PairsReloaded { renumbered }];
@@ -827,9 +842,13 @@ impl Shared {
                 // The caller ended the topic: its state goes now, and a new
                 // subscription starts afresh.
                 inner.wanted.retain(|w| w != t);
+                inner.symbols.remove(t);
                 drop_topic(&mut write_unpoisoned(&self.state), *t);
             } else if !inner.wanted.contains(t) {
                 inner.wanted.push(*t);
+                if let Some(symbol) = self.pairs().symbol(t.symbol_id) {
+                    inner.symbols.insert(*t, symbol);
+                }
             }
         }
         let Some(id) = inner.send(&self.ids, unsubscribe, topics) else {
@@ -1499,8 +1518,9 @@ fn emit_gaps(shared: &Arc<Shared>, gaps: Vec<TradesGap>) {
         // The recovery belongs to this connection and its catalog: a result
         // that arrives under a newer connection is dropped.
         let started = shared.generation.load(Ordering::SeqCst);
+        let pairs = shared.pairs();
         let handle = tokio::spawn(async move {
-            let trades = backfill_paced(history.as_ref(), gap, pacing).await;
+            let trades = backfill_paced(history.as_ref(), Some(pairs.as_ref()), gap, pacing).await;
             task_shared.emit_backfill(started, gap, trades);
         });
         inner.backfills.retain(|h| !h.is_finished());
@@ -1559,7 +1579,10 @@ fn on_subscribe_response(
                 applied.push(topic);
                 match apply(owner, &mut state, topic, r.result, sent.unsubscribe, want) {
                     Applied::Done => {}
-                    Applied::Refused => inner.wanted.retain(|w| *w != topic),
+                    Applied::Refused => {
+                        inner.wanted.retain(|w| *w != topic);
+                        inner.symbols.remove(&topic);
+                    }
                     Applied::Unknown => {
                         broken.get_or_insert(Error::MarketStream(StreamError::Unsubscribe {
                             topic,

@@ -772,10 +772,11 @@ fn stop_all_already_ended(error: &Error) -> bool {
 
 /// One of the two catalogs the client loads when it is created.
 /// Re-reads the spot config for the market-data stream on every connection.
-/// A read is validated in a catalog of its own; installing it, which the
-/// stream does only while its connection is current, puts it into the
-/// client's one catalog, so the stream's live decoding and the trade history
-/// it recovers gaps from read the same pairs and scales.
+/// A read is validated in a catalog of its own, an immutable snapshot that
+/// the connection decodes with, live and in trade recovery, for its whole
+/// life. Installing it, which the stream does only while its connection is
+/// current, also refreshes the client's catalog for its other users; no
+/// stream reads that shared catalog mid-connection.
 struct SpotPairs {
     factory: Factory,
     timeout: Duration,
@@ -791,11 +792,15 @@ impl crate::marketstream::PairsSource for SpotPairs {
             let (snapshot, raw) =
                 crate::catalog_startup::read_spot(&self.factory, deadline).await?;
             let catalogs = self.catalogs.clone();
+            let snapshot: Arc<dyn crate::marketstream::Pairs> = Arc::new(snapshot);
+            let decode = snapshot.clone();
             Ok(crate::marketstream::LoadedPairs::with_install(
-                Arc::new(snapshot),
+                snapshot,
                 move || {
+                    // Fresh for the client's other users; the stream keeps
+                    // decoding with its own snapshot, which nothing changes.
                     catalogs.hydrate_spot_config_json(raw)?;
-                    Ok(catalogs as Arc<dyn crate::marketstream::Pairs>)
+                    Ok(decode)
                 },
             ))
         })
