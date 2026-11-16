@@ -318,10 +318,10 @@ pub enum AssistantKeyPreset {
     PRESET_UNSPECIFIED = 0i32,
     /// Read actions only: READ_BALANCES, READ_SPOT, READ_INTERNAL_TRANSFERS,
     /// READ_AUTO_WITHDRAW, READ_API_KEYS, READ_SUBACCOUNTS,
-    /// READ_DEPOSIT_ADDRESSES and READ_STATEMENTS. On the main account, also
-    /// READ_PRICE_ALERTS, a main-account permission. Policy name "Polyester AI -
-    /// Read only (main account)" on the main account, "Polyester AI - Read only
-    /// (sub-account)" on a sub-account.
+    /// READ_DEPOSIT_ADDRESSES, READ_STATEMENTS and READ_FUNDING_FLOWS. On the
+    /// main account, also READ_PRICE_ALERTS, a main-account permission. Policy
+    /// name "Polyester AI - Read only (main account)" on the main account,
+    /// "Polyester AI - Read only (sub-account)" on a sub-account.
     READ_ONLY = 1i32,
     /// READ_ONLY plus TRADE_SPOT, SWAP and CREATE_DEPOSIT_ADDRESS: the assistant
     /// also places, changes and cancels orders and triggers, and swaps, each only
@@ -4023,6 +4023,15 @@ pub enum PolicyAction {
     /// period, with fees and the balance after each entry. It grants no other
     /// balance or transfer read.
     READ_STATEMENTS = 38i32,
+    /// Allow quoting and converting dust, small Trading balances, into a target
+    /// asset, and reading the conversions. Listing dust balances needs
+    /// READ_BALANCES. Account permission.
+    CONVERT_DUST = 39i32,
+    /// Allow reading the account's deposit, withdrawal, and transfer flows,
+    /// including the flows no chain transaction started and the transfers it
+    /// receives from other accounts. It grants no balance or transfer read.
+    /// Account permission.
+    READ_FUNDING_FLOWS = 40i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4130,6 +4139,12 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::READ_STATEMENTS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadStatements: Self = Self::READ_STATEMENTS;
+    ///Idiomatic alias for [`Self::CONVERT_DUST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConvertDust: Self = Self::CONVERT_DUST;
+    ///Idiomatic alias for [`Self::READ_FUNDING_FLOWS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadFundingFlows: Self = Self::READ_FUNDING_FLOWS;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -4260,6 +4275,8 @@ impl ::buffa::Enumeration for PolicyAction {
             36i32 => ::core::option::Option::Some(Self::READ_PRICE_ALERTS),
             37i32 => ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS),
             38i32 => ::core::option::Option::Some(Self::READ_STATEMENTS),
+            39i32 => ::core::option::Option::Some(Self::CONVERT_DUST),
+            40i32 => ::core::option::Option::Some(Self::READ_FUNDING_FLOWS),
             _ => ::core::option::Option::None,
         }
     }
@@ -4303,6 +4320,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_PRICE_ALERTS => "READ_PRICE_ALERTS",
             Self::MANAGE_PRICE_ALERTS => "MANAGE_PRICE_ALERTS",
             Self::READ_STATEMENTS => "READ_STATEMENTS",
+            Self::CONVERT_DUST => "CONVERT_DUST",
+            Self::READ_FUNDING_FLOWS => "READ_FUNDING_FLOWS",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4376,6 +4395,10 @@ impl ::buffa::Enumeration for PolicyAction {
                 ::core::option::Option::Some(Self::MANAGE_PRICE_ALERTS)
             }
             "READ_STATEMENTS" => ::core::option::Option::Some(Self::READ_STATEMENTS),
+            "CONVERT_DUST" => ::core::option::Option::Some(Self::CONVERT_DUST),
+            "READ_FUNDING_FLOWS" => {
+                ::core::option::Option::Some(Self::READ_FUNDING_FLOWS)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4416,6 +4439,8 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_PRICE_ALERTS,
             Self::MANAGE_PRICE_ALERTS,
             Self::READ_STATEMENTS,
+            Self::CONVERT_DUST,
+            Self::READ_FUNDING_FLOWS,
         ]
     }
 }
@@ -10680,6 +10705,12 @@ pub enum SubaccountPermission {
     SUBACCOUNT_PERMISSION_SWAP = 28i32,
     /// Export account statements of the sub-account.
     SUBACCOUNT_PERMISSION_READ_STATEMENTS = 29i32,
+    /// Quote, convert, and view conversions of the sub-account's dust: small
+    /// Trading balances converted into a target asset.
+    SUBACCOUNT_PERMISSION_CONVERT_DUST = 30i32,
+    /// View the sub-account's deposit, withdrawal, and transfer flows, including
+    /// those without a public chain transaction.
+    SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS = 31i32,
 }
 impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -10772,6 +10803,12 @@ impl SubaccountPermission {
     ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadStatements: Self = Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_CONVERT_DUST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConvertDust: Self = Self::SUBACCOUNT_PERMISSION_CONVERT_DUST;
+    ///Idiomatic alias for [`Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadFundingFlows: Self = Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS;
 }
 impl ::core::default::Default for SubaccountPermission {
     fn default() -> Self {
@@ -10984,6 +11021,14 @@ impl ::buffa::Enumeration for SubaccountPermission {
             29i32 => {
                 ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS)
             }
+            30i32 => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_CONVERT_DUST)
+            }
+            31i32 => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -11075,6 +11120,12 @@ impl ::buffa::Enumeration for SubaccountPermission {
             Self::SUBACCOUNT_PERMISSION_SWAP => "SUBACCOUNT_PERMISSION_SWAP",
             Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS => {
                 "SUBACCOUNT_PERMISSION_READ_STATEMENTS"
+            }
+            Self::SUBACCOUNT_PERMISSION_CONVERT_DUST => {
+                "SUBACCOUNT_PERMISSION_CONVERT_DUST"
+            }
+            Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS => {
+                "SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS"
             }
         }
     }
@@ -11202,6 +11253,14 @@ impl ::buffa::Enumeration for SubaccountPermission {
             "SUBACCOUNT_PERMISSION_READ_STATEMENTS" => {
                 ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS)
             }
+            "SUBACCOUNT_PERMISSION_CONVERT_DUST" => {
+                ::core::option::Option::Some(Self::SUBACCOUNT_PERMISSION_CONVERT_DUST)
+            }
+            "SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS" => {
+                ::core::option::Option::Some(
+                    Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS,
+                )
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -11237,6 +11296,8 @@ impl ::buffa::Enumeration for SubaccountPermission {
             Self::SUBACCOUNT_PERMISSION_MANAGE_AUTO_WITHDRAW,
             Self::SUBACCOUNT_PERMISSION_SWAP,
             Self::SUBACCOUNT_PERMISSION_READ_STATEMENTS,
+            Self::SUBACCOUNT_PERMISSION_CONVERT_DUST,
+            Self::SUBACCOUNT_PERMISSION_READ_FUNDING_FLOWS,
         ]
     }
 }
@@ -14789,6 +14850,8 @@ pub struct CreateSubaccountChallengeResponse {
     )]
     pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+    /// It differs per environment, so read it from this response rather than
+    /// assuming a fixed value.
     ///
     /// Field 5: `polyester_chain_id`
     #[serde(
@@ -38722,6 +38785,15 @@ pub enum AuthErrorCode {
     /// The signed WebSocket login nonce has already been used. Create a new login
     /// with a fresh random nonce and signature. HTTP 401, REPLAY_DETECTED.
     AUTH_REPLAY_DETECTED = 63i32,
+    /// The X/Twitter or Discord account was unlinked from another Polyester
+    /// account less than 30 days ago, and can be linked to a different account
+    /// only after that. The account that unlinked it may link it again at once.
+    /// retry_after says when. HTTP 412, SOCIAL_ACCOUNT_COOLDOWN.
+    AUTH_SOCIAL_ACCOUNT_COOLDOWN = 64i32,
+    /// The account already changed or unlinked its X/Twitter or Discord account
+    /// less than 30 days ago: one change per provider every 30 days. retry_after
+    /// says when the next one is allowed. HTTP 412, SOCIAL_CHANGE_LIMIT_REACHED.
+    AUTH_SOCIAL_CHANGE_LIMIT_REACHED = 65i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -38913,6 +38985,12 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_REPLAY_DETECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthReplayDetected: Self = Self::AUTH_REPLAY_DETECTED;
+    ///Idiomatic alias for [`Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSocialAccountCooldown: Self = Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN;
+    ///Idiomatic alias for [`Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthSocialChangeLimitReached: Self = Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -39099,6 +39177,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
                 ::core::option::Option::Some(Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR)
             }
             63i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_DETECTED),
+            64i32 => ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN),
+            65i32 => ::core::option::Option::Some(Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED),
             _ => ::core::option::Option::None,
         }
     }
@@ -39192,6 +39272,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
                 "AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR"
             }
             Self::AUTH_REPLAY_DETECTED => "AUTH_REPLAY_DETECTED",
+            Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN => "AUTH_SOCIAL_ACCOUNT_COOLDOWN",
+            Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED => "AUTH_SOCIAL_CHANGE_LIMIT_REACHED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -39383,6 +39465,12 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_REPLAY_DETECTED" => {
                 ::core::option::Option::Some(Self::AUTH_REPLAY_DETECTED)
             }
+            "AUTH_SOCIAL_ACCOUNT_COOLDOWN" => {
+                ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN)
+            }
+            "AUTH_SOCIAL_CHANGE_LIMIT_REACHED" => {
+                ::core::option::Option::Some(Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -39451,6 +39539,8 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_ASSISTANT_KEY_REGISTRATION_EXPIRED,
             Self::AUTH_ASSISTANT_KEY_DEADLINE_TOO_FAR,
             Self::AUTH_REPLAY_DETECTED,
+            Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN,
+            Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED,
         ]
     }
 }
@@ -40728,6 +40818,17 @@ pub struct AuthErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub message: ::buffa::alloc::string::String,
+    /// Time in UTC from which the same request may succeed. Set for
+    /// AUTH_SOCIAL_ACCOUNT_COOLDOWN and AUTH_SOCIAL_CHANGE_LIMIT_REACHED; empty
+    /// otherwise.
+    ///
+    /// Field 3: `retry_after`
+    #[serde(
+        rename = "retryAfter",
+        alias = "retry_after",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub retry_after: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -40737,6 +40838,7 @@ impl ::core::fmt::Debug for AuthErrorDetail {
         f.debug_struct("AuthErrorDetail")
             .field("code", &self.code)
             .field("message", &self.message)
+            .field("retry_after", &self.retry_after)
             .finish()
     }
 }
@@ -40761,7 +40863,7 @@ impl ::buffa::Message for AuthErrorDetail {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -40774,12 +40876,20 @@ impl ::buffa::Message for AuthErrorDetail {
         if !self.message.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.message) as u32;
         }
+        if self.retry_after.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.retry_after.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -40792,6 +40902,10 @@ impl ::buffa::Message for AuthErrorDetail {
         }
         if !self.message.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.message, buf);
+        }
+        if self.retry_after.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.retry_after.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -40820,6 +40934,17 @@ impl ::buffa::Message for AuthErrorDetail {
                 )?;
                 ::buffa::types::merge_string(&mut self.message, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.retry_after.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -40830,6 +40955,7 @@ impl ::buffa::Message for AuthErrorDetail {
     fn clear(&mut self) {
         self.code = ::buffa::EnumValue::from(0);
         self.message.clear();
+        self.retry_after = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -41492,7 +41618,10 @@ pub struct UserProfile {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub website: ::buffa::alloc::string::String,
-    /// X/Twitter handle without "@". Maximum length is 15 characters.
+    /// Handle of the account's verified X/Twitter account, without "@", as X
+    /// reports it at the latest successful verification. Empty while no X account
+    /// is linked. Only SocialVerificationService sets it; UpdateProfile cannot.
+    /// Maximum length is 15 characters.
     ///
     /// Field 4: `twitter`
     #[serde(
@@ -41501,7 +41630,7 @@ pub struct UserProfile {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub twitter: ::buffa::alloc::string::String,
-    /// Whether the X/Twitter handle for this account has been verified.
+    /// Whether an X/Twitter account is linked: true exactly when twitter is set.
     ///
     /// Field 8: `twitter_verified`
     #[serde(
@@ -41940,12 +42069,6 @@ pub struct UserProfilePatch {
     /// Field 3: `website`
     #[serde(rename = "website", skip_serializing_if = "::core::option::Option::is_none")]
     pub website: ::core::option::Option<::buffa::alloc::string::String>,
-    /// X/Twitter handle without "@". Use an empty string to clear it. Non-empty
-    /// values must be 1 to 15 letters, digits, or underscores.
-    ///
-    /// Field 4: `twitter`
-    #[serde(rename = "twitter", skip_serializing_if = "::core::option::Option::is_none")]
-    pub twitter: ::core::option::Option<::buffa::alloc::string::String>,
     /// Avatar URL. Use an empty string to clear it. Non-empty values must be valid
     /// http(s) URLs up to 256 characters.
     ///
@@ -41966,7 +42089,6 @@ impl ::core::fmt::Debug for UserProfilePatch {
             .field("username", &self.username)
             .field("bio", &self.bio)
             .field("website", &self.website)
-            .field("twitter", &self.twitter)
             .field("avatar_url", &self.avatar_url)
             .finish()
     }
@@ -42008,16 +42130,6 @@ impl UserProfilePatch {
     }
     #[must_use = "with_* setters return `self` by value; assign or chain the result"]
     #[inline]
-    ///Sets [`Self::twitter`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_twitter(
-        mut self,
-        value: impl Into<::buffa::alloc::string::String>,
-    ) -> Self {
-        self.twitter = Some(value.into());
-        self
-    }
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
     ///Sets [`Self::avatar_url`] to `Some(value)`, consuming and returning `self`.
     pub fn with_avatar_url(
         mut self,
@@ -42054,9 +42166,6 @@ impl ::buffa::Message for UserProfilePatch {
         if let Some(ref v) = self.website {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
-        if let Some(ref v) = self.twitter {
-            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-        }
         if let Some(ref v) = self.avatar_url {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
@@ -42078,9 +42187,6 @@ impl ::buffa::Message for UserProfilePatch {
         }
         if let Some(ref v) = self.website {
             ::buffa::types::put_string_field(3u32, v, buf);
-        }
-        if let Some(ref v) = self.twitter {
-            ::buffa::types::put_string_field(4u32, v, buf);
         }
         if let Some(ref v) = self.avatar_url {
             ::buffa::types::put_string_field(5u32, v, buf);
@@ -42130,16 +42236,6 @@ impl ::buffa::Message for UserProfilePatch {
                     buf,
                 )?;
             }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(
-                    self.twitter.get_or_insert_with(::buffa::alloc::string::String::new),
-                    buf,
-                )?;
-            }
             5u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -42163,7 +42259,6 @@ impl ::buffa::Message for UserProfilePatch {
         self.username = ::core::option::Option::None;
         self.bio = ::core::option::Option::None;
         self.website = ::core::option::Option::None;
-        self.twitter = ::core::option::Option::None;
         self.avatar_url = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
@@ -42313,8 +42408,8 @@ pub struct ProfileErrorDetail {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub code: ::buffa::EnumValue<ProfileErrorCode>,
-    /// Field name associated with the error, such as "bio", "website", "twitter",
-    /// or "avatar_url".
+    /// Field name associated with the error, such as "bio", "website", or
+    /// "avatar_url".
     ///
     /// Field 2: `field`
     #[serde(
@@ -44777,10 +44872,12 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub handle: ::buffa::alloc::string::String,
-    /// Stable provider-side user identifier. Empty until verification succeeds,
-    /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
-    /// the numeric user ID of the Telegram account that submitted the code, the
-    /// value ConfirmSocialVerification takes.
+    /// Stable provider-side user identifier of the linked provider account. Empty
+    /// while no account is linked. A restarted X/Twitter or Discord verification
+    /// keeps the current link, and this value, until the new verification succeeds
+    /// and replaces it. For Telegram, while the status is
+    /// STATUS_AWAITING_CONFIRMATION, it is the numeric user ID of the Telegram
+    /// account that submitted the code, the value ConfirmSocialVerification takes.
     ///
     /// Field 3: `provider_user_id`
     #[serde(
@@ -44841,7 +44938,9 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Time in UTC when verification succeeded. Empty until status is STATUS_VERIFIED.
+    /// Time in UTC when the linked provider account was last verified. Empty while
+    /// no account is linked; kept, like provider_user_id, while a restarted
+    /// verification runs.
     ///
     /// Field 7: `verified_at`
     #[serde(
@@ -44890,6 +44989,17 @@ pub struct SocialVerification {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Time in UTC from which a new verification may succeed, when this one
+    /// failed with error_code AUTH_SOCIAL_ACCOUNT_COOLDOWN or
+    /// AUTH_SOCIAL_CHANGE_LIMIT_REACHED. Empty otherwise.
+    ///
+    /// Field 18: `retry_after`
+    #[serde(
+        rename = "retryAfter",
+        alias = "retry_after",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub retry_after: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -44912,6 +45022,7 @@ impl ::core::fmt::Debug for SocialVerification {
             .field("last_error", &self.last_error)
             .field("error_code", &self.error_code)
             .field("updated_at", &self.updated_at)
+            .field("retry_after", &self.retry_after)
             .finish()
     }
 }
@@ -45021,6 +45132,14 @@ impl ::buffa::Message for SocialVerification {
         if !self.display_name.is_empty() {
             size += 2u32 + ::buffa::types::string_encoded_len(&self.display_name) as u32;
         }
+        if self.retry_after.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.retry_after.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -45091,6 +45210,10 @@ impl ::buffa::Message for SocialVerification {
         }
         if !self.display_name.is_empty() {
             ::buffa::types::put_string_field(17u32, &self.display_name, buf);
+        }
+        if self.retry_after.is_set() {
+            ::buffa::types::put_len_delimited_header(18u32, __cache.consume_next(), buf);
+            self.retry_after.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -45234,6 +45357,17 @@ impl ::buffa::Message for SocialVerification {
                 )?;
                 ::buffa::types::merge_string(&mut self.display_name, buf)?;
             }
+            18u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.retry_after.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -45257,6 +45391,7 @@ impl ::buffa::Message for SocialVerification {
         self.updated_at = ::buffa::MessageField::none();
         self.error_code = ::buffa::EnumValue::from(0);
         self.display_name.clear();
+        self.retry_after = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -45290,7 +45425,10 @@ pub const __SOCIAL_VERIFICATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     is_wkt: false,
 };
 /// StartSocialVerificationRequest starts or restarts social account verification.
-/// Starting again for the same provider replaces the previous challenge.
+/// Starting again for the same provider replaces the previous challenge. A linked
+/// X/Twitter or Discord account stays linked until the new verification
+/// succeeds; then the newly verified account replaces it, which counts as the
+/// provider's one change per 30 days.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -46570,7 +46708,7 @@ pub const __CONFIRM_SOCIAL_VERIFICATION_RESPONSE_JSON_ANY: ::buffa::type_registr
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct UnlinkSocialAccountRequest {
-    /// Provider account to unlink. Only TELEGRAM is accepted.
+    /// Provider account to unlink.
     ///
     /// Field 1: `provider`
     #[serde(
@@ -69345,6 +69483,8 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+            /// It differs per environment, so read it from this response rather than
+            /// assuming a fixed value.
             ///
             /// Field 5: `polyester_chain_id`
             pub polyester_chain_id: u64,
@@ -69763,6 +69903,8 @@ pub mod __buffa {
                 &self.0.reborrow().expires_at
             }
             /// Polyester EIP-155 chain ID used for smart-account derivation and verification.
+            /// It differs per environment, so read it from this response rather than
+            /// assuming a fixed value.
             ///
             /// Field 5: `polyester_chain_id`
             #[must_use]
@@ -114128,6 +114270,14 @@ pub mod __buffa {
             ///
             /// Field 2: `message`
             pub message: &'a str,
+            /// Time in UTC from which the same request may succeed. Set for
+            /// AUTH_SOCIAL_ACCOUNT_COOLDOWN and AUTH_SOCIAL_CHANGE_LIMIT_REACHED; empty
+            /// otherwise.
+            ///
+            /// Field 3: `retry_after`
+            pub retry_after: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AuthErrorDetailView<'a> {
@@ -114177,6 +114327,31 @@ pub mod __buffa {
                         )?;
                         view.message = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.retry_after.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.retry_after = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -114208,6 +114383,14 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::AuthErrorDetail {
                     code: self.code,
                     message: self.message.to_string(),
+                    retry_after: match self.retry_after.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -114218,7 +114401,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for AuthErrorDetailView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -114233,13 +114416,21 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.message) as u32;
                 }
+                if self.retry_after.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.retry_after.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -114252,6 +114443,14 @@ pub mod __buffa {
                 }
                 if !self.message.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.message, buf);
+                }
+                if self.retry_after.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.retry_after.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -114279,6 +114478,14 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.message) {
                     __map.serialize_entry("message", self.message)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .retry_after
+                        .as_option()
+                    {
+                        __map.serialize_entry("retryAfter", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -114389,6 +114596,19 @@ pub mod __buffa {
             #[must_use]
             pub fn message(&self) -> &'_ str {
                 self.0.reborrow().message
+            }
+            /// Time in UTC from which the same request may succeed. Set for
+            /// AUTH_SOCIAL_ACCOUNT_COOLDOWN and AUTH_SOCIAL_CHANGE_LIMIT_REACHED; empty
+            /// otherwise.
+            ///
+            /// Field 3: `retry_after`
+            #[must_use]
+            pub fn retry_after(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().retry_after
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AuthErrorDetailView<'static>>>
@@ -115296,11 +115516,14 @@ pub mod __buffa {
             ///
             /// Field 3: `website`
             pub website: &'a str,
-            /// X/Twitter handle without "@". Maximum length is 15 characters.
+            /// Handle of the account's verified X/Twitter account, without "@", as X
+            /// reports it at the latest successful verification. Empty while no X account
+            /// is linked. Only SocialVerificationService sets it; UpdateProfile cannot.
+            /// Maximum length is 15 characters.
             ///
             /// Field 4: `twitter`
             pub twitter: &'a str,
-            /// Whether the X/Twitter handle for this account has been verified.
+            /// Whether an X/Twitter account is linked: true exactly when twitter is set.
             ///
             /// Field 8: `twitter_verified`
             pub twitter_verified: bool,
@@ -115900,14 +116123,17 @@ pub mod __buffa {
             pub fn website(&self) -> &'_ str {
                 self.0.reborrow().website
             }
-            /// X/Twitter handle without "@". Maximum length is 15 characters.
+            /// Handle of the account's verified X/Twitter account, without "@", as X
+            /// reports it at the latest successful verification. Empty while no X account
+            /// is linked. Only SocialVerificationService sets it; UpdateProfile cannot.
+            /// Maximum length is 15 characters.
             ///
             /// Field 4: `twitter`
             #[must_use]
             pub fn twitter(&self) -> &'_ str {
                 self.0.reborrow().twitter
             }
-            /// Whether the X/Twitter handle for this account has been verified.
+            /// Whether an X/Twitter account is linked: true exactly when twitter is set.
             ///
             /// Field 8: `twitter_verified`
             #[must_use]
@@ -116038,11 +116264,6 @@ pub mod __buffa {
             ///
             /// Field 3: `website`
             pub website: ::core::option::Option<&'a str>,
-            /// X/Twitter handle without "@". Use an empty string to clear it. Non-empty
-            /// values must be 1 to 15 letters, digits, or underscores.
-            ///
-            /// Field 4: `twitter`
-            pub twitter: ::core::option::Option<&'a str>,
             /// Avatar URL. Use an empty string to clear it. Non-empty values must be valid
             /// http(s) URLs up to 256 characters.
             ///
@@ -116102,13 +116323,6 @@ pub mod __buffa {
                         )?;
                         view.website = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.twitter = Some(::buffa::types::borrow_str(&mut cur)?);
-                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -116148,7 +116362,6 @@ pub mod __buffa {
                     username: self.username.map(|s| s.to_string()),
                     bio: self.bio.map(|s| s.to_string()),
                     website: self.website.map(|s| s.to_string()),
-                    twitter: self.twitter.map(|s| s.to_string()),
                     avatar_url: self.avatar_url.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
@@ -116173,9 +116386,6 @@ pub mod __buffa {
                 if let Some(ref v) = self.website {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
-                if let Some(ref v) = self.twitter {
-                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
-                }
                 if let Some(ref v) = self.avatar_url {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
@@ -116198,9 +116408,6 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.website {
                     ::buffa::types::put_string_field(3u32, v, buf);
-                }
-                if let Some(ref v) = self.twitter {
-                    ::buffa::types::put_string_field(4u32, v, buf);
                 }
                 if let Some(ref v) = self.avatar_url {
                     ::buffa::types::put_string_field(5u32, v, buf);
@@ -116234,9 +116441,6 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.website {
                     __map.serialize_entry("website", __v)?;
-                }
-                if let ::core::option::Option::Some(__v) = self.twitter {
-                    __map.serialize_entry("twitter", __v)?;
                 }
                 if let ::core::option::Option::Some(__v) = self.avatar_url {
                     __map.serialize_entry("avatarUrl", __v)?;
@@ -116361,14 +116565,6 @@ pub mod __buffa {
             #[must_use]
             pub fn website(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().website
-            }
-            /// X/Twitter handle without "@". Use an empty string to clear it. Non-empty
-            /// values must be 1 to 15 letters, digits, or underscores.
-            ///
-            /// Field 4: `twitter`
-            #[must_use]
-            pub fn twitter(&self) -> ::core::option::Option<&'_ str> {
-                self.0.reborrow().twitter
             }
             /// Avatar URL. Use an empty string to clear it. Non-empty values must be valid
             /// http(s) URLs up to 256 characters.
@@ -116654,8 +116850,8 @@ pub mod __buffa {
             ///
             /// Field 1: `code`
             pub code: ::buffa::EnumValue<super::super::ProfileErrorCode>,
-            /// Field name associated with the error, such as "bio", "website", "twitter",
-            /// or "avatar_url".
+            /// Field name associated with the error, such as "bio", "website", or
+            /// "avatar_url".
             ///
             /// Field 2: `field`
             pub field: &'a str,
@@ -116936,8 +117132,8 @@ pub mod __buffa {
             pub fn code(&self) -> ::buffa::EnumValue<super::super::ProfileErrorCode> {
                 self.0.reborrow().code
             }
-            /// Field name associated with the error, such as "bio", "website", "twitter",
-            /// or "avatar_url".
+            /// Field name associated with the error, such as "bio", "website", or
+            /// "avatar_url".
             ///
             /// Field 2: `field`
             #[must_use]
@@ -119932,10 +120128,12 @@ pub mod __buffa {
             ///
             /// Field 2: `handle`
             pub handle: &'a str,
-            /// Stable provider-side user identifier. Empty until verification succeeds,
-            /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
-            /// the numeric user ID of the Telegram account that submitted the code, the
-            /// value ConfirmSocialVerification takes.
+            /// Stable provider-side user identifier of the linked provider account. Empty
+            /// while no account is linked. A restarted X/Twitter or Discord verification
+            /// keeps the current link, and this value, until the new verification succeeds
+            /// and replaces it. For Telegram, while the status is
+            /// STATUS_AWAITING_CONFIRMATION, it is the numeric user ID of the Telegram
+            /// account that submitted the code, the value ConfirmSocialVerification takes.
             ///
             /// Field 3: `provider_user_id`
             pub provider_user_id: &'a str,
@@ -119967,7 +120165,9 @@ pub mod __buffa {
             pub expires_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Time in UTC when verification succeeded. Empty until status is STATUS_VERIFIED.
+            /// Time in UTC when the linked provider account was last verified. Empty while
+            /// no account is linked; kept, like provider_user_id, while a restarted
+            /// verification runs.
             ///
             /// Field 7: `verified_at`
             pub verified_at: ::buffa::MessageFieldView<
@@ -119991,6 +120191,14 @@ pub mod __buffa {
             ///
             /// Field 15: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Time in UTC from which a new verification may succeed, when this one
+            /// failed with error_code AUTH_SOCIAL_ACCOUNT_COOLDOWN or
+            /// AUTH_SOCIAL_CHANGE_LIMIT_REACHED. Empty otherwise.
+            ///
+            /// Field 18: `retry_after`
+            pub retry_after: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
@@ -120211,6 +120419,31 @@ pub mod __buffa {
                             }
                         }
                     }
+                    18u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.retry_after.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.retry_after = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -120276,6 +120509,14 @@ pub mod __buffa {
                     last_error: self.last_error.to_string(),
                     error_code: self.error_code,
                     updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    retry_after: match self.retry_after.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
                                 ::buffa_types::google::protobuf::Timestamp,
@@ -120390,6 +120631,14 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.display_name)
                                 as u32;
                 }
+                if self.retry_after.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.retry_after.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -120477,6 +120726,14 @@ pub mod __buffa {
                 }
                 if !self.display_name.is_empty() {
                     ::buffa::types::put_string_field(17u32, &self.display_name, buf);
+                }
+                if self.retry_after.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        18u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.retry_after.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -120574,6 +120831,14 @@ pub mod __buffa {
                         .as_option()
                     {
                         __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .retry_after
+                        .as_option()
+                    {
+                        __map.serialize_entry("retryAfter", __v)?;
                     }
                 }
                 __map.end()
@@ -120705,10 +120970,12 @@ pub mod __buffa {
             pub fn handle(&self) -> &'_ str {
                 self.0.reborrow().handle
             }
-            /// Stable provider-side user identifier. Empty until verification succeeds,
-            /// except for Telegram: while the status is STATUS_AWAITING_CONFIRMATION, it is
-            /// the numeric user ID of the Telegram account that submitted the code, the
-            /// value ConfirmSocialVerification takes.
+            /// Stable provider-side user identifier of the linked provider account. Empty
+            /// while no account is linked. A restarted X/Twitter or Discord verification
+            /// keeps the current link, and this value, until the new verification succeeds
+            /// and replaces it. For Telegram, while the status is
+            /// STATUS_AWAITING_CONFIRMATION, it is the numeric user ID of the Telegram
+            /// account that submitted the code, the value ConfirmSocialVerification takes.
             ///
             /// Field 3: `provider_user_id`
             #[must_use]
@@ -120764,7 +121031,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().expires_at
             }
-            /// Time in UTC when verification succeeded. Empty until status is STATUS_VERIFIED.
+            /// Time in UTC when the linked provider account was last verified. Empty while
+            /// no account is linked; kept, like provider_user_id, while a restarted
+            /// verification runs.
             ///
             /// Field 7: `verified_at`
             #[must_use]
@@ -120809,6 +121078,19 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().updated_at
             }
+            /// Time in UTC from which a new verification may succeed, when this one
+            /// failed with error_code AUTH_SOCIAL_ACCOUNT_COOLDOWN or
+            /// AUTH_SOCIAL_CHANGE_LIMIT_REACHED. Empty otherwise.
+            ///
+            /// Field 18: `retry_after`
+            #[must_use]
+            pub fn retry_after(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().retry_after
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<SocialVerificationView<'static>>>
         for SocialVerificationOwnedView {
@@ -120841,7 +121123,10 @@ pub mod __buffa {
             }
         }
         /// StartSocialVerificationRequest starts or restarts social account verification.
-        /// Starting again for the same provider replaces the previous challenge.
+        /// Starting again for the same provider replaces the previous challenge. A linked
+        /// X/Twitter or Discord account stays linked until the new verification
+        /// succeeds; then the newly verified account replaces it, which counts as the
+        /// provider's one change per 30 days.
         #[derive(Clone, Debug, Default)]
         pub struct StartSocialVerificationRequestView<'a> {
             /// Provider account to verify.
@@ -123544,7 +123829,7 @@ pub mod __buffa {
         /// cancels a link in progress.
         #[derive(Clone, Debug, Default)]
         pub struct UnlinkSocialAccountRequestView<'a> {
-            /// Provider account to unlink. Only TELEGRAM is accepted.
+            /// Provider account to unlink.
             ///
             /// Field 1: `provider`
             pub provider: ::buffa::EnumValue<super::super::SocialProvider>,
@@ -123783,7 +124068,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Provider account to unlink. Only TELEGRAM is accepted.
+            /// Provider account to unlink.
             ///
             /// Field 1: `provider`
             #[must_use]

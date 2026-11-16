@@ -309,6 +309,32 @@ mod tests {
         );
     }
 
+    /// The dust conversion and funding flow permissions read by name on both
+    /// policy kinds and keep their numbers.
+    #[test]
+    fn dust_and_funding_flow_policy_actions_read_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let actions = vec![
+            PolicyAction::CONVERT_DUST.into(),
+            PolicyAction::READ_FUNDING_FLOWS.into(),
+        ];
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: actions.clone(),
+            ..Default::default()
+        });
+        let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
+            actions,
+            ..Default::default()
+        });
+        for decoded in [&api.actions, &sub.actions] {
+            assert_eq!(decoded, &["CONVERT_DUST", "READ_FUNDING_FLOWS"]);
+        }
+        assert_eq!(PolicyAction::CONVERT_DUST.to_i32(), 39);
+        assert_eq!(PolicyAction::READ_FUNDING_FLOWS.to_i32(), 40);
+    }
+
     /// Every `PolicyAction`, the POLY-9102 account permissions included,
     /// reads as its proto name and parses back to the same value. Unset
     /// entries are skipped and a value newer than this SDK keeps its number.

@@ -1127,8 +1127,8 @@ pub enum RouteStatus {
     STATUS_UNSPECIFIED = 0i32,
     /// The route accepts new requests.
     NORMAL = 1i32,
-    /// The route does not accept new requests. Requests created before the
-    /// suspension continue to process.
+    /// The route does not accept new requests. Do not send funds on it until it
+    /// returns to NORMAL.
     SUSPENDED = 2i32,
 }
 impl RouteStatus {
@@ -1887,9 +1887,9 @@ pub struct AssetChainVariant {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub supply_q: u64,
-    /// Whether this route currently accepts new deposits. Funds sent to a
-    /// deposit address while deposits are suspended are delayed, not lost: they
-    /// can be processed only after deposits resume.
+    /// Whether this route currently accepts new deposits. While it is
+    /// SUSPENDED, do not send funds to a deposit address on this route; wait
+    /// until it returns to NORMAL.
     ///
     /// Field 13: `deposit_status`
     #[serde(
@@ -1899,7 +1899,11 @@ pub struct AssetChainVariant {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub deposit_status: ::buffa::EnumValue<RouteStatus>,
-    /// Whether this route currently accepts new withdrawals.
+    /// Whether this route currently accepts new withdrawals. A Trading
+    /// withdrawal accepted before the route became SUSPENDED and not yet sent
+    /// stays pending, with its funds held, and is sent once the route returns
+    /// to NORMAL. One already being sent when the suspension takes effect may
+    /// fail instead; its funds then return to the account.
     ///
     /// Field 14: `withdrawal_status`
     #[serde(
@@ -4572,13 +4576,17 @@ pub mod __buffa {
             ///
             /// Field 12: `supply_q`
             pub supply_q: u64,
-            /// Whether this route currently accepts new deposits. Funds sent to a
-            /// deposit address while deposits are suspended are delayed, not lost: they
-            /// can be processed only after deposits resume.
+            /// Whether this route currently accepts new deposits. While it is
+            /// SUSPENDED, do not send funds to a deposit address on this route; wait
+            /// until it returns to NORMAL.
             ///
             /// Field 13: `deposit_status`
             pub deposit_status: ::buffa::EnumValue<super::super::RouteStatus>,
-            /// Whether this route currently accepts new withdrawals.
+            /// Whether this route currently accepts new withdrawals. A Trading
+            /// withdrawal accepted before the route became SUSPENDED and not yet sent
+            /// stays pending, with its funds held, and is sent once the route returns
+            /// to NORMAL. One already being sent when the suspension takes effect may
+            /// fail instead; its funds then return to the account.
             ///
             /// Field 14: `withdrawal_status`
             pub withdrawal_status: ::buffa::EnumValue<super::super::RouteStatus>,
@@ -5169,9 +5177,9 @@ pub mod __buffa {
             pub fn supply_q(&self) -> u64 {
                 self.0.reborrow().supply_q
             }
-            /// Whether this route currently accepts new deposits. Funds sent to a
-            /// deposit address while deposits are suspended are delayed, not lost: they
-            /// can be processed only after deposits resume.
+            /// Whether this route currently accepts new deposits. While it is
+            /// SUSPENDED, do not send funds to a deposit address on this route; wait
+            /// until it returns to NORMAL.
             ///
             /// Field 13: `deposit_status`
             #[must_use]
@@ -5180,7 +5188,11 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::RouteStatus> {
                 self.0.reborrow().deposit_status
             }
-            /// Whether this route currently accepts new withdrawals.
+            /// Whether this route currently accepts new withdrawals. A Trading
+            /// withdrawal accepted before the route became SUSPENDED and not yet sent
+            /// stays pending, with its funds held, and is sent once the route returns
+            /// to NORMAL. One already being sent when the suspension takes effect may
+            /// fail instead; its funds then return to the account.
             ///
             /// Field 14: `withdrawal_status`
             #[must_use]

@@ -7,6 +7,8 @@ mod balances;
 mod changelog;
 mod correlation_id;
 mod deposit_withdraw;
+mod dust;
+mod limits;
 mod market_data;
 mod orders;
 mod profile;
@@ -29,6 +31,7 @@ pub use deposit_withdraw::{
     DepositService, PreparedTradingWithdraw, WithdrawService, ZipperService,
     new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,
 };
+pub use dust::DustConversionService;
 pub use market_data::{
     CreateSubscriptionOptions, ListMarketOverviewOptions, MarketDataService,
     MarketOverviewCreateSubscriptionOptions, MarketOverviewService, OrderbookService,
@@ -36,7 +39,7 @@ pub use market_data::{
 pub(crate) use orders::scale_order;
 pub use orders::{OrdersService, TradesService};
 pub use profile::ProfileService;
-pub use statements::{ExportStatementOptions, StatementsService};
+pub use statements::{CreateStatementExportOptions, ExportStatementOptions, StatementsService};
 pub use system::ListStatusEventsOptions;
 pub use thin::*;
 pub use triggers::TriggersService;

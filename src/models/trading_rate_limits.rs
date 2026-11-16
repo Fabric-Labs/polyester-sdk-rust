@@ -25,11 +25,20 @@ pub struct RateLimitConfig {
     pub rules: Vec<TradingRateLimitRule>,
 }
 
-/// Effective trading limits for one account target and caller.
+/// Effective trading limits for one account target and caller. Trading
+/// limits apply per account: the main account and each sub-account have their
+/// own, and every API key and session that trades for an account shares them.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TradingRateLimits {
     pub policy_version: u64,
     pub effective_from: Option<Timestamp>,
+    /// The placement and cancellation rules enforced for the selected
+    /// account, placement first and cancellation second. All of the
+    /// account's API keys and sessions draw on these together: budget
+    /// against them.
     pub rules: Vec<TradingRateLimitRule>,
+    /// The rules resolved for the calling API key, placement first; empty
+    /// for a session. Informational only: trading requests are not limited
+    /// per API key, and only `rules` are enforced.
     pub api_key_rules: Vec<TradingRateLimitRule>,
 }

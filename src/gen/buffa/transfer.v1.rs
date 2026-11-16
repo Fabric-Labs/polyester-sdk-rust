@@ -61,6 +61,25 @@ pub enum ErrorCode {
     ERROR_CODE_NOT_FOUND = 26i32,
     /// The request conflicts with existing state.
     ERROR_CODE_CONFLICT = 27i32,
+    /// The dust quote is older than 30 seconds, unknown, or another account's.
+    ERROR_CODE_DUST_QUOTE_EXPIRED = 28i32,
+    /// The dust conversion's payout fell more than 1% below its quote.
+    ERROR_CODE_DUST_PRICE_MOVED = 29i32,
+    /// A quoted balance no longer converts as dust, or the payout rounds to zero.
+    ERROR_CODE_DUST_NOT_ELIGIBLE = 30i32,
+    /// The account converted dust within the last 6 hours, or a conversion is
+    /// still processing.
+    ERROR_CODE_DUST_WINDOW_ACTIVE = 31i32,
+    /// The target asset's daily dust conversion limit is reached.
+    ERROR_CODE_DUST_DAILY_LIMIT = 32i32,
+    /// Too many dust conversions are in progress. Retry shortly.
+    ERROR_CODE_DUST_BUSY = 33i32,
+    /// The target asset cannot be paid now, or has no current price.
+    ERROR_CODE_DUST_TARGET_UNAVAILABLE = 34i32,
+    /// A source balance moved since the quote: quote again.
+    ERROR_CODE_DUST_BALANCE_CHANGED = 35i32,
+    /// The dust conversion could not complete. Nothing moved; quote again.
+    ERROR_CODE_DUST_CONVERSION_FAILED = 36i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -147,6 +166,33 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CONFLICT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Conflict: Self = Self::ERROR_CODE_CONFLICT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_QUOTE_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustQuoteExpired: Self = Self::ERROR_CODE_DUST_QUOTE_EXPIRED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_PRICE_MOVED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustPriceMoved: Self = Self::ERROR_CODE_DUST_PRICE_MOVED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_NOT_ELIGIBLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustNotEligible: Self = Self::ERROR_CODE_DUST_NOT_ELIGIBLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_WINDOW_ACTIVE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustWindowActive: Self = Self::ERROR_CODE_DUST_WINDOW_ACTIVE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_DAILY_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustDailyLimit: Self = Self::ERROR_CODE_DUST_DAILY_LIMIT;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_BUSY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustBusy: Self = Self::ERROR_CODE_DUST_BUSY;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustTargetUnavailable: Self = Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_BALANCE_CHANGED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustBalanceChanged: Self = Self::ERROR_CODE_DUST_BALANCE_CHANGED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_DUST_CONVERSION_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DustConversionFailed: Self = Self::ERROR_CODE_DUST_CONVERSION_FAILED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -284,6 +330,19 @@ impl ::buffa::Enumeration for ErrorCode {
             25i32 => ::core::option::Option::Some(Self::ERROR_CODE_FAILED_PRECONDITION),
             26i32 => ::core::option::Option::Some(Self::ERROR_CODE_NOT_FOUND),
             27i32 => ::core::option::Option::Some(Self::ERROR_CODE_CONFLICT),
+            28i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_QUOTE_EXPIRED),
+            29i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_PRICE_MOVED),
+            30i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_NOT_ELIGIBLE),
+            31i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_WINDOW_ACTIVE),
+            32i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_DAILY_LIMIT),
+            33i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_BUSY),
+            34i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE)
+            }
+            35i32 => ::core::option::Option::Some(Self::ERROR_CODE_DUST_BALANCE_CHANGED),
+            36i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_CONVERSION_FAILED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -332,6 +391,19 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_FAILED_PRECONDITION => "ERROR_CODE_FAILED_PRECONDITION",
             Self::ERROR_CODE_NOT_FOUND => "ERROR_CODE_NOT_FOUND",
             Self::ERROR_CODE_CONFLICT => "ERROR_CODE_CONFLICT",
+            Self::ERROR_CODE_DUST_QUOTE_EXPIRED => "ERROR_CODE_DUST_QUOTE_EXPIRED",
+            Self::ERROR_CODE_DUST_PRICE_MOVED => "ERROR_CODE_DUST_PRICE_MOVED",
+            Self::ERROR_CODE_DUST_NOT_ELIGIBLE => "ERROR_CODE_DUST_NOT_ELIGIBLE",
+            Self::ERROR_CODE_DUST_WINDOW_ACTIVE => "ERROR_CODE_DUST_WINDOW_ACTIVE",
+            Self::ERROR_CODE_DUST_DAILY_LIMIT => "ERROR_CODE_DUST_DAILY_LIMIT",
+            Self::ERROR_CODE_DUST_BUSY => "ERROR_CODE_DUST_BUSY",
+            Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE => {
+                "ERROR_CODE_DUST_TARGET_UNAVAILABLE"
+            }
+            Self::ERROR_CODE_DUST_BALANCE_CHANGED => "ERROR_CODE_DUST_BALANCE_CHANGED",
+            Self::ERROR_CODE_DUST_CONVERSION_FAILED => {
+                "ERROR_CODE_DUST_CONVERSION_FAILED"
+            }
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -422,6 +494,33 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CONFLICT" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CONFLICT)
             }
+            "ERROR_CODE_DUST_QUOTE_EXPIRED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_QUOTE_EXPIRED)
+            }
+            "ERROR_CODE_DUST_PRICE_MOVED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_PRICE_MOVED)
+            }
+            "ERROR_CODE_DUST_NOT_ELIGIBLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_NOT_ELIGIBLE)
+            }
+            "ERROR_CODE_DUST_WINDOW_ACTIVE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_WINDOW_ACTIVE)
+            }
+            "ERROR_CODE_DUST_DAILY_LIMIT" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_DAILY_LIMIT)
+            }
+            "ERROR_CODE_DUST_BUSY" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_BUSY)
+            }
+            "ERROR_CODE_DUST_TARGET_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE)
+            }
+            "ERROR_CODE_DUST_BALANCE_CHANGED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_BALANCE_CHANGED)
+            }
+            "ERROR_CODE_DUST_CONVERSION_FAILED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_DUST_CONVERSION_FAILED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -455,6 +554,15 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_FAILED_PRECONDITION,
             Self::ERROR_CODE_NOT_FOUND,
             Self::ERROR_CODE_CONFLICT,
+            Self::ERROR_CODE_DUST_QUOTE_EXPIRED,
+            Self::ERROR_CODE_DUST_PRICE_MOVED,
+            Self::ERROR_CODE_DUST_NOT_ELIGIBLE,
+            Self::ERROR_CODE_DUST_WINDOW_ACTIVE,
+            Self::ERROR_CODE_DUST_DAILY_LIMIT,
+            Self::ERROR_CODE_DUST_BUSY,
+            Self::ERROR_CODE_DUST_TARGET_UNAVAILABLE,
+            Self::ERROR_CODE_DUST_BALANCE_CHANGED,
+            Self::ERROR_CODE_DUST_CONVERSION_FAILED,
         ]
     }
 }
@@ -632,6 +740,335 @@ impl ::buffa::Enumeration for InternalTransferStatus {
             Self::INTERNAL_TRANSFER_STATUS_ACCEPTED,
             Self::INTERNAL_TRANSFER_STATUS_REJECTED,
             Self::INTERNAL_TRANSFER_STATUS_FAILED,
+        ]
+    }
+}
+/// InternalTransferBatchStatus is the outcome of a batch request as a whole.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum InternalTransferBatchStatus {
+    /// Status was not specified.
+    BATCH_STATUS_UNSPECIFIED = 0i32,
+    /// Every leg passed its checks and the batch was submitted. Legs run
+    /// independently: read each leg's status.
+    BATCH_SUBMITTED = 1i32,
+    /// At least one leg failed its checks, so no leg ran, no funds moved and no
+    /// step-up verification was used. Failed legs carry their reason; the other
+    /// legs are LEG_NOT_SUBMITTED.
+    BATCH_REFUSED = 2i32,
+}
+impl InternalTransferBatchStatus {
+    ///Idiomatic alias for [`Self::BATCH_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchStatusUnspecified: Self = Self::BATCH_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::BATCH_SUBMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchSubmitted: Self = Self::BATCH_SUBMITTED;
+    ///Idiomatic alias for [`Self::BATCH_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BatchRefused: Self = Self::BATCH_REFUSED;
+}
+impl ::core::default::Default for InternalTransferBatchStatus {
+    fn default() -> Self {
+        Self::BATCH_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for InternalTransferBatchStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for InternalTransferBatchStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = InternalTransferBatchStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(InternalTransferBatchStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<InternalTransferBatchStatus, E> {
+                <InternalTransferBatchStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<InternalTransferBatchStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <InternalTransferBatchStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<InternalTransferBatchStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <InternalTransferBatchStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<InternalTransferBatchStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for InternalTransferBatchStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for InternalTransferBatchStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::BATCH_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::BATCH_SUBMITTED),
+            2i32 => ::core::option::Option::Some(Self::BATCH_REFUSED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BATCH_STATUS_UNSPECIFIED => "BATCH_STATUS_UNSPECIFIED",
+            Self::BATCH_SUBMITTED => "BATCH_SUBMITTED",
+            Self::BATCH_REFUSED => "BATCH_REFUSED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BATCH_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BATCH_STATUS_UNSPECIFIED)
+            }
+            "BATCH_SUBMITTED" => ::core::option::Option::Some(Self::BATCH_SUBMITTED),
+            "BATCH_REFUSED" => ::core::option::Option::Some(Self::BATCH_REFUSED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::BATCH_STATUS_UNSPECIFIED, Self::BATCH_SUBMITTED, Self::BATCH_REFUSED]
+    }
+}
+/// InternalTransferBatchLegStatus is the outcome of one leg of a batch.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum InternalTransferBatchLegStatus {
+    /// Status was not specified.
+    LEG_STATUS_UNSPECIFIED = 0i32,
+    /// The leg's transfer was accepted and has a durable transfer identifier.
+    LEG_ACCEPTED = 1i32,
+    /// The leg's outcome is not known yet. The transfer runs to its outcome
+    /// without the caller: read it with GetInternalTransfer, or retry the batch
+    /// with the same idempotency key.
+    LEG_PENDING = 2i32,
+    /// The leg moved no funds; error_code gives the reason. A retry of the batch
+    /// with the same idempotency key runs a submitted leg again.
+    LEG_REFUSED = 3i32,
+    /// The leg did not run: its batch was refused, or the request ended before
+    /// the leg started. A retry with the same idempotency key runs it.
+    LEG_NOT_SUBMITTED = 4i32,
+}
+impl InternalTransferBatchLegStatus {
+    ///Idiomatic alias for [`Self::LEG_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LegStatusUnspecified: Self = Self::LEG_STATUS_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::LEG_ACCEPTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LegAccepted: Self = Self::LEG_ACCEPTED;
+    ///Idiomatic alias for [`Self::LEG_PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LegPending: Self = Self::LEG_PENDING;
+    ///Idiomatic alias for [`Self::LEG_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LegRefused: Self = Self::LEG_REFUSED;
+    ///Idiomatic alias for [`Self::LEG_NOT_SUBMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LegNotSubmitted: Self = Self::LEG_NOT_SUBMITTED;
+}
+impl ::core::default::Default for InternalTransferBatchLegStatus {
+    fn default() -> Self {
+        Self::LEG_STATUS_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for InternalTransferBatchLegStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for InternalTransferBatchLegStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = InternalTransferBatchLegStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(InternalTransferBatchLegStatus)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<InternalTransferBatchLegStatus, E> {
+                <InternalTransferBatchLegStatus as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<InternalTransferBatchLegStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <InternalTransferBatchLegStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<InternalTransferBatchLegStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <InternalTransferBatchLegStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<InternalTransferBatchLegStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for InternalTransferBatchLegStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for InternalTransferBatchLegStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::LEG_STATUS_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::LEG_ACCEPTED),
+            2i32 => ::core::option::Option::Some(Self::LEG_PENDING),
+            3i32 => ::core::option::Option::Some(Self::LEG_REFUSED),
+            4i32 => ::core::option::Option::Some(Self::LEG_NOT_SUBMITTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::LEG_STATUS_UNSPECIFIED => "LEG_STATUS_UNSPECIFIED",
+            Self::LEG_ACCEPTED => "LEG_ACCEPTED",
+            Self::LEG_PENDING => "LEG_PENDING",
+            Self::LEG_REFUSED => "LEG_REFUSED",
+            Self::LEG_NOT_SUBMITTED => "LEG_NOT_SUBMITTED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "LEG_STATUS_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::LEG_STATUS_UNSPECIFIED)
+            }
+            "LEG_ACCEPTED" => ::core::option::Option::Some(Self::LEG_ACCEPTED),
+            "LEG_PENDING" => ::core::option::Option::Some(Self::LEG_PENDING),
+            "LEG_REFUSED" => ::core::option::Option::Some(Self::LEG_REFUSED),
+            "LEG_NOT_SUBMITTED" => ::core::option::Option::Some(Self::LEG_NOT_SUBMITTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::LEG_STATUS_UNSPECIFIED,
+            Self::LEG_ACCEPTED,
+            Self::LEG_PENDING,
+            Self::LEG_REFUSED,
+            Self::LEG_NOT_SUBMITTED,
         ]
     }
 }
@@ -1836,6 +2273,1263 @@ pub const __CREATE_INTERNAL_TRANSFER_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<CreateInternalTransferResponse>,
     is_wkt: false,
 };
+/// InternalTransferBatchLeg is one transfer of a batch. It takes the fields of
+/// CreateInternalTransferRequest except the idempotency key, which the batch
+/// carries for all of its legs.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize)]
+#[serde(default)]
+pub struct InternalTransferBatchLeg {
+    /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+    /// keys use their bound subaccount; other callers use their authenticated
+    /// root account. Legs of one batch may debit different source accounts.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Canonical public unified asset id for the asset being transferred.
+    ///
+    /// Field 5: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// Transfer amount in canonical 18-decimal unified asset units.
+    /// For example, 0.5 is encoded as 500000000000000000.
+    ///
+    /// Field 6: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    #[serde(flatten)]
+    pub destination: ::core::option::Option<
+        __buffa::oneof::internal_transfer_batch_leg::Destination,
+    >,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for InternalTransferBatchLeg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("InternalTransferBatchLeg")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("asset_id", &self.asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .field("destination", &self.destination)
+            .finish()
+    }
+}
+impl InternalTransferBatchLeg {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLeg";
+}
+::buffa::impl_default_instance!(InternalTransferBatchLeg);
+impl ::buffa::MessageName for InternalTransferBatchLeg {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "InternalTransferBatchLeg";
+    const FULL_NAME: &'static str = "transfer.v1.InternalTransferBatchLeg";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLeg";
+}
+impl ::buffa::Message for InternalTransferBatchLeg {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if let ::core::option::Option::Some(ref v) = self.destination {
+            match v {
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                    _x,
+                ) => {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                    _x,
+                ) => {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                    x,
+                ) => {
+                    size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                }
+            }
+        }
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if let ::core::option::Option::Some(ref v) = self.destination {
+            match v {
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                    x,
+                ) => {
+                    ::buffa::types::put_fixed64_field(2u32, *x, buf);
+                }
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                    x,
+                ) => {
+                    ::buffa::types::put_fixed64_field(3u32, *x, buf);
+                }
+                __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                    x,
+                ) => {
+                    ::buffa::types::put_string_field(4u32, x, buf);
+                }
+            }
+        }
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.destination = ::core::option::Option::Some(
+                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                        ::buffa::types::decode_fixed64(buf)?,
+                    ),
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.destination = ::core::option::Option::Some(
+                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                        ::buffa::types::decode_fixed64(buf)?,
+                    ),
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.destination = ::core::option::Option::Some(
+                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                        ::buffa::types::decode_string(buf)?,
+                    ),
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.destination = ::core::option::Option::None;
+        self.asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for InternalTransferBatchLeg {
+    const PROTO_FQN: &'static str = "transfer.v1.InternalTransferBatchLeg";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl<'de> serde::Deserialize<'de> for InternalTransferBatchLeg {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl<'de> serde::de::Visitor<'de> for _V {
+            type Value = InternalTransferBatchLeg;
+            fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.write_str("struct InternalTransferBatchLeg")
+            }
+            #[allow(clippy::field_reassign_with_default)]
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> ::core::result::Result<InternalTransferBatchLeg, A::Error> {
+                let mut __f_subaccount_id: ::core::option::Option<u64> = None;
+                let mut __f_asset_id: ::core::option::Option<u32> = None;
+                let mut __f_amount_e18: ::core::option::Option<
+                    ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+                > = None;
+                let mut __oneof_destination: ::core::option::Option<
+                    __buffa::oneof::internal_transfer_batch_leg::Destination,
+                > = None;
+                while let Some(key) = map.next_key::<::buffa::alloc::string::String>()? {
+                    match key.as_str() {
+                        "subaccountId" | "subaccount_id" => {
+                            __f_subaccount_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u64;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u64, D::Error> {
+                                        ::buffa::json_helpers::uint64::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "assetId" | "asset_id" => {
+                            __f_asset_id = Some({
+                                struct _S;
+                                impl<'de> serde::de::DeserializeSeed<'de> for _S {
+                                    type Value = u32;
+                                    fn deserialize<D: serde::Deserializer<'de>>(
+                                        self,
+                                        d: D,
+                                    ) -> ::core::result::Result<u32, D::Error> {
+                                        ::buffa::json_helpers::uint32::deserialize(d)
+                                    }
+                                }
+                                map.next_value_seed(_S)?
+                            });
+                        }
+                        "amountE18" | "amount_e18" => {
+                            __f_amount_e18 = Some(
+                                map
+                                    .next_value::<
+                                        ::buffa::MessageField<
+                                            super::super::polyester::r#type::v1::U128,
+                                        >,
+                                    >()?,
+                            );
+                        }
+                        "destinationAccountId" | "destination_account_id" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = u64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<u64, D::Error> {
+                                    ::buffa::json_helpers::uint64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<u64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "destinationSubaccountId" | "destination_subaccount_id" => {
+                            struct _DeserSeed;
+                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
+                                type Value = u64;
+                                fn deserialize<D: serde::Deserializer<'de>>(
+                                    self,
+                                    d: D,
+                                ) -> ::core::result::Result<u64, D::Error> {
+                                    ::buffa::json_helpers::uint64::deserialize(d)
+                                }
+                            }
+                            let v: ::core::option::Option<u64> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        "destinationSmartAccountAddress"
+                        | "destination_smart_account_address" => {
+                            let v: ::core::option::Option<
+                                ::buffa::alloc::string::String,
+                            > = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            ::buffa::alloc::string::String,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_destination.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'destination'",
+                                        ),
+                                    );
+                                }
+                                __oneof_destination = Some(
+                                    __buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                                        v,
+                                    ),
+                                );
+                            }
+                        }
+                        _ => {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                }
+                let mut __r = <InternalTransferBatchLeg as ::core::default::Default>::default();
+                if let ::core::option::Option::Some(v) = __f_subaccount_id {
+                    __r.subaccount_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_asset_id {
+                    __r.asset_id = v;
+                }
+                if let ::core::option::Option::Some(v) = __f_amount_e18 {
+                    __r.amount_e18 = v;
+                }
+                __r.destination = __oneof_destination;
+                Ok(__r)
+            }
+        }
+        d.deserialize_map(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for InternalTransferBatchLeg {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __INTERNAL_TRANSFER_BATCH_LEG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.InternalTransferBatchLeg",
+    to_json: ::buffa::type_registry::any_to_json::<InternalTransferBatchLeg>,
+    from_json: ::buffa::type_registry::any_from_json::<InternalTransferBatchLeg>,
+    is_wkt: false,
+};
+pub mod internal_transfer_batch_leg {
+    #[allow(unused_imports)]
+    use super::*;
+    #[doc(inline)]
+    pub use super::__buffa::oneof::internal_transfer_batch_leg::Destination;
+    #[doc(inline)]
+    pub use super::__buffa::view::oneof::internal_transfer_batch_leg::Destination as DestinationView;
+}
+/// BatchCreateInternalTransfersRequest submits up to 10 independent Trading to
+/// Trading transfers under one idempotency key and one MFA check.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCreateInternalTransfersRequest {
+    /// Transfers to run, in order. At most 10 legs; each leg counts as one
+    /// internal transfer against the caller's rate limit. Legs may repeat an asset,
+    /// a source or a destination.
+    ///
+    /// Field 1: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<InternalTransferBatchLeg>,
+    /// Stable client-supplied idempotency key used to collapse safe retries of
+    /// the whole batch. It is scoped to the authenticated caller: the session's
+    /// account, or the API key. A retry must send the same legs in the same
+    /// order; different legs under the same key are refused.
+    ///
+    /// Field 2: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCreateInternalTransfersRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCreateInternalTransfersRequest")
+            .field("legs", &self.legs)
+            .field("idempotency_key", &self.idempotency_key)
+            .finish()
+    }
+}
+impl BatchCreateInternalTransfersRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersRequest";
+}
+::buffa::impl_default_instance!(BatchCreateInternalTransfersRequest);
+impl ::buffa::MessageName for BatchCreateInternalTransfersRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "BatchCreateInternalTransfersRequest";
+    const FULL_NAME: &'static str = "transfer.v1.BatchCreateInternalTransfersRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersRequest";
+}
+impl ::buffa::Message for BatchCreateInternalTransfersRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.legs.clear();
+        self.idempotency_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCreateInternalTransfersRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.BatchCreateInternalTransfersRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCreateInternalTransfersRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CREATE_INTERNAL_TRANSFERS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersRequest",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCreateInternalTransfersRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        BatchCreateInternalTransfersRequest,
+    >,
+    is_wkt: false,
+};
+/// InternalTransferBatchLegResult is the outcome of one leg, in request order.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct InternalTransferBatchLegResult {
+    /// Zero-based position of the leg in the request.
+    ///
+    /// Field 1: `leg_index`
+    #[serde(
+        rename = "legIndex",
+        alias = "leg_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub leg_index: u32,
+    /// Outcome of the leg.
+    ///
+    /// Field 2: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<InternalTransferBatchLegStatus>,
+    /// Stable server-owned request identifier of the leg's transfer. Use it with
+    /// GetInternalTransfer. Empty while the leg has not been submitted.
+    ///
+    /// Field 3: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Stable transfer identifier, set once the leg is accepted.
+    ///
+    /// Field 4: `transfer_id`
+    #[serde(
+        rename = "transferId",
+        alias = "transfer_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub transfer_id: ::buffa::alloc::string::String,
+    /// Authoritative lifecycle flow identifier, set once the leg is accepted.
+    ///
+    /// Field 5: `flow_id`
+    #[serde(
+        rename = "flowId",
+        alias = "flow_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub flow_id: ::buffa::alloc::string::String,
+    /// Acceptance timestamp in nanoseconds since epoch (server time), set once
+    /// the leg is accepted.
+    ///
+    /// Field 6: `accepted_at_ts_ns`
+    #[serde(
+        rename = "acceptedAtTsNs",
+        alias = "accepted_at_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub accepted_at_ts_ns: u64,
+    /// Echoed canonical public unified asset id.
+    ///
+    /// Field 7: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// Resolved asset code, set once the leg is submitted.
+    ///
+    /// Field 8: `asset_code`
+    #[serde(
+        rename = "assetCode",
+        alias = "asset_code",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub asset_code: ::buffa::alloc::string::String,
+    /// Echoed transfer amount in canonical 18-decimal unified asset units.
+    ///
+    /// Field 9: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Server-resolved destination summary, set once the leg is submitted.
+    ///
+    /// Field 10: `destination`
+    #[serde(
+        rename = "destination",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub destination: ::buffa::MessageField<ResolvedDestination>,
+    /// Why the leg was refused, or why its outcome is not known yet. Unset for an
+    /// accepted leg and for a leg that was not submitted.
+    ///
+    /// Field 11: `error_code`
+    #[serde(
+        rename = "errorCode",
+        alias = "error_code",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub error_code: ::buffa::EnumValue<ErrorCode>,
+    /// Human-readable description of error_code.
+    ///
+    /// Field 12: `error_message`
+    #[serde(
+        rename = "errorMessage",
+        alias = "error_message",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub error_message: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for InternalTransferBatchLegResult {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("InternalTransferBatchLegResult")
+            .field("leg_index", &self.leg_index)
+            .field("status", &self.status)
+            .field("request_id", &self.request_id)
+            .field("transfer_id", &self.transfer_id)
+            .field("flow_id", &self.flow_id)
+            .field("accepted_at_ts_ns", &self.accepted_at_ts_ns)
+            .field("asset_id", &self.asset_id)
+            .field("asset_code", &self.asset_code)
+            .field("amount_e18", &self.amount_e18)
+            .field("destination", &self.destination)
+            .field("error_code", &self.error_code)
+            .field("error_message", &self.error_message)
+            .finish()
+    }
+}
+impl InternalTransferBatchLegResult {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLegResult";
+}
+::buffa::impl_default_instance!(InternalTransferBatchLegResult);
+impl ::buffa::MessageName for InternalTransferBatchLegResult {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "InternalTransferBatchLegResult";
+    const FULL_NAME: &'static str = "transfer.v1.InternalTransferBatchLegResult";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLegResult";
+}
+impl ::buffa::Message for InternalTransferBatchLegResult {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.leg_index != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.leg_index) as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        if !self.transfer_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.transfer_id) as u32;
+        }
+        if !self.flow_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns) as u32;
+        }
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if !self.asset_code.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.asset_code) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.destination.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.destination.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        {
+            let val = self.error_code.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.error_message.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.error_message) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.leg_index != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.leg_index, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.request_id, buf);
+        }
+        if !self.transfer_id.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.transfer_id, buf);
+        }
+        if !self.flow_id.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.flow_id, buf);
+        }
+        if self.accepted_at_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(6u32, self.accepted_at_ts_ns, buf);
+        }
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(7u32, self.asset_id, buf);
+        }
+        if !self.asset_code.is_empty() {
+            ::buffa::types::put_string_field(8u32, &self.asset_code, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        if self.destination.is_set() {
+            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            self.destination.write_to(__cache, buf);
+        }
+        {
+            let val = self.error_code.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(11u32, val, buf);
+            }
+        }
+        if !self.error_message.is_empty() {
+            ::buffa::types::put_string_field(12u32, &self.error_message, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.leg_index = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.transfer_id, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.flow_id, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.accepted_at_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.asset_code, buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.destination.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.error_code = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.error_message, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.leg_index = 0u32;
+        self.status = ::buffa::EnumValue::from(0);
+        self.request_id.clear();
+        self.transfer_id.clear();
+        self.flow_id.clear();
+        self.accepted_at_ts_ns = 0u64;
+        self.asset_id = 0u32;
+        self.asset_code.clear();
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.destination = ::buffa::MessageField::none();
+        self.error_code = ::buffa::EnumValue::from(0);
+        self.error_message.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for InternalTransferBatchLegResult {
+    const PROTO_FQN: &'static str = "transfer.v1.InternalTransferBatchLegResult";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for InternalTransferBatchLegResult {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __INTERNAL_TRANSFER_BATCH_LEG_RESULT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.InternalTransferBatchLegResult",
+    to_json: ::buffa::type_registry::any_to_json::<InternalTransferBatchLegResult>,
+    from_json: ::buffa::type_registry::any_from_json::<InternalTransferBatchLegResult>,
+    is_wkt: false,
+};
+/// BatchCreateInternalTransfersResponse returns the outcome of every leg.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct BatchCreateInternalTransfersResponse {
+    /// Stable server-owned identifier of the batch request. Empty when the batch
+    /// was refused.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    /// Outcome of the batch as a whole.
+    ///
+    /// Field 2: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<InternalTransferBatchStatus>,
+    /// One result per requested leg, in request order.
+    ///
+    /// Field 3: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<InternalTransferBatchLegResult>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for BatchCreateInternalTransfersResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("BatchCreateInternalTransfersResponse")
+            .field("request_id", &self.request_id)
+            .field("status", &self.status)
+            .field("legs", &self.legs)
+            .finish()
+    }
+}
+impl BatchCreateInternalTransfersResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersResponse";
+}
+::buffa::impl_default_instance!(BatchCreateInternalTransfersResponse);
+impl ::buffa::MessageName for BatchCreateInternalTransfersResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "BatchCreateInternalTransfersResponse";
+    const FULL_NAME: &'static str = "transfer.v1.BatchCreateInternalTransfersResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersResponse";
+}
+impl ::buffa::Message for BatchCreateInternalTransfersResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.status = ::buffa::EnumValue::from(0);
+        self.legs.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for BatchCreateInternalTransfersResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.BatchCreateInternalTransfersResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for BatchCreateInternalTransfersResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __BATCH_CREATE_INTERNAL_TRANSFERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersResponse",
+    to_json: ::buffa::type_registry::any_to_json::<BatchCreateInternalTransfersResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        BatchCreateInternalTransfersResponse,
+    >,
+    is_wkt: false,
+};
 /// GetInternalTransferRequest selects an accepted transfer from the source account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
@@ -2337,6 +4031,3465 @@ pub const __GET_INTERNAL_TRANSFER_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     type_url: "type.googleapis.com/transfer.v1.GetInternalTransferResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetInternalTransferResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetInternalTransferResponse>,
+    is_wkt: false,
+};
+/// DustAssetEligibility says whether one Trading balance converts as dust, or
+/// why not.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DustAssetEligibility {
+    /// No eligibility was supplied.
+    DUST_ASSET_ELIGIBILITY_UNSPECIFIED = 0i32,
+    /// The whole available balance is dust and converts.
+    DUST_ASSET_ELIGIBILITY_ELIGIBLE = 1i32,
+    /// The asset is the conversion's target; it is never a source.
+    DUST_ASSET_ELIGIBILITY_TARGET_ASSET = 2i32,
+    /// An open market accepts an order for the balance at the current index price:
+    /// sell it, or for an asset only quoted, spend it, instead.
+    DUST_ASSET_ELIGIBILITY_TRADABLE = 3i32,
+    /// The balance is worth more than 10 USD.
+    DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT = 4i32,
+    /// The asset, or the quote asset of a market it trades on, has no current
+    /// index price. A balance without a price is never valued at zero.
+    DUST_ASSET_ELIGIBILITY_NO_PRICE = 5i32,
+    /// The asset is not convertible.
+    DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET = 6i32,
+    /// One conversion takes at most 20 balances, the highest-valued first; this
+    /// one waits for the next conversion.
+    DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT = 7i32,
+}
+impl DustAssetEligibility {
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Eligible: Self = Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TargetAsset: Self = Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_TRADABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Tradable: Self = Self::DUST_ASSET_ELIGIBILITY_TRADABLE;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AboveValueLimit: Self = Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_NO_PRICE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NoPrice: Self = Self::DUST_ASSET_ELIGIBILITY_NO_PRICE;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnsupportedAsset: Self = Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET;
+    ///Idiomatic alias for [`Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SourceLimit: Self = Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT;
+}
+impl ::core::default::Default for DustAssetEligibility {
+    fn default() -> Self {
+        Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DustAssetEligibility {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DustAssetEligibility {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DustAssetEligibility;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DustAssetEligibility)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DustAssetEligibility, E> {
+                <DustAssetEligibility as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DustAssetEligibility, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DustAssetEligibility as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DustAssetEligibility, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DustAssetEligibility as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DustAssetEligibility, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustAssetEligibility {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DustAssetEligibility {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED)
+            }
+            1i32 => ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE),
+            2i32 => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET)
+            }
+            3i32 => ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_TRADABLE),
+            4i32 => {
+                ::core::option::Option::Some(
+                    Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT,
+                )
+            }
+            5i32 => ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_NO_PRICE),
+            6i32 => {
+                ::core::option::Option::Some(
+                    Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET,
+                )
+            }
+            7i32 => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED => {
+                "DUST_ASSET_ELIGIBILITY_UNSPECIFIED"
+            }
+            Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE => "DUST_ASSET_ELIGIBILITY_ELIGIBLE",
+            Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET => {
+                "DUST_ASSET_ELIGIBILITY_TARGET_ASSET"
+            }
+            Self::DUST_ASSET_ELIGIBILITY_TRADABLE => "DUST_ASSET_ELIGIBILITY_TRADABLE",
+            Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT => {
+                "DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT"
+            }
+            Self::DUST_ASSET_ELIGIBILITY_NO_PRICE => "DUST_ASSET_ELIGIBILITY_NO_PRICE",
+            Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET => {
+                "DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET"
+            }
+            Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT => {
+                "DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT"
+            }
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DUST_ASSET_ELIGIBILITY_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED)
+            }
+            "DUST_ASSET_ELIGIBILITY_ELIGIBLE" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE)
+            }
+            "DUST_ASSET_ELIGIBILITY_TARGET_ASSET" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET)
+            }
+            "DUST_ASSET_ELIGIBILITY_TRADABLE" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_TRADABLE)
+            }
+            "DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT" => {
+                ::core::option::Option::Some(
+                    Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT,
+                )
+            }
+            "DUST_ASSET_ELIGIBILITY_NO_PRICE" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_NO_PRICE)
+            }
+            "DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET" => {
+                ::core::option::Option::Some(
+                    Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET,
+                )
+            }
+            "DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT" => {
+                ::core::option::Option::Some(Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DUST_ASSET_ELIGIBILITY_UNSPECIFIED,
+            Self::DUST_ASSET_ELIGIBILITY_ELIGIBLE,
+            Self::DUST_ASSET_ELIGIBILITY_TARGET_ASSET,
+            Self::DUST_ASSET_ELIGIBILITY_TRADABLE,
+            Self::DUST_ASSET_ELIGIBILITY_ABOVE_VALUE_LIMIT,
+            Self::DUST_ASSET_ELIGIBILITY_NO_PRICE,
+            Self::DUST_ASSET_ELIGIBILITY_UNSUPPORTED_ASSET,
+            Self::DUST_ASSET_ELIGIBILITY_SOURCE_LIMIT,
+        ]
+    }
+}
+/// DustConversionState is a conversion's public state.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DustConversionState {
+    /// No state was supplied.
+    DUST_CONVERSION_STATE_UNSPECIFIED = 0i32,
+    /// The conversion is accepted and being completed. It completes or is refused
+    /// without any further request; read it again with GetDustConversion.
+    DUST_CONVERSION_STATE_PROCESSING = 1i32,
+    /// Every source moved and the payout was credited, atomically.
+    DUST_CONVERSION_STATE_COMPLETED = 2i32,
+    /// The conversion was refused: nothing moved. refusal_code says why. A refused
+    /// conversion does not count toward the 6 hour conversion window.
+    DUST_CONVERSION_STATE_REFUSED = 3i32,
+}
+impl DustConversionState {
+    ///Idiomatic alias for [`Self::DUST_CONVERSION_STATE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unspecified: Self = Self::DUST_CONVERSION_STATE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DUST_CONVERSION_STATE_PROCESSING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Processing: Self = Self::DUST_CONVERSION_STATE_PROCESSING;
+    ///Idiomatic alias for [`Self::DUST_CONVERSION_STATE_COMPLETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Completed: Self = Self::DUST_CONVERSION_STATE_COMPLETED;
+    ///Idiomatic alias for [`Self::DUST_CONVERSION_STATE_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Refused: Self = Self::DUST_CONVERSION_STATE_REFUSED;
+}
+impl ::core::default::Default for DustConversionState {
+    fn default() -> Self {
+        Self::DUST_CONVERSION_STATE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DustConversionState {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DustConversionState {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DustConversionState;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(DustConversionState)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DustConversionState, E> {
+                <DustConversionState as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DustConversionState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DustConversionState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DustConversionState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DustConversionState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DustConversionState, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustConversionState {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DustConversionState {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_PROCESSING),
+            2i32 => ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_COMPLETED),
+            3i32 => ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_REFUSED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DUST_CONVERSION_STATE_UNSPECIFIED => {
+                "DUST_CONVERSION_STATE_UNSPECIFIED"
+            }
+            Self::DUST_CONVERSION_STATE_PROCESSING => "DUST_CONVERSION_STATE_PROCESSING",
+            Self::DUST_CONVERSION_STATE_COMPLETED => "DUST_CONVERSION_STATE_COMPLETED",
+            Self::DUST_CONVERSION_STATE_REFUSED => "DUST_CONVERSION_STATE_REFUSED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DUST_CONVERSION_STATE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_UNSPECIFIED)
+            }
+            "DUST_CONVERSION_STATE_PROCESSING" => {
+                ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_PROCESSING)
+            }
+            "DUST_CONVERSION_STATE_COMPLETED" => {
+                ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_COMPLETED)
+            }
+            "DUST_CONVERSION_STATE_REFUSED" => {
+                ::core::option::Option::Some(Self::DUST_CONVERSION_STATE_REFUSED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DUST_CONVERSION_STATE_UNSPECIFIED,
+            Self::DUST_CONVERSION_STATE_PROCESSING,
+            Self::DUST_CONVERSION_STATE_COMPLETED,
+            Self::DUST_CONVERSION_STATE_REFUSED,
+        ]
+    }
+}
+/// DustBalance is one Trading balance judged for dust conversion.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DustBalance {
+    /// Canonical public unified asset id.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// The whole available Trading balance, in canonical 18-decimal units: what no
+    /// open order or other reservation holds.
+    ///
+    /// Field 2: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Whether the balance converts, and why not otherwise.
+    ///
+    /// Field 3: `eligibility`
+    #[serde(
+        rename = "eligibility",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub eligibility: ::buffa::EnumValue<DustAssetEligibility>,
+    /// The balance's USD value in 18-decimal fixed point, rounded down. Unset when
+    /// the asset has no current price.
+    ///
+    /// Field 4: `usd_value_e18`
+    #[serde(
+        rename = "usdValueE18",
+        alias = "usd_value_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub usd_value_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DustBalance {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DustBalance")
+            .field("asset_id", &self.asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .field("eligibility", &self.eligibility)
+            .field("usd_value_e18", &self.usd_value_e18)
+            .finish()
+    }
+}
+impl DustBalance {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustBalance";
+}
+::buffa::impl_default_instance!(DustBalance);
+impl ::buffa::MessageName for DustBalance {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "DustBalance";
+    const FULL_NAME: &'static str = "transfer.v1.DustBalance";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustBalance";
+}
+impl ::buffa::Message for DustBalance {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        {
+            let val = self.eligibility.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.usd_value_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.usd_value_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        {
+            let val = self.eligibility.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.usd_value_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.usd_value_e18.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.eligibility = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.usd_value_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.eligibility = ::buffa::EnumValue::from(0);
+        self.usd_value_e18 = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DustBalance {
+    const PROTO_FQN: &'static str = "transfer.v1.DustBalance";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustBalance {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DUST_BALANCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.DustBalance",
+    to_json: ::buffa::type_registry::any_to_json::<DustBalance>,
+    from_json: ::buffa::type_registry::any_from_json::<DustBalance>,
+    is_wkt: false,
+};
+/// DustAssetPrice is the USD index price a quote or conversion used for one
+/// asset.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DustAssetPrice {
+    /// Canonical public unified asset id.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// USD per whole asset unit: price_ticks / 10^price_scale.
+    ///
+    /// Field 2: `price_ticks`
+    #[serde(
+        rename = "priceTicks",
+        alias = "price_ticks",
+        with = "::buffa::json_helpers::int64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
+    )]
+    pub price_ticks: i64,
+    /// Decimal scale of price_ticks.
+    ///
+    /// Field 3: `price_scale`
+    #[serde(
+        rename = "priceScale",
+        alias = "price_scale",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub price_scale: u32,
+    /// Time of the oldest index observation the price used.
+    ///
+    /// Field 4: `as_of`
+    #[serde(
+        rename = "asOf",
+        alias = "as_of",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub as_of: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DustAssetPrice {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DustAssetPrice")
+            .field("asset_id", &self.asset_id)
+            .field("price_ticks", &self.price_ticks)
+            .field("price_scale", &self.price_scale)
+            .field("as_of", &self.as_of)
+            .finish()
+    }
+}
+impl DustAssetPrice {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustAssetPrice";
+}
+::buffa::impl_default_instance!(DustAssetPrice);
+impl ::buffa::MessageName for DustAssetPrice {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "DustAssetPrice";
+    const FULL_NAME: &'static str = "transfer.v1.DustAssetPrice";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustAssetPrice";
+}
+impl ::buffa::Message for DustAssetPrice {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.price_ticks != 0i64 {
+            size += 1u32 + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+        }
+        if self.price_scale != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.price_scale) as u32;
+        }
+        if self.as_of.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.as_of.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.price_ticks != 0i64 {
+            ::buffa::types::put_int64_field(2u32, self.price_ticks, buf);
+        }
+        if self.price_scale != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.price_scale, buf);
+        }
+        if self.as_of.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.as_of.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_ticks = ::buffa::types::decode_int64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_scale = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.as_of.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.price_ticks = 0i64;
+        self.price_scale = 0u32;
+        self.as_of = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DustAssetPrice {
+    const PROTO_FQN: &'static str = "transfer.v1.DustAssetPrice";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustAssetPrice {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DUST_ASSET_PRICE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.DustAssetPrice",
+    to_json: ::buffa::type_registry::any_to_json::<DustAssetPrice>,
+    from_json: ::buffa::type_registry::any_from_json::<DustAssetPrice>,
+    is_wkt: false,
+};
+/// DustSource is one balance a conversion moves.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DustSource {
+    /// Canonical public unified asset id.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// The whole quoted balance, in canonical 18-decimal units.
+    ///
+    /// Field 2: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DustSource {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DustSource")
+            .field("asset_id", &self.asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .finish()
+    }
+}
+impl DustSource {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustSource";
+}
+::buffa::impl_default_instance!(DustSource);
+impl ::buffa::MessageName for DustSource {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "DustSource";
+    const FULL_NAME: &'static str = "transfer.v1.DustSource";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustSource";
+}
+impl ::buffa::Message for DustSource {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DustSource {
+    const PROTO_FQN: &'static str = "transfer.v1.DustSource";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustSource {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DUST_SOURCE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.DustSource",
+    to_json: ::buffa::type_registry::any_to_json::<DustSource>,
+    from_json: ::buffa::type_registry::any_from_json::<DustSource>,
+    is_wkt: false,
+};
+/// DustConversion is one conversion of an account's dust into a target asset.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DustConversion {
+    /// Stable conversion identifier.
+    ///
+    /// Field 1: `conversion_id`
+    #[serde(
+        rename = "conversionId",
+        alias = "conversion_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub conversion_id: ::buffa::alloc::string::String,
+    /// The quote the conversion converted.
+    ///
+    /// Field 2: `quote_id`
+    #[serde(
+        rename = "quoteId",
+        alias = "quote_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_id: ::buffa::alloc::string::String,
+    /// Current state.
+    ///
+    /// Field 3: `state`
+    #[serde(
+        rename = "state",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub state: ::buffa::EnumValue<DustConversionState>,
+    /// Why the conversion was refused; unspecified unless state is
+    /// DUST_CONVERSION_STATE_REFUSED.
+    ///
+    /// Field 4: `refusal_code`
+    #[serde(
+        rename = "refusalCode",
+        alias = "refusal_code",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub refusal_code: ::buffa::EnumValue<ErrorCode>,
+    /// Target asset id.
+    ///
+    /// Field 5: `target_asset_id`
+    #[serde(
+        rename = "targetAssetId",
+        alias = "target_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub target_asset_id: u32,
+    /// Sources, in asset id order.
+    ///
+    /// Field 6: `sources`
+    #[serde(
+        rename = "sources",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub sources: ::buffa::alloc::vec::Vec<DustSource>,
+    /// Payout in canonical 18-decimal target units, after the fee: the sources'
+    /// value at the index prices current when the conversion was created.
+    ///
+    /// Field 7: `payout_e18`
+    #[serde(
+        rename = "payoutE18",
+        alias = "payout_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payout_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// The payout the quote showed, in canonical 18-decimal target units.
+    ///
+    /// Field 8: `quoted_payout_e18`
+    #[serde(
+        rename = "quotedPayoutE18",
+        alias = "quoted_payout_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub quoted_payout_e18: ::buffa::MessageField<
+        super::super::polyester::r#type::v1::U128,
+    >,
+    /// The fee taken from the payout, in canonical 18-decimal target units.
+    ///
+    /// Field 9: `fee_e18`
+    #[serde(
+        rename = "feeE18",
+        alias = "fee_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub fee_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// The fee in basis points.
+    ///
+    /// Field 10: `fee_bps`
+    #[serde(
+        rename = "feeBps",
+        alias = "fee_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub fee_bps: u32,
+    /// When the conversion was created.
+    ///
+    /// Field 11: `created_at`
+    #[serde(
+        rename = "createdAt",
+        alias = "created_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub created_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// When the conversion completed; unset until state is
+    /// DUST_CONVERSION_STATE_COMPLETED.
+    ///
+    /// Field 12: `completed_at`
+    #[serde(
+        rename = "completedAt",
+        alias = "completed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub completed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DustConversion {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DustConversion")
+            .field("conversion_id", &self.conversion_id)
+            .field("quote_id", &self.quote_id)
+            .field("state", &self.state)
+            .field("refusal_code", &self.refusal_code)
+            .field("target_asset_id", &self.target_asset_id)
+            .field("sources", &self.sources)
+            .field("payout_e18", &self.payout_e18)
+            .field("quoted_payout_e18", &self.quoted_payout_e18)
+            .field("fee_e18", &self.fee_e18)
+            .field("fee_bps", &self.fee_bps)
+            .field("created_at", &self.created_at)
+            .field("completed_at", &self.completed_at)
+            .finish()
+    }
+}
+impl DustConversion {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustConversion";
+}
+::buffa::impl_default_instance!(DustConversion);
+impl ::buffa::MessageName for DustConversion {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "DustConversion";
+    const FULL_NAME: &'static str = "transfer.v1.DustConversion";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustConversion";
+}
+impl ::buffa::Message for DustConversion {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.conversion_id.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.conversion_id) as u32;
+        }
+        if !self.quote_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+        }
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.refusal_code.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.target_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.target_asset_id) as u32;
+        }
+        for v in &self.sources {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payout_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payout_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.quoted_payout_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.quoted_payout_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.fee_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.fee_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.fee_bps != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+        }
+        if self.created_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.created_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.completed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.completed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.conversion_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.conversion_id, buf);
+        }
+        if !self.quote_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.quote_id, buf);
+        }
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        {
+            let val = self.refusal_code.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if self.target_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.target_asset_id, buf);
+        }
+        for v in &self.sources {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.payout_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.payout_e18.write_to(__cache, buf);
+        }
+        if self.quoted_payout_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
+            self.quoted_payout_e18.write_to(__cache, buf);
+        }
+        if self.fee_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(9u32, __cache.consume_next(), buf);
+            self.fee_e18.write_to(__cache, buf);
+        }
+        if self.fee_bps != 0u32 {
+            ::buffa::types::put_uint32_field(10u32, self.fee_bps, buf);
+        }
+        if self.created_at.is_set() {
+            ::buffa::types::put_len_delimited_header(11u32, __cache.consume_next(), buf);
+            self.created_at.write_to(__cache, buf);
+        }
+        if self.completed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
+            self.completed_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.conversion_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.state = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.refusal_code = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.sources.push(elem);
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payout_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.quoted_payout_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.fee_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.created_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.completed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.conversion_id.clear();
+        self.quote_id.clear();
+        self.state = ::buffa::EnumValue::from(0);
+        self.refusal_code = ::buffa::EnumValue::from(0);
+        self.target_asset_id = 0u32;
+        self.sources.clear();
+        self.payout_e18 = ::buffa::MessageField::none();
+        self.quoted_payout_e18 = ::buffa::MessageField::none();
+        self.fee_e18 = ::buffa::MessageField::none();
+        self.fee_bps = 0u32;
+        self.created_at = ::buffa::MessageField::none();
+        self.completed_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DustConversion {
+    const PROTO_FQN: &'static str = "transfer.v1.DustConversion";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DustConversion {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DUST_CONVERSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.DustConversion",
+    to_json: ::buffa::type_registry::any_to_json::<DustConversion>,
+    from_json: ::buffa::type_registry::any_from_json::<DustConversion>,
+    is_wkt: false,
+};
+/// ListDustBalancesRequest judges the account's Trading balances for
+/// conversion into one target.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDustBalancesRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+    /// their bound subaccount; other callers use their authenticated root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Target asset id, one of the response's targets; 0 means the first target.
+    ///
+    /// Field 2: `target_asset_id`
+    #[serde(
+        rename = "targetAssetId",
+        alias = "target_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub target_asset_id: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDustBalancesRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDustBalancesRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("target_asset_id", &self.target_asset_id)
+            .finish()
+    }
+}
+impl ListDustBalancesRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesRequest";
+}
+::buffa::impl_default_instance!(ListDustBalancesRequest);
+impl ::buffa::MessageName for ListDustBalancesRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "ListDustBalancesRequest";
+    const FULL_NAME: &'static str = "transfer.v1.ListDustBalancesRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesRequest";
+}
+impl ::buffa::Message for ListDustBalancesRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.target_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.target_asset_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if self.target_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.target_asset_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.target_asset_id = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDustBalancesRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.ListDustBalancesRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDustBalancesRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DUST_BALANCES_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.ListDustBalancesRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListDustBalancesRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDustBalancesRequest>,
+    is_wkt: false,
+};
+/// ListDustBalancesResponse lists every nonzero available Trading balance with
+/// its eligibility and the payout the eligible ones would bring now. It
+/// reserves nothing; QuoteDustConversion prices a conversion.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDustBalancesResponse {
+    /// Target asset id the balances were judged for.
+    ///
+    /// Field 1: `target_asset_id`
+    #[serde(
+        rename = "targetAssetId",
+        alias = "target_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub target_asset_id: u32,
+    /// Every asset id the account can convert dust into, in preference order.
+    ///
+    /// Field 2: `targets`
+    #[serde(
+        rename = "targets",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub targets: ::buffa::alloc::vec::Vec<u32>,
+    /// The fee in basis points, taken from the payout.
+    ///
+    /// Field 3: `fee_bps`
+    #[serde(
+        rename = "feeBps",
+        alias = "fee_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub fee_bps: u32,
+    /// Every nonzero available Trading balance, in asset id order.
+    ///
+    /// Field 4: `balances`
+    #[serde(
+        rename = "balances",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub balances: ::buffa::alloc::vec::Vec<DustBalance>,
+    /// The eligible balances' total USD value in 18-decimal fixed point, rounded
+    /// down.
+    ///
+    /// Field 5: `gross_usd_e18`
+    #[serde(
+        rename = "grossUsdE18",
+        alias = "gross_usd_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub gross_usd_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// The payout they would bring now, in canonical 18-decimal target units,
+    /// after the fee.
+    ///
+    /// Field 6: `payout_e18`
+    #[serde(
+        rename = "payoutE18",
+        alias = "payout_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payout_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Whether the target can be paid now. When false, QuoteDustConversion is
+    /// refused with ERROR_CODE_DUST_TARGET_UNAVAILABLE.
+    ///
+    /// Field 7: `target_available`
+    #[serde(
+        rename = "targetAvailable",
+        alias = "target_available",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub target_available: bool,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDustBalancesResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDustBalancesResponse")
+            .field("target_asset_id", &self.target_asset_id)
+            .field("targets", &self.targets)
+            .field("fee_bps", &self.fee_bps)
+            .field("balances", &self.balances)
+            .field("gross_usd_e18", &self.gross_usd_e18)
+            .field("payout_e18", &self.payout_e18)
+            .field("target_available", &self.target_available)
+            .finish()
+    }
+}
+impl ListDustBalancesResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesResponse";
+}
+::buffa::impl_default_instance!(ListDustBalancesResponse);
+impl ::buffa::MessageName for ListDustBalancesResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "ListDustBalancesResponse";
+    const FULL_NAME: &'static str = "transfer.v1.ListDustBalancesResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesResponse";
+}
+impl ::buffa::Message for ListDustBalancesResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.target_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.target_asset_id) as u32;
+        }
+        if !self.targets.is_empty() {
+            let payload: u32 = self
+                .targets
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if self.fee_bps != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+        }
+        for v in &self.balances {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.gross_usd_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.gross_usd_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payout_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payout_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.target_available {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.target_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.target_asset_id, buf);
+        }
+        if !self.targets.is_empty() {
+            let payload: u32 = self
+                .targets
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+            for &v in &self.targets {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        if self.fee_bps != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.fee_bps, buf);
+        }
+        for v in &self.balances {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.gross_usd_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.gross_usd_e18.write_to(__cache, buf);
+        }
+        if self.payout_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.payout_e18.write_to(__cache, buf);
+        }
+        if self.target_available {
+            ::buffa::types::put_bool_field(7u32, self.target_available, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.targets.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.targets.push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.targets.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.balances.push(elem);
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.gross_usd_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payout_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_available = ::buffa::types::decode_bool(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.target_asset_id = 0u32;
+        self.targets.clear();
+        self.fee_bps = 0u32;
+        self.balances.clear();
+        self.gross_usd_e18 = ::buffa::MessageField::none();
+        self.payout_e18 = ::buffa::MessageField::none();
+        self.target_available = false;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDustBalancesResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.ListDustBalancesResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDustBalancesResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DUST_BALANCES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.ListDustBalancesResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListDustBalancesResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDustBalancesResponse>,
+    is_wkt: false,
+};
+/// QuoteDustConversionRequest prices the account's dust into one target.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct QuoteDustConversionRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+    /// their bound subaccount; other callers use their authenticated root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Target asset id, one of ListDustBalances' targets.
+    ///
+    /// Field 2: `target_asset_id`
+    #[serde(
+        rename = "targetAssetId",
+        alias = "target_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub target_asset_id: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for QuoteDustConversionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("QuoteDustConversionRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("target_asset_id", &self.target_asset_id)
+            .finish()
+    }
+}
+impl QuoteDustConversionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionRequest";
+}
+::buffa::impl_default_instance!(QuoteDustConversionRequest);
+impl ::buffa::MessageName for QuoteDustConversionRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "QuoteDustConversionRequest";
+    const FULL_NAME: &'static str = "transfer.v1.QuoteDustConversionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionRequest";
+}
+impl ::buffa::Message for QuoteDustConversionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.target_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.target_asset_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if self.target_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.target_asset_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.target_asset_id = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for QuoteDustConversionRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.QuoteDustConversionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for QuoteDustConversionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __QUOTE_DUST_CONVERSION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.QuoteDustConversionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<QuoteDustConversionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<QuoteDustConversionRequest>,
+    is_wkt: false,
+};
+/// QuoteDustConversionResponse is a quote valid for 30 seconds.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct QuoteDustConversionResponse {
+    /// Quote identifier CreateDustConversion takes. Empty when no balance is
+    /// eligible or their payout rounds to zero; balances still says why.
+    ///
+    /// Field 1: `quote_id`
+    #[serde(
+        rename = "quoteId",
+        alias = "quote_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_id: ::buffa::alloc::string::String,
+    /// After this time CreateDustConversion refuses the quote with
+    /// ERROR_CODE_DUST_QUOTE_EXPIRED.
+    ///
+    /// Field 2: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Target asset id.
+    ///
+    /// Field 3: `target_asset_id`
+    #[serde(
+        rename = "targetAssetId",
+        alias = "target_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub target_asset_id: u32,
+    /// The fee in basis points, taken from the payout.
+    ///
+    /// Field 4: `fee_bps`
+    #[serde(
+        rename = "feeBps",
+        alias = "fee_bps",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub fee_bps: u32,
+    /// The sources' total USD value in 18-decimal fixed point, rounded down.
+    ///
+    /// Field 5: `gross_usd_e18`
+    #[serde(
+        rename = "grossUsdE18",
+        alias = "gross_usd_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub gross_usd_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Payout in canonical 18-decimal target units, after the fee, rounded down
+    /// to the target's quantity precision.
+    ///
+    /// Field 6: `payout_e18`
+    #[serde(
+        rename = "payoutE18",
+        alias = "payout_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub payout_e18: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
+    /// Every nonzero available Trading balance, sources and others, in asset id
+    /// order.
+    ///
+    /// Field 7: `balances`
+    #[serde(
+        rename = "balances",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub balances: ::buffa::alloc::vec::Vec<DustBalance>,
+    /// Prices of the sources and the target, in asset id order.
+    ///
+    /// Field 8: `prices`
+    #[serde(
+        rename = "prices",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub prices: ::buffa::alloc::vec::Vec<DustAssetPrice>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for QuoteDustConversionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("QuoteDustConversionResponse")
+            .field("quote_id", &self.quote_id)
+            .field("expires_at", &self.expires_at)
+            .field("target_asset_id", &self.target_asset_id)
+            .field("fee_bps", &self.fee_bps)
+            .field("gross_usd_e18", &self.gross_usd_e18)
+            .field("payout_e18", &self.payout_e18)
+            .field("balances", &self.balances)
+            .field("prices", &self.prices)
+            .finish()
+    }
+}
+impl QuoteDustConversionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionResponse";
+}
+::buffa::impl_default_instance!(QuoteDustConversionResponse);
+impl ::buffa::MessageName for QuoteDustConversionResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "QuoteDustConversionResponse";
+    const FULL_NAME: &'static str = "transfer.v1.QuoteDustConversionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionResponse";
+}
+impl ::buffa::Message for QuoteDustConversionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.quote_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.target_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.target_asset_id) as u32;
+        }
+        if self.fee_bps != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+        }
+        if self.gross_usd_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.gross_usd_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.payout_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.payout_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.balances {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.prices {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.quote_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.quote_id, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        if self.target_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.target_asset_id, buf);
+        }
+        if self.fee_bps != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.fee_bps, buf);
+        }
+        if self.gross_usd_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.gross_usd_e18.write_to(__cache, buf);
+        }
+        if self.payout_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.payout_e18.write_to(__cache, buf);
+        }
+        for v in &self.balances {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.prices {
+            ::buffa::types::put_len_delimited_header(8u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.target_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.fee_bps = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.gross_usd_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.payout_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.balances.push(elem);
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.prices.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.quote_id.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.target_asset_id = 0u32;
+        self.fee_bps = 0u32;
+        self.gross_usd_e18 = ::buffa::MessageField::none();
+        self.payout_e18 = ::buffa::MessageField::none();
+        self.balances.clear();
+        self.prices.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for QuoteDustConversionResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.QuoteDustConversionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for QuoteDustConversionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __QUOTE_DUST_CONVERSION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.QuoteDustConversionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<QuoteDustConversionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<QuoteDustConversionResponse>,
+    is_wkt: false,
+};
+/// CreateDustConversionRequest converts one quote.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateDustConversionRequest {
+    /// Optional public subaccount ID; it must select the quote's account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Stable client-supplied key collapsing retries for the account.
+    ///
+    /// Field 2: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    /// Quote from QuoteDustConversion, at most 30 seconds old. A quote converts
+    /// once.
+    ///
+    /// Field 3: `quote_id`
+    #[serde(
+        rename = "quoteId",
+        alias = "quote_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub quote_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateDustConversionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateDustConversionRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("idempotency_key", &self.idempotency_key)
+            .field("quote_id", &self.quote_id)
+            .finish()
+    }
+}
+impl CreateDustConversionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionRequest";
+}
+::buffa::impl_default_instance!(CreateDustConversionRequest);
+impl ::buffa::MessageName for CreateDustConversionRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "CreateDustConversionRequest";
+    const FULL_NAME: &'static str = "transfer.v1.CreateDustConversionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionRequest";
+}
+impl ::buffa::Message for CreateDustConversionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        if !self.quote_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+        }
+        if !self.quote_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.quote_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.quote_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.idempotency_key.clear();
+        self.quote_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateDustConversionRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.CreateDustConversionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateDustConversionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_DUST_CONVERSION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.CreateDustConversionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CreateDustConversionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateDustConversionRequest>,
+    is_wkt: false,
+};
+/// CreateDustConversionResponse returns the conversion.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateDustConversionResponse {
+    /// The conversion: completed, or still processing when its outcome is not
+    /// known yet.
+    ///
+    /// Field 1: `conversion`
+    #[serde(
+        rename = "conversion",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub conversion: ::buffa::MessageField<DustConversion>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateDustConversionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateDustConversionResponse")
+            .field("conversion", &self.conversion)
+            .finish()
+    }
+}
+impl CreateDustConversionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionResponse";
+}
+::buffa::impl_default_instance!(CreateDustConversionResponse);
+impl ::buffa::MessageName for CreateDustConversionResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "CreateDustConversionResponse";
+    const FULL_NAME: &'static str = "transfer.v1.CreateDustConversionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionResponse";
+}
+impl ::buffa::Message for CreateDustConversionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.conversion.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.conversion.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.conversion.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.conversion.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.conversion.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.conversion = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateDustConversionResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.CreateDustConversionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateDustConversionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_DUST_CONVERSION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.CreateDustConversionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CreateDustConversionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CreateDustConversionResponse>,
+    is_wkt: false,
+};
+/// GetDustConversionRequest reads one of the account's conversions.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetDustConversionRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+    /// their bound subaccount; other callers use their authenticated root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Conversion identifier.
+    ///
+    /// Field 2: `conversion_id`
+    #[serde(
+        rename = "conversionId",
+        alias = "conversion_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub conversion_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetDustConversionRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetDustConversionRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("conversion_id", &self.conversion_id)
+            .finish()
+    }
+}
+impl GetDustConversionRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionRequest";
+}
+::buffa::impl_default_instance!(GetDustConversionRequest);
+impl ::buffa::MessageName for GetDustConversionRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "GetDustConversionRequest";
+    const FULL_NAME: &'static str = "transfer.v1.GetDustConversionRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionRequest";
+}
+impl ::buffa::Message for GetDustConversionRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.conversion_id.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.conversion_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if !self.conversion_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.conversion_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.conversion_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.conversion_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetDustConversionRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.GetDustConversionRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetDustConversionRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_DUST_CONVERSION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.GetDustConversionRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetDustConversionRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetDustConversionRequest>,
+    is_wkt: false,
+};
+/// GetDustConversionResponse returns one conversion.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetDustConversionResponse {
+    /// The conversion.
+    ///
+    /// Field 1: `conversion`
+    #[serde(
+        rename = "conversion",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub conversion: ::buffa::MessageField<DustConversion>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetDustConversionResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetDustConversionResponse")
+            .field("conversion", &self.conversion)
+            .finish()
+    }
+}
+impl GetDustConversionResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionResponse";
+}
+::buffa::impl_default_instance!(GetDustConversionResponse);
+impl ::buffa::MessageName for GetDustConversionResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "GetDustConversionResponse";
+    const FULL_NAME: &'static str = "transfer.v1.GetDustConversionResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionResponse";
+}
+impl ::buffa::Message for GetDustConversionResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.conversion.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.conversion.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.conversion.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.conversion.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.conversion.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.conversion = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetDustConversionResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.GetDustConversionResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetDustConversionResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_DUST_CONVERSION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.GetDustConversionResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetDustConversionResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetDustConversionResponse>,
+    is_wkt: false,
+};
+/// ListDustConversionsRequest lists the account's conversions, newest first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDustConversionsRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+    /// their bound subaccount; other callers use their authenticated root account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Maximum number of conversions to return: 0 means 20, at most 100.
+    ///
+    /// Field 2: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub limit: u32,
+    /// Opaque, exclusive, keyset-backed cursor from a previous response, bound to
+    /// the caller's account or subaccount and the newest-first creation order.
+    /// Empty for the first page.
+    ///
+    /// Field 3: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDustConversionsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDustConversionsRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("limit", &self.limit)
+            .field("page_token", &self.page_token)
+            .finish()
+    }
+}
+impl ListDustConversionsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsRequest";
+}
+::buffa::impl_default_instance!(ListDustConversionsRequest);
+impl ::buffa::MessageName for ListDustConversionsRequest {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "ListDustConversionsRequest";
+    const FULL_NAME: &'static str = "transfer.v1.ListDustConversionsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsRequest";
+}
+impl ::buffa::Message for ListDustConversionsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.limit != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+        }
+        if self.limit != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.limit, buf);
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = 0u64;
+        self.limit = 0u32;
+        self.page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDustConversionsRequest {
+    const PROTO_FQN: &'static str = "transfer.v1.ListDustConversionsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDustConversionsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DUST_CONVERSIONS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.ListDustConversionsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListDustConversionsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDustConversionsRequest>,
+    is_wkt: false,
+};
+/// ListDustConversionsResponse returns one page of conversions, newest first.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListDustConversionsResponse {
+    /// Conversions ordered by creation time, newest first.
+    ///
+    /// Field 1: `conversions`
+    #[serde(
+        rename = "conversions",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub conversions: ::buffa::alloc::vec::Vec<DustConversion>,
+    /// Cursor for the next page. Empty when no more results exist.
+    ///
+    /// Field 2: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListDustConversionsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListDustConversionsResponse")
+            .field("conversions", &self.conversions)
+            .field("next_page_token", &self.next_page_token)
+            .finish()
+    }
+}
+impl ListDustConversionsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsResponse";
+}
+::buffa::impl_default_instance!(ListDustConversionsResponse);
+impl ::buffa::MessageName for ListDustConversionsResponse {
+    const PACKAGE: &'static str = "transfer.v1";
+    const NAME: &'static str = "ListDustConversionsResponse";
+    const FULL_NAME: &'static str = "transfer.v1.ListDustConversionsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsResponse";
+}
+impl ::buffa::Message for ListDustConversionsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.conversions {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.conversions {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.conversions.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.conversions.clear();
+        self.next_page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListDustConversionsResponse {
+    const PROTO_FQN: &'static str = "transfer.v1.ListDustConversionsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListDustConversionsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_DUST_CONVERSIONS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/transfer.v1.ListDustConversionsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListDustConversionsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListDustConversionsResponse>,
     is_wkt: false,
 };
 #[allow(
@@ -4239,6 +9392,2023 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// InternalTransferBatchLeg is one transfer of a batch. It takes the fields of
+        /// CreateInternalTransferRequest except the idempotency key, which the batch
+        /// carries for all of its legs.
+        #[derive(Clone, Debug, Default)]
+        pub struct InternalTransferBatchLegView<'a> {
+            /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+            /// keys use their bound subaccount; other callers use their authenticated
+            /// root account. Legs of one batch may debit different source accounts.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Canonical public unified asset id for the asset being transferred.
+            ///
+            /// Field 5: `asset_id`
+            pub asset_id: u32,
+            /// Transfer amount in canonical 18-decimal unified asset units.
+            /// For example, 0.5 is encoded as 500000000000000000.
+            ///
+            /// Field 6: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            pub destination: ::core::option::Option<
+                super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for InternalTransferBatchLegView<'a> {
+            type Owned = super::super::InternalTransferBatchLeg;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.destination = Some(
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                                ::buffa::types::decode_fixed64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.destination = Some(
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                                ::buffa::types::decode_fixed64(&mut cur)?,
+                            ),
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination = Some(
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                                ::buffa::types::borrow_str(&mut cur)?,
+                            ),
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::InternalTransferBatchLeg {
+                    subaccount_id: self.subaccount_id,
+                    asset_id: self.asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    destination: self
+                        .destination
+                        .as_ref()
+                        .map(|v| match v {
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                                    *v,
+                                )
+                            }
+                            super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                                v,
+                            ) => {
+                                super::super::__buffa::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                                    v.to_string(),
+                                )
+                            }
+                        }),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for InternalTransferBatchLegView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if let ::core::option::Option::Some(ref v) = self.destination {
+                    match v {
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                            _x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                            _x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                            x,
+                        ) => {
+                            size += 1u32 + ::buffa::types::string_encoded_len(x) as u32;
+                        }
+                    }
+                }
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if let ::core::option::Option::Some(ref v) = self.destination {
+                    match v {
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_fixed64_field(2u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                            x,
+                        ) => {
+                            ::buffa::types::put_fixed64_field(3u32, *x, buf);
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                            x,
+                        ) => {
+                            ::buffa::types::put_string_field(4u32, x, buf);
+                        }
+                    }
+                }
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for InternalTransferBatchLegView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if let ::core::option::Option::Some(ref __ov) = self.destination {
+                    match __ov {
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationAccountId(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "destinationAccountId",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSubaccountId(
+                            v,
+                        ) => {
+                            __map
+                                .serialize_entry(
+                                    "destinationSubaccountId",
+                                    &::buffa::json_helpers::ProtoJson(v),
+                                )?;
+                        }
+                        super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination::DestinationSmartAccountAddress(
+                            v,
+                        ) => {
+                            __map.serialize_entry("destinationSmartAccountAddress", v)?;
+                        }
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for InternalTransferBatchLegView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "InternalTransferBatchLeg";
+            const FULL_NAME: &'static str = "transfer.v1.InternalTransferBatchLeg";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLeg";
+        }
+        ::buffa::impl_default_view_instance!(InternalTransferBatchLegView);
+        ::buffa::impl_view_reborrow!(InternalTransferBatchLegView);
+        /** Self-contained, `'static` owned view of a `InternalTransferBatchLeg` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`InternalTransferBatchLegView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`InternalTransferBatchLegView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct InternalTransferBatchLegOwnedView(
+            ::buffa::OwnedView<InternalTransferBatchLegView<'static>>,
+        );
+        impl InternalTransferBatchLegOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::InternalTransferBatchLeg,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`InternalTransferBatchLegView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &InternalTransferBatchLegView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional source public subaccount ID. When omitted, subaccount-scoped API
+            /// keys use their bound subaccount; other callers use their authenticated
+            /// root account. Legs of one batch may debit different source accounts.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Canonical public unified asset id for the asset being transferred.
+            ///
+            /// Field 5: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// Transfer amount in canonical 18-decimal unified asset units.
+            /// For example, 0.5 is encoded as 500000000000000000.
+            ///
+            /// Field 6: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// Oneof `destination`.
+            #[must_use]
+            pub fn destination(
+                &self,
+            ) -> ::core::option::Option<
+                &super::super::__buffa::view::oneof::internal_transfer_batch_leg::Destination<
+                    '_,
+                >,
+            > {
+                self.0.reborrow().destination.as_ref()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<InternalTransferBatchLegView<'static>>,
+        > for InternalTransferBatchLegOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<InternalTransferBatchLegView<'static>>,
+            ) -> Self {
+                InternalTransferBatchLegOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<InternalTransferBatchLegOwnedView>
+        for ::buffa::OwnedView<InternalTransferBatchLegView<'static>> {
+            fn from(wrapper: InternalTransferBatchLegOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<InternalTransferBatchLegView<'static>>,
+        > for InternalTransferBatchLegOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<InternalTransferBatchLegView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::InternalTransferBatchLeg {
+            type View<'a> = InternalTransferBatchLegView<'a>;
+            type ViewHandle = InternalTransferBatchLegOwnedView;
+        }
+        impl ::serde::Serialize for InternalTransferBatchLegOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCreateInternalTransfersRequest submits up to 10 independent Trading to
+        /// Trading transfers under one idempotency key and one MFA check.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCreateInternalTransfersRequestView<'a> {
+            /// Transfers to run, in order. At most 10 legs; each leg counts as one
+            /// internal transfer against the caller's rate limit. Legs may repeat an asset,
+            /// a source or a destination.
+            ///
+            /// Field 1: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::InternalTransferBatchLegView<'a>,
+            >,
+            /// Stable client-supplied idempotency key used to collapse safe retries of
+            /// the whole batch. It is scoped to the authenticated caller: the session's
+            /// account, or the API key. A retry must send the same legs in the same
+            /// order; different legs under the same key are refused.
+            ///
+            /// Field 2: `idempotency_key`
+            pub idempotency_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for BatchCreateInternalTransfersRequestView<'a> {
+            type Owned = super::super::BatchCreateInternalTransfersRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::__buffa::view::InternalTransferBatchLegView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCreateInternalTransfersRequest {
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    idempotency_key: self.idempotency_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for BatchCreateInternalTransfersRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for BatchCreateInternalTransfersRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCreateInternalTransfersRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "BatchCreateInternalTransfersRequest";
+            const FULL_NAME: &'static str = "transfer.v1.BatchCreateInternalTransfersRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersRequest";
+        }
+        ::buffa::impl_default_view_instance!(BatchCreateInternalTransfersRequestView);
+        ::buffa::impl_view_reborrow!(BatchCreateInternalTransfersRequestView);
+        /** Self-contained, `'static` owned view of a `BatchCreateInternalTransfersRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCreateInternalTransfersRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCreateInternalTransfersRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCreateInternalTransfersRequestOwnedView(
+            ::buffa::OwnedView<BatchCreateInternalTransfersRequestView<'static>>,
+        );
+        impl BatchCreateInternalTransfersRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCreateInternalTransfersRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`BatchCreateInternalTransfersRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCreateInternalTransfersRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Transfers to run, in order. At most 10 legs; each leg counts as one
+            /// internal transfer against the caller's rate limit. Legs may repeat an asset,
+            /// a source or a destination.
+            ///
+            /// Field 1: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::InternalTransferBatchLegView<'_>,
+            > {
+                &self.0.reborrow().legs
+            }
+            /// Stable client-supplied idempotency key used to collapse safe retries of
+            /// the whole batch. It is scoped to the authenticated caller: the session's
+            /// account, or the API key. A retry must send the same legs in the same
+            /// order; different legs under the same key are refused.
+            ///
+            /// Field 2: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchCreateInternalTransfersRequestView<'static>>,
+        > for BatchCreateInternalTransfersRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    BatchCreateInternalTransfersRequestView<'static>,
+                >,
+            ) -> Self {
+                BatchCreateInternalTransfersRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCreateInternalTransfersRequestOwnedView>
+        for ::buffa::OwnedView<BatchCreateInternalTransfersRequestView<'static>> {
+            fn from(wrapper: BatchCreateInternalTransfersRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchCreateInternalTransfersRequestView<'static>>,
+        > for BatchCreateInternalTransfersRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchCreateInternalTransfersRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::BatchCreateInternalTransfersRequest {
+            type View<'a> = BatchCreateInternalTransfersRequestView<'a>;
+            type ViewHandle = BatchCreateInternalTransfersRequestOwnedView;
+        }
+        impl ::serde::Serialize for BatchCreateInternalTransfersRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// InternalTransferBatchLegResult is the outcome of one leg, in request order.
+        #[derive(Clone, Debug, Default)]
+        pub struct InternalTransferBatchLegResultView<'a> {
+            /// Zero-based position of the leg in the request.
+            ///
+            /// Field 1: `leg_index`
+            pub leg_index: u32,
+            /// Outcome of the leg.
+            ///
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<super::super::InternalTransferBatchLegStatus>,
+            /// Stable server-owned request identifier of the leg's transfer. Use it with
+            /// GetInternalTransfer. Empty while the leg has not been submitted.
+            ///
+            /// Field 3: `request_id`
+            pub request_id: &'a str,
+            /// Stable transfer identifier, set once the leg is accepted.
+            ///
+            /// Field 4: `transfer_id`
+            pub transfer_id: &'a str,
+            /// Authoritative lifecycle flow identifier, set once the leg is accepted.
+            ///
+            /// Field 5: `flow_id`
+            pub flow_id: &'a str,
+            /// Acceptance timestamp in nanoseconds since epoch (server time), set once
+            /// the leg is accepted.
+            ///
+            /// Field 6: `accepted_at_ts_ns`
+            pub accepted_at_ts_ns: u64,
+            /// Echoed canonical public unified asset id.
+            ///
+            /// Field 7: `asset_id`
+            pub asset_id: u32,
+            /// Resolved asset code, set once the leg is submitted.
+            ///
+            /// Field 8: `asset_code`
+            pub asset_code: &'a str,
+            /// Echoed transfer amount in canonical 18-decimal unified asset units.
+            ///
+            /// Field 9: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Server-resolved destination summary, set once the leg is submitted.
+            ///
+            /// Field 10: `destination`
+            pub destination: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ResolvedDestinationView<'a>,
+            >,
+            /// Why the leg was refused, or why its outcome is not known yet. Unset for an
+            /// accepted leg and for a leg that was not submitted.
+            ///
+            /// Field 11: `error_code`
+            pub error_code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Human-readable description of error_code.
+            ///
+            /// Field 12: `error_message`
+            pub error_message: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for InternalTransferBatchLegResultView<'a> {
+            type Owned = super::super::InternalTransferBatchLegResult;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.leg_index = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.transfer_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.flow_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.accepted_at_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.asset_code = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.destination.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.destination = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ResolvedDestinationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.error_code = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.error_message = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::InternalTransferBatchLegResult {
+                    leg_index: self.leg_index,
+                    status: self.status,
+                    request_id: self.request_id.to_string(),
+                    transfer_id: self.transfer_id.to_string(),
+                    flow_id: self.flow_id.to_string(),
+                    accepted_at_ts_ns: self.accepted_at_ts_ns,
+                    asset_id: self.asset_id,
+                    asset_code: self.asset_code.to_string(),
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    destination: match self.destination.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ResolvedDestination,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    error_code: self.error_code,
+                    error_message: self.error_message.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for InternalTransferBatchLegResultView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.leg_index != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.leg_index) as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                if !self.transfer_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.transfer_id)
+                                as u32;
+                }
+                if !self.flow_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.accepted_at_ts_ns)
+                                as u32;
+                }
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if !self.asset_code.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.asset_code)
+                                as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.destination.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.destination.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                {
+                    let val = self.error_code.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.error_message.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.error_message)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.leg_index != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.leg_index, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.request_id, buf);
+                }
+                if !self.transfer_id.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.transfer_id, buf);
+                }
+                if !self.flow_id.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.flow_id, buf);
+                }
+                if self.accepted_at_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(6u32, self.accepted_at_ts_ns, buf);
+                }
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(7u32, self.asset_id, buf);
+                }
+                if !self.asset_code.is_empty() {
+                    ::buffa::types::put_string_field(8u32, &self.asset_code, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                if self.destination.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.destination.write_to(__cache, buf);
+                }
+                {
+                    let val = self.error_code.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(11u32, val, buf);
+                    }
+                }
+                if !self.error_message.is_empty() {
+                    ::buffa::types::put_string_field(12u32, &self.error_message, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for InternalTransferBatchLegResultView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.leg_index) {
+                    __map
+                        .serialize_entry(
+                            "legIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.leg_index),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.transfer_id) {
+                    __map.serialize_entry("transferId", self.transfer_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.flow_id) {
+                    __map.serialize_entry("flowId", self.flow_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.accepted_at_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "acceptedAtTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.accepted_at_ts_ns),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.asset_code) {
+                    __map.serialize_entry("assetCode", self.asset_code)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .destination
+                        .as_option()
+                    {
+                        __map.serialize_entry("destination", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.error_code,
+                ) {
+                    __map.serialize_entry("errorCode", &self.error_code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.error_message) {
+                    __map.serialize_entry("errorMessage", self.error_message)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for InternalTransferBatchLegResultView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "InternalTransferBatchLegResult";
+            const FULL_NAME: &'static str = "transfer.v1.InternalTransferBatchLegResult";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.InternalTransferBatchLegResult";
+        }
+        ::buffa::impl_default_view_instance!(InternalTransferBatchLegResultView);
+        ::buffa::impl_view_reborrow!(InternalTransferBatchLegResultView);
+        /** Self-contained, `'static` owned view of a `InternalTransferBatchLegResult` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`InternalTransferBatchLegResultView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`InternalTransferBatchLegResultView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct InternalTransferBatchLegResultOwnedView(
+            ::buffa::OwnedView<InternalTransferBatchLegResultView<'static>>,
+        );
+        impl InternalTransferBatchLegResultOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegResultOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegResultOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::InternalTransferBatchLegResult,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    InternalTransferBatchLegResultOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`InternalTransferBatchLegResultView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &InternalTransferBatchLegResultView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::InternalTransferBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Zero-based position of the leg in the request.
+            ///
+            /// Field 1: `leg_index`
+            #[must_use]
+            pub fn leg_index(&self) -> u32 {
+                self.0.reborrow().leg_index
+            }
+            /// Outcome of the leg.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::InternalTransferBatchLegStatus> {
+                self.0.reborrow().status
+            }
+            /// Stable server-owned request identifier of the leg's transfer. Use it with
+            /// GetInternalTransfer. Empty while the leg has not been submitted.
+            ///
+            /// Field 3: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Stable transfer identifier, set once the leg is accepted.
+            ///
+            /// Field 4: `transfer_id`
+            #[must_use]
+            pub fn transfer_id(&self) -> &'_ str {
+                self.0.reborrow().transfer_id
+            }
+            /// Authoritative lifecycle flow identifier, set once the leg is accepted.
+            ///
+            /// Field 5: `flow_id`
+            #[must_use]
+            pub fn flow_id(&self) -> &'_ str {
+                self.0.reborrow().flow_id
+            }
+            /// Acceptance timestamp in nanoseconds since epoch (server time), set once
+            /// the leg is accepted.
+            ///
+            /// Field 6: `accepted_at_ts_ns`
+            #[must_use]
+            pub fn accepted_at_ts_ns(&self) -> u64 {
+                self.0.reborrow().accepted_at_ts_ns
+            }
+            /// Echoed canonical public unified asset id.
+            ///
+            /// Field 7: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// Resolved asset code, set once the leg is submitted.
+            ///
+            /// Field 8: `asset_code`
+            #[must_use]
+            pub fn asset_code(&self) -> &'_ str {
+                self.0.reborrow().asset_code
+            }
+            /// Echoed transfer amount in canonical 18-decimal unified asset units.
+            ///
+            /// Field 9: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// Server-resolved destination summary, set once the leg is submitted.
+            ///
+            /// Field 10: `destination`
+            #[must_use]
+            pub fn destination(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ResolvedDestinationView<'_>,
+            > {
+                &self.0.reborrow().destination
+            }
+            /// Why the leg was refused, or why its outcome is not known yet. Unset for an
+            /// accepted leg and for a leg that was not submitted.
+            ///
+            /// Field 11: `error_code`
+            #[must_use]
+            pub fn error_code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
+                self.0.reborrow().error_code
+            }
+            /// Human-readable description of error_code.
+            ///
+            /// Field 12: `error_message`
+            #[must_use]
+            pub fn error_message(&self) -> &'_ str {
+                self.0.reborrow().error_message
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<InternalTransferBatchLegResultView<'static>>,
+        > for InternalTransferBatchLegResultOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<InternalTransferBatchLegResultView<'static>>,
+            ) -> Self {
+                InternalTransferBatchLegResultOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<InternalTransferBatchLegResultOwnedView>
+        for ::buffa::OwnedView<InternalTransferBatchLegResultView<'static>> {
+            fn from(wrapper: InternalTransferBatchLegResultOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<InternalTransferBatchLegResultView<'static>>,
+        > for InternalTransferBatchLegResultOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<InternalTransferBatchLegResultView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::InternalTransferBatchLegResult {
+            type View<'a> = InternalTransferBatchLegResultView<'a>;
+            type ViewHandle = InternalTransferBatchLegResultOwnedView;
+        }
+        impl ::serde::Serialize for InternalTransferBatchLegResultOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// BatchCreateInternalTransfersResponse returns the outcome of every leg.
+        #[derive(Clone, Debug, Default)]
+        pub struct BatchCreateInternalTransfersResponseView<'a> {
+            /// Stable server-owned identifier of the batch request. Empty when the batch
+            /// was refused.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            /// Outcome of the batch as a whole.
+            ///
+            /// Field 2: `status`
+            pub status: ::buffa::EnumValue<super::super::InternalTransferBatchStatus>,
+            /// One result per requested leg, in request order.
+            ///
+            /// Field 3: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::InternalTransferBatchLegResultView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for BatchCreateInternalTransfersResponseView<'a> {
+            type Owned = super::super::BatchCreateInternalTransfersResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::__buffa::view::InternalTransferBatchLegResultView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::BatchCreateInternalTransfersResponse {
+                    request_id: self.request_id.to_string(),
+                    status: self.status,
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for BatchCreateInternalTransfersResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for BatchCreateInternalTransfersResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for BatchCreateInternalTransfersResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "BatchCreateInternalTransfersResponse";
+            const FULL_NAME: &'static str = "transfer.v1.BatchCreateInternalTransfersResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.BatchCreateInternalTransfersResponse";
+        }
+        ::buffa::impl_default_view_instance!(BatchCreateInternalTransfersResponseView);
+        ::buffa::impl_view_reborrow!(BatchCreateInternalTransfersResponseView);
+        /** Self-contained, `'static` owned view of a `BatchCreateInternalTransfersResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`BatchCreateInternalTransfersResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`BatchCreateInternalTransfersResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct BatchCreateInternalTransfersResponseOwnedView(
+            ::buffa::OwnedView<BatchCreateInternalTransfersResponseView<'static>>,
+        );
+        impl BatchCreateInternalTransfersResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::BatchCreateInternalTransfersResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    BatchCreateInternalTransfersResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`BatchCreateInternalTransfersResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &BatchCreateInternalTransfersResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::BatchCreateInternalTransfersResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable server-owned identifier of the batch request. Empty when the batch
+            /// was refused.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+            /// Outcome of the batch as a whole.
+            ///
+            /// Field 2: `status`
+            #[must_use]
+            pub fn status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::InternalTransferBatchStatus> {
+                self.0.reborrow().status
+            }
+            /// One result per requested leg, in request order.
+            ///
+            /// Field 3: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::InternalTransferBatchLegResultView<'_>,
+            > {
+                &self.0.reborrow().legs
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<BatchCreateInternalTransfersResponseView<'static>>,
+        > for BatchCreateInternalTransfersResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    BatchCreateInternalTransfersResponseView<'static>,
+                >,
+            ) -> Self {
+                BatchCreateInternalTransfersResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<BatchCreateInternalTransfersResponseOwnedView>
+        for ::buffa::OwnedView<BatchCreateInternalTransfersResponseView<'static>> {
+            fn from(wrapper: BatchCreateInternalTransfersResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<BatchCreateInternalTransfersResponseView<'static>>,
+        > for BatchCreateInternalTransfersResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<BatchCreateInternalTransfersResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::BatchCreateInternalTransfersResponse {
+            type View<'a> = BatchCreateInternalTransfersResponseView<'a>;
+            type ViewHandle = BatchCreateInternalTransfersResponseOwnedView;
+        }
+        impl ::serde::Serialize for BatchCreateInternalTransfersResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// GetInternalTransferRequest selects an accepted transfer from the source account.
         #[derive(Clone, Debug, Default)]
         pub struct GetInternalTransferRequestView<'a> {
@@ -5001,10 +12171,6078 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// DustBalance is one Trading balance judged for dust conversion.
+        #[derive(Clone, Debug, Default)]
+        pub struct DustBalanceView<'a> {
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// The whole available Trading balance, in canonical 18-decimal units: what no
+            /// open order or other reservation holds.
+            ///
+            /// Field 2: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Whether the balance converts, and why not otherwise.
+            ///
+            /// Field 3: `eligibility`
+            pub eligibility: ::buffa::EnumValue<super::super::DustAssetEligibility>,
+            /// The balance's USD value in 18-decimal fixed point, rounded down. Unset when
+            /// the asset has no current price.
+            ///
+            /// Field 4: `usd_value_e18`
+            pub usd_value_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DustBalanceView<'a> {
+            type Owned = super::super::DustBalance;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.eligibility = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.usd_value_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.usd_value_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustBalance,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DustBalance,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DustBalance {
+                    asset_id: self.asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    eligibility: self.eligibility,
+                    usd_value_e18: match self.usd_value_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DustBalanceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                {
+                    let val = self.eligibility.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.usd_value_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.usd_value_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                {
+                    let val = self.eligibility.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if self.usd_value_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.usd_value_e18.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DustBalanceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.eligibility,
+                ) {
+                    __map.serialize_entry("eligibility", &self.eligibility)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .usd_value_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("usdValueE18", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DustBalanceView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "DustBalance";
+            const FULL_NAME: &'static str = "transfer.v1.DustBalance";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustBalance";
+        }
+        ::buffa::impl_default_view_instance!(DustBalanceView);
+        ::buffa::impl_view_reborrow!(DustBalanceView);
+        /** Self-contained, `'static` owned view of a `DustBalance` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DustBalanceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DustBalanceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DustBalanceOwnedView(::buffa::OwnedView<DustBalanceView<'static>>);
+        impl DustBalanceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustBalanceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustBalanceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DustBalance,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustBalanceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DustBalanceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DustBalanceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustBalance,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// The whole available Trading balance, in canonical 18-decimal units: what no
+            /// open order or other reservation holds.
+            ///
+            /// Field 2: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// Whether the balance converts, and why not otherwise.
+            ///
+            /// Field 3: `eligibility`
+            #[must_use]
+            pub fn eligibility(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DustAssetEligibility> {
+                self.0.reborrow().eligibility
+            }
+            /// The balance's USD value in 18-decimal fixed point, rounded down. Unset when
+            /// the asset has no current price.
+            ///
+            /// Field 4: `usd_value_e18`
+            #[must_use]
+            pub fn usd_value_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().usd_value_e18
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DustBalanceView<'static>>>
+        for DustBalanceOwnedView {
+            fn from(inner: ::buffa::OwnedView<DustBalanceView<'static>>) -> Self {
+                DustBalanceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DustBalanceOwnedView>
+        for ::buffa::OwnedView<DustBalanceView<'static>> {
+            fn from(wrapper: DustBalanceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DustBalanceView<'static>>>
+        for DustBalanceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DustBalanceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DustBalance {
+            type View<'a> = DustBalanceView<'a>;
+            type ViewHandle = DustBalanceOwnedView;
+        }
+        impl ::serde::Serialize for DustBalanceOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DustAssetPrice is the USD index price a quote or conversion used for one
+        /// asset.
+        #[derive(Clone, Debug, Default)]
+        pub struct DustAssetPriceView<'a> {
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// USD per whole asset unit: price_ticks / 10^price_scale.
+            ///
+            /// Field 2: `price_ticks`
+            pub price_ticks: i64,
+            /// Decimal scale of price_ticks.
+            ///
+            /// Field 3: `price_scale`
+            pub price_scale: u32,
+            /// Time of the oldest index observation the price used.
+            ///
+            /// Field 4: `as_of`
+            pub as_of: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DustAssetPriceView<'a> {
+            type Owned = super::super::DustAssetPrice;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_ticks = ::buffa::types::decode_int64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_scale = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.as_of.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.as_of = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustAssetPrice,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DustAssetPrice,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DustAssetPrice {
+                    asset_id: self.asset_id,
+                    price_ticks: self.price_ticks,
+                    price_scale: self.price_scale,
+                    as_of: match self.as_of.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DustAssetPriceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.price_ticks != 0i64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int64_encoded_len(self.price_ticks) as u32;
+                }
+                if self.price_scale != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.price_scale)
+                                as u32;
+                }
+                if self.as_of.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.as_of.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.price_ticks != 0i64 {
+                    ::buffa::types::put_int64_field(2u32, self.price_ticks, buf);
+                }
+                if self.price_scale != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.price_scale, buf);
+                }
+                if self.as_of.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.as_of.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DustAssetPriceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i64(&self.price_ticks) {
+                    __map
+                        .serialize_entry(
+                            "priceTicks",
+                            &::buffa::json_helpers::ProtoJson(&self.price_ticks),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.price_scale) {
+                    __map
+                        .serialize_entry(
+                            "priceScale",
+                            &::buffa::json_helpers::ProtoJson(&self.price_scale),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.as_of.as_option() {
+                        __map.serialize_entry("asOf", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DustAssetPriceView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "DustAssetPrice";
+            const FULL_NAME: &'static str = "transfer.v1.DustAssetPrice";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustAssetPrice";
+        }
+        ::buffa::impl_default_view_instance!(DustAssetPriceView);
+        ::buffa::impl_view_reborrow!(DustAssetPriceView);
+        /** Self-contained, `'static` owned view of a `DustAssetPrice` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DustAssetPriceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DustAssetPriceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DustAssetPriceOwnedView(
+            ::buffa::OwnedView<DustAssetPriceView<'static>>,
+        );
+        impl DustAssetPriceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustAssetPriceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustAssetPriceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DustAssetPrice,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustAssetPriceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DustAssetPriceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DustAssetPriceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustAssetPrice,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// USD per whole asset unit: price_ticks / 10^price_scale.
+            ///
+            /// Field 2: `price_ticks`
+            #[must_use]
+            pub fn price_ticks(&self) -> i64 {
+                self.0.reborrow().price_ticks
+            }
+            /// Decimal scale of price_ticks.
+            ///
+            /// Field 3: `price_scale`
+            #[must_use]
+            pub fn price_scale(&self) -> u32 {
+                self.0.reborrow().price_scale
+            }
+            /// Time of the oldest index observation the price used.
+            ///
+            /// Field 4: `as_of`
+            #[must_use]
+            pub fn as_of(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().as_of
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DustAssetPriceView<'static>>>
+        for DustAssetPriceOwnedView {
+            fn from(inner: ::buffa::OwnedView<DustAssetPriceView<'static>>) -> Self {
+                DustAssetPriceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DustAssetPriceOwnedView>
+        for ::buffa::OwnedView<DustAssetPriceView<'static>> {
+            fn from(wrapper: DustAssetPriceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DustAssetPriceView<'static>>>
+        for DustAssetPriceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DustAssetPriceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DustAssetPrice {
+            type View<'a> = DustAssetPriceView<'a>;
+            type ViewHandle = DustAssetPriceOwnedView;
+        }
+        impl ::serde::Serialize for DustAssetPriceOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DustSource is one balance a conversion moves.
+        #[derive(Clone, Debug, Default)]
+        pub struct DustSourceView<'a> {
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// The whole quoted balance, in canonical 18-decimal units.
+            ///
+            /// Field 2: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DustSourceView<'a> {
+            type Owned = super::super::DustSource;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::DustSource, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::DustSource, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DustSource {
+                    asset_id: self.asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DustSourceView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DustSourceView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DustSourceView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "DustSource";
+            const FULL_NAME: &'static str = "transfer.v1.DustSource";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustSource";
+        }
+        ::buffa::impl_default_view_instance!(DustSourceView);
+        ::buffa::impl_view_reborrow!(DustSourceView);
+        /** Self-contained, `'static` owned view of a `DustSource` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DustSourceView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DustSourceView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DustSourceOwnedView(::buffa::OwnedView<DustSourceView<'static>>);
+        impl DustSourceOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustSourceOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustSourceOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DustSource,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustSourceOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DustSourceView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DustSourceView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::DustSource, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Canonical public unified asset id.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// The whole quoted balance, in canonical 18-decimal units.
+            ///
+            /// Field 2: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DustSourceView<'static>>>
+        for DustSourceOwnedView {
+            fn from(inner: ::buffa::OwnedView<DustSourceView<'static>>) -> Self {
+                DustSourceOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DustSourceOwnedView>
+        for ::buffa::OwnedView<DustSourceView<'static>> {
+            fn from(wrapper: DustSourceOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DustSourceView<'static>>>
+        for DustSourceOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DustSourceView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DustSource {
+            type View<'a> = DustSourceView<'a>;
+            type ViewHandle = DustSourceOwnedView;
+        }
+        impl ::serde::Serialize for DustSourceOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DustConversion is one conversion of an account's dust into a target asset.
+        #[derive(Clone, Debug, Default)]
+        pub struct DustConversionView<'a> {
+            /// Stable conversion identifier.
+            ///
+            /// Field 1: `conversion_id`
+            pub conversion_id: &'a str,
+            /// The quote the conversion converted.
+            ///
+            /// Field 2: `quote_id`
+            pub quote_id: &'a str,
+            /// Current state.
+            ///
+            /// Field 3: `state`
+            pub state: ::buffa::EnumValue<super::super::DustConversionState>,
+            /// Why the conversion was refused; unspecified unless state is
+            /// DUST_CONVERSION_STATE_REFUSED.
+            ///
+            /// Field 4: `refusal_code`
+            pub refusal_code: ::buffa::EnumValue<super::super::ErrorCode>,
+            /// Target asset id.
+            ///
+            /// Field 5: `target_asset_id`
+            pub target_asset_id: u32,
+            /// Sources, in asset id order.
+            ///
+            /// Field 6: `sources`
+            pub sources: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DustSourceView<'a>,
+            >,
+            /// Payout in canonical 18-decimal target units, after the fee: the sources'
+            /// value at the index prices current when the conversion was created.
+            ///
+            /// Field 7: `payout_e18`
+            pub payout_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The payout the quote showed, in canonical 18-decimal target units.
+            ///
+            /// Field 8: `quoted_payout_e18`
+            pub quoted_payout_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The fee taken from the payout, in canonical 18-decimal target units.
+            ///
+            /// Field 9: `fee_e18`
+            pub fee_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The fee in basis points.
+            ///
+            /// Field 10: `fee_bps`
+            pub fee_bps: u32,
+            /// When the conversion was created.
+            ///
+            /// Field 11: `created_at`
+            pub created_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// When the conversion completed; unset until state is
+            /// DUST_CONVERSION_STATE_COMPLETED.
+            ///
+            /// Field 12: `completed_at`
+            pub completed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DustConversionView<'a> {
+            type Owned = super::super::DustConversion;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.conversion_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.state = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.refusal_code = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payout_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payout_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.quoted_payout_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.quoted_payout_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.fee_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.fee_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.created_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.created_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.completed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.completed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.sources
+                            .push(
+                                <super::super::__buffa::view::DustSourceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustConversion,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DustConversion,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DustConversion {
+                    conversion_id: self.conversion_id.to_string(),
+                    quote_id: self.quote_id.to_string(),
+                    state: self.state,
+                    refusal_code: self.refusal_code,
+                    target_asset_id: self.target_asset_id,
+                    sources: self
+                        .sources
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    payout_e18: match self.payout_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    quoted_payout_e18: match self.quoted_payout_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    fee_e18: match self.fee_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    fee_bps: self.fee_bps,
+                    created_at: match self.created_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    completed_at: match self.completed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DustConversionView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.conversion_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.conversion_id)
+                                as u32;
+                }
+                if !self.quote_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+                }
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.refusal_code.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.target_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.target_asset_id)
+                                as u32;
+                }
+                for v in &self.sources {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payout_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payout_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.quoted_payout_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.quoted_payout_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.fee_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.fee_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.fee_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+                }
+                if self.created_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.created_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.completed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.completed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.conversion_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.conversion_id, buf);
+                }
+                if !self.quote_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.quote_id, buf);
+                }
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.refusal_code.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if self.target_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.target_asset_id, buf);
+                }
+                for v in &self.sources {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.payout_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payout_e18.write_to(__cache, buf);
+                }
+                if self.quoted_payout_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.quoted_payout_e18.write_to(__cache, buf);
+                }
+                if self.fee_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        9u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.fee_e18.write_to(__cache, buf);
+                }
+                if self.fee_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(10u32, self.fee_bps, buf);
+                }
+                if self.created_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        11u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.created_at.write_to(__cache, buf);
+                }
+                if self.completed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.completed_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DustConversionView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.conversion_id) {
+                    __map.serialize_entry("conversionId", self.conversion_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_id) {
+                    __map.serialize_entry("quoteId", self.quote_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.state) {
+                    __map.serialize_entry("state", &self.state)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.refusal_code,
+                ) {
+                    __map.serialize_entry("refusalCode", &self.refusal_code)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.target_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "targetAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.target_asset_id),
+                        )?;
+                }
+                if !self.sources.is_empty() {
+                    __map.serialize_entry("sources", &*self.sources)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payout_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("payoutE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .quoted_payout_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("quotedPayoutE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.fee_e18.as_option() {
+                        __map.serialize_entry("feeE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.fee_bps) {
+                    __map
+                        .serialize_entry(
+                            "feeBps",
+                            &::buffa::json_helpers::ProtoJson(&self.fee_bps),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .created_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("createdAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .completed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("completedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DustConversionView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "DustConversion";
+            const FULL_NAME: &'static str = "transfer.v1.DustConversion";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.DustConversion";
+        }
+        ::buffa::impl_default_view_instance!(DustConversionView);
+        ::buffa::impl_view_reborrow!(DustConversionView);
+        /** Self-contained, `'static` owned view of a `DustConversion` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DustConversionView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DustConversionView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DustConversionOwnedView(
+            ::buffa::OwnedView<DustConversionView<'static>>,
+        );
+        impl DustConversionOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustConversionOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustConversionOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DustConversion,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DustConversionOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DustConversionView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DustConversionView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DustConversion,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable conversion identifier.
+            ///
+            /// Field 1: `conversion_id`
+            #[must_use]
+            pub fn conversion_id(&self) -> &'_ str {
+                self.0.reborrow().conversion_id
+            }
+            /// The quote the conversion converted.
+            ///
+            /// Field 2: `quote_id`
+            #[must_use]
+            pub fn quote_id(&self) -> &'_ str {
+                self.0.reborrow().quote_id
+            }
+            /// Current state.
+            ///
+            /// Field 3: `state`
+            #[must_use]
+            pub fn state(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::DustConversionState> {
+                self.0.reborrow().state
+            }
+            /// Why the conversion was refused; unspecified unless state is
+            /// DUST_CONVERSION_STATE_REFUSED.
+            ///
+            /// Field 4: `refusal_code`
+            #[must_use]
+            pub fn refusal_code(&self) -> ::buffa::EnumValue<super::super::ErrorCode> {
+                self.0.reborrow().refusal_code
+            }
+            /// Target asset id.
+            ///
+            /// Field 5: `target_asset_id`
+            #[must_use]
+            pub fn target_asset_id(&self) -> u32 {
+                self.0.reborrow().target_asset_id
+            }
+            /// Sources, in asset id order.
+            ///
+            /// Field 6: `sources`
+            #[must_use]
+            pub fn sources(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DustSourceView<'_>,
+            > {
+                &self.0.reborrow().sources
+            }
+            /// Payout in canonical 18-decimal target units, after the fee: the sources'
+            /// value at the index prices current when the conversion was created.
+            ///
+            /// Field 7: `payout_e18`
+            #[must_use]
+            pub fn payout_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().payout_e18
+            }
+            /// The payout the quote showed, in canonical 18-decimal target units.
+            ///
+            /// Field 8: `quoted_payout_e18`
+            #[must_use]
+            pub fn quoted_payout_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().quoted_payout_e18
+            }
+            /// The fee taken from the payout, in canonical 18-decimal target units.
+            ///
+            /// Field 9: `fee_e18`
+            #[must_use]
+            pub fn fee_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().fee_e18
+            }
+            /// The fee in basis points.
+            ///
+            /// Field 10: `fee_bps`
+            #[must_use]
+            pub fn fee_bps(&self) -> u32 {
+                self.0.reborrow().fee_bps
+            }
+            /// When the conversion was created.
+            ///
+            /// Field 11: `created_at`
+            #[must_use]
+            pub fn created_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().created_at
+            }
+            /// When the conversion completed; unset until state is
+            /// DUST_CONVERSION_STATE_COMPLETED.
+            ///
+            /// Field 12: `completed_at`
+            #[must_use]
+            pub fn completed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().completed_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DustConversionView<'static>>>
+        for DustConversionOwnedView {
+            fn from(inner: ::buffa::OwnedView<DustConversionView<'static>>) -> Self {
+                DustConversionOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DustConversionOwnedView>
+        for ::buffa::OwnedView<DustConversionView<'static>> {
+            fn from(wrapper: DustConversionOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DustConversionView<'static>>>
+        for DustConversionOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DustConversionView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DustConversion {
+            type View<'a> = DustConversionView<'a>;
+            type ViewHandle = DustConversionOwnedView;
+        }
+        impl ::serde::Serialize for DustConversionOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDustBalancesRequest judges the account's Trading balances for
+        /// conversion into one target.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDustBalancesRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Target asset id, one of the response's targets; 0 means the first target.
+            ///
+            /// Field 2: `target_asset_id`
+            pub target_asset_id: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDustBalancesRequestView<'a> {
+            type Owned = super::super::ListDustBalancesRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDustBalancesRequest {
+                    subaccount_id: self.subaccount_id,
+                    target_asset_id: self.target_asset_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDustBalancesRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.target_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.target_asset_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if self.target_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.target_asset_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDustBalancesRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.target_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "targetAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.target_asset_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDustBalancesRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "ListDustBalancesRequest";
+            const FULL_NAME: &'static str = "transfer.v1.ListDustBalancesRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListDustBalancesRequestView);
+        ::buffa::impl_view_reborrow!(ListDustBalancesRequestView);
+        /** Self-contained, `'static` owned view of a `ListDustBalancesRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDustBalancesRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDustBalancesRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDustBalancesRequestOwnedView(
+            ::buffa::OwnedView<ListDustBalancesRequestView<'static>>,
+        );
+        impl ListDustBalancesRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDustBalancesRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDustBalancesRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDustBalancesRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Target asset id, one of the response's targets; 0 means the first target.
+            ///
+            /// Field 2: `target_asset_id`
+            #[must_use]
+            pub fn target_asset_id(&self) -> u32 {
+                self.0.reborrow().target_asset_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDustBalancesRequestView<'static>>,
+        > for ListDustBalancesRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDustBalancesRequestView<'static>>,
+            ) -> Self {
+                ListDustBalancesRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDustBalancesRequestOwnedView>
+        for ::buffa::OwnedView<ListDustBalancesRequestView<'static>> {
+            fn from(wrapper: ListDustBalancesRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDustBalancesRequestView<'static>>,
+        > for ListDustBalancesRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDustBalancesRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDustBalancesRequest {
+            type View<'a> = ListDustBalancesRequestView<'a>;
+            type ViewHandle = ListDustBalancesRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListDustBalancesRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDustBalancesResponse lists every nonzero available Trading balance with
+        /// its eligibility and the payout the eligible ones would bring now. It
+        /// reserves nothing; QuoteDustConversion prices a conversion.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDustBalancesResponseView<'a> {
+            /// Target asset id the balances were judged for.
+            ///
+            /// Field 1: `target_asset_id`
+            pub target_asset_id: u32,
+            /// Every asset id the account can convert dust into, in preference order.
+            ///
+            /// Field 2: `targets`
+            pub targets: ::buffa::RepeatedView<'a, u32>,
+            /// The fee in basis points, taken from the payout.
+            ///
+            /// Field 3: `fee_bps`
+            pub fee_bps: u32,
+            /// Every nonzero available Trading balance, in asset id order.
+            ///
+            /// Field 4: `balances`
+            pub balances: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DustBalanceView<'a>,
+            >,
+            /// The eligible balances' total USD value in 18-decimal fixed point, rounded
+            /// down.
+            ///
+            /// Field 5: `gross_usd_e18`
+            pub gross_usd_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// The payout they would bring now, in canonical 18-decimal target units,
+            /// after the fee.
+            ///
+            /// Field 6: `payout_e18`
+            pub payout_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Whether the target can be paid now. When false, QuoteDustConversion is
+            /// refused with ERROR_CODE_DUST_TARGET_UNAVAILABLE.
+            ///
+            /// Field 7: `target_available`
+            pub target_available: bool,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDustBalancesResponseView<'a> {
+            type Owned = super::super::ListDustBalancesResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.gross_usd_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.gross_usd_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payout_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payout_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_available = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    2u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.targets
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.targets
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.targets.push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.balances
+                            .push(
+                                <super::super::__buffa::view::DustBalanceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDustBalancesResponse {
+                    target_asset_id: self.target_asset_id,
+                    targets: self.targets.to_vec(),
+                    fee_bps: self.fee_bps,
+                    balances: self
+                        .balances
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    gross_usd_e18: match self.gross_usd_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    payout_e18: match self.payout_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    target_available: self.target_available,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDustBalancesResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.target_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.target_asset_id)
+                                as u32;
+                }
+                if !self.targets.is_empty() {
+                    let payload: u32 = self
+                        .targets
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if self.fee_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+                }
+                for v in &self.balances {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.gross_usd_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.gross_usd_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payout_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payout_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.target_available {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.target_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.target_asset_id, buf);
+                }
+                if !self.targets.is_empty() {
+                    let payload: u32 = self
+                        .targets
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(2u32, payload, buf);
+                    for &v in &self.targets {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                if self.fee_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.fee_bps, buf);
+                }
+                for v in &self.balances {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.gross_usd_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.gross_usd_e18.write_to(__cache, buf);
+                }
+                if self.payout_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payout_e18.write_to(__cache, buf);
+                }
+                if self.target_available {
+                    ::buffa::types::put_bool_field(7u32, self.target_available, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDustBalancesResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.target_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "targetAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.target_asset_id),
+                        )?;
+                }
+                if !self.targets.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "targets",
+                            &::buffa::json_helpers::RepeatedJson(&self.targets),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.fee_bps) {
+                    __map
+                        .serialize_entry(
+                            "feeBps",
+                            &::buffa::json_helpers::ProtoJson(&self.fee_bps),
+                        )?;
+                }
+                if !self.balances.is_empty() {
+                    __map.serialize_entry("balances", &*self.balances)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .gross_usd_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("grossUsdE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payout_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("payoutE18", __v)?;
+                    }
+                }
+                if self.target_available {
+                    __map.serialize_entry("targetAvailable", &self.target_available)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDustBalancesResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "ListDustBalancesResponse";
+            const FULL_NAME: &'static str = "transfer.v1.ListDustBalancesResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustBalancesResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListDustBalancesResponseView);
+        ::buffa::impl_view_reborrow!(ListDustBalancesResponseView);
+        /** Self-contained, `'static` owned view of a `ListDustBalancesResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDustBalancesResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDustBalancesResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDustBalancesResponseOwnedView(
+            ::buffa::OwnedView<ListDustBalancesResponseView<'static>>,
+        );
+        impl ListDustBalancesResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDustBalancesResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustBalancesResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDustBalancesResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDustBalancesResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustBalancesResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Target asset id the balances were judged for.
+            ///
+            /// Field 1: `target_asset_id`
+            #[must_use]
+            pub fn target_asset_id(&self) -> u32 {
+                self.0.reborrow().target_asset_id
+            }
+            /// Every asset id the account can convert dust into, in preference order.
+            ///
+            /// Field 2: `targets`
+            #[must_use]
+            pub fn targets(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().targets
+            }
+            /// The fee in basis points, taken from the payout.
+            ///
+            /// Field 3: `fee_bps`
+            #[must_use]
+            pub fn fee_bps(&self) -> u32 {
+                self.0.reborrow().fee_bps
+            }
+            /// Every nonzero available Trading balance, in asset id order.
+            ///
+            /// Field 4: `balances`
+            #[must_use]
+            pub fn balances(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DustBalanceView<'_>,
+            > {
+                &self.0.reborrow().balances
+            }
+            /// The eligible balances' total USD value in 18-decimal fixed point, rounded
+            /// down.
+            ///
+            /// Field 5: `gross_usd_e18`
+            #[must_use]
+            pub fn gross_usd_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().gross_usd_e18
+            }
+            /// The payout they would bring now, in canonical 18-decimal target units,
+            /// after the fee.
+            ///
+            /// Field 6: `payout_e18`
+            #[must_use]
+            pub fn payout_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().payout_e18
+            }
+            /// Whether the target can be paid now. When false, QuoteDustConversion is
+            /// refused with ERROR_CODE_DUST_TARGET_UNAVAILABLE.
+            ///
+            /// Field 7: `target_available`
+            #[must_use]
+            pub fn target_available(&self) -> bool {
+                self.0.reborrow().target_available
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDustBalancesResponseView<'static>>,
+        > for ListDustBalancesResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDustBalancesResponseView<'static>>,
+            ) -> Self {
+                ListDustBalancesResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDustBalancesResponseOwnedView>
+        for ::buffa::OwnedView<ListDustBalancesResponseView<'static>> {
+            fn from(wrapper: ListDustBalancesResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDustBalancesResponseView<'static>>,
+        > for ListDustBalancesResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDustBalancesResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDustBalancesResponse {
+            type View<'a> = ListDustBalancesResponseView<'a>;
+            type ViewHandle = ListDustBalancesResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListDustBalancesResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// QuoteDustConversionRequest prices the account's dust into one target.
+        #[derive(Clone, Debug, Default)]
+        pub struct QuoteDustConversionRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Target asset id, one of ListDustBalances' targets.
+            ///
+            /// Field 2: `target_asset_id`
+            pub target_asset_id: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for QuoteDustConversionRequestView<'a> {
+            type Owned = super::super::QuoteDustConversionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::QuoteDustConversionRequest {
+                    subaccount_id: self.subaccount_id,
+                    target_asset_id: self.target_asset_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for QuoteDustConversionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.target_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.target_asset_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if self.target_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.target_asset_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for QuoteDustConversionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.target_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "targetAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.target_asset_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for QuoteDustConversionRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "QuoteDustConversionRequest";
+            const FULL_NAME: &'static str = "transfer.v1.QuoteDustConversionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionRequest";
+        }
+        ::buffa::impl_default_view_instance!(QuoteDustConversionRequestView);
+        ::buffa::impl_view_reborrow!(QuoteDustConversionRequestView);
+        /** Self-contained, `'static` owned view of a `QuoteDustConversionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`QuoteDustConversionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`QuoteDustConversionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct QuoteDustConversionRequestOwnedView(
+            ::buffa::OwnedView<QuoteDustConversionRequestView<'static>>,
+        );
+        impl QuoteDustConversionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::QuoteDustConversionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`QuoteDustConversionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &QuoteDustConversionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Target asset id, one of ListDustBalances' targets.
+            ///
+            /// Field 2: `target_asset_id`
+            #[must_use]
+            pub fn target_asset_id(&self) -> u32 {
+                self.0.reborrow().target_asset_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<QuoteDustConversionRequestView<'static>>,
+        > for QuoteDustConversionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<QuoteDustConversionRequestView<'static>>,
+            ) -> Self {
+                QuoteDustConversionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<QuoteDustConversionRequestOwnedView>
+        for ::buffa::OwnedView<QuoteDustConversionRequestView<'static>> {
+            fn from(wrapper: QuoteDustConversionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<QuoteDustConversionRequestView<'static>>,
+        > for QuoteDustConversionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<QuoteDustConversionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::QuoteDustConversionRequest {
+            type View<'a> = QuoteDustConversionRequestView<'a>;
+            type ViewHandle = QuoteDustConversionRequestOwnedView;
+        }
+        impl ::serde::Serialize for QuoteDustConversionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// QuoteDustConversionResponse is a quote valid for 30 seconds.
+        #[derive(Clone, Debug, Default)]
+        pub struct QuoteDustConversionResponseView<'a> {
+            /// Quote identifier CreateDustConversion takes. Empty when no balance is
+            /// eligible or their payout rounds to zero; balances still says why.
+            ///
+            /// Field 1: `quote_id`
+            pub quote_id: &'a str,
+            /// After this time CreateDustConversion refuses the quote with
+            /// ERROR_CODE_DUST_QUOTE_EXPIRED.
+            ///
+            /// Field 2: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Target asset id.
+            ///
+            /// Field 3: `target_asset_id`
+            pub target_asset_id: u32,
+            /// The fee in basis points, taken from the payout.
+            ///
+            /// Field 4: `fee_bps`
+            pub fee_bps: u32,
+            /// The sources' total USD value in 18-decimal fixed point, rounded down.
+            ///
+            /// Field 5: `gross_usd_e18`
+            pub gross_usd_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Payout in canonical 18-decimal target units, after the fee, rounded down
+            /// to the target's quantity precision.
+            ///
+            /// Field 6: `payout_e18`
+            pub payout_e18: ::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Every nonzero available Trading balance, sources and others, in asset id
+            /// order.
+            ///
+            /// Field 7: `balances`
+            pub balances: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DustBalanceView<'a>,
+            >,
+            /// Prices of the sources and the target, in asset id order.
+            ///
+            /// Field 8: `prices`
+            pub prices: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DustAssetPriceView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for QuoteDustConversionResponseView<'a> {
+            type Owned = super::super::QuoteDustConversionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.target_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.fee_bps = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.gross_usd_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.gross_usd_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.payout_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.payout_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.balances
+                            .push(
+                                <super::super::__buffa::view::DustBalanceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.prices
+                            .push(
+                                <super::super::__buffa::view::DustAssetPriceView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::QuoteDustConversionResponse {
+                    quote_id: self.quote_id.to_string(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    target_asset_id: self.target_asset_id,
+                    fee_bps: self.fee_bps,
+                    gross_usd_e18: match self.gross_usd_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    payout_e18: match self.payout_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    balances: self
+                        .balances
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    prices: self
+                        .prices
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for QuoteDustConversionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.quote_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.target_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.target_asset_id)
+                                as u32;
+                }
+                if self.fee_bps != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.fee_bps) as u32;
+                }
+                if self.gross_usd_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.gross_usd_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.payout_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.payout_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.balances {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.prices {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.quote_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.quote_id, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                if self.target_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.target_asset_id, buf);
+                }
+                if self.fee_bps != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.fee_bps, buf);
+                }
+                if self.gross_usd_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.gross_usd_e18.write_to(__cache, buf);
+                }
+                if self.payout_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.payout_e18.write_to(__cache, buf);
+                }
+                for v in &self.balances {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.prices {
+                    ::buffa::types::put_len_delimited_header(
+                        8u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for QuoteDustConversionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_id) {
+                    __map.serialize_entry("quoteId", self.quote_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.target_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "targetAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.target_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.fee_bps) {
+                    __map
+                        .serialize_entry(
+                            "feeBps",
+                            &::buffa::json_helpers::ProtoJson(&self.fee_bps),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .gross_usd_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("grossUsdE18", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .payout_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("payoutE18", __v)?;
+                    }
+                }
+                if !self.balances.is_empty() {
+                    __map.serialize_entry("balances", &*self.balances)?;
+                }
+                if !self.prices.is_empty() {
+                    __map.serialize_entry("prices", &*self.prices)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for QuoteDustConversionResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "QuoteDustConversionResponse";
+            const FULL_NAME: &'static str = "transfer.v1.QuoteDustConversionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.QuoteDustConversionResponse";
+        }
+        ::buffa::impl_default_view_instance!(QuoteDustConversionResponseView);
+        ::buffa::impl_view_reborrow!(QuoteDustConversionResponseView);
+        /** Self-contained, `'static` owned view of a `QuoteDustConversionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`QuoteDustConversionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`QuoteDustConversionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct QuoteDustConversionResponseOwnedView(
+            ::buffa::OwnedView<QuoteDustConversionResponseView<'static>>,
+        );
+        impl QuoteDustConversionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::QuoteDustConversionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    QuoteDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`QuoteDustConversionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &QuoteDustConversionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::QuoteDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Quote identifier CreateDustConversion takes. Empty when no balance is
+            /// eligible or their payout rounds to zero; balances still says why.
+            ///
+            /// Field 1: `quote_id`
+            #[must_use]
+            pub fn quote_id(&self) -> &'_ str {
+                self.0.reborrow().quote_id
+            }
+            /// After this time CreateDustConversion refuses the quote with
+            /// ERROR_CODE_DUST_QUOTE_EXPIRED.
+            ///
+            /// Field 2: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+            /// Target asset id.
+            ///
+            /// Field 3: `target_asset_id`
+            #[must_use]
+            pub fn target_asset_id(&self) -> u32 {
+                self.0.reborrow().target_asset_id
+            }
+            /// The fee in basis points, taken from the payout.
+            ///
+            /// Field 4: `fee_bps`
+            #[must_use]
+            pub fn fee_bps(&self) -> u32 {
+                self.0.reborrow().fee_bps
+            }
+            /// The sources' total USD value in 18-decimal fixed point, rounded down.
+            ///
+            /// Field 5: `gross_usd_e18`
+            #[must_use]
+            pub fn gross_usd_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().gross_usd_e18
+            }
+            /// Payout in canonical 18-decimal target units, after the fee, rounded down
+            /// to the target's quantity precision.
+            ///
+            /// Field 6: `payout_e18`
+            #[must_use]
+            pub fn payout_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().payout_e18
+            }
+            /// Every nonzero available Trading balance, sources and others, in asset id
+            /// order.
+            ///
+            /// Field 7: `balances`
+            #[must_use]
+            pub fn balances(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DustBalanceView<'_>,
+            > {
+                &self.0.reborrow().balances
+            }
+            /// Prices of the sources and the target, in asset id order.
+            ///
+            /// Field 8: `prices`
+            #[must_use]
+            pub fn prices(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DustAssetPriceView<'_>,
+            > {
+                &self.0.reborrow().prices
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<QuoteDustConversionResponseView<'static>>,
+        > for QuoteDustConversionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<QuoteDustConversionResponseView<'static>>,
+            ) -> Self {
+                QuoteDustConversionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<QuoteDustConversionResponseOwnedView>
+        for ::buffa::OwnedView<QuoteDustConversionResponseView<'static>> {
+            fn from(wrapper: QuoteDustConversionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<QuoteDustConversionResponseView<'static>>,
+        > for QuoteDustConversionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<QuoteDustConversionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::QuoteDustConversionResponse {
+            type View<'a> = QuoteDustConversionResponseView<'a>;
+            type ViewHandle = QuoteDustConversionResponseOwnedView;
+        }
+        impl ::serde::Serialize for QuoteDustConversionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateDustConversionRequest converts one quote.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateDustConversionRequestView<'a> {
+            /// Optional public subaccount ID; it must select the quote's account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Stable client-supplied key collapsing retries for the account.
+            ///
+            /// Field 2: `idempotency_key`
+            pub idempotency_key: &'a str,
+            /// Quote from QuoteDustConversion, at most 30 seconds old. A quote converts
+            /// once.
+            ///
+            /// Field 3: `quote_id`
+            pub quote_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateDustConversionRequestView<'a> {
+            type Owned = super::super::CreateDustConversionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.quote_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateDustConversionRequest {
+                    subaccount_id: self.subaccount_id,
+                    idempotency_key: self.idempotency_key.to_string(),
+                    quote_id: self.quote_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateDustConversionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                if !self.quote_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.quote_id) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.idempotency_key, buf);
+                }
+                if !self.quote_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.quote_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateDustConversionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.quote_id) {
+                    __map.serialize_entry("quoteId", self.quote_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateDustConversionRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "CreateDustConversionRequest";
+            const FULL_NAME: &'static str = "transfer.v1.CreateDustConversionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionRequest";
+        }
+        ::buffa::impl_default_view_instance!(CreateDustConversionRequestView);
+        ::buffa::impl_view_reborrow!(CreateDustConversionRequestView);
+        /** Self-contained, `'static` owned view of a `CreateDustConversionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateDustConversionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateDustConversionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateDustConversionRequestOwnedView(
+            ::buffa::OwnedView<CreateDustConversionRequestView<'static>>,
+        );
+        impl CreateDustConversionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateDustConversionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateDustConversionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateDustConversionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID; it must select the quote's account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Stable client-supplied key collapsing retries for the account.
+            ///
+            /// Field 2: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+            /// Quote from QuoteDustConversion, at most 30 seconds old. A quote converts
+            /// once.
+            ///
+            /// Field 3: `quote_id`
+            #[must_use]
+            pub fn quote_id(&self) -> &'_ str {
+                self.0.reborrow().quote_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateDustConversionRequestView<'static>>,
+        > for CreateDustConversionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateDustConversionRequestView<'static>>,
+            ) -> Self {
+                CreateDustConversionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateDustConversionRequestOwnedView>
+        for ::buffa::OwnedView<CreateDustConversionRequestView<'static>> {
+            fn from(wrapper: CreateDustConversionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateDustConversionRequestView<'static>>,
+        > for CreateDustConversionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateDustConversionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateDustConversionRequest {
+            type View<'a> = CreateDustConversionRequestView<'a>;
+            type ViewHandle = CreateDustConversionRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateDustConversionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateDustConversionResponse returns the conversion.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateDustConversionResponseView<'a> {
+            /// The conversion: completed, or still processing when its outcome is not
+            /// known yet.
+            ///
+            /// Field 1: `conversion`
+            pub conversion: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DustConversionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CreateDustConversionResponseView<'a> {
+            type Owned = super::super::CreateDustConversionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.conversion.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.conversion = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DustConversionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateDustConversionResponse {
+                    conversion: match self.conversion.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DustConversion,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CreateDustConversionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.conversion.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.conversion.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.conversion.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.conversion.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CreateDustConversionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .conversion
+                        .as_option()
+                    {
+                        __map.serialize_entry("conversion", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CreateDustConversionResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "CreateDustConversionResponse";
+            const FULL_NAME: &'static str = "transfer.v1.CreateDustConversionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.CreateDustConversionResponse";
+        }
+        ::buffa::impl_default_view_instance!(CreateDustConversionResponseView);
+        ::buffa::impl_view_reborrow!(CreateDustConversionResponseView);
+        /** Self-contained, `'static` owned view of a `CreateDustConversionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateDustConversionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateDustConversionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateDustConversionResponseOwnedView(
+            ::buffa::OwnedView<CreateDustConversionResponseView<'static>>,
+        );
+        impl CreateDustConversionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateDustConversionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateDustConversionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateDustConversionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The conversion: completed, or still processing when its outcome is not
+            /// known yet.
+            ///
+            /// Field 1: `conversion`
+            #[must_use]
+            pub fn conversion(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DustConversionView<'_>,
+            > {
+                &self.0.reborrow().conversion
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateDustConversionResponseView<'static>>,
+        > for CreateDustConversionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CreateDustConversionResponseView<'static>>,
+            ) -> Self {
+                CreateDustConversionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateDustConversionResponseOwnedView>
+        for ::buffa::OwnedView<CreateDustConversionResponseView<'static>> {
+            fn from(wrapper: CreateDustConversionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateDustConversionResponseView<'static>>,
+        > for CreateDustConversionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CreateDustConversionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CreateDustConversionResponse {
+            type View<'a> = CreateDustConversionResponseView<'a>;
+            type ViewHandle = CreateDustConversionResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateDustConversionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetDustConversionRequest reads one of the account's conversions.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetDustConversionRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Conversion identifier.
+            ///
+            /// Field 2: `conversion_id`
+            pub conversion_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetDustConversionRequestView<'a> {
+            type Owned = super::super::GetDustConversionRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.conversion_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetDustConversionRequest {
+                    subaccount_id: self.subaccount_id,
+                    conversion_id: self.conversion_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetDustConversionRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.conversion_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.conversion_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if !self.conversion_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.conversion_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetDustConversionRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.conversion_id) {
+                    __map.serialize_entry("conversionId", self.conversion_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetDustConversionRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "GetDustConversionRequest";
+            const FULL_NAME: &'static str = "transfer.v1.GetDustConversionRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetDustConversionRequestView);
+        ::buffa::impl_view_reborrow!(GetDustConversionRequestView);
+        /** Self-contained, `'static` owned view of a `GetDustConversionRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetDustConversionRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetDustConversionRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetDustConversionRequestOwnedView(
+            ::buffa::OwnedView<GetDustConversionRequestView<'static>>,
+        );
+        impl GetDustConversionRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetDustConversionRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetDustConversionRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetDustConversionRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Conversion identifier.
+            ///
+            /// Field 2: `conversion_id`
+            #[must_use]
+            pub fn conversion_id(&self) -> &'_ str {
+                self.0.reborrow().conversion_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetDustConversionRequestView<'static>>,
+        > for GetDustConversionRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetDustConversionRequestView<'static>>,
+            ) -> Self {
+                GetDustConversionRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetDustConversionRequestOwnedView>
+        for ::buffa::OwnedView<GetDustConversionRequestView<'static>> {
+            fn from(wrapper: GetDustConversionRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetDustConversionRequestView<'static>>,
+        > for GetDustConversionRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetDustConversionRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetDustConversionRequest {
+            type View<'a> = GetDustConversionRequestView<'a>;
+            type ViewHandle = GetDustConversionRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetDustConversionRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetDustConversionResponse returns one conversion.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetDustConversionResponseView<'a> {
+            /// The conversion.
+            ///
+            /// Field 1: `conversion`
+            pub conversion: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DustConversionView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetDustConversionResponseView<'a> {
+            type Owned = super::super::GetDustConversionResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.conversion.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.conversion = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DustConversionView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetDustConversionResponse {
+                    conversion: match self.conversion.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DustConversion,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetDustConversionResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.conversion.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.conversion.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.conversion.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.conversion.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetDustConversionResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .conversion
+                        .as_option()
+                    {
+                        __map.serialize_entry("conversion", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetDustConversionResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "GetDustConversionResponse";
+            const FULL_NAME: &'static str = "transfer.v1.GetDustConversionResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.GetDustConversionResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetDustConversionResponseView);
+        ::buffa::impl_view_reborrow!(GetDustConversionResponseView);
+        /** Self-contained, `'static` owned view of a `GetDustConversionResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetDustConversionResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetDustConversionResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetDustConversionResponseOwnedView(
+            ::buffa::OwnedView<GetDustConversionResponseView<'static>>,
+        );
+        impl GetDustConversionResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetDustConversionResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetDustConversionResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetDustConversionResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetDustConversionResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetDustConversionResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The conversion.
+            ///
+            /// Field 1: `conversion`
+            #[must_use]
+            pub fn conversion(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DustConversionView<'_>,
+            > {
+                &self.0.reborrow().conversion
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetDustConversionResponseView<'static>>,
+        > for GetDustConversionResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetDustConversionResponseView<'static>>,
+            ) -> Self {
+                GetDustConversionResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetDustConversionResponseOwnedView>
+        for ::buffa::OwnedView<GetDustConversionResponseView<'static>> {
+            fn from(wrapper: GetDustConversionResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetDustConversionResponseView<'static>>,
+        > for GetDustConversionResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetDustConversionResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetDustConversionResponse {
+            type View<'a> = GetDustConversionResponseView<'a>;
+            type ViewHandle = GetDustConversionResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetDustConversionResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDustConversionsRequest lists the account's conversions, newest first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDustConversionsRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Maximum number of conversions to return: 0 means 20, at most 100.
+            ///
+            /// Field 2: `limit`
+            pub limit: u32,
+            /// Opaque, exclusive, keyset-backed cursor from a previous response, bound to
+            /// the caller's account or subaccount and the newest-first creation order.
+            /// Empty for the first page.
+            ///
+            /// Field 3: `page_token`
+            pub page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDustConversionsRequestView<'a> {
+            type Owned = super::super::ListDustConversionsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDustConversionsRequest {
+                    subaccount_id: self.subaccount_id,
+                    limit: self.limit,
+                    page_token: self.page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDustConversionsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.limit != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.subaccount_id, buf);
+                }
+                if self.limit != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.limit, buf);
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDustConversionsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&self.limit),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDustConversionsRequestView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "ListDustConversionsRequest";
+            const FULL_NAME: &'static str = "transfer.v1.ListDustConversionsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListDustConversionsRequestView);
+        ::buffa::impl_view_reborrow!(ListDustConversionsRequestView);
+        /** Self-contained, `'static` owned view of a `ListDustConversionsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDustConversionsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDustConversionsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDustConversionsRequestOwnedView(
+            ::buffa::OwnedView<ListDustConversionsRequestView<'static>>,
+        );
+        impl ListDustConversionsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDustConversionsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDustConversionsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDustConversionsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys use
+            /// their bound subaccount; other callers use their authenticated root account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Maximum number of conversions to return: 0 means 20, at most 100.
+            ///
+            /// Field 2: `limit`
+            #[must_use]
+            pub fn limit(&self) -> u32 {
+                self.0.reborrow().limit
+            }
+            /// Opaque, exclusive, keyset-backed cursor from a previous response, bound to
+            /// the caller's account or subaccount and the newest-first creation order.
+            /// Empty for the first page.
+            ///
+            /// Field 3: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDustConversionsRequestView<'static>>,
+        > for ListDustConversionsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDustConversionsRequestView<'static>>,
+            ) -> Self {
+                ListDustConversionsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDustConversionsRequestOwnedView>
+        for ::buffa::OwnedView<ListDustConversionsRequestView<'static>> {
+            fn from(wrapper: ListDustConversionsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDustConversionsRequestView<'static>>,
+        > for ListDustConversionsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDustConversionsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDustConversionsRequest {
+            type View<'a> = ListDustConversionsRequestView<'a>;
+            type ViewHandle = ListDustConversionsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListDustConversionsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListDustConversionsResponse returns one page of conversions, newest first.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListDustConversionsResponseView<'a> {
+            /// Conversions ordered by creation time, newest first.
+            ///
+            /// Field 1: `conversions`
+            pub conversions: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::DustConversionView<'a>,
+            >,
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            pub next_page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListDustConversionsResponseView<'a> {
+            type Owned = super::super::ListDustConversionsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.conversions
+                            .push(
+                                <super::super::__buffa::view::DustConversionView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListDustConversionsResponse {
+                    conversions: self
+                        .conversions
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_page_token: self.next_page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListDustConversionsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.conversions {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.conversions {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListDustConversionsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.conversions.is_empty() {
+                    __map.serialize_entry("conversions", &*self.conversions)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListDustConversionsResponseView<'a> {
+            const PACKAGE: &'static str = "transfer.v1";
+            const NAME: &'static str = "ListDustConversionsResponse";
+            const FULL_NAME: &'static str = "transfer.v1.ListDustConversionsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/transfer.v1.ListDustConversionsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListDustConversionsResponseView);
+        ::buffa::impl_view_reborrow!(ListDustConversionsResponseView);
+        /** Self-contained, `'static` owned view of a `ListDustConversionsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListDustConversionsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListDustConversionsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListDustConversionsResponseOwnedView(
+            ::buffa::OwnedView<ListDustConversionsResponseView<'static>>,
+        );
+        impl ListDustConversionsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListDustConversionsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListDustConversionsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListDustConversionsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListDustConversionsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListDustConversionsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Conversions ordered by creation time, newest first.
+            ///
+            /// Field 1: `conversions`
+            #[must_use]
+            pub fn conversions(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::DustConversionView<'_>,
+            > {
+                &self.0.reborrow().conversions
+            }
+            /// Cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListDustConversionsResponseView<'static>>,
+        > for ListDustConversionsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListDustConversionsResponseView<'static>>,
+            ) -> Self {
+                ListDustConversionsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListDustConversionsResponseOwnedView>
+        for ::buffa::OwnedView<ListDustConversionsResponseView<'static>> {
+            fn from(wrapper: ListDustConversionsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListDustConversionsResponseView<'static>>,
+        > for ListDustConversionsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListDustConversionsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListDustConversionsResponse {
+            type View<'a> = ListDustConversionsResponseView<'a>;
+            type ViewHandle = ListDustConversionsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListDustConversionsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
             pub mod create_internal_transfer_request {
+                #[allow(unused_imports)]
+                use super::*;
+                #[derive(Clone, Debug)]
+                pub enum Destination<'a> {
+                    DestinationAccountId(u64),
+                    DestinationSubaccountId(u64),
+                    DestinationSmartAccountAddress(&'a str),
+                }
+            }
+            pub mod internal_transfer_batch_leg {
                 #[allow(unused_imports)]
                 use super::*;
                 #[derive(Clone, Debug)]
@@ -5029,6 +18267,44 @@ pub mod __buffa {
         #[allow(unused_imports)]
         use super::*;
         pub mod create_internal_transfer_request {
+            #[allow(unused_imports)]
+            use super::*;
+            #[derive(Clone, PartialEq, Debug)]
+            pub enum Destination {
+                DestinationAccountId(u64),
+                DestinationSubaccountId(u64),
+                DestinationSmartAccountAddress(::buffa::alloc::string::String),
+            }
+            impl ::buffa::Oneof for Destination {}
+            impl serde::Serialize for Destination {
+                fn serialize<S: serde::Serializer>(
+                    &self,
+                    s: S,
+                ) -> ::core::result::Result<S::Ok, S::Error> {
+                    use serde::ser::SerializeMap;
+                    let mut map = s.serialize_map(Some(1))?;
+                    match self {
+                        Self::DestinationAccountId(v) => {
+                            map.serialize_entry(
+                                "destinationAccountId",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::DestinationSubaccountId(v) => {
+                            map.serialize_entry(
+                                "destinationSubaccountId",
+                                &::buffa::json_helpers::ProtoJson(v),
+                            )?;
+                        }
+                        Self::DestinationSmartAccountAddress(v) => {
+                            map.serialize_entry("destinationSmartAccountAddress", v)?;
+                        }
+                    }
+                    map.end()
+                }
+            }
+        }
+        pub mod internal_transfer_batch_leg {
             #[allow(unused_imports)]
             use super::*;
             #[derive(Clone, PartialEq, Debug)]
@@ -5101,8 +18377,28 @@ pub mod __buffa {
         reg.register_json_any(super::__RESOLVED_DESTINATION_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__CREATE_INTERNAL_TRANSFER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__INTERNAL_TRANSFER_BATCH_LEG_JSON_ANY);
+        reg.register_json_any(super::__BATCH_CREATE_INTERNAL_TRANSFERS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__INTERNAL_TRANSFER_BATCH_LEG_RESULT_JSON_ANY);
+        reg.register_json_any(
+            super::__BATCH_CREATE_INTERNAL_TRANSFERS_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_INTERNAL_TRANSFER_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DUST_BALANCE_JSON_ANY);
+        reg.register_json_any(super::__DUST_ASSET_PRICE_JSON_ANY);
+        reg.register_json_any(super::__DUST_SOURCE_JSON_ANY);
+        reg.register_json_any(super::__DUST_CONVERSION_JSON_ANY);
+        reg.register_json_any(super::__LIST_DUST_BALANCES_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_DUST_BALANCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__QUOTE_DUST_CONVERSION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__QUOTE_DUST_CONVERSION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CREATE_DUST_CONVERSION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CREATE_DUST_CONVERSION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_DUST_CONVERSION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_DUST_CONVERSION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_DUST_CONVERSIONS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_DUST_CONVERSIONS_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -5122,6 +18418,22 @@ pub use self::__buffa::view::CreateInternalTransferResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateInternalTransferResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::InternalTransferBatchLegView;
+#[doc(inline)]
+pub use self::__buffa::view::InternalTransferBatchLegOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateInternalTransfersRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateInternalTransfersRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::InternalTransferBatchLegResultView;
+#[doc(inline)]
+pub use self::__buffa::view::InternalTransferBatchLegResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateInternalTransfersResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::BatchCreateInternalTransfersResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::GetInternalTransferRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::GetInternalTransferRequestOwnedView;
@@ -5129,5 +18441,61 @@ pub use self::__buffa::view::GetInternalTransferRequestOwnedView;
 pub use self::__buffa::view::GetInternalTransferResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetInternalTransferResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DustBalanceView;
+#[doc(inline)]
+pub use self::__buffa::view::DustBalanceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DustAssetPriceView;
+#[doc(inline)]
+pub use self::__buffa::view::DustAssetPriceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DustSourceView;
+#[doc(inline)]
+pub use self::__buffa::view::DustSourceOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DustConversionView;
+#[doc(inline)]
+pub use self::__buffa::view::DustConversionOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustBalancesRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustBalancesRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustBalancesResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustBalancesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::QuoteDustConversionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::QuoteDustConversionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::QuoteDustConversionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::QuoteDustConversionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateDustConversionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateDustConversionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateDustConversionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateDustConversionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDustConversionRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDustConversionRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDustConversionResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetDustConversionResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustConversionsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustConversionsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustConversionsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListDustConversionsResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

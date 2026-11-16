@@ -5,9 +5,9 @@ and automation. Parity with `polyester-sdk-go` and `polyester-sdk-python`, built
 on [Connect for Rust](https://github.com/connectrpc/connect-rust) (Buffa + Connect
 **0.8.x**) and the checked-in `src/gen/` protobuf bundle.
 
-**Status:** `0.30.0` (git tag `v0.30.0`). Pre-1.0: minor releases may break the API.
+**Status:** `0.31.0` (git tag `v0.31.0`). Pre-1.0: minor releases may break the API.
 The Go, Python and Rust SDKs are released together. Their versions match unless a
-change breaks only one SDK's API: Rust 0.30.0 is the release of Go 0.32.0 and Python 0.31.0.
+change breaks only one SDK's API: Rust 0.31.0 is the release of Go 0.33.0 and Python 0.32.0.
 Proprietary license (not open source). API-key only; no browser login or JWT flows.
 
 **MSRV:** Rust 1.90+
@@ -43,6 +43,8 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | User trades | Yes |
 | Triggers | Yes |
 | Internal transfers | Yes |
+| Dust conversion | Yes |
+| Statement export files | Yes |
 | Transfer history | Yes |
 | Deposit addresses | Yes |
 | Trading / funding withdraws | Yes |
@@ -93,9 +95,12 @@ for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
 `READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
 `sub_accounts.get`, which leaves out an expansion the key may not read rather
 than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
-`READ_BALANCES` for `withdraw.get_wallet_balances`, and `READ_STATEMENTS` for
-`statements.export_page` and `statements.export` (`READ_BALANCES` does not grant
-it). A key scoped to the main
+`READ_BALANCES` for `withdraw.get_wallet_balances` and `dust.list_balances`,
+`READ_STATEMENTS` for `statements.export_page`, `statements.export` and the
+statement export files (`READ_BALANCES` does not grant it), `CONVERT_DUST` for
+`dust.quote`, `dust.convert`, `dust.get_conversion` and `dust.list_conversions`,
+and `READ_FUNDING_FLOWS` for `lifecycle.list_account_flows` and
+`lifecycle.get_account_flow`. A key scoped to the main
 account also needs `READ_ADDRESS_BOOK` (or `MANAGE_ADDRESS_BOOK`) for the main
 account's address-book reads, as a sub-account's book already did. VIP status
 and social verification need a key scoped to the main account. A key scoped to
@@ -124,7 +129,7 @@ crates.io: https://crates.io/crates/polyester-sdk
 
 ```toml
 [dependencies]
-polyester-sdk = "0.30.0"
+polyester-sdk = "0.31.0"
 ```
 
 Realtime (Centrifugo) and on-chain Funding helpers are always included. The optional
@@ -134,7 +139,7 @@ To pin a git tag instead of crates.io:
 
 ```toml
 [dependencies]
-polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.30.0" }
+polyester-sdk = { git = "https://github.com/Fabric-Labs/polyester-sdk-rust", tag = "v0.31.0" }
 ```
 
 For development from a git checkout:
@@ -429,9 +434,21 @@ accepts new deposits and new withdrawals: `deposit_status` and
 `withdrawal_status` read `"normal"` or `"suspended"`, and are empty while
 availability is not known. `accepts_deposits()` and `accepts_withdrawals()` are
 true only for `"normal"`, so stop a user before they send funds or start a
-withdrawal on a suspended or unknown route. A suspension can stop one direction
-only; funds sent while deposits are suspended are delayed, not lost. The config
-is cacheable for 10 seconds: read it again to see a suspension start or end.
+withdrawal on a suspended or unknown route. An empty status means not known,
+not suspended. A suspension can stop one direction only. While a route is
+`"suspended"`, do not send funds on it; wait until it returns to `"normal"`. A
+Trading withdrawal accepted before its route's withdrawals were suspended, and
+not yet sent, stays pending with its funds held and is sent once
+`withdrawal_status` is `"normal"` again; one already being sent when the
+suspension takes effect may fail, and its funds then return to the account. A
+new withdrawal on a suspended route is refused with `ERROR_CODE_ROUTE_SUSPENDED`
+(`Error::is_withdraw_route_suspended()`): the suspension is temporary, nothing
+was reserved for the refused request, so submit a new request once the route's
+`withdrawal_status` is `"normal"` again. An auto-withdraw run skips such a
+destination as a `skipped` step with reason `route_suspended`, and a broker
+vault's payout rolls over with reason `route_suspended`; these reasons name
+the status only. The config is cacheable for 10 seconds: read it again to see a
+suspension start or end.
 
 Catalogs supply scales and symbol IDs for encoding. Tick/step/minimum
 quantity and notional checks are venue-owned (preview/admission); the SDK does
@@ -974,7 +991,11 @@ omitted when unset. `settled_volume_quality` and `average_aop_quality` say how c
 rolling 30-day metric is (`complete`, `price_unavailable` or `incomplete_history`, with
 `incomplete_hours`); when the volume's status is `price_unavailable`, `settled_volume_30d_usd`
 is a lower bound. `policy_class` uses full protobuf enum names
-(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`).
+(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Trading limits apply per account: the main
+account and each sub-account have their own, and every API key and session that trades for an
+account shares them. Budget against `TradingRateLimits::rules` (placement first, cancellation
+second); `api_key_rules` are informational only, since trading requests are not limited per API
+key, so adding a key does not add capacity.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1521,8 +1542,76 @@ SDK notes:
   wallet. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The result's `flow_id` names the transfer's lifecycle flow
-  (`client.lifecycle.get_flow`). Looking a transfer up by its request or
+  (`client.lifecycle.get_account_flow`). Looking a transfer up by its request or
   transfer ID is session-only and not wrapped.
+- **Several Trading → trading transfers at once:**
+  `client.internal_transfers.batch_create(...)` sends 1 to 10 legs under one
+  idempotency key and one MFA check (an API key needs none). Every leg is
+  checked before any leg runs: if one fails, the batch is `refused` and nothing
+  moves. Otherwise legs run in order and are not atomic, so a leg can be
+  `refused` after earlier legs were `accepted`. A `pending` leg's outcome is not
+  known yet: retry the batch with the same key and legs to learn it. Each leg
+  counts as one internal transfer against the rate limit.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::{
+    BatchCreateInternalTransfersParams, InternalTransferBatchLeg, SubAccountScope,
+};
+use polyester::{AssetAmount, QuantityDomain};
+
+let leg = |asset_id: u32, amount: &str| -> Result<InternalTransferBatchLeg, polyester::Error> {
+    Ok(InternalTransferBatchLeg {
+        asset_id,
+        quantity: AssetAmount::from_decimal_str(amount, 18, QuantityDomain::LedgerE18, Some(asset_id))?,
+        quantity_scale: None,
+        subaccount_id: SubAccountScope::Main,
+        destination_account_id: None,
+        destination_subaccount_id: None,
+        destination_smart_account_address: Some("0x2222222222222222222222222222222222222222".into()),
+    })
+};
+let batch = client
+    .internal_transfers
+    .batch_create(BatchCreateInternalTransfersParams {
+        legs: vec![leg(1, "0.5")?, leg(3, "0.001")?],
+        idempotency_key: "rebalance-2026-11-13-1".into(),
+    })
+    .await?;
+for leg in &batch.legs {
+    println!("leg {} {} {:?}", leg.leg_index, leg.status, leg.error_code);
+}
+# Ok(())
+# }
+```
+
+- **Dust:** `client.dust` converts Trading balances too small to trade (no
+  open market takes them, each worth at most 10 USD) into one target asset at
+  index prices less a disclosed fee, atomically. `list_balances` previews,
+  `quote` prices for 30 seconds, `convert` converts a quote under an
+  idempotency key (`completed`, or `processing`: poll `get_conversion`), and
+  `list_conversions` pages newest first. Amounts are exact `AssetAmount`s at 18
+  decimals. An account converts once every 6 hours: `ERROR_CODE_DUST_WINDOW_ACTIVE`
+  and `ERROR_CODE_DUST_DAILY_LIMIT` are not retryable, `ERROR_CODE_DUST_BUSY` is;
+  `ERROR_CODE_DUST_QUOTE_EXPIRED`, `ERROR_CODE_DUST_PRICE_MOVED` and
+  `ERROR_CODE_DUST_BALANCE_CHANGED` mean quote again.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::SubAccountScope;
+
+let preview = client.dust.list_balances(0, SubAccountScope::Default).await?;
+let quote = client.dust.quote(preview.target_asset_id, SubAccountScope::Default).await?;
+if let Some(quote_id) = &quote.quote_id {
+    let conversion = client
+        .dust
+        .convert(quote_id, "dust-2026-11-14-1", SubAccountScope::Default)
+        .await?;
+    println!("{} {} payout {}", conversion.conversion_id, conversion.state, conversion.payout.as_scaled());
+}
+# Ok(())
+# }
+```
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1703,6 +1792,44 @@ decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
 `account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
 `link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
 internal transfer (empty for other entries).
+
+Each page and the whole statement carry `complete_through`: the statement covers
+movements from `start_time` up to it, exclusive, and it is the same on every
+page. When it is before `end_time`, request the rest, from `complete_through` to
+`end_time`, later. Pages that disagree on it fail with `Error::ResponseContract`.
+
+### Statement export files
+
+For a long period, `create_export` asks the server to produce the whole
+statement as one CSV file in the background (up to 366 days, idempotent per
+`idempotency_key`); `get_export` and `list_exports` report its status
+(`queued`, `processing`, `ready`, `failed` or `expired`), progress and expiry. A
+`ready` file is byte for byte the statement up to `complete_through` and is
+downloaded for 7 days over REST only, with an authenticated
+`GET /v1/statements/exports/{export_id}/file`; this SDK does not download it. A
+main account has at most 5 exports queued or processing
+(`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, not retryable), and a period with
+more than 4,000,000 movements fails with `failure_reason` `too_large`.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::services::CreateStatementExportOptions;
+use std::time::{Duration, UNIX_EPOCH};
+
+let export = client
+    .statements
+    .create_export(CreateStatementExportOptions {
+        start_time: Some(UNIX_EPOCH + Duration::from_secs(1_767_225_600)),
+        end_time: Some(UNIX_EPOCH + Duration::from_secs(1_798_761_600)),
+        idempotency_key: "statement-2026".into(),
+        ..Default::default()
+    })
+    .await?;
+let current = client.statements.get_export(&export.export_id).await?;
+println!("{} {} {} movements", current.export_id, current.status, current.movements);
+# Ok(())
+# }
+```
 
 ## Errors, retries, and withdrawal identity
 
@@ -2529,24 +2656,27 @@ apply Polyester API-key signatures by themselves.
 
 ## Lifecycle flow lists
 
-A flow list that selects an account (`owner_account_id` or `smart_account_address`) returns the
-flows it owns and the transfers other accounts sent to it, such as a transfer from another user or
-sub-account, or a reward payout. Each row's `participation` says which: `owner` (its deposit,
-withdrawal, or a transfer it sent, including a move between its own Funding and Trading balances)
-or `recipient`. For a transfer, the counterparty is `destination_address` when the account sent it
-and `source_address` (with `owner_account_id`) when it received it. `ListFlowsRequest::participation`
-narrows the list to one side; the server refuses it without an account.
+The public flow reads (`list_flows`, `get_flow`, `list_flows_by_tx`) return only flows a chain
+transaction started, and select an account by its smart account address only. A list that selects
+one (`account_selector`) returns the flows it owns and the transfers other accounts sent to it,
+such as a transfer from another user or sub-account, or a reward payout. Each row's
+`participation` says which: `owner` (its deposit, withdrawal, or a transfer it sent, including a
+move between its own Funding and Trading balances) or `recipient`. For a transfer, the
+counterparty is `destination_address` when the account sent it and `source_address` when it
+received it. `ListFlowsRequest::participation` narrows the list to one side; the server refuses it
+without a smart account address.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
-# let account_id: u64 = 0;
 use polyester::proto::chain::lifecycle::v1::__buffa::oneof::list_flows_request::AccountSelector;
 use polyester::proto::chain::lifecycle::v1::{FlowParticipation, ListFlowsRequest};
 
 let page = client
     .lifecycle
     .list_flows(ListFlowsRequest {
-        account_selector: Some(AccountSelector::OwnerAccountId(account_id)),
+        account_selector: Some(AccountSelector::SmartAccountAddress(
+            "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed".into(),
+        )),
         participation: FlowParticipation::PARTICIPATION_RECIPIENT.into(),
         limit: 20,
         ..Default::default()
@@ -2558,6 +2688,41 @@ let page = client
 
 A page token is bound to the request it was returned for: continue with the same account,
 participation, scope and order; only `limit` may change.
+
+An account reads all of its own flows, including transfers between Trading accounts and Trading
+withdrawals not yet on chain, with the signed `list_account_flows` and `get_account_flow`. They take
+the filters, ordering and pagination of `list_flows`, and the account through the sub-account
+scope (`subaccount_id` `None` takes the configured default). An API key needs
+`READ_FUNDING_FLOWS`. `limit` 0 asks for the server's default; above 500 is refused before
+sending.
+
+```rust,no_run
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::models::SubAccountScope;
+use polyester::proto::chain::lifecycle::v1::ListAccountFlowsRequest;
+
+let page = client
+    .lifecycle
+    .list_account_flows(ListAccountFlowsRequest {
+        limit: 50,
+        ..Default::default()
+    })
+    .await?;
+if let Some(flow) = page.flows.first() {
+    let one = client
+        .lifecycle
+        .get_account_flow(&flow.intent_id, SubAccountScope::Default)
+        .await?;
+    println!("{} {}", one.intent_id, one.participation);
+}
+# Ok(())
+# }
+```
+
+A deposit whose `lifecycle_reason` is `zipper_deposit_delivered_to_wallet` ended completed at the
+account's own Polyester Chain wallet (`smart_account_address`) because its destination did not
+accept the credit: show it as delivered to the wallet, not as a failure and not as credited to
+Funding or Trading.
 
 ## Lifecycle transaction lookups
 

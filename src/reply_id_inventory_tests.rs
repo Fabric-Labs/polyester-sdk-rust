@@ -357,3 +357,108 @@ fn inventory_lists_every_reply_id_field() {
         "reply ID inventory out of date:\nunlisted: {unlisted:?}\nlisted but not in any reply: {gone:?}"
     );
 }
+
+/// The messages of the 0.93.3 contract additions whose every field the SDK
+/// sets from a parameter or exposes on a model, unless the inventory says
+/// why not.
+const FIELD_INVENTORY_MESSAGES: [&str; 35] = [
+    "ledger.read.v1.CreateStatementExportRequest",
+    "ledger.read.v1.GetStatementExportRequest",
+    "ledger.read.v1.ListStatementExportsRequest",
+    "ledger.read.v1.StatementExport",
+    "ledger.read.v1.CreateStatementExportResponse",
+    "ledger.read.v1.GetStatementExportResponse",
+    "ledger.read.v1.ListStatementExportsResponse",
+    "ledger.read.v1.ExportStatementResponse",
+    "ledger.read.v1.BalanceSeries",
+    "ledger.read.v1.GetBalanceHistoryResponse",
+    "transfer.v1.BatchCreateInternalTransfersRequest",
+    "transfer.v1.InternalTransferBatchLeg",
+    "transfer.v1.BatchCreateInternalTransfersResponse",
+    "transfer.v1.InternalTransferBatchLegResult",
+    "transfer.v1.ResolvedDestination",
+    "transfer.v1.ListDustBalancesRequest",
+    "transfer.v1.QuoteDustConversionRequest",
+    "transfer.v1.CreateDustConversionRequest",
+    "transfer.v1.GetDustConversionRequest",
+    "transfer.v1.ListDustConversionsRequest",
+    "transfer.v1.DustBalance",
+    "transfer.v1.DustAssetPrice",
+    "transfer.v1.DustSource",
+    "transfer.v1.DustConversion",
+    "transfer.v1.ListDustBalancesResponse",
+    "transfer.v1.QuoteDustConversionResponse",
+    "transfer.v1.CreateDustConversionResponse",
+    "transfer.v1.GetDustConversionResponse",
+    "transfer.v1.ListDustConversionsResponse",
+    "chain.lifecycle.v1.ListAccountFlowsRequest",
+    "chain.lifecycle.v1.GetAccountFlowRequest",
+    "chain.lifecycle.v1.ListAccountFlowsResponse",
+    "chain.lifecycle.v1.GetAccountFlowResponse",
+    "orders.v1.ErrorDetail",
+    "auth.v1.AuthErrorDetail",
+];
+
+/// Every proto field of `message` as `<message>.<field>`, a oneof's members
+/// in place of the oneof. `None` when the contract has no such message.
+fn message_fields(contract: &Contract, message: &str) -> Option<BTreeSet<String>> {
+    let (package, name) = message.rsplit_once('.')?;
+    let key = (package.to_owned(), Vec::new(), name.to_owned());
+    let item = contract.items.get(&key)?;
+    let mut out = BTreeSet::new();
+    for (field, ty) in &item.fields {
+        if field.starts_with("__buffa") {
+            continue;
+        }
+        match resolve(contract, package, &item.scope, ty) {
+            Some(oneof)
+                if contract.items[&oneof].scope.first().map(String::as_str) == Some("__buffa") =>
+            {
+                for (member, _) in &contract.items[&oneof].fields {
+                    out.insert(format!("{message}.{member}"));
+                }
+            }
+            _ => {
+                out.insert(format!("{message}.{field}"));
+            }
+        }
+    }
+    Some(out)
+}
+
+#[test]
+fn contract_field_inventory_lists_every_field() {
+    let inventory = include_str!("../testdata/contract_field_inventory.tsv");
+    let mut listed = BTreeSet::new();
+    for line in inventory.lines() {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('\t').collect();
+        assert_eq!(parts.len(), 3, "malformed inventory line {line:?}");
+        assert!(
+            matches!(parts[1], "covered" | "omitted") && !parts[2].is_empty(),
+            "malformed inventory line {line:?}"
+        );
+        assert!(
+            listed.insert(parts[0].to_owned()),
+            "{} is listed twice",
+            parts[0]
+        );
+    }
+    let contract = load();
+    let mut walked = BTreeSet::new();
+    let mut missing = Vec::new();
+    for message in FIELD_INVENTORY_MESSAGES {
+        match message_fields(&contract, message) {
+            Some(fields) => walked.extend(fields),
+            None => missing.push(message),
+        }
+    }
+    let unlisted: Vec<_> = walked.difference(&listed).collect();
+    let gone: Vec<_> = listed.difference(&walked).collect();
+    assert!(
+        missing.is_empty() && unlisted.is_empty() && gone.is_empty(),
+        "contract field inventory out of date:\nmessages not in the contract: {missing:?}\nunlisted: {unlisted:?}\nlisted but gone: {gone:?}"
+    );
+}

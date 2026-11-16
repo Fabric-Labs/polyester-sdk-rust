@@ -183,6 +183,15 @@ pub enum Error {
         /// schedule then.
         /// Boxed so `Error` stays small enough for Clippy's `result_large_err`.
         detail: Option<Box<RateLimitDetail>>,
+        /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the code the refused
+        /// ladder order would return as a single order, such as
+        /// `ERROR_CODE_RATE_LIMIT_EXCEEDED`; `None` otherwise. Read it with
+        /// [`Error::cause_code`].
+        cause_code: Option<String>,
+        /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the refused order's
+        /// zero-based index among the ladder's orders (`Some(0)` is the
+        /// first); `None` otherwise. Read it with [`Error::level_index`].
+        level_index: Option<u32>,
     },
     #[error("{0}")]
     Server(String),
@@ -326,6 +335,14 @@ impl std::fmt::Display for SubscriptionEndReason {
 /// Stable auth.v1.AuthErrorDetail codes used for MFA control flow.
 /// Prefer these over ConnectError message text.
 pub mod auth_codes {
+    /// The X/Twitter or Discord account was unlinked from another Polyester
+    /// account less than 30 days ago (HTTP 412). Not retryable before
+    /// [`super::Error::retry_at`].
+    pub const SOCIAL_ACCOUNT_COOLDOWN: &str = "AUTH_SOCIAL_ACCOUNT_COOLDOWN";
+    /// The account changed or unlinked that provider's account less than 30
+    /// days ago: one change per provider every 30 days (HTTP 412). Not
+    /// retryable before [`super::Error::retry_at`].
+    pub const SOCIAL_CHANGE_LIMIT_REACHED: &str = "AUTH_SOCIAL_CHANGE_LIMIT_REACHED";
     pub const MFA_NOT_ENROLLED: &str = "AUTH_MFA_NOT_ENROLLED";
     pub const STEP_UP_REQUIRED: &str = "AUTH_STEP_UP_REQUIRED";
     pub const MFA_ELEVATION_REQUIRED: &str = "AUTH_MFA_ELEVATION_REQUIRED";
@@ -457,6 +474,62 @@ pub mod problem_codes {
 }
 
 /// Stable orders.v1.ErrorDetail codes used for retry control flow.
+/// `chain.withdraw.v1.ErrorCode` names this SDK branches on.
+pub mod withdraw_codes {
+    /// A broker-vault withdrawal to a destination whitelisted less than 24
+    /// hours ago; see [`super::Error::is_withdraw_destination_cooling_down`].
+    pub const EXTERNAL_DESTINATION_COOLING_DOWN: &str =
+        "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN";
+    /// Withdrawals of the asset to the destination network are temporarily
+    /// suspended (REST `ROUTE_SUSPENDED`, Connect `failed_precondition`, HTTP
+    /// 400); see [`super::Error::is_withdraw_route_suspended`].
+    pub const ROUTE_SUSPENDED: &str = "ERROR_CODE_ROUTE_SUSPENDED";
+}
+
+/// `transfer.v1.ErrorCode` names of dust conversion refusals.
+pub mod transfer_codes {
+    /// The quote is older than 30 seconds, unknown, or another account's:
+    /// quote again. Final.
+    pub const DUST_QUOTE_EXPIRED: &str = "ERROR_CODE_DUST_QUOTE_EXPIRED";
+    /// The payout fell more than 1% below the quote: quote again. Final.
+    pub const DUST_PRICE_MOVED: &str = "ERROR_CODE_DUST_PRICE_MOVED";
+    /// A quoted balance no longer converts as dust, or the payout rounds to
+    /// zero: quote again. Final.
+    pub const DUST_NOT_ELIGIBLE: &str = "ERROR_CODE_DUST_NOT_ELIGIBLE";
+    /// The account converted dust within the last 6 hours, or a conversion
+    /// is still processing (HTTP 429). Not retryable: try much later.
+    pub const DUST_WINDOW_ACTIVE: &str = "ERROR_CODE_DUST_WINDOW_ACTIVE";
+    /// The target's daily dust conversion limit is reached (HTTP 429). Not
+    /// retryable: try later.
+    pub const DUST_DAILY_LIMIT: &str = "ERROR_CODE_DUST_DAILY_LIMIT";
+    /// Too many dust conversions are in progress (HTTP 429). Retryable
+    /// shortly.
+    pub const DUST_BUSY: &str = "ERROR_CODE_DUST_BUSY";
+    /// The target cannot be paid now, or has no current price: quote again
+    /// later. Final.
+    pub const DUST_TARGET_UNAVAILABLE: &str = "ERROR_CODE_DUST_TARGET_UNAVAILABLE";
+    /// A source balance moved since the quote: quote again. Final.
+    pub const DUST_BALANCE_CHANGED: &str = "ERROR_CODE_DUST_BALANCE_CHANGED";
+    /// The conversion could not complete; nothing moved: quote again. Final.
+    pub const DUST_CONVERSION_FAILED: &str = "ERROR_CODE_DUST_CONVERSION_FAILED";
+}
+
+/// `ledger.read.v1.ErrorCode` names of statement export refusals.
+pub mod ledger_codes {
+    /// The idempotency key was used for a create with other fields
+    /// (REST 409). Final.
+    pub const IDEMPOTENCY_KEY_REUSED: &str = "ERROR_CODE_IDEMPOTENCY_KEY_REUSED";
+    /// The main account already has 5 exports queued or processing
+    /// (REST 429). Not retryable: wait for one to finish.
+    pub const STATEMENT_EXPORT_LIMIT_REACHED: &str = "ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED";
+    /// The export's file is not ready yet.
+    pub const STATEMENT_EXPORT_NOT_READY: &str = "ERROR_CODE_STATEMENT_EXPORT_NOT_READY";
+    /// The export's file expired and was deleted; create a new export.
+    pub const STATEMENT_EXPORT_EXPIRED: &str = "ERROR_CODE_STATEMENT_EXPORT_EXPIRED";
+    /// The export failed and has no file.
+    pub const STATEMENT_EXPORT_FAILED: &str = "ERROR_CODE_STATEMENT_EXPORT_FAILED";
+}
+
 pub mod order_codes {
     use std::sync::LazyLock;
 
@@ -560,6 +633,19 @@ pub(crate) fn is_credential_refusal_code(code: &str) -> bool {
 
 /// [`Error::Api`] metadata key holding [`Error::existing_order_id`].
 const EXISTING_ORDER_ID_METADATA: &str = "existing_order_id";
+/// [`Error::Api`] metadata key holding [`Error::cause_code`].
+const CAUSE_CODE_METADATA: &str = "cause_code";
+/// [`Error::Api`] metadata key holding [`Error::level_index`].
+const LEVEL_INDEX_METADATA: &str = "level_index";
+/// [`Error::Api`] metadata key holding [`Error::retry_at`], as
+/// `<unix seconds>.<nanoseconds>`.
+const AUTH_RETRY_AFTER_METADATA: &str = "auth_retry_after";
+
+/// A `Timestamp` at or after the epoch as `<unix seconds>.<nanoseconds>`.
+fn timestamp_metadata(at: &buffa_types::google::protobuf::Timestamp) -> Option<String> {
+    (at.seconds >= 0 && (0..1_000_000_000).contains(&at.nanos))
+        .then(|| format!("{}.{:09}", at.seconds, at.nanos))
+}
 /// [`Error::Api`] metadata key holding [`Error::withdraw_field_path`].
 const WITHDRAW_FIELD_PATH_METADATA: &str = "withdraw_field_path";
 /// [`Error::Api`] metadata key holding [`Error::withdraw_min_floor_e18`].
@@ -584,14 +670,8 @@ fn withdraw_detail_metadata(detail: &WithdrawErrorDetail) -> Vec<(String, String
             crate::codecs::scalars::u128_to_str(floor.hi, floor.lo),
         ));
     }
-    if let Some(at) = detail.payable_from.as_option()
-        && at.seconds >= 0
-        && (0..1_000_000_000).contains(&at.nanos)
-    {
-        metadata.push((
-            WITHDRAW_PAYABLE_FROM_METADATA.to_owned(),
-            format!("{}.{:09}", at.seconds, at.nanos),
-        ));
+    if let Some(at) = detail.payable_from.as_option().and_then(timestamp_metadata) {
+        metadata.push((WITHDRAW_PAYABLE_FROM_METADATA.to_owned(), at));
     }
     metadata
 }
@@ -844,8 +924,12 @@ impl Error {
                 message,
                 retry_after,
                 detail,
+                cause_code,
+                level_index,
             } => Self::RateLimit {
                 code,
+                cause_code,
+                level_index,
                 message: text(message),
                 retry_after,
                 detail: detail.map(|mut detail| {
@@ -1004,6 +1088,7 @@ impl Error {
                     || code == order_codes::ACCOUNT_REPAIRING
                     || code == order_codes::REQUEST_DEADLINE_EXCEEDED
                     || code == alert_codes::PRICE_UNAVAILABLE
+                    || code == transfer_codes::DUST_BUSY
             }
             _ => false,
         }
@@ -1243,7 +1328,58 @@ impl Error {
     /// succeeds from [`Self::withdraw_payable_from`] on. Not
     /// [`Self::is_retryable`]: wait until then rather than retrying at once.
     pub fn is_withdraw_destination_cooling_down(&self) -> bool {
-        matches!(self, Self::Api { code, .. } if code == "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN")
+        matches!(self, Self::Api { code, .. } if code == withdraw_codes::EXTERNAL_DESTINATION_COOLING_DOWN)
+    }
+
+    /// True for `ERROR_CODE_ROUTE_SUSPENDED` (REST `ROUTE_SUSPENDED`):
+    /// withdrawals of the asset to the destination network are temporarily
+    /// suspended, so the withdrawal was refused before anything was
+    /// reserved. The suspension is temporary: submit a new request once the
+    /// route's `withdrawal_status` in `GetDepositWithdrawConfig` is `NORMAL`
+    /// again. Nothing was reserved for the refused request, so a fresh
+    /// request is safe. Final and not [`Self::is_retryable`]: repeating it
+    /// while the route is `SUSPENDED` is refused the same way.
+    pub fn is_withdraw_route_suspended(&self) -> bool {
+        matches!(self, Self::Api { code, .. } if code == withdraw_codes::ROUTE_SUSPENDED)
+    }
+
+    /// With `AUTH_SOCIAL_ACCOUNT_COOLDOWN` or
+    /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED`: the time from which the same
+    /// request may succeed, from `auth.v1.AuthErrorDetail.retry_after`;
+    /// `None` when the server sent none.
+    pub fn retry_at(&self) -> Option<std::time::SystemTime> {
+        let (seconds, nanos) = self
+            .api_metadata(AUTH_RETRY_AFTER_METADATA)?
+            .split_once('.')?;
+        let duration = Duration::new(seconds.parse().ok()?, nanos.parse().ok()?);
+        std::time::UNIX_EPOCH.checked_add(duration)
+    }
+
+    /// Why the refused order of a ladder can't be placed, when a trigger
+    /// create is refused with `ERROR_CODE_LADDER_LEVEL_REJECTED`: the code
+    /// that order would return as a single order, spelled like the error's
+    /// own code (for example `ERROR_CODE_MAX_OPEN_ORDERS_PER_PAIR`), from
+    /// `orders.v1.ErrorDetail.cause_code`. `None` for every other refusal.
+    /// A ladder order refused for the account's rate limit is an
+    /// [`Error::RateLimit`] whose code is `ERROR_CODE_LADDER_LEVEL_REJECTED`;
+    /// it carries the cause (`ERROR_CODE_RATE_LIMIT_EXCEEDED`) and the index
+    /// too.
+    pub fn cause_code(&self) -> Option<&str> {
+        match self {
+            Self::RateLimit { cause_code, .. } => cause_code.as_deref(),
+            _ => self.api_metadata(CAUSE_CODE_METADATA),
+        }
+    }
+
+    /// With `ERROR_CODE_LADDER_LEVEL_REJECTED`: the refused order's
+    /// zero-based index among the ladder's orders, the `i` of the violation
+    /// path `trigger.strategy.ladder.levels[i]`, so `Some(0)` is the first
+    /// order. `None` for every other refusal.
+    pub fn level_index(&self) -> Option<u32> {
+        match self {
+            Self::RateLimit { level_index, .. } => *level_index,
+            _ => self.api_metadata(LEVEL_INDEX_METADATA)?.parse().ok(),
+        }
     }
 
     /// With `ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`: when the
@@ -1460,6 +1596,17 @@ pub(crate) fn retryable_resource_code(code: &str) -> bool {
     )
 }
 
+/// An `orders.v1.ErrorDetail.cause_code`, spelled like the error's own
+/// code; `None` when unspecified.
+fn ladder_cause_code(detail: &OrderErrorDetail) -> Option<String> {
+    (detail.cause_code.to_i32() != 0).then(|| {
+        known_or_unknown_code(
+            detail.cause_code.as_known().map(|c| c.proto_name()),
+            detail.cause_code.to_i32(),
+        )
+    })
+}
+
 fn rate_limit_error(
     message: String,
     detail: Option<RateLimitDetail>,
@@ -1475,6 +1622,8 @@ fn rate_limit_error(
         message,
         retry_after,
         detail: detail.map(Box::new),
+        cause_code: None,
+        level_index: None,
     }
 }
 
@@ -1738,10 +1887,16 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             } else {
                 auth_detail.message
             };
+            let metadata = auth_detail
+                .retry_after
+                .as_option()
+                .and_then(timestamp_metadata)
+                .map(|at| vec![(AUTH_RETRY_AFTER_METADATA.to_owned(), at)])
+                .unwrap_or_default();
             return Error::Api {
                 message,
                 code,
-                metadata: Vec::new(),
+                metadata,
                 violations: Vec::new(),
             };
         }
@@ -1765,12 +1920,18 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     .as_option()
                     .map(rate_limit_detail_from_proto_local)
                     .or(problem_rate_limit);
-                return rate_limit_error(
-                    fallback_message.clone(),
-                    detail,
-                    header_retry,
-                    Some(code),
-                );
+                let mut limited =
+                    rate_limit_error(fallback_message.clone(), detail, header_retry, Some(code));
+                if let Error::RateLimit {
+                    cause_code,
+                    level_index,
+                    ..
+                } = &mut limited
+                {
+                    *cause_code = ladder_cause_code(&order_detail);
+                    *level_index = order_detail.level_index;
+                }
+                return limited;
             }
             // Backoff hints and unknown mutation outcomes take precedence.
             if err.code == ErrorCode::Unavailable
@@ -1810,7 +1971,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             if is_auth_like_error_code(&code) {
                 return Error::Auth(fallback_message.clone());
             }
-            let metadata = order_detail
+            let mut metadata = order_detail
                 .existing_order_id
                 .filter(|id| *id != 0)
                 .map(|id| {
@@ -1820,6 +1981,12 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     )]
                 })
                 .unwrap_or_default();
+            if let Some(cause) = ladder_cause_code(&order_detail) {
+                metadata.push((CAUSE_CODE_METADATA.to_owned(), cause));
+            }
+            if let Some(index) = order_detail.level_index {
+                metadata.push((LEVEL_INDEX_METADATA.to_owned(), index.to_string()));
+            }
             let violations = order_detail
                 .violations
                 .iter()
@@ -2107,6 +2274,7 @@ mod tests {
                 retry_after,
                 detail,
                 code,
+                ..
             } => {
                 assert_eq!(message, "resource_exhausted: request rate exceeded");
                 assert_eq!(retry_after, Some(2.5));
@@ -2200,6 +2368,8 @@ mod tests {
             message: "slow down".into(),
             retry_after: Some(1.0),
             detail: None,
+            cause_code: None,
+            level_index: None,
         };
         assert!(limited.is_retryable());
         assert!(!limited.mutation_outcome_unknown());

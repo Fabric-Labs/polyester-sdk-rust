@@ -3169,9 +3169,12 @@ pub struct AutoWithdrawStep {
     /// current price valued the asset; the funds stay for a later run),
     /// rule_superseded, destination_not_whitelisted, destination_cooling_down
     /// (a broker vault's destination added to its external withdraw whitelist
-    /// less than 24 hours ago; the funds stay for a later run),
-    /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
-    /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
+    /// less than 24 hours ago; the funds stay for a later run), route_suspended
+    /// (withdrawals of the asset to the destination network are suspended, as
+    /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
+    /// the funds stay for a later run), authority_revoked,
+    /// gateway_capacity_insufficient (the funds stay for a later run),
+    /// withdrawal_released or withdrawal_failed; empty otherwise.
     ///
     /// Field 7: `reason`
     #[serde(
@@ -5377,6 +5380,11 @@ pub enum ErrorCode {
     /// more recently. ErrorDetail.payable_from is when it can be paid; unset
     /// when that time is not known yet. Retry after it.
     ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN = 49i32,
+    /// Withdrawals of this asset to the destination network are temporarily
+    /// suspended, as AssetChainVariant.withdrawal_status SUSPENDED shows.
+    /// Nothing was reserved; submit a new request once the status is NORMAL
+    /// again.
+    ERROR_CODE_ROUTE_SUSPENDED = 50i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -5529,6 +5537,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ExternalDestinationCoolingDown: Self = Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN;
+    ///Idiomatic alias for [`Self::ERROR_CODE_ROUTE_SUSPENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RouteSuspended: Self = Self::ERROR_CODE_ROUTE_SUSPENDED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -5740,6 +5751,7 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
                 )
             }
+            50i32 => ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_SUSPENDED),
             _ => ::core::option::Option::None,
         }
     }
@@ -5838,6 +5850,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN => {
                 "ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN"
             }
+            Self::ERROR_CODE_ROUTE_SUSPENDED => "ERROR_CODE_ROUTE_SUSPENDED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -6018,6 +6031,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
                 )
             }
+            "ERROR_CODE_ROUTE_SUSPENDED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_ROUTE_SUSPENDED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -6073,6 +6089,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_ROUTE_UNSUPPORTED,
             Self::ERROR_CODE_VERSION_CONFLICT,
             Self::ERROR_CODE_EXTERNAL_DESTINATION_COOLING_DOWN,
+            Self::ERROR_CODE_ROUTE_SUSPENDED,
         ]
     }
 }
@@ -12990,9 +13007,12 @@ pub mod __buffa {
             /// current price valued the asset; the funds stay for a later run),
             /// rule_superseded, destination_not_whitelisted, destination_cooling_down
             /// (a broker vault's destination added to its external withdraw whitelist
-            /// less than 24 hours ago; the funds stay for a later run),
-            /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
-            /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
+            /// less than 24 hours ago; the funds stay for a later run), route_suspended
+            /// (withdrawals of the asset to the destination network are suspended, as
+            /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
+            /// the funds stay for a later run), authority_revoked,
+            /// gateway_capacity_insufficient (the funds stay for a later run),
+            /// withdrawal_released or withdrawal_failed; empty otherwise.
             ///
             /// Field 7: `reason`
             pub reason: &'a str,
@@ -13698,9 +13718,12 @@ pub mod __buffa {
             /// current price valued the asset; the funds stay for a later run),
             /// rule_superseded, destination_not_whitelisted, destination_cooling_down
             /// (a broker vault's destination added to its external withdraw whitelist
-            /// less than 24 hours ago; the funds stay for a later run),
-            /// authority_revoked, gateway_capacity_insufficient (the funds stay for a
-            /// later run), withdrawal_released or withdrawal_failed; empty otherwise.
+            /// less than 24 hours ago; the funds stay for a later run), route_suspended
+            /// (withdrawals of the asset to the destination network are suspended, as
+            /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
+            /// the funds stay for a later run), authority_revoked,
+            /// gateway_capacity_insufficient (the funds stay for a later run),
+            /// withdrawal_released or withdrawal_failed; empty otherwise.
             ///
             /// Field 7: `reason`
             #[must_use]

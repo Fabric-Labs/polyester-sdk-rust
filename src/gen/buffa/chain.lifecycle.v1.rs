@@ -204,6 +204,14 @@ pub enum LifecycleReason {
     /// its FAILED step's transaction is that transfer. Polyester records
     /// neither the recipient nor the amount. This is not a return or a refund.
     ZIPPER_COMPLIANCE_TRANSFERRED = 105i32,
+    /// The deposit was delivered as zTokens to the account's own Polyester
+    /// Chain wallet, the flow's `smart_account_address`, instead of its Funding
+    /// or Trading balance: the destination did not accept the credit, for
+    /// example because deposits into it were paused. The flow ends COMPLETED at
+    /// the wallet, its destination domain is DOMAIN_ZIPPER, and its final
+    /// step's transaction is the delivery. No Funding or Trading balance was
+    /// credited; `destination_address` stays the deposit address.
+    ZIPPER_DEPOSIT_DELIVERED_TO_WALLET = 106i32,
     /// Ledger mirror rejected a command before it could be durably applied.
     LEDGER_MIRROR_REJECTED = 200i32,
     /// Ledger settlement rejected the mirror command because the source account did
@@ -247,6 +255,9 @@ impl LifecycleReason {
     ///Idiomatic alias for [`Self::ZIPPER_COMPLIANCE_TRANSFERRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ZipperComplianceTransferred: Self = Self::ZIPPER_COMPLIANCE_TRANSFERRED;
+    ///Idiomatic alias for [`Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ZipperDepositDeliveredToWallet: Self = Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET;
     ///Idiomatic alias for [`Self::LEDGER_MIRROR_REJECTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const LedgerMirrorRejected: Self = Self::LEDGER_MIRROR_REJECTED;
@@ -379,6 +390,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             }
             104i32 => ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_REFUND_FAILED),
             105i32 => ::core::option::Option::Some(Self::ZIPPER_COMPLIANCE_TRANSFERRED),
+            106i32 => {
+                ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET)
+            }
             200i32 => ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED),
             201i32 => {
                 ::core::option::Option::Some(
@@ -418,6 +432,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::ZIPPER_WITHDRAW_EXECUTION_FAILED => "ZIPPER_WITHDRAW_EXECUTION_FAILED",
             Self::ZIPPER_DEPOSIT_REFUND_FAILED => "ZIPPER_DEPOSIT_REFUND_FAILED",
             Self::ZIPPER_COMPLIANCE_TRANSFERRED => "ZIPPER_COMPLIANCE_TRANSFERRED",
+            Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET => {
+                "ZIPPER_DEPOSIT_DELIVERED_TO_WALLET"
+            }
             Self::LEDGER_MIRROR_REJECTED => "LEDGER_MIRROR_REJECTED",
             Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS => {
                 "LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS"
@@ -458,6 +475,9 @@ impl ::buffa::Enumeration for LifecycleReason {
             }
             "ZIPPER_COMPLIANCE_TRANSFERRED" => {
                 ::core::option::Option::Some(Self::ZIPPER_COMPLIANCE_TRANSFERRED)
+            }
+            "ZIPPER_DEPOSIT_DELIVERED_TO_WALLET" => {
+                ::core::option::Option::Some(Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET)
             }
             "LEDGER_MIRROR_REJECTED" => {
                 ::core::option::Option::Some(Self::LEDGER_MIRROR_REJECTED)
@@ -503,6 +523,7 @@ impl ::buffa::Enumeration for LifecycleReason {
             Self::ZIPPER_WITHDRAW_EXECUTION_FAILED,
             Self::ZIPPER_DEPOSIT_REFUND_FAILED,
             Self::ZIPPER_COMPLIANCE_TRANSFERRED,
+            Self::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET,
             Self::LEDGER_MIRROR_REJECTED,
             Self::LEDGER_MIRROR_TRANSFER_EXCEEDS_CREDITS,
             Self::LEDGER_MIRROR_TRANSFER_EXISTS,
@@ -3568,7 +3589,7 @@ pub struct ListFlowsRequest {
     /// returns the flows the account owns and the transfers it receives.
     /// `PARTICIPATION_OWNER` returns only the flows it owns, and
     /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
-    /// account. Requires `owner_account_id` or `smart_account_address`.
+    /// account. Requires `smart_account_address`.
     ///
     /// Field 14: `participation`
     #[serde(
@@ -3661,11 +3682,6 @@ impl ::buffa::Message for ListFlowsRequest {
         }
         if let ::core::option::Option::Some(ref v) = self.account_selector {
             match v {
-                __buffa::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                    _x,
-                ) => {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                }
                 __buffa::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                     x,
                 ) => {
@@ -3757,11 +3773,6 @@ impl ::buffa::Message for ListFlowsRequest {
         }
         if let ::core::option::Option::Some(ref v) = self.account_selector {
             match v {
-                __buffa::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                    x,
-                ) => {
-                    ::buffa::types::put_fixed64_field(7u32, *x, buf);
-                }
                 __buffa::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                     x,
                 ) => {
@@ -3876,17 +3887,6 @@ impl ::buffa::Message for ListFlowsRequest {
                 )?;
                 self.scope = ::buffa::EnumValue::from(
                     ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            7u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.account_selector = ::core::option::Option::Some(
-                    __buffa::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                        ::buffa::types::decode_fixed64(buf)?,
-                    ),
                 );
             }
             8u32 => {
@@ -4316,36 +4316,6 @@ impl<'de> serde::Deserialize<'de> for ListFlowsRequest {
                                 map.next_value_seed(_S)?
                             });
                         }
-                        "ownerAccountId" | "owner_account_id" => {
-                            struct _DeserSeed;
-                            impl<'de> serde::de::DeserializeSeed<'de> for _DeserSeed {
-                                type Value = u64;
-                                fn deserialize<D: serde::Deserializer<'de>>(
-                                    self,
-                                    d: D,
-                                ) -> ::core::result::Result<u64, D::Error> {
-                                    ::buffa::json_helpers::uint64::deserialize(d)
-                                }
-                            }
-                            let v: ::core::option::Option<u64> = map
-                                .next_value_seed(
-                                    ::buffa::json_helpers::NullableDeserializeSeed(_DeserSeed),
-                                )?;
-                            if let Some(v) = v {
-                                if __oneof_account_selector.is_some() {
-                                    return Err(
-                                        serde::de::Error::custom(
-                                            "multiple oneof fields set for 'account_selector'",
-                                        ),
-                                    );
-                                }
-                                __oneof_account_selector = Some(
-                                    __buffa::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                                        v,
-                                    ),
-                                );
-                            }
-                        }
                         "smartAccountAddress" | "smart_account_address" => {
                             let v: ::core::option::Option<
                                 ::buffa::alloc::string::String,
@@ -4612,6 +4582,1080 @@ pub const __LIST_FLOWS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<ListFlowsResponse>,
     is_wkt: false,
 };
+/// ListAccountFlowsRequest filters and paginates the authenticated account's
+/// lifecycle flow summaries.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAccountFlowsRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account. The list covers that one account only.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Maximum number of flows to return. Defaults to 100 when omitted; maximum is
+    /// 500.
+    ///
+    /// Field 2: `limit`
+    #[serde(
+        rename = "limit",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub limit: u32,
+    /// Sort direction for the selected ordering timestamp.
+    ///
+    /// Field 3: `sort`
+    #[serde(
+        rename = "sort",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub sort: ::buffa::EnumValue<Sort>,
+    /// Optional product flow kind filter. Unspecified includes all kinds.
+    ///
+    /// Field 4: `flow_kind`
+    #[serde(
+        rename = "flowKind",
+        alias = "flow_kind",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub flow_kind: ::buffa::EnumValue<FlowKind>,
+    /// Optional lifecycle state filter. Unspecified includes all states permitted
+    /// by the selected scope.
+    ///
+    /// Field 5: `flow_state`
+    #[serde(
+        rename = "flowState",
+        alias = "flow_state",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub flow_state: ::buffa::EnumValue<FlowState>,
+    /// Optional transaction reference filter. Matches source or latest activity
+    /// transaction identifiers across supported chains.
+    ///
+    /// Field 6: `tx_ref`
+    #[serde(
+        rename = "txRef",
+        alias = "tx_ref",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tx_ref: ::buffa::alloc::string::String,
+    /// Selects open, terminal, or all lifecycle flows.
+    ///
+    /// Field 7: `scope`
+    #[serde(
+        rename = "scope",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub scope: ::buffa::EnumValue<ListScope>,
+    /// Optional Polyester Chain ids to include. Maximum 100 unique ids.
+    ///
+    /// Field 8: `polyester_chain_ids`
+    #[serde(
+        rename = "polyesterChainIds",
+        alias = "polyester_chain_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub polyester_chain_ids: ::buffa::alloc::vec::Vec<u32>,
+    /// Optional chain asset mapping ids to include. Maximum 100 unique ids.
+    ///
+    /// Field 9: `zipped_asset_ids`
+    #[serde(
+        rename = "zippedAssetIds",
+        alias = "zipped_asset_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub zipped_asset_ids: ::buffa::alloc::vec::Vec<u32>,
+    /// Optional unified asset ids to include. Maximum 100 unique ids.
+    ///
+    /// Field 10: `unified_asset_ids`
+    #[serde(
+        rename = "unifiedAssetIds",
+        alias = "unified_asset_ids",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub unified_asset_ids: ::buffa::alloc::vec::Vec<u32>,
+    /// Opaque keyset cursor returned by a previous response. The cursor is
+    /// exclusive and bound to the authenticated account and the request it was
+    /// returned for: the subaccount, participation, every filter including
+    /// scope, sort direction, and ordering timestamp. Send it with that same
+    /// request; only `limit` may change. A cursor sent with any other request or
+    /// by another account is rejected as invalid.
+    ///
+    /// Field 11: `page_token`
+    #[serde(
+        rename = "pageToken",
+        alias = "page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub page_token: ::buffa::alloc::string::String,
+    /// Timestamp used for ordering and pagination. Defaults to last activity.
+    ///
+    /// Field 12: `order_by`
+    #[serde(
+        rename = "orderBy",
+        alias = "order_by",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub order_by: ::buffa::EnumValue<ListOrderBy>,
+    /// Optional participation filter. Unspecified returns the flows the account
+    /// owns and the transfers it receives. `PARTICIPATION_OWNER` returns only the
+    /// flows it owns, and `PARTICIPATION_RECIPIENT` only the transfers it
+    /// receives from another account.
+    ///
+    /// Field 13: `participation`
+    #[serde(
+        rename = "participation",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub participation: ::buffa::EnumValue<FlowParticipation>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAccountFlowsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAccountFlowsRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("limit", &self.limit)
+            .field("sort", &self.sort)
+            .field("flow_kind", &self.flow_kind)
+            .field("flow_state", &self.flow_state)
+            .field("tx_ref", &self.tx_ref)
+            .field("scope", &self.scope)
+            .field("polyester_chain_ids", &self.polyester_chain_ids)
+            .field("zipped_asset_ids", &self.zipped_asset_ids)
+            .field("unified_asset_ids", &self.unified_asset_ids)
+            .field("page_token", &self.page_token)
+            .field("order_by", &self.order_by)
+            .field("participation", &self.participation)
+            .finish()
+    }
+}
+impl ListAccountFlowsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsRequest";
+}
+impl ListAccountFlowsRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(ListAccountFlowsRequest);
+impl ::buffa::MessageName for ListAccountFlowsRequest {
+    const PACKAGE: &'static str = "chain.lifecycle.v1";
+    const NAME: &'static str = "ListAccountFlowsRequest";
+    const FULL_NAME: &'static str = "chain.lifecycle.v1.ListAccountFlowsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsRequest";
+}
+impl ::buffa::Message for ListAccountFlowsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.limit != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+        }
+        {
+            let val = self.sort.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.flow_kind.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.flow_state.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.tx_ref.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.tx_ref) as u32;
+        }
+        {
+            let val = self.scope.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.polyester_chain_ids.is_empty() {
+            let payload: u32 = self
+                .polyester_chain_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.zipped_asset_ids.is_empty() {
+            let payload: u32 = self
+                .zipped_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.unified_asset_ids.is_empty() {
+            let payload: u32 = self
+                .unified_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            size
+                += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32 + payload;
+        }
+        if !self.page_token.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
+        }
+        {
+            let val = self.order_by.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if self.limit != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.limit, buf);
+        }
+        {
+            let val = self.sort.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        {
+            let val = self.flow_kind.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        {
+            let val = self.flow_state.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        if !self.tx_ref.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.tx_ref, buf);
+        }
+        {
+            let val = self.scope.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
+        }
+        if !self.polyester_chain_ids.is_empty() {
+            let payload: u32 = self
+                .polyester_chain_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+            for &v in &self.polyester_chain_ids {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        if !self.zipped_asset_ids.is_empty() {
+            let payload: u32 = self
+                .zipped_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(9u32, payload, buf);
+            for &v in &self.zipped_asset_ids {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        if !self.unified_asset_ids.is_empty() {
+            let payload: u32 = self
+                .unified_asset_ids
+                .iter()
+                .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                .sum::<u32>();
+            ::buffa::types::put_len_delimited_header(10u32, payload, buf);
+            for &v in &self.unified_asset_ids {
+                ::buffa::types::encode_uint32(v, buf);
+            }
+        }
+        if !self.page_token.is_empty() {
+            ::buffa::types::put_string_field(11u32, &self.page_token, buf);
+        }
+        {
+            let val = self.order_by.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(12u32, val, buf);
+            }
+        }
+        {
+            let val = self.participation.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.limit = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.sort = ::buffa::EnumValue::from(::buffa::types::decode_int32(buf)?);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.flow_kind = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.flow_state = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tx_ref, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.scope = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            8u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.polyester_chain_ids.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.polyester_chain_ids
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.polyester_chain_ids.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            9u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.zipped_asset_ids.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.zipped_asset_ids
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.zipped_asset_ids.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            10u32 => {
+                if tag.wire_type() == ::buffa::encoding::WireType::LengthDelimited {
+                    let len = ::buffa::encoding::decode_varint(buf)?;
+                    let len = usize::try_from(len)
+                        .map_err(|_| ::buffa::DecodeError::MessageTooLarge)?;
+                    if buf.remaining() < len {
+                        return ::core::result::Result::Err(
+                            ::buffa::DecodeError::UnexpectedEof,
+                        );
+                    }
+                    self.unified_asset_ids.reserve(len);
+                    let mut limited = buf.take(len);
+                    while limited.has_remaining() {
+                        self.unified_asset_ids
+                            .push(::buffa::types::decode_uint32(&mut limited)?);
+                    }
+                    let leftover = limited.remaining();
+                    if leftover > 0 {
+                        limited.advance(leftover);
+                    }
+                } else if tag.wire_type() == ::buffa::encoding::WireType::Varint {
+                    self.unified_asset_ids.push(::buffa::types::decode_uint32(buf)?);
+                } else {
+                    return ::core::result::Result::Err(
+                        ::buffa::encoding::wire_type_mismatch(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        ),
+                    );
+                }
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.page_token, buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.order_by = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.participation = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.limit = 0u32;
+        self.sort = ::buffa::EnumValue::from(0);
+        self.flow_kind = ::buffa::EnumValue::from(0);
+        self.flow_state = ::buffa::EnumValue::from(0);
+        self.tx_ref.clear();
+        self.scope = ::buffa::EnumValue::from(0);
+        self.polyester_chain_ids.clear();
+        self.zipped_asset_ids.clear();
+        self.unified_asset_ids.clear();
+        self.page_token.clear();
+        self.order_by = ::buffa::EnumValue::from(0);
+        self.participation = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAccountFlowsRequest {
+    const PROTO_FQN: &'static str = "chain.lifecycle.v1.ListAccountFlowsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAccountFlowsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ACCOUNT_FLOWS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListAccountFlowsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAccountFlowsRequest>,
+    is_wkt: false,
+};
+/// ListAccountFlowsResponse returns one page of the account's flow summaries.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListAccountFlowsResponse {
+    /// Flow summaries ordered by the selected timestamp, then public flow id. Sort
+    /// direction is controlled by the request `sort` field.
+    ///
+    /// Field 1: `flows`
+    #[serde(
+        rename = "flows",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub flows: ::buffa::alloc::vec::Vec<FlowSummaryView>,
+    /// Opaque cursor for the next page. Empty when no more results exist.
+    ///
+    /// Field 2: `next_page_token`
+    #[serde(
+        rename = "nextPageToken",
+        alias = "next_page_token",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub next_page_token: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListAccountFlowsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListAccountFlowsResponse")
+            .field("flows", &self.flows)
+            .field("next_page_token", &self.next_page_token)
+            .finish()
+    }
+}
+impl ListAccountFlowsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsResponse";
+}
+::buffa::impl_default_instance!(ListAccountFlowsResponse);
+impl ::buffa::MessageName for ListAccountFlowsResponse {
+    const PACKAGE: &'static str = "chain.lifecycle.v1";
+    const NAME: &'static str = "ListAccountFlowsResponse";
+    const FULL_NAME: &'static str = "chain.lifecycle.v1.ListAccountFlowsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsResponse";
+}
+impl ::buffa::Message for ListAccountFlowsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.flows {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.next_page_token.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.flows {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if !self.next_page_token.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.flows.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.flows.clear();
+        self.next_page_token.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListAccountFlowsResponse {
+    const PROTO_FQN: &'static str = "chain.lifecycle.v1.ListAccountFlowsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListAccountFlowsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_ACCOUNT_FLOWS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListAccountFlowsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListAccountFlowsResponse>,
+    is_wkt: false,
+};
+/// GetAccountFlowRequest selects one lifecycle flow of the authenticated
+/// account by its public flow id.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetAccountFlowRequest {
+    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+    /// use their bound subaccount; other callers use their authenticated root
+    /// account.
+    ///
+    /// Field 1: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
+    /// Public, URL-safe lifecycle identifier returned by list responses.
+    ///
+    /// Field 2: `flow_id`
+    #[serde(
+        rename = "flowId",
+        alias = "flow_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub flow_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetAccountFlowRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetAccountFlowRequest")
+            .field("subaccount_id", &self.subaccount_id)
+            .field("flow_id", &self.flow_id)
+            .finish()
+    }
+}
+impl GetAccountFlowRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowRequest";
+}
+impl GetAccountFlowRequest {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(GetAccountFlowRequest);
+impl ::buffa::MessageName for GetAccountFlowRequest {
+    const PACKAGE: &'static str = "chain.lifecycle.v1";
+    const NAME: &'static str = "GetAccountFlowRequest";
+    const FULL_NAME: &'static str = "chain.lifecycle.v1.GetAccountFlowRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowRequest";
+}
+impl ::buffa::Message for GetAccountFlowRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.flow_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(1u32, v, buf);
+        }
+        if !self.flow_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.flow_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.flow_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.subaccount_id = ::core::option::Option::None;
+        self.flow_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetAccountFlowRequest {
+    const PROTO_FQN: &'static str = "chain.lifecycle.v1.GetAccountFlowRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetAccountFlowRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_ACCOUNT_FLOW_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetAccountFlowRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetAccountFlowRequest>,
+    is_wkt: false,
+};
+/// GetAccountFlowResponse returns one lifecycle flow of the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetAccountFlowResponse {
+    /// Lifecycle flow detail for the requested flow id. Its summary's
+    /// `participation` says whether the account owns the flow or receives it.
+    ///
+    /// Field 1: `flow`
+    #[serde(
+        rename = "flow",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub flow: ::buffa::MessageField<FlowDetailView>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetAccountFlowResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetAccountFlowResponse").field("flow", &self.flow).finish()
+    }
+}
+impl GetAccountFlowResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowResponse";
+}
+::buffa::impl_default_instance!(GetAccountFlowResponse);
+impl ::buffa::MessageName for GetAccountFlowResponse {
+    const PACKAGE: &'static str = "chain.lifecycle.v1";
+    const NAME: &'static str = "GetAccountFlowResponse";
+    const FULL_NAME: &'static str = "chain.lifecycle.v1.GetAccountFlowResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowResponse";
+}
+impl ::buffa::Message for GetAccountFlowResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.flow.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.flow.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.flow.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.flow.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.flow.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.flow = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetAccountFlowResponse {
+    const PROTO_FQN: &'static str = "chain.lifecycle.v1.GetAccountFlowResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetAccountFlowResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_ACCOUNT_FLOW_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetAccountFlowResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetAccountFlowResponse>,
+    is_wkt: false,
+};
 /// FlowTxMatchView is one lifecycle flow matched by a transaction-hash search.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -4789,16 +5833,6 @@ pub struct FlowTxMatchView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub last_activity_at_unix_ms: u64,
-    /// Public account or subaccount identifier that owns this flow.
-    ///
-    /// Field 19: `owner_account_id`
-    #[serde(
-        rename = "ownerAccountId",
-        alias = "owner_account_id",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub owner_account_id: u64,
     /// Smart account address on Polyester Chain when known.
     ///
     /// Field 20: `smart_account_address`
@@ -4844,7 +5878,6 @@ impl ::core::fmt::Debug for FlowTxMatchView {
             .field("destination_address", &self.destination_address)
             .field("lifecycle_reason", &self.lifecycle_reason)
             .field("last_activity_at_unix_ms", &self.last_activity_at_unix_ms)
-            .field("owner_account_id", &self.owner_account_id)
             .field("smart_account_address", &self.smart_account_address)
             .field("zipper_reason", &self.zipper_reason)
             .finish()
@@ -4967,9 +6000,6 @@ impl ::buffa::Message for FlowTxMatchView {
                     + ::buffa::types::uint64_encoded_len(self.last_activity_at_unix_ms)
                         as u32;
         }
-        if self.owner_account_id != 0u64 {
-            size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
         if !self.smart_account_address.is_empty() {
             size
                 += 2u32
@@ -5061,9 +6091,6 @@ impl ::buffa::Message for FlowTxMatchView {
         }
         if self.last_activity_at_unix_ms != 0u64 {
             ::buffa::types::put_uint64_field(18u32, self.last_activity_at_unix_ms, buf);
-        }
-        if self.owner_account_id != 0u64 {
-            ::buffa::types::put_fixed64_field(19u32, self.owner_account_id, buf);
         }
         if !self.smart_account_address.is_empty() {
             ::buffa::types::put_string_field(20u32, &self.smart_account_address, buf);
@@ -5222,13 +6249,6 @@ impl ::buffa::Message for FlowTxMatchView {
                 )?;
                 self.last_activity_at_unix_ms = ::buffa::types::decode_uint64(buf)?;
             }
-            19u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.owner_account_id = ::buffa::types::decode_fixed64(buf)?;
-            }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -5272,7 +6292,6 @@ impl ::buffa::Message for FlowTxMatchView {
         self.destination_address.clear();
         self.lifecycle_reason = ::buffa::EnumValue::from(0);
         self.last_activity_at_unix_ms = 0u64;
-        self.owner_account_id = 0u64;
         self.smart_account_address.clear();
         self.zipper_reason = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
@@ -5502,19 +6521,9 @@ pub const __LIST_FLOWS_BY_TX_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyE
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct FlowSummaryView {
-    /// Public account identifier for the root account or subaccount the flow belongs to.
-    ///
-    /// Field 1: `owner_account_id`
-    #[serde(
-        rename = "ownerAccountId",
-        alias = "owner_account_id",
-        with = "::buffa::json_helpers::uint64",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
-    )]
-    pub owner_account_id: u64,
-    /// Smart-account address for the account the flow belongs to. This is the
-    /// stable address selector equivalent of `owner_account_id`; do not derive it
-    /// from source or destination display addresses.
+    /// Smart-account address for the account the flow belongs to: the account's
+    /// public identity, and the value of the ListFlows account selector. Do not
+    /// derive it from source or destination display addresses.
     ///
     /// Field 34: `smart_account_address`
     #[serde(
@@ -5821,12 +6830,14 @@ pub struct FlowSummaryView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_delayed: bool,
-    /// How the account selected by a ListFlows request takes part in this flow:
-    /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+    /// How the selected account takes part in this flow: `PARTICIPATION_OWNER`
+    /// for a flow it owns, including a transfer it sent, or
     /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
-    /// Each flow appears once with one participation. Unspecified when the
-    /// response is not scoped to an account, such as ListFlows without an account
-    /// selector, flow detail, and realtime updates.
+    /// Set by ListFlows with an account selector, ListAccountFlows and
+    /// GetAccountFlow; each flow appears once with one participation.
+    /// Unspecified when the response is not scoped to an account, such as
+    /// ListFlows without an account selector, GetFlowById, ListFlowsByTx, and
+    /// realtime updates.
     ///
     /// Field 37: `participation`
     #[serde(
@@ -5842,7 +6853,6 @@ pub struct FlowSummaryView {
 impl ::core::fmt::Debug for FlowSummaryView {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         f.debug_struct("FlowSummaryView")
-            .field("owner_account_id", &self.owner_account_id)
             .field("smart_account_address", &self.smart_account_address)
             .field("flow_id", &self.flow_id)
             .field("flow_kind", &self.flow_kind)
@@ -5901,9 +6911,6 @@ impl ::buffa::Message for FlowSummaryView {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
-        if self.owner_account_id != 0u64 {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
         {
             let val = self.flow_kind.to_i32();
             if val != 0 {
@@ -6088,9 +7095,6 @@ impl ::buffa::Message for FlowSummaryView {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
-        if self.owner_account_id != 0u64 {
-            ::buffa::types::put_fixed64_field(1u32, self.owner_account_id, buf);
-        }
         {
             let val = self.flow_kind.to_i32();
             if val != 0 {
@@ -6225,13 +7229,6 @@ impl ::buffa::Message for FlowSummaryView {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.owner_account_id = ::buffa::types::decode_fixed64(buf)?;
-            }
             4u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -6486,7 +7483,6 @@ impl ::buffa::Message for FlowSummaryView {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
-        self.owner_account_id = 0u64;
         self.flow_kind = ::buffa::EnumValue::from(0);
         self.current_step = ::buffa::EnumValue::from(0);
         self.asset_ids = ::buffa::MessageField::none();
@@ -10495,7 +11491,7 @@ pub mod __buffa {
             /// returns the flows the account owns and the transfers it receives.
             /// `PARTICIPATION_OWNER` returns only the flows it owns, and
             /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
-            /// account. Requires `owner_account_id` or `smart_account_address`.
+            /// account. Requires `smart_account_address`.
             ///
             /// Field 14: `participation`
             pub participation: ::buffa::EnumValue<super::super::FlowParticipation>,
@@ -10687,17 +11683,6 @@ pub mod __buffa {
                             );
                         }
                     }
-                    7u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Fixed64,
-                        )?;
-                        view.account_selector = Some(
-                            super::super::__buffa::view::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                                ::buffa::types::decode_fixed64(&mut cur)?,
-                            ),
-                        );
-                    }
                     8u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -10754,13 +11739,6 @@ pub mod __buffa {
                         .account_selector
                         .as_ref()
                         .map(|v| match v {
-                            super::super::__buffa::view::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                                v,
-                            ) => {
-                                super::super::__buffa::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                                    *v,
-                                )
-                            }
                             super::super::__buffa::view::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                                 v,
                             ) => {
@@ -10817,11 +11795,6 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(ref v) = self.account_selector {
                     match v {
-                        super::super::__buffa::view::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                            _x,
-                        ) => {
-                            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                        }
                         super::super::__buffa::view::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                             x,
                         ) => {
@@ -10920,11 +11893,6 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(ref v) = self.account_selector {
                     match v {
-                        super::super::__buffa::view::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                            x,
-                        ) => {
-                            ::buffa::types::put_fixed64_field(7u32, *x, buf);
-                        }
                         super::super::__buffa::view::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                             x,
                         ) => {
@@ -11065,15 +12033,6 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(ref __ov) = self.account_selector {
                     match __ov {
-                        super::super::__buffa::view::oneof::list_flows_request::AccountSelector::OwnerAccountId(
-                            v,
-                        ) => {
-                            __map
-                                .serialize_entry(
-                                    "ownerAccountId",
-                                    &::buffa::json_helpers::ProtoJson(v),
-                                )?;
-                        }
                         super::super::__buffa::view::oneof::list_flows_request::AccountSelector::SmartAccountAddress(
                             v,
                         ) => {
@@ -11265,7 +12224,7 @@ pub mod __buffa {
             /// returns the flows the account owns and the transfers it receives.
             /// `PARTICIPATION_OWNER` returns only the flows it owns, and
             /// `PARTICIPATION_RECIPIENT` only the transfers it receives from another
-            /// account. Requires `owner_account_id` or `smart_account_address`.
+            /// account. Requires `smart_account_address`.
             ///
             /// Field 14: `participation`
             #[must_use]
@@ -11645,6 +12604,1794 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ListAccountFlowsRequest filters and paginates the authenticated account's
+        /// lifecycle flow summaries.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAccountFlowsRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account. The list covers that one account only.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Maximum number of flows to return. Defaults to 100 when omitted; maximum is
+            /// 500.
+            ///
+            /// Field 2: `limit`
+            pub limit: u32,
+            /// Sort direction for the selected ordering timestamp.
+            ///
+            /// Field 3: `sort`
+            pub sort: ::buffa::EnumValue<super::super::Sort>,
+            /// Optional product flow kind filter. Unspecified includes all kinds.
+            ///
+            /// Field 4: `flow_kind`
+            pub flow_kind: ::buffa::EnumValue<super::super::FlowKind>,
+            /// Optional lifecycle state filter. Unspecified includes all states permitted
+            /// by the selected scope.
+            ///
+            /// Field 5: `flow_state`
+            pub flow_state: ::buffa::EnumValue<super::super::FlowState>,
+            /// Optional transaction reference filter. Matches source or latest activity
+            /// transaction identifiers across supported chains.
+            ///
+            /// Field 6: `tx_ref`
+            pub tx_ref: &'a str,
+            /// Selects open, terminal, or all lifecycle flows.
+            ///
+            /// Field 7: `scope`
+            pub scope: ::buffa::EnumValue<super::super::ListScope>,
+            /// Optional Polyester Chain ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 8: `polyester_chain_ids`
+            pub polyester_chain_ids: ::buffa::RepeatedView<'a, u32>,
+            /// Optional chain asset mapping ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 9: `zipped_asset_ids`
+            pub zipped_asset_ids: ::buffa::RepeatedView<'a, u32>,
+            /// Optional unified asset ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 10: `unified_asset_ids`
+            pub unified_asset_ids: ::buffa::RepeatedView<'a, u32>,
+            /// Opaque keyset cursor returned by a previous response. The cursor is
+            /// exclusive and bound to the authenticated account and the request it was
+            /// returned for: the subaccount, participation, every filter including
+            /// scope, sort direction, and ordering timestamp. Send it with that same
+            /// request; only `limit` may change. A cursor sent with any other request or
+            /// by another account is rejected as invalid.
+            ///
+            /// Field 11: `page_token`
+            pub page_token: &'a str,
+            /// Timestamp used for ordering and pagination. Defaults to last activity.
+            ///
+            /// Field 12: `order_by`
+            pub order_by: ::buffa::EnumValue<super::super::ListOrderBy>,
+            /// Optional participation filter. Unspecified returns the flows the account
+            /// owns and the transfers it receives. `PARTICIPATION_OWNER` returns only the
+            /// flows it owns, and `PARTICIPATION_RECIPIENT` only the transfers it
+            /// receives from another account.
+            ///
+            /// Field 13: `participation`
+            pub participation: ::buffa::EnumValue<super::super::FlowParticipation>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAccountFlowsRequestView<'a> {
+            type Owned = super::super::ListAccountFlowsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.limit = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.sort = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.flow_kind = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.flow_state = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.tx_ref = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.scope = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.order_by = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.participation = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    8u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.polyester_chain_ids
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.polyester_chain_ids
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.polyester_chain_ids
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    9u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.zipped_asset_ids
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.zipped_asset_ids
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.zipped_asset_ids
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    10u32 => {
+                        if tag.wire_type()
+                            == ::buffa::encoding::WireType::LengthDelimited
+                        {
+                            let payload = ::buffa::types::borrow_bytes(&mut cur)?;
+                            view.unified_asset_ids
+                                .reserve(::buffa::encoding::count_varints(payload));
+                            let mut pcur: &[u8] = payload;
+                            while !pcur.is_empty() {
+                                view.unified_asset_ids
+                                    .push(::buffa::types::decode_uint32(&mut pcur)?);
+                            }
+                        } else if tag.wire_type() == ::buffa::encoding::WireType::Varint
+                        {
+                            view.unified_asset_ids
+                                .push(::buffa::types::decode_uint32(&mut cur)?);
+                        } else {
+                            return Err(
+                                ::buffa::encoding::wire_type_mismatch(
+                                    tag,
+                                    ::buffa::encoding::WireType::LengthDelimited,
+                                ),
+                            );
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAccountFlowsRequest {
+                    subaccount_id: self.subaccount_id,
+                    limit: self.limit,
+                    sort: self.sort,
+                    flow_kind: self.flow_kind,
+                    flow_state: self.flow_state,
+                    tx_ref: self.tx_ref.to_string(),
+                    scope: self.scope,
+                    polyester_chain_ids: self.polyester_chain_ids.to_vec(),
+                    zipped_asset_ids: self.zipped_asset_ids.to_vec(),
+                    unified_asset_ids: self.unified_asset_ids.to_vec(),
+                    page_token: self.page_token.to_string(),
+                    order_by: self.order_by,
+                    participation: self.participation,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAccountFlowsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.limit != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.limit) as u32;
+                }
+                {
+                    let val = self.sort.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.flow_kind.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.flow_state.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.tx_ref.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.tx_ref) as u32;
+                }
+                {
+                    let val = self.scope.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.polyester_chain_ids.is_empty() {
+                    let payload: u32 = self
+                        .polyester_chain_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.zipped_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .zipped_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.unified_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .unified_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(payload as u64) as u32
+                            + payload;
+                }
+                if !self.page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.page_token)
+                                as u32;
+                }
+                {
+                    let val = self.order_by.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if self.limit != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.limit, buf);
+                }
+                {
+                    let val = self.sort.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.flow_kind.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.flow_state.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                if !self.tx_ref.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.tx_ref, buf);
+                }
+                {
+                    let val = self.scope.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
+                }
+                if !self.polyester_chain_ids.is_empty() {
+                    let payload: u32 = self
+                        .polyester_chain_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(8u32, payload, buf);
+                    for &v in &self.polyester_chain_ids {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                if !self.zipped_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .zipped_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(9u32, payload, buf);
+                    for &v in &self.zipped_asset_ids {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                if !self.unified_asset_ids.is_empty() {
+                    let payload: u32 = self
+                        .unified_asset_ids
+                        .iter()
+                        .map(|&v| ::buffa::types::uint32_encoded_len(v) as u32)
+                        .sum::<u32>();
+                    ::buffa::types::put_len_delimited_header(10u32, payload, buf);
+                    for &v in &self.unified_asset_ids {
+                        ::buffa::types::encode_uint32(v, buf);
+                    }
+                }
+                if !self.page_token.is_empty() {
+                    ::buffa::types::put_string_field(11u32, &self.page_token, buf);
+                }
+                {
+                    let val = self.order_by.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(12u32, val, buf);
+                    }
+                }
+                {
+                    let val = self.participation.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(13u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAccountFlowsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.limit) {
+                    __map
+                        .serialize_entry(
+                            "limit",
+                            &::buffa::json_helpers::ProtoJson(&self.limit),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.sort) {
+                    __map.serialize_entry("sort", &self.sort)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.flow_kind,
+                ) {
+                    __map.serialize_entry("flowKind", &self.flow_kind)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.flow_state,
+                ) {
+                    __map.serialize_entry("flowState", &self.flow_state)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.tx_ref) {
+                    __map.serialize_entry("txRef", self.tx_ref)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.scope) {
+                    __map.serialize_entry("scope", &self.scope)?;
+                }
+                if !self.polyester_chain_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "polyesterChainIds",
+                            &::buffa::json_helpers::RepeatedJson(
+                                &self.polyester_chain_ids,
+                            ),
+                        )?;
+                }
+                if !self.zipped_asset_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "zippedAssetIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.zipped_asset_ids),
+                        )?;
+                }
+                if !self.unified_asset_ids.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "unifiedAssetIds",
+                            &::buffa::json_helpers::RepeatedJson(&self.unified_asset_ids),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
+                    __map.serialize_entry("pageToken", self.page_token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.order_by,
+                ) {
+                    __map.serialize_entry("orderBy", &self.order_by)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.participation,
+                ) {
+                    __map.serialize_entry("participation", &self.participation)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAccountFlowsRequestView<'a> {
+            const PACKAGE: &'static str = "chain.lifecycle.v1";
+            const NAME: &'static str = "ListAccountFlowsRequest";
+            const FULL_NAME: &'static str = "chain.lifecycle.v1.ListAccountFlowsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListAccountFlowsRequestView);
+        ::buffa::impl_view_reborrow!(ListAccountFlowsRequestView);
+        /** Self-contained, `'static` owned view of a `ListAccountFlowsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAccountFlowsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAccountFlowsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAccountFlowsRequestOwnedView(
+            ::buffa::OwnedView<ListAccountFlowsRequestView<'static>>,
+        );
+        impl ListAccountFlowsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAccountFlowsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAccountFlowsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAccountFlowsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account. The list covers that one account only.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Maximum number of flows to return. Defaults to 100 when omitted; maximum is
+            /// 500.
+            ///
+            /// Field 2: `limit`
+            #[must_use]
+            pub fn limit(&self) -> u32 {
+                self.0.reborrow().limit
+            }
+            /// Sort direction for the selected ordering timestamp.
+            ///
+            /// Field 3: `sort`
+            #[must_use]
+            pub fn sort(&self) -> ::buffa::EnumValue<super::super::Sort> {
+                self.0.reborrow().sort
+            }
+            /// Optional product flow kind filter. Unspecified includes all kinds.
+            ///
+            /// Field 4: `flow_kind`
+            #[must_use]
+            pub fn flow_kind(&self) -> ::buffa::EnumValue<super::super::FlowKind> {
+                self.0.reborrow().flow_kind
+            }
+            /// Optional lifecycle state filter. Unspecified includes all states permitted
+            /// by the selected scope.
+            ///
+            /// Field 5: `flow_state`
+            #[must_use]
+            pub fn flow_state(&self) -> ::buffa::EnumValue<super::super::FlowState> {
+                self.0.reborrow().flow_state
+            }
+            /// Optional transaction reference filter. Matches source or latest activity
+            /// transaction identifiers across supported chains.
+            ///
+            /// Field 6: `tx_ref`
+            #[must_use]
+            pub fn tx_ref(&self) -> &'_ str {
+                self.0.reborrow().tx_ref
+            }
+            /// Selects open, terminal, or all lifecycle flows.
+            ///
+            /// Field 7: `scope`
+            #[must_use]
+            pub fn scope(&self) -> ::buffa::EnumValue<super::super::ListScope> {
+                self.0.reborrow().scope
+            }
+            /// Optional Polyester Chain ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 8: `polyester_chain_ids`
+            #[must_use]
+            pub fn polyester_chain_ids(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().polyester_chain_ids
+            }
+            /// Optional chain asset mapping ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 9: `zipped_asset_ids`
+            #[must_use]
+            pub fn zipped_asset_ids(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().zipped_asset_ids
+            }
+            /// Optional unified asset ids to include. Maximum 100 unique ids.
+            ///
+            /// Field 10: `unified_asset_ids`
+            #[must_use]
+            pub fn unified_asset_ids(&self) -> &::buffa::RepeatedView<'_, u32> {
+                &self.0.reborrow().unified_asset_ids
+            }
+            /// Opaque keyset cursor returned by a previous response. The cursor is
+            /// exclusive and bound to the authenticated account and the request it was
+            /// returned for: the subaccount, participation, every filter including
+            /// scope, sort direction, and ordering timestamp. Send it with that same
+            /// request; only `limit` may change. A cursor sent with any other request or
+            /// by another account is rejected as invalid.
+            ///
+            /// Field 11: `page_token`
+            #[must_use]
+            pub fn page_token(&self) -> &'_ str {
+                self.0.reborrow().page_token
+            }
+            /// Timestamp used for ordering and pagination. Defaults to last activity.
+            ///
+            /// Field 12: `order_by`
+            #[must_use]
+            pub fn order_by(&self) -> ::buffa::EnumValue<super::super::ListOrderBy> {
+                self.0.reborrow().order_by
+            }
+            /// Optional participation filter. Unspecified returns the flows the account
+            /// owns and the transfers it receives. `PARTICIPATION_OWNER` returns only the
+            /// flows it owns, and `PARTICIPATION_RECIPIENT` only the transfers it
+            /// receives from another account.
+            ///
+            /// Field 13: `participation`
+            #[must_use]
+            pub fn participation(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::FlowParticipation> {
+                self.0.reborrow().participation
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAccountFlowsRequestView<'static>>,
+        > for ListAccountFlowsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAccountFlowsRequestView<'static>>,
+            ) -> Self {
+                ListAccountFlowsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAccountFlowsRequestOwnedView>
+        for ::buffa::OwnedView<ListAccountFlowsRequestView<'static>> {
+            fn from(wrapper: ListAccountFlowsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAccountFlowsRequestView<'static>>,
+        > for ListAccountFlowsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAccountFlowsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAccountFlowsRequest {
+            type View<'a> = ListAccountFlowsRequestView<'a>;
+            type ViewHandle = ListAccountFlowsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListAccountFlowsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ListAccountFlowsResponse returns one page of the account's flow summaries.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListAccountFlowsResponseView<'a> {
+            /// Flow summaries ordered by the selected timestamp, then public flow id. Sort
+            /// direction is controlled by the request `sort` field.
+            ///
+            /// Field 1: `flows`
+            pub flows: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::FlowSummaryViewView<'a>,
+            >,
+            /// Opaque cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            pub next_page_token: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListAccountFlowsResponseView<'a> {
+            type Owned = super::super::ListAccountFlowsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.flows
+                            .push(
+                                <super::super::__buffa::view::FlowSummaryViewView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListAccountFlowsResponse {
+                    flows: self
+                        .flows
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    next_page_token: self.next_page_token.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListAccountFlowsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.flows {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.next_page_token.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.next_page_token)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.flows {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if !self.next_page_token.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListAccountFlowsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.flows.is_empty() {
+                    __map.serialize_entry("flows", &*self.flows)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
+                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListAccountFlowsResponseView<'a> {
+            const PACKAGE: &'static str = "chain.lifecycle.v1";
+            const NAME: &'static str = "ListAccountFlowsResponse";
+            const FULL_NAME: &'static str = "chain.lifecycle.v1.ListAccountFlowsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.ListAccountFlowsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListAccountFlowsResponseView);
+        ::buffa::impl_view_reborrow!(ListAccountFlowsResponseView);
+        /** Self-contained, `'static` owned view of a `ListAccountFlowsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListAccountFlowsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListAccountFlowsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListAccountFlowsResponseOwnedView(
+            ::buffa::OwnedView<ListAccountFlowsResponseView<'static>>,
+        );
+        impl ListAccountFlowsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListAccountFlowsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListAccountFlowsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListAccountFlowsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListAccountFlowsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListAccountFlowsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Flow summaries ordered by the selected timestamp, then public flow id. Sort
+            /// direction is controlled by the request `sort` field.
+            ///
+            /// Field 1: `flows`
+            #[must_use]
+            pub fn flows(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::FlowSummaryViewView<'_>,
+            > {
+                &self.0.reborrow().flows
+            }
+            /// Opaque cursor for the next page. Empty when no more results exist.
+            ///
+            /// Field 2: `next_page_token`
+            #[must_use]
+            pub fn next_page_token(&self) -> &'_ str {
+                self.0.reborrow().next_page_token
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListAccountFlowsResponseView<'static>>,
+        > for ListAccountFlowsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListAccountFlowsResponseView<'static>>,
+            ) -> Self {
+                ListAccountFlowsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListAccountFlowsResponseOwnedView>
+        for ::buffa::OwnedView<ListAccountFlowsResponseView<'static>> {
+            fn from(wrapper: ListAccountFlowsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListAccountFlowsResponseView<'static>>,
+        > for ListAccountFlowsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListAccountFlowsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListAccountFlowsResponse {
+            type View<'a> = ListAccountFlowsResponseView<'a>;
+            type ViewHandle = ListAccountFlowsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListAccountFlowsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetAccountFlowRequest selects one lifecycle flow of the authenticated
+        /// account by its public flow id.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetAccountFlowRequestView<'a> {
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
+            ///
+            /// Field 1: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
+            /// Public, URL-safe lifecycle identifier returned by list responses.
+            ///
+            /// Field 2: `flow_id`
+            pub flow_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetAccountFlowRequestView<'a> {
+            type Owned = super::super::GetAccountFlowRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.flow_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetAccountFlowRequest {
+                    subaccount_id: self.subaccount_id,
+                    flow_id: self.flow_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetAccountFlowRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.flow_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(1u32, v, buf);
+                }
+                if !self.flow_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.flow_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetAccountFlowRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.flow_id) {
+                    __map.serialize_entry("flowId", self.flow_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetAccountFlowRequestView<'a> {
+            const PACKAGE: &'static str = "chain.lifecycle.v1";
+            const NAME: &'static str = "GetAccountFlowRequest";
+            const FULL_NAME: &'static str = "chain.lifecycle.v1.GetAccountFlowRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetAccountFlowRequestView);
+        ::buffa::impl_view_reborrow!(GetAccountFlowRequestView);
+        /** Self-contained, `'static` owned view of a `GetAccountFlowRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetAccountFlowRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetAccountFlowRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetAccountFlowRequestOwnedView(
+            ::buffa::OwnedView<GetAccountFlowRequestView<'static>>,
+        );
+        impl GetAccountFlowRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetAccountFlowRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetAccountFlowRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetAccountFlowRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
+            /// use their bound subaccount; other callers use their authenticated root
+            /// account.
+            ///
+            /// Field 1: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
+            }
+            /// Public, URL-safe lifecycle identifier returned by list responses.
+            ///
+            /// Field 2: `flow_id`
+            #[must_use]
+            pub fn flow_id(&self) -> &'_ str {
+                self.0.reborrow().flow_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetAccountFlowRequestView<'static>>,
+        > for GetAccountFlowRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetAccountFlowRequestView<'static>>,
+            ) -> Self {
+                GetAccountFlowRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetAccountFlowRequestOwnedView>
+        for ::buffa::OwnedView<GetAccountFlowRequestView<'static>> {
+            fn from(wrapper: GetAccountFlowRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetAccountFlowRequestView<'static>>,
+        > for GetAccountFlowRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetAccountFlowRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetAccountFlowRequest {
+            type View<'a> = GetAccountFlowRequestView<'a>;
+            type ViewHandle = GetAccountFlowRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetAccountFlowRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetAccountFlowResponse returns one lifecycle flow of the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetAccountFlowResponseView<'a> {
+            /// Lifecycle flow detail for the requested flow id. Its summary's
+            /// `participation` says whether the account owns the flow or receives it.
+            ///
+            /// Field 1: `flow`
+            pub flow: ::buffa::MessageFieldView<
+                super::super::__buffa::view::FlowDetailViewView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetAccountFlowResponseView<'a> {
+            type Owned = super::super::GetAccountFlowResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.flow.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.flow = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::FlowDetailViewView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetAccountFlowResponse {
+                    flow: match self.flow.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::FlowDetailView,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetAccountFlowResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.flow.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.flow.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.flow.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.flow.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetAccountFlowResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.flow.as_option() {
+                        __map.serialize_entry("flow", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetAccountFlowResponseView<'a> {
+            const PACKAGE: &'static str = "chain.lifecycle.v1";
+            const NAME: &'static str = "GetAccountFlowResponse";
+            const FULL_NAME: &'static str = "chain.lifecycle.v1.GetAccountFlowResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.lifecycle.v1.GetAccountFlowResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetAccountFlowResponseView);
+        ::buffa::impl_view_reborrow!(GetAccountFlowResponseView);
+        /** Self-contained, `'static` owned view of a `GetAccountFlowResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetAccountFlowResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetAccountFlowResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetAccountFlowResponseOwnedView(
+            ::buffa::OwnedView<GetAccountFlowResponseView<'static>>,
+        );
+        impl GetAccountFlowResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetAccountFlowResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAccountFlowResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetAccountFlowResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetAccountFlowResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAccountFlowResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Lifecycle flow detail for the requested flow id. Its summary's
+            /// `participation` says whether the account owns the flow or receives it.
+            ///
+            /// Field 1: `flow`
+            #[must_use]
+            pub fn flow(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::FlowDetailViewView<'_>,
+            > {
+                &self.0.reborrow().flow
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetAccountFlowResponseView<'static>>,
+        > for GetAccountFlowResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetAccountFlowResponseView<'static>>,
+            ) -> Self {
+                GetAccountFlowResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetAccountFlowResponseOwnedView>
+        for ::buffa::OwnedView<GetAccountFlowResponseView<'static>> {
+            fn from(wrapper: GetAccountFlowResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetAccountFlowResponseView<'static>>,
+        > for GetAccountFlowResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetAccountFlowResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetAccountFlowResponse {
+            type View<'a> = GetAccountFlowResponseView<'a>;
+            type ViewHandle = GetAccountFlowResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetAccountFlowResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// FlowTxMatchView is one lifecycle flow matched by a transaction-hash search.
         #[derive(Clone, Debug, Default)]
         pub struct FlowTxMatchViewView<'a> {
@@ -11724,10 +14471,6 @@ pub mod __buffa {
             ///
             /// Field 18: `last_activity_at_unix_ms`
             pub last_activity_at_unix_ms: u64,
-            /// Public account or subaccount identifier that owns this flow.
-            ///
-            /// Field 19: `owner_account_id`
-            pub owner_account_id: u64,
             /// Smart account address on Polyester Chain when known.
             ///
             /// Field 20: `smart_account_address`
@@ -11944,15 +14687,6 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
-                    19u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Fixed64,
-                        )?;
-                        view.owner_account_id = ::buffa::types::decode_fixed64(
-                            &mut cur,
-                        )?;
-                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -12047,7 +14781,6 @@ pub mod __buffa {
                     destination_address: self.destination_address.to_string(),
                     lifecycle_reason: self.lifecycle_reason,
                     last_activity_at_unix_ms: self.last_activity_at_unix_ms,
-                    owner_account_id: self.owner_account_id,
                     smart_account_address: self.smart_account_address.to_string(),
                     zipper_reason: match self.zipper_reason.as_option() {
                         Some(v) => {
@@ -12173,9 +14906,6 @@ pub mod __buffa {
                                 self.last_activity_at_unix_ms,
                             ) as u32;
                 }
-                if self.owner_account_id != 0u64 {
-                    size += 2u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                }
                 if !self.smart_account_address.is_empty() {
                     size
                         += 2u32
@@ -12293,9 +15023,6 @@ pub mod __buffa {
                         self.last_activity_at_unix_ms,
                         buf,
                     );
-                }
-                if self.owner_account_id != 0u64 {
-                    ::buffa::types::put_fixed64_field(19u32, self.owner_account_id, buf);
                 }
                 if !self.smart_account_address.is_empty() {
                     ::buffa::types::put_string_field(
@@ -12427,13 +15154,6 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(
                                 &self.last_activity_at_unix_ms,
                             ),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.owner_account_id) {
-                    __map
-                        .serialize_entry(
-                            "ownerAccountId",
-                            &::buffa::json_helpers::ProtoJson(&self.owner_account_id),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
@@ -12683,13 +15403,6 @@ pub mod __buffa {
             #[must_use]
             pub fn last_activity_at_unix_ms(&self) -> u64 {
                 self.0.reborrow().last_activity_at_unix_ms
-            }
-            /// Public account or subaccount identifier that owns this flow.
-            ///
-            /// Field 19: `owner_account_id`
-            #[must_use]
-            pub fn owner_account_id(&self) -> u64 {
-                self.0.reborrow().owner_account_id
             }
             /// Smart account address on Polyester Chain when known.
             ///
@@ -13110,13 +15823,9 @@ pub mod __buffa {
         /// realtime updates, and the header of a detail view.
         #[derive(Clone, Debug, Default)]
         pub struct FlowSummaryViewView<'a> {
-            /// Public account identifier for the root account or subaccount the flow belongs to.
-            ///
-            /// Field 1: `owner_account_id`
-            pub owner_account_id: u64,
-            /// Smart-account address for the account the flow belongs to. This is the
-            /// stable address selector equivalent of `owner_account_id`; do not derive it
-            /// from source or destination display addresses.
+            /// Smart-account address for the account the flow belongs to: the account's
+            /// public identity, and the value of the ListFlows account selector. Do not
+            /// derive it from source or destination display addresses.
             ///
             /// Field 34: `smart_account_address`
             pub smart_account_address: &'a str,
@@ -13269,12 +15978,14 @@ pub mod __buffa {
             ///
             /// Field 36: `is_delayed`
             pub is_delayed: bool,
-            /// How the account selected by a ListFlows request takes part in this flow:
-            /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+            /// How the selected account takes part in this flow: `PARTICIPATION_OWNER`
+            /// for a flow it owns, including a transfer it sent, or
             /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
-            /// Each flow appears once with one participation. Unspecified when the
-            /// response is not scoped to an account, such as ListFlows without an account
-            /// selector, flow detail, and realtime updates.
+            /// Set by ListFlows with an account selector, ListAccountFlows and
+            /// GetAccountFlow; each flow appears once with one participation.
+            /// Unspecified when the response is not scoped to an account, such as
+            /// ListFlows without an account selector, GetFlowById, ListFlowsByTx, and
+            /// realtime updates.
             ///
             /// Field 37: `participation`
             pub participation: ::buffa::EnumValue<super::super::FlowParticipation>,
@@ -13311,15 +16022,6 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Fixed64,
-                        )?;
-                        view.owner_account_id = ::buffa::types::decode_fixed64(
-                            &mut cur,
-                        )?;
-                    }
                     34u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -13689,7 +16391,6 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::FlowSummaryView {
-                    owner_account_id: self.owner_account_id,
                     smart_account_address: self.smart_account_address.to_string(),
                     flow_id: self.flow_id.to_string(),
                     flow_kind: self.flow_kind,
@@ -13773,9 +16474,6 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
-                if self.owner_account_id != 0u64 {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                }
                 {
                     let val = self.flow_kind.to_i32();
                     if val != 0 {
@@ -13976,9 +16674,6 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
-                if self.owner_account_id != 0u64 {
-                    ::buffa::types::put_fixed64_field(1u32, self.owner_account_id, buf);
-                }
                 {
                     let val = self.flow_kind.to_i32();
                     if val != 0 {
@@ -14177,13 +16872,6 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.owner_account_id) {
-                    __map
-                        .serialize_entry(
-                            "ownerAccountId",
-                            &::buffa::json_helpers::ProtoJson(&self.owner_account_id),
-                        )?;
-                }
                 if !::buffa::json_helpers::skip_if::is_empty_str(
                     self.smart_account_address,
                 ) {
@@ -14478,16 +17166,9 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Public account identifier for the root account or subaccount the flow belongs to.
-            ///
-            /// Field 1: `owner_account_id`
-            #[must_use]
-            pub fn owner_account_id(&self) -> u64 {
-                self.0.reborrow().owner_account_id
-            }
-            /// Smart-account address for the account the flow belongs to. This is the
-            /// stable address selector equivalent of `owner_account_id`; do not derive it
-            /// from source or destination display addresses.
+            /// Smart-account address for the account the flow belongs to: the account's
+            /// public identity, and the value of the ListFlows account selector. Do not
+            /// derive it from source or destination display addresses.
             ///
             /// Field 34: `smart_account_address`
             #[must_use]
@@ -14743,12 +17424,14 @@ pub mod __buffa {
             pub fn is_delayed(&self) -> bool {
                 self.0.reborrow().is_delayed
             }
-            /// How the account selected by a ListFlows request takes part in this flow:
-            /// `PARTICIPATION_OWNER` for a flow it owns, including a transfer it sent, or
+            /// How the selected account takes part in this flow: `PARTICIPATION_OWNER`
+            /// for a flow it owns, including a transfer it sent, or
             /// `PARTICIPATION_RECIPIENT` for a transfer it received from another account.
-            /// Each flow appears once with one participation. Unspecified when the
-            /// response is not scoped to an account, such as ListFlows without an account
-            /// selector, flow detail, and realtime updates.
+            /// Set by ListFlows with an account selector, ListAccountFlows and
+            /// GetAccountFlow; each flow appears once with one participation.
+            /// Unspecified when the response is not scoped to an account, such as
+            /// ListFlows without an account selector, GetFlowById, ListFlowsByTx, and
+            /// realtime updates.
             ///
             /// Field 37: `participation`
             #[must_use]
@@ -18514,7 +21197,6 @@ pub mod __buffa {
                 use super::*;
                 #[derive(Clone, Debug)]
                 pub enum AccountSelector<'a> {
-                    OwnerAccountId(u64),
                     SmartAccountAddress(&'a str),
                 }
             }
@@ -18526,13 +21208,12 @@ pub mod __buffa {
         pub mod list_flows_request {
             #[allow(unused_imports)]
             use super::*;
-            /// Optional account selector. Omit to list across accounts the caller is
-            /// allowed to inspect. A selected account matches the flows it owns and the
-            /// transfers it receives from other accounts; use `participation` to narrow
-            /// to one of them.
+            /// Optional account selector. Omit to list the flows of every account. A
+            /// selected smart account matches the flows it owns and the transfers it
+            /// receives from other accounts; use `participation` to narrow to one of
+            /// them.
             #[derive(Clone, PartialEq, Debug)]
             pub enum AccountSelector {
-                OwnerAccountId(u64),
                 SmartAccountAddress(::buffa::alloc::string::String),
             }
             impl ::buffa::Oneof for AccountSelector {}
@@ -18544,12 +21225,6 @@ pub mod __buffa {
                     use serde::ser::SerializeMap;
                     let mut map = s.serialize_map(Some(1))?;
                     match self {
-                        Self::OwnerAccountId(v) => {
-                            map.serialize_entry(
-                                "ownerAccountId",
-                                &::buffa::json_helpers::ProtoJson(v),
-                            )?;
-                        }
                         Self::SmartAccountAddress(v) => {
                             map.serialize_entry("smartAccountAddress", v)?;
                         }
@@ -18568,6 +21243,10 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_FLOWS_BY_TX_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_FLOWS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_FLOWS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_ACCOUNT_FLOWS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_ACCOUNT_FLOWS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_ACCOUNT_FLOW_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_ACCOUNT_FLOW_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__FLOW_TX_MATCH_VIEW_JSON_ANY);
         reg.register_json_any(super::__LIST_FLOWS_BY_TX_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__FLOW_SUMMARY_VIEW_JSON_ANY);
@@ -18606,6 +21285,22 @@ pub use self::__buffa::view::ListFlowsRequestOwnedView;
 pub use self::__buffa::view::ListFlowsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListFlowsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAccountFlowsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAccountFlowsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAccountFlowsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListAccountFlowsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAccountFlowRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAccountFlowRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAccountFlowResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAccountFlowResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::FlowTxMatchViewView;
 #[doc(inline)]

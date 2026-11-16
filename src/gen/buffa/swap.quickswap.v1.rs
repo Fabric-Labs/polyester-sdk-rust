@@ -1460,11 +1460,17 @@ impl ::buffa::Enumeration for WithdrawalState {
 /// PREPARING_DEPOSIT | CONFIRMING) → CREDITED → EXECUTING (skipped for a
 /// bridge) → PAYING_OUT | REFUNDING | RETURNING → a terminal status. A
 /// QuickSwap that cannot be issued a deposit address goes from ALLOCATING
-/// straight to EXPIRED (DEPOSIT_ADDRESS_CONFLICT). HELD can be entered from
-/// any non-terminal status and is not terminal; a QuickSwap HELD with
-/// SOURCE_SCREENING_BLOCKED can end CLOSED. The terminal statuses are
+/// straight to EXPIRED (DEPOSIT_ADDRESS_CONFLICT). A deposit that is dropped
+/// or replaced on its network before it confirms brings no funds: the
+/// QuickSwap goes back from PREPARING_DEPOSIT or WAITING_FOR_CAPACITY to
+/// AWAITING_DEPOSIT, the only status that moves back, and no longer shows
+/// that deposit. HELD can be
+/// entered from any non-terminal status and is not terminal; a QuickSwap HELD
+/// with SOURCE_SCREENING_BLOCKED can end CLOSED. The terminal statuses are
 /// COMPLETED, REFUNDED, RETURNED, EXPIRED and CLOSED; a terminal status never
-/// changes. Accept status values added later; is_terminal is authoritative.
+/// changes, except that EXPIRED becomes HELD when a dropped or replaced
+/// deposit confirms after all (see EXPIRED). Accept status values added
+/// later; is_terminal is authoritative.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum QuickSwapStatus {
@@ -1516,7 +1522,11 @@ pub enum QuickSwapStatus {
     RETURNED = 15i32,
     /// Terminal: the funding window ended without an eligible deposit
     /// (FUNDING_WINDOW_ENDED), or the QuickSwap never got a deposit address
-    /// (DEPOSIT_ADDRESS_CONFLICT).
+    /// (DEPOSIT_ADDRESS_CONFLICT). With FUNDING_WINDOW_ENDED, terminal_at is
+    /// funding_expires_at, also after a dropped or replaced deposit. If such a
+    /// deposit confirms after all, its funds are held for review: the QuickSwap
+    /// becomes HELD, with that deposit ON_HOLD, the one change of a terminal
+    /// status.
     EXPIRED = 16i32,
     /// Terminal: the deposit was blocked by its risk screen
     /// (SOURCE_SCREENING_BLOCKED), and Zipper's compliance team transferred the
@@ -1918,6 +1928,17 @@ pub enum ErrorCode {
     /// The vault's payout address allowlist cannot be changed yet: its
     /// on-chain protection is still being set up. Retry in a few minutes.
     VAULT_ALLOWLIST_NOT_READY = 53i32,
+    /// The route is temporarily suspended: deposits on the source network or
+    /// withdrawals on the destination network, as AssetChainVariant
+    /// deposit_status and withdrawal_status SUSPENDED show. Quotes and creates
+    /// are refused and nothing is bound to the key; QuickSwaps already created
+    /// continue. Repeat the request once both are NORMAL again.
+    ROUTE_SUSPENDED = 54i32,
+    /// The invite is void: the member who sent it has left the broker or may no
+    /// longer grant its role. Accepting it granted nothing and cancelled it; ask
+    /// a member who may grant the role for a new invite. Invites voided by a
+    /// member change are cancelled by that change and answer INVITE_NOT_FOUND.
+    INVITE_VOID = 55i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2070,6 +2091,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::VAULT_ALLOWLIST_NOT_READY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const VaultAllowlistNotReady: Self = Self::VAULT_ALLOWLIST_NOT_READY;
+    ///Idiomatic alias for [`Self::ROUTE_SUSPENDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const RouteSuspended: Self = Self::ROUTE_SUSPENDED;
+    ///Idiomatic alias for [`Self::INVITE_VOID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InviteVoid: Self = Self::INVITE_VOID;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2215,6 +2242,8 @@ impl ::buffa::Enumeration for ErrorCode {
             51i32 => ::core::option::Option::Some(Self::ALLOWLIST_DESTINATION_IN_USE),
             52i32 => ::core::option::Option::Some(Self::ALLOWLIST_CHANGE_PENDING),
             53i32 => ::core::option::Option::Some(Self::VAULT_ALLOWLIST_NOT_READY),
+            54i32 => ::core::option::Option::Some(Self::ROUTE_SUSPENDED),
+            55i32 => ::core::option::Option::Some(Self::INVITE_VOID),
             _ => ::core::option::Option::None,
         }
     }
@@ -2273,6 +2302,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ALLOWLIST_DESTINATION_IN_USE => "ALLOWLIST_DESTINATION_IN_USE",
             Self::ALLOWLIST_CHANGE_PENDING => "ALLOWLIST_CHANGE_PENDING",
             Self::VAULT_ALLOWLIST_NOT_READY => "VAULT_ALLOWLIST_NOT_READY",
+            Self::ROUTE_SUSPENDED => "ROUTE_SUSPENDED",
+            Self::INVITE_VOID => "INVITE_VOID",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -2381,6 +2412,8 @@ impl ::buffa::Enumeration for ErrorCode {
             "VAULT_ALLOWLIST_NOT_READY" => {
                 ::core::option::Option::Some(Self::VAULT_ALLOWLIST_NOT_READY)
             }
+            "ROUTE_SUSPENDED" => ::core::option::Option::Some(Self::ROUTE_SUSPENDED),
+            "INVITE_VOID" => ::core::option::Option::Some(Self::INVITE_VOID),
             _ => ::core::option::Option::None,
         }
     }
@@ -2436,6 +2469,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ALLOWLIST_DESTINATION_IN_USE,
             Self::ALLOWLIST_CHANGE_PENDING,
             Self::VAULT_ALLOWLIST_NOT_READY,
+            Self::ROUTE_SUSPENDED,
+            Self::INVITE_VOID,
         ]
     }
 }
@@ -5186,7 +5221,11 @@ pub const __DEPOSIT_INSTRUCTIONS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry 
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Deposit {
-    /// Zero-based position in detection order; stable for the QuickSwap's life.
+    /// Zero-based position in deposits, which lists deposits oldest first. Not
+    /// stable: a deposit detected earlier can appear later, for example a
+    /// dropped or replaced deposit that confirms after all, and then shifts the
+    /// index of every deposit after it. Identify a deposit by tx_hash with
+    /// tx_occurrence_index, not by index.
     ///
     /// Field 1: `index`
     #[serde(
@@ -7483,7 +7522,8 @@ pub struct Withdrawal {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub role: ::buffa::EnumValue<WithdrawalRole>,
-    /// Deposit whose funds this withdrawal moves.
+    /// Index (Deposit.index), in the same response, of the deposit whose funds
+    /// this withdrawal moves. Not stable across reads, like Deposit.index.
     ///
     /// Field 3: `deposit_index`
     #[serde(
@@ -8052,8 +8092,9 @@ pub struct QuickSwap {
     /// another deposit observed on an already retired address shows as
     /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
     /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
-    /// Read again if the end user reports such a deposit or needs the final
-    /// retirement time.
+    /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
+    /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
+    /// reports such a deposit or needs the final retirement time.
     ///
     /// Field 5: `is_terminal`
     #[serde(
@@ -8175,7 +8216,8 @@ pub struct QuickSwap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub screening: ::buffa::MessageField<Screening>,
-    /// Detected deposits, oldest first, at most 50.
+    /// Detected deposits, oldest first, at most 50. A deposit detected earlier
+    /// can appear later and shift the others' index (see Deposit.index).
     ///
     /// Field 17: `deposits`
     #[serde(
@@ -11766,8 +11808,10 @@ pub enum PayoutStatus {
     /// reason is nothing_to_pay (no asset reached its minimum), below_minimum
     /// (an amount was below the least a withdrawal on its network pays),
     /// price_unavailable (the rule has a USD minimum and no current price
-    /// valued an asset) or destination_cooling_down (the destination was added
-    /// to the vault's external withdraw whitelist less than 24 hours ago). Each
+    /// valued an asset), destination_cooling_down (the destination was added
+    /// to the vault's external withdraw whitelist less than 24 hours ago) or
+    /// route_suspended (withdrawals to the destination's network were
+    /// suspended). Each
     /// step carries the balance evaluated, its value and the minimum it was
     /// held to.
     PAYOUT_ROLLED_OVER = 4i32,
@@ -23841,7 +23885,9 @@ pub struct PayoutStep {
     /// price_unavailable, rule_superseded, destination_not_whitelisted,
     /// destination_cooling_down (the destination was added to the vault's
     /// external withdraw whitelist less than 24 hours ago; the balance stays
-    /// for a later run), destination_invalid, authority_revoked,
+    /// for a later run), route_suspended (withdrawals to the destination's
+    /// network were suspended; the balance stays for a later run),
+    /// destination_invalid, authority_revoked,
     /// withdrawal_refused,
     /// gateway_capacity_insufficient, withdrawal_released (the withdrawal was
     /// released before it was sent; nothing left the vault) or
@@ -41540,7 +41586,11 @@ pub mod __buffa {
         /// Deposit is one deposit detected on the QuickSwap's deposit address.
         #[derive(Clone, Debug, Default)]
         pub struct DepositView<'a> {
-            /// Zero-based position in detection order; stable for the QuickSwap's life.
+            /// Zero-based position in deposits, which lists deposits oldest first. Not
+            /// stable: a deposit detected earlier can appear later, for example a
+            /// dropped or replaced deposit that confirms after all, and then shifts the
+            /// index of every deposit after it. Identify a deposit by tx_hash with
+            /// tx_occurrence_index, not by index.
             ///
             /// Field 1: `index`
             pub index: u32,
@@ -42194,7 +42244,11 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Zero-based position in detection order; stable for the QuickSwap's life.
+            /// Zero-based position in deposits, which lists deposits oldest first. Not
+            /// stable: a deposit detected earlier can appear later, for example a
+            /// dropped or replaced deposit that confirms after all, and then shifts the
+            /// index of every deposit after it. Identify a deposit by tx_hash with
+            /// tx_occurrence_index, not by index.
             ///
             /// Field 1: `index`
             #[must_use]
@@ -44767,7 +44821,8 @@ pub mod __buffa {
             ///
             /// Field 2: `role`
             pub role: ::buffa::EnumValue<super::super::WithdrawalRole>,
-            /// Deposit whose funds this withdrawal moves.
+            /// Index (Deposit.index), in the same response, of the deposit whose funds
+            /// this withdrawal moves. Not stable across reads, like Deposit.index.
             ///
             /// Field 3: `deposit_index`
             pub deposit_index: u32,
@@ -45535,7 +45590,8 @@ pub mod __buffa {
             pub fn role(&self) -> ::buffa::EnumValue<super::super::WithdrawalRole> {
                 self.0.reborrow().role
             }
-            /// Deposit whose funds this withdrawal moves.
+            /// Index (Deposit.index), in the same response, of the deposit whose funds
+            /// this withdrawal moves. Not stable across reads, like Deposit.index.
             ///
             /// Field 3: `deposit_index`
             #[must_use]
@@ -45730,8 +45786,9 @@ pub mod __buffa {
             /// another deposit observed on an already retired address shows as
             /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
             /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
-            /// Read again if the end user reports such a deposit or needs the final
-            /// retirement time.
+            /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
+            /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
+            /// reports such a deposit or needs the final retirement time.
             ///
             /// Field 5: `is_terminal`
             pub is_terminal: bool,
@@ -45796,7 +45853,8 @@ pub mod __buffa {
             pub screening: ::buffa::MessageFieldView<
                 super::super::__buffa::view::ScreeningView<'a>,
             >,
-            /// Detected deposits, oldest first, at most 50.
+            /// Detected deposits, oldest first, at most 50. A deposit detected earlier
+            /// can appear later and shift the others' index (see Deposit.index).
             ///
             /// Field 17: `deposits`
             pub deposits: ::buffa::RepeatedView<
@@ -47102,8 +47160,9 @@ pub mod __buffa {
             /// another deposit observed on an already retired address shows as
             /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
             /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
-            /// Read again if the end user reports such a deposit or needs the final
-            /// retirement time.
+            /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
+            /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
+            /// reports such a deposit or needs the final retirement time.
             ///
             /// Field 5: `is_terminal`
             #[must_use]
@@ -47212,7 +47271,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().screening
             }
-            /// Detected deposits, oldest first, at most 50.
+            /// Detected deposits, oldest first, at most 50. A deposit detected earlier
+            /// can appear later and shift the others' index (see Deposit.index).
             ///
             /// Field 17: `deposits`
             #[must_use]
@@ -72658,7 +72718,9 @@ pub mod __buffa {
             /// price_unavailable, rule_superseded, destination_not_whitelisted,
             /// destination_cooling_down (the destination was added to the vault's
             /// external withdraw whitelist less than 24 hours ago; the balance stays
-            /// for a later run), destination_invalid, authority_revoked,
+            /// for a later run), route_suspended (withdrawals to the destination's
+            /// network were suspended; the balance stays for a later run),
+            /// destination_invalid, authority_revoked,
             /// withdrawal_refused,
             /// gateway_capacity_insufficient, withdrawal_released (the withdrawal was
             /// released before it was sent; nothing left the vault) or
@@ -73464,7 +73526,9 @@ pub mod __buffa {
             /// price_unavailable, rule_superseded, destination_not_whitelisted,
             /// destination_cooling_down (the destination was added to the vault's
             /// external withdraw whitelist less than 24 hours ago; the balance stays
-            /// for a later run), destination_invalid, authority_revoked,
+            /// for a later run), route_suspended (withdrawals to the destination's
+            /// network were suspended; the balance stays for a later run),
+            /// destination_invalid, authority_revoked,
             /// withdrawal_refused,
             /// gateway_capacity_insufficient, withdrawal_released (the withdrawal was
             /// released before it was sent; nothing left the vault) or

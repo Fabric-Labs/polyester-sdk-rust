@@ -724,6 +724,16 @@ CAPABILITY_DEFS: list[dict[str, Any]] = [
         "any_services": ["transfer.v1.InternalTransferService"],
     },
     {
+        "id": "dust_conversion",
+        "label": "Dust conversion",
+        "any_services": ["transfer.v1.DustConversionService"],
+    },
+    {
+        "id": "statement_exports",
+        "label": "Statement export files",
+        "any_services": ["ledger.read.v1.StatementExportService"],
+    },
+    {
         "id": "transfer_history",
         "label": "Transfer history",
         "any_procedures": ["/ledger.read.v1.LedgerReadService/ListTransfers"],
