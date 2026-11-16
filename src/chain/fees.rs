@@ -102,19 +102,34 @@ async fn eth_call(client: &JsonRpcClient, to: &str, data: Vec<u8>) -> Result<Str
 }
 
 fn address_from_eth_call_result(raw: &str) -> Result<String> {
-    let hex_body = raw.trim().trim_start_matches("0x").to_ascii_lowercase();
-    if hex_body.len() < 40 {
-        return Err(Error::transport(format!(
-            "eth_call address result too short: {raw}"
-        )));
+    let word = eth_call_word(raw, "address")?;
+    if word[..12].iter().any(|byte| *byte != 0) {
+        return Err(Error::transport(
+            "eth_call address result is not an ABI-encoded address",
+        ));
     }
-    Ok(format!("0x{}", &hex_body[hex_body.len() - 40..]))
+    Ok(format!("0x{}", hex::encode(&word[12..])))
 }
 
 fn u256_from_eth_call_result(raw: &str) -> Result<U256> {
-    let hex_body = raw.trim().trim_start_matches("0x");
-    U256::from_str_radix(hex_body, 16)
-        .map_err(|_| Error::transport(format!("eth_call u256 decode failed: {raw}")))
+    eth_call_word(raw, "uint256").map(U256::from_be_bytes)
+}
+
+/// The one 32-byte ABI word that an `eth_call` of a function returning a single
+/// static value answers: `0x` and exactly 64 hex digits. Anything else, such as
+/// non-ASCII, short, odd-length or non-hex text from the RPC endpoint, is an
+/// [`Error::Transport`]; the text is not echoed.
+fn eth_call_word(raw: &str, kind: &str) -> Result<[u8; 32]> {
+    let malformed = || {
+        Error::transport(format!(
+            "eth_call {kind} result is not a 0x-prefixed 32-byte hex word ({} bytes of text)",
+            raw.len()
+        ))
+    };
+    let hex_body = raw.trim().strip_prefix("0x").ok_or_else(malformed)?;
+    let mut word = [0u8; 32];
+    hex::decode_to_slice(hex_body, &mut word).map_err(|_| malformed())?;
+    Ok(word)
 }
 
 fn normalize_address(value: &str, field: &str) -> Result<String> {
@@ -158,6 +173,34 @@ mod tests {
         let decoded = getFeeCall::abi_decode(&data).unwrap();
         assert_eq!(decoded.chainId, 56);
         assert_eq!(decoded.zToken, token);
+    }
+
+    #[test]
+    fn malformed_eth_call_results_are_errors() {
+        let word = format!("0x{}", "0".repeat(64));
+        for raw in [
+            format!("0xé{}", "a".repeat(39)),
+            format!("0x{}é", "0".repeat(62)),
+            "0x1234".to_string(),
+            format!("0x{}", "0".repeat(63)),
+            format!("0x{}0", "0".repeat(64)),
+            format!("0x{}zz", "0".repeat(62)),
+            "0x".to_string(),
+            String::new(),
+            "0".repeat(64),
+        ] {
+            assert!(
+                matches!(address_from_eth_call_result(&raw), Err(Error::Transport(_))),
+                "address {raw:?}"
+            );
+            assert!(
+                matches!(u256_from_eth_call_result(&raw), Err(Error::Transport(_))),
+                "uint256 {raw:?}"
+            );
+        }
+        assert_eq!(u256_from_eth_call_result(&word).unwrap(), U256::ZERO);
+        let dirty = format!("0x01{}", "0".repeat(62));
+        assert!(address_from_eth_call_result(&dirty).is_err());
     }
 
     #[test]
