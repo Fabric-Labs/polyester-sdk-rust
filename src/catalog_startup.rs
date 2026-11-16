@@ -34,6 +34,36 @@ const MAX_BACKOFF: Duration = Duration::from_secs(1);
 const SPOT_OPERATION: &str = "marketdata.v1.MarketDataService/GetSpotConfig";
 const FUNDING_OPERATION: &str = "chain.zipper.v1.ZipperService/GetDepositWithdrawConfig";
 
+/// Read the spot config within `deadline` into a catalog of its own, which
+/// validates it, and return that catalog with the config it holds; nothing
+/// else changes.
+pub(crate) async fn read_spot(
+    factory: &Factory,
+    deadline: Instant,
+) -> Result<(CatalogManager, serde_json::Value)> {
+    let response = read_with_retry(
+        factory,
+        "spot",
+        SPOT_OPERATION,
+        deadline,
+        |transport, config| async move {
+            let client = MarketDataServiceClient::new(transport, config);
+            unary::await_public_connect(client.get_spot_config(GetSpotConfigRequest::default()))
+                .await
+                .map(|response| response.into_owned())
+        },
+    )
+    .await?;
+    let (response, attempts, elapsed) = response;
+    let snapshot = CatalogManager::new();
+    let raw = spot_config_from_proto(&response).and_then(|spot| {
+        snapshot.hydrate_spot_config_json(spot.raw.clone())?;
+        Ok(spot.raw)
+    });
+    raw.map(|raw| (snapshot, raw))
+        .map_err(|source| invalid("spot", SPOT_OPERATION, attempts, elapsed, source))
+}
+
 /// Load and install the spot config, within `deadline`.
 pub(crate) async fn load_spot(
     factory: &Factory,

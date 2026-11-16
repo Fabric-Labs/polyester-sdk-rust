@@ -22,8 +22,8 @@ use super::sbe;
 use super::trades::Tracker;
 use super::{
     BestBidOffer, DepthSnapshot, DepthUpdate, Event, FeedState, Level, MarketStatus, PATH, Pong,
-    Side, Stream, StreamError, SubscribeResponse, SubscribeResult, Topic, TopicResult, Trade,
-    Trades, TradesBackfill, TradesGap, TradesThrough,
+    Renumbered, Side, Stream, StreamError, SubscribeResponse, SubscribeResult, Topic, TopicResult,
+    Trade, Trades, TradesBackfill, TradesGap, TradesThrough,
 };
 use crate::errors::{Error, Result};
 use crate::realtime::{ReconnectBackoff, lock_unpoisoned, read_unpoisoned, write_unpoisoned};
@@ -37,6 +37,8 @@ type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 pub trait Pairs: Send + Sync {
     fn base_quantity_scale(&self, symbol_id: u32) -> Option<u32>;
     fn symbol(&self, symbol_id: u32) -> Option<String>;
+    /// The numeric ID of the pair `symbol`.
+    fn symbol_id(&self, symbol: &str) -> Option<u32>;
 }
 
 impl Pairs for crate::catalogs::Manager {
@@ -45,6 +47,69 @@ impl Pairs for crate::catalogs::Manager {
     }
     fn symbol(&self, symbol_id: u32) -> Option<String> {
         self.symbol_for_symbol_id(symbol_id)
+    }
+    fn symbol_id(&self, symbol: &str) -> Option<u32> {
+        self.symbol_id_for_symbol(symbol)
+    }
+}
+
+/// Reads the spot pairs afresh: the client calls it on every connection,
+/// before it subscribes anything on it.
+pub trait PairsSource: Send + Sync {
+    /// Reads the pairs without making them current anywhere.
+    fn load(&self) -> futures_util::future::BoxFuture<'_, Result<LoadedPairs>>;
+}
+
+type Install = Box<dyn FnOnce() -> Result<Arc<dyn Pairs>> + Send>;
+
+/// Pairs a [`PairsSource`] read for one connection. The stream installs them
+/// only while that connection is current: it runs their install step, which
+/// makes them current wherever else they are read (`Client::market_stream`
+/// refreshes the client's catalogs, which its trade history reads), and
+/// decodes with the pairs the step returns.
+pub struct LoadedPairs {
+    pairs: Arc<dyn Pairs>,
+    install: Option<Install>,
+}
+
+impl LoadedPairs {
+    /// Pairs that are current once the stream decodes with them.
+    pub fn new(pairs: Arc<dyn Pairs>) -> Self {
+        Self {
+            pairs,
+            install: None,
+        }
+    }
+
+    /// Pairs whose install step `install` makes them current and returns the
+    /// pairs to decode with. A failed step installs nothing and is retried
+    /// as a failed read.
+    pub fn with_install(
+        pairs: Arc<dyn Pairs>,
+        install: impl FnOnce() -> Result<Arc<dyn Pairs>> + Send + 'static,
+    ) -> Self {
+        Self {
+            pairs,
+            install: Some(Box::new(install)),
+        }
+    }
+
+    /// The pairs read.
+    pub fn pairs(&self) -> &Arc<dyn Pairs> {
+        &self.pairs
+    }
+
+    fn install(self) -> Result<Arc<dyn Pairs>> {
+        match self.install {
+            Some(install) => install(),
+            None => Ok(self.pairs),
+        }
+    }
+}
+
+impl std::fmt::Debug for LoadedPairs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadedPairs").finish_non_exhaustive()
     }
 }
 
@@ -56,6 +121,8 @@ pub struct Config {
     pub url: String,
     /// Pair scales and symbols, usually the client's catalogs.
     pub pairs: Arc<dyn Pairs>,
+    /// Re-reads the pairs on every connection.
+    pub reload: Option<Arc<dyn PairsSource>>,
     /// When set, every [`TradesGap`] is recovered from the trade history API
     /// in the background and its outcome delivered as an
     /// [`Event::TradesBackfill`].
@@ -78,6 +145,7 @@ impl Config {
         Self {
             url: url.into(),
             pairs,
+            reload: None,
             history: None,
             queue_size: 0,
             ping_interval: Duration::ZERO,
@@ -152,6 +220,12 @@ pub struct MarketStream {
 
 pub(crate) struct Shared {
     cfg: Config,
+    /// The pairs every message is decoded with: [`Config::pairs`], then the
+    /// pairs last read for the current connection ([`Config::reload`]).
+    pairs: RwLock<Arc<dyn Pairs>>,
+    /// The current connection's number; a read of the pairs for any other
+    /// installs nothing.
+    generation: AtomicU64,
     ids: AtomicU64,
     /// Set once a connection delivered a message, so the next reconnect
     /// starts from the shortest backoff.
@@ -170,10 +244,17 @@ struct Inner {
     /// A request is given its ID and queued under this lock, so the server
     /// receives requests in ID order.
     out: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    /// The current connection waits for its read of the pairs: it subscribes
+    /// nothing, and a request is held as between connections.
+    paused: bool,
     /// The topics the caller wants held, in the order first asked: the intent
     /// every topic's owner moves the server toward. A topic leaves it when the
     /// caller unsubscribes or the server refuses it.
     wanted: Vec<Topic>,
+    /// The pair each wanted topic was asked for, by symbol: the caller's
+    /// intent. A topic's pair ID is only the current connection's mapping
+    /// of it, and a new connection maps it again from its own catalog.
+    symbols: HashMap<Topic, String>,
     waiting: HashMap<u64, oneshot::Sender<Result<SubscribeResponse>>>,
     /// Every Subscribe and Unsubscribe sent on the current connection, by
     /// request ID: its kind and topics. A response is matched to it by ID
@@ -217,6 +298,9 @@ impl Inner {
     /// requests reach the wire in the order of their IDs. `None` without a
     /// connection.
     fn send(&mut self, ids: &AtomicU64, unsubscribe: bool, topics: &[Topic]) -> Option<u64> {
+        if self.paused {
+            return None;
+        }
         let out = self.out.as_ref()?;
         let id = ids.fetch_add(1, Ordering::SeqCst) + 1;
         let frame = if unsubscribe {
@@ -274,6 +358,8 @@ pub async fn connect(mut config: Config) -> Result<MarketStream> {
     let (events, rx) = mpsc::channel(config.queue_size);
     let (stop, _) = watch::channel(false);
     let shared = Arc::new(Shared {
+        pairs: RwLock::new(config.pairs.clone()),
+        generation: AtomicU64::new(0),
         cfg: config,
         ids: AtomicU64::new(0),
         healthy: AtomicBool::new(false),
@@ -285,9 +371,15 @@ pub async fn connect(mut config: Config) -> Result<MarketStream> {
         state: RwLock::new(State::default()),
     });
     let ws = shared.dial().await?;
+    // The first connection's pairs are read before connect returns, so a
+    // subscribe right after it uses them.
+    if let Some(source) = &shared.cfg.reload {
+        let pairs = source.load().await?.install()?;
+        *write_unpoisoned(&shared.pairs) = pairs;
+    }
     // Subscribe may run as soon as connect returns: the connection is the
     // client's before then.
-    let out_rx = shared.attach().ok_or_else(closed)?;
+    let out_rx = shared.attach(false).ok_or_else(closed)?;
     let task = tokio::spawn(run(shared.clone(), ws, out_rx));
     Ok(MarketStream { rx, shared, task })
 }
@@ -333,8 +425,7 @@ impl MarketStream {
         for t in topics {
             if self
                 .shared
-                .cfg
-                .pairs
+                .pairs()
                 .base_quantity_scale(t.symbol_id)
                 .is_none()
             {
@@ -404,7 +495,7 @@ impl MarketStream {
         let take = |n: usize| if levels > 0 { n.min(levels) } else { n };
         Some(OrderBook {
             symbol_id,
-            symbol: self.shared.cfg.pairs.symbol(symbol_id),
+            symbol: self.shared.pairs().symbol(symbol_id),
             stream,
             book_epoch: b.epoch,
             update_id: b.update_id,
@@ -499,7 +590,9 @@ impl Shared {
     /// The session subscribes what is wanted then, and a request after this
     /// queues its topics on the connection itself: each topic is sent once,
     /// by whichever its owner records first.
-    fn attach(&self) -> Option<mpsc::UnboundedReceiver<Vec<u8>>> {
+    /// `paused`: the connection subscribes nothing until its read of the
+    /// pairs is installed ([`Self::install`]).
+    fn attach(&self, paused: bool) -> Option<mpsc::UnboundedReceiver<Vec<u8>>> {
         let mut inner = lock_unpoisoned(&self.inner);
         if inner.closed || inner.err.is_some() {
             return None;
@@ -507,7 +600,111 @@ impl Shared {
         let (tx, rx) = mpsc::unbounded_channel();
         inner.out = Some(tx);
         inner.ping = None;
+        inner.paused = paused;
+        self.generation.fetch_add(1, Ordering::SeqCst);
         Some(rx)
+    }
+
+    /// The pairs messages are decoded with now.
+    fn pairs(&self) -> Arc<dyn Pairs> {
+        read_unpoisoned(&self.pairs).clone()
+    }
+
+    /// Installs pairs read for connection `generation` and ends its pause;
+    /// `None`, installing nothing, when another connection has superseded it
+    /// or the stream stopped. Every wanted topic follows its pair by symbol
+    /// to the pair's new ID; one whose pair is gone ends. Each pair whose ID,
+    /// symbol or scale changed loses its state, so no new ID is ever read
+    /// with an old pair's symbol or scale. Returns the events to deliver.
+    fn install(&self, generation: u64, loaded: LoadedPairs) -> Result<Option<Vec<Event>>> {
+        let mut inner = lock_unpoisoned(&self.inner);
+        if inner.closed
+            || inner.err.is_some()
+            || self.generation.load(Ordering::SeqCst) != generation
+        {
+            return Ok(None);
+        }
+        // Everything is compared with the pairs read before their install
+        // step runs, which may change the catalog the old pairs are read
+        // from.
+        let old = self.pairs();
+        let pairs = loaded.pairs.clone();
+        let mut renumbered: Vec<Renumbered> = Vec::new();
+        let mut ended = Vec::new();
+        let mut wanted: Vec<Topic> = Vec::new();
+        let mut symbols = HashMap::new();
+        for topic in &inner.wanted {
+            // The caller's intent, else what the connection's own catalog
+            // named the pair.
+            let symbol = inner
+                .symbols
+                .get(topic)
+                .cloned()
+                .or_else(|| old.symbol(topic.symbol_id));
+            let Some(id) = symbol.as_deref().and_then(|s| pairs.symbol_id(s)) else {
+                ended.push((*topic, symbol));
+                continue;
+            };
+            if id != topic.symbol_id
+                && let Some(symbol) = symbol
+                && !renumbered.iter().any(|r| r.symbol == symbol)
+            {
+                renumbered.push(Renumbered {
+                    symbol,
+                    from: topic.symbol_id,
+                    to: id,
+                });
+            }
+            let moved = Topic::new(id, topic.stream);
+            if !wanted.contains(&moved) {
+                wanted.push(moved);
+            }
+            if let Some(symbol) = pairs.symbol(id) {
+                symbols.insert(moved, symbol);
+            }
+        }
+        let changed: Vec<u32> = {
+            let state = read_unpoisoned(&self.state);
+            let held: HashSet<u32> = state
+                .books
+                .keys()
+                .map(|t| t.symbol_id)
+                .chain(state.quotes.keys().copied())
+                .chain(state.trackers.keys().copied())
+                .chain(state.feeds.keys().copied())
+                .collect();
+            held.into_iter()
+                .filter(|id| {
+                    old.symbol(*id).is_none()
+                        || old.symbol(*id) != pairs.symbol(*id)
+                        || old.base_quantity_scale(*id) != pairs.base_quantity_scale(*id)
+                })
+                .collect()
+        };
+        // A failed install step changes nothing and is retried as a failed
+        // read.
+        let current = loaded.install()?;
+        {
+            let mut state = write_unpoisoned(&self.state);
+            for (topic, _) in &ended {
+                drop_topic(&mut state, *topic);
+            }
+            for id in changed {
+                for stream in Stream::ALL {
+                    drop_topic(&mut state, Topic::new(id, stream));
+                }
+            }
+        }
+        inner.wanted = wanted;
+        inner.symbols = symbols;
+        inner.paused = false;
+        *write_unpoisoned(&self.pairs) = current;
+        let mut events = vec![Event::PairsReloaded { renumbered }];
+        events.extend(ended.into_iter().map(|(topic, symbol)| Event::Ended {
+            topic,
+            error: Error::MarketStream(StreamError::PairNotListed { topic, symbol }),
+        }));
+        Ok(Some(events))
     }
 
     /// Ends a connection: everything it fed becomes stale before the client
@@ -565,7 +762,7 @@ impl Shared {
     /// answer is reconciled when that answer is applied.
     fn reconcile(&self, pick: impl FnOnce(&Inner) -> Vec<Topic>) {
         let mut inner = lock_unpoisoned(&self.inner);
-        if inner.closed || inner.out.is_none() {
+        if inner.closed || inner.out.is_none() || inner.paused {
             return;
         }
         let (mut subs, mut unsubs) = (Vec::new(), Vec::new());
@@ -645,9 +842,13 @@ impl Shared {
                 // The caller ended the topic: its state goes now, and a new
                 // subscription starts afresh.
                 inner.wanted.retain(|w| w != t);
+                inner.symbols.remove(t);
                 drop_topic(&mut write_unpoisoned(&self.state), *t);
             } else if !inner.wanted.contains(t) {
                 inner.wanted.push(*t);
+                if let Some(symbol) = self.pairs().symbol(t.symbol_id) {
+                    inner.symbols.insert(*t, symbol);
+                }
             }
         }
         let Some(id) = inner.send(&self.ids, unsubscribe, topics) else {
@@ -672,6 +873,40 @@ impl Shared {
             if inner.closed || inner.err.is_some() {
                 return false;
             }
+            match inner.events.as_ref().map(|tx| tx.try_send(event)) {
+                Some(Ok(())) => return true,
+                Some(Err(mpsc::error::TrySendError::Full(_))) => true,
+                _ => false,
+            }
+        };
+        if overflow {
+            self.shutdown(Some(Error::queue_overflow(
+                "market stream event queue full; consumer too slow",
+            )));
+        }
+        false
+    }
+
+    /// Delivers a trades recovery started under connection `started`. Under a
+    /// newer connection its trades are dropped, never delivered: they were
+    /// read and decoded with that connection's catalog, which the pairs read
+    /// since may have replaced, so the gap's recovery fails instead
+    /// ([`StreamError::Superseded`]). The check and the delivery are atomic
+    /// with the start of a new connection.
+    fn emit_backfill(&self, started: u64, gap: TradesGap, trades: Result<Vec<Trade>>) -> bool {
+        let overflow = {
+            let inner = lock_unpoisoned(&self.inner);
+            if inner.closed || inner.err.is_some() {
+                return false;
+            }
+            let trades = if self.generation.load(Ordering::SeqCst) == started {
+                trades
+            } else {
+                Err(Error::MarketStream(StreamError::Superseded {
+                    symbol_id: gap.symbol_id,
+                }))
+            };
+            let event = Event::TradesBackfill(TradesBackfill { gap, trades });
             match inner.events.as_ref().map(|tx| tx.try_send(event)) {
                 Some(Ok(())) => return true,
                 Some(Err(mpsc::error::TrySendError::Full(_))) => true,
@@ -711,8 +946,9 @@ impl Shared {
     }
 
     fn level(&self, symbol_id: u32, price: i64, qty: i64) -> Result<Level> {
-        let symbol = self.cfg.pairs.symbol(symbol_id);
-        let scale = self.cfg.pairs.base_quantity_scale(symbol_id);
+        let pairs = self.pairs();
+        let symbol = pairs.symbol(symbol_id);
+        let scale = pairs.base_quantity_scale(symbol_id);
         Ok(Level {
             price: Price::from_ticks(price, symbol.clone())?,
             qty: Quantity::from_scaled(
@@ -770,7 +1006,7 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
                 return finish(&shared);
             }
         };
-        let Some(rx) = shared.attach() else {
+        let Some(rx) = shared.attach(shared.cfg.reload.is_some()) else {
             break;
         };
         ws = next;
@@ -814,9 +1050,25 @@ async fn session(
     if !shared.emit(Event::Connected { reconnect }) {
         return None;
     }
-    // Every wanted topic no request is outstanding for is subscribed; the
-    // requests are queued, and written in order with any sent since attach.
-    shared.reconcile(|inner| inner.wanted.clone());
+    // A reconnect reads the pairs afresh first ([`Config::reload`]); the
+    // connection subscribes nothing until that read is installed, and a
+    // failed read is retried with backoff while the connection stays up.
+    // `connect` read the first connection's.
+    let generation = shared.generation.load(Ordering::SeqCst);
+    let source = if reconnect {
+        shared.cfg.reload.clone()
+    } else {
+        None
+    };
+    let mut reload = source.as_ref().map(|s| s.load());
+    let mut retry: Option<std::pin::Pin<Box<tokio::time::Sleep>>> = None;
+    let mut reload_backoff = ReconnectBackoff::new();
+    if reload.is_none() {
+        // Every wanted topic no request is outstanding for is subscribed; the
+        // requests are queued, and written in order with any sent since
+        // attach.
+        shared.reconcile(|inner| inner.wanted.clone());
+    }
     let cfg = &shared.cfg;
     let mut stop = shared.stop.subscribe();
     let mut ping = tokio::time::interval_at(
@@ -834,6 +1086,32 @@ async fn session(
             _ = async { let _ = stop.wait_for(|s| *s).await; } => {
                 let _ = write.close().await;
                 return None;
+            }
+            loaded = async { reload.as_mut().expect("a read in progress").await }, if reload.is_some() => {
+                reload = None;
+                match loaded.and_then(|loaded| shared.install(generation, loaded)) {
+                    Ok(Some(events)) => {
+                        for event in events {
+                            if !shared.emit(event) {
+                                return None;
+                            }
+                        }
+                        shared.reconcile(|inner| inner.wanted.clone());
+                    }
+                    // Superseded, or the stream stopped.
+                    Ok(None) => {}
+                    Err(error) => {
+                        let delay = reload_backoff.next_delay();
+                        if !shared.emit(Event::PairsReloadFailed { error, delay }) {
+                            return None;
+                        }
+                        retry = Some(Box::pin(tokio::time::sleep(delay)));
+                    }
+                }
+            }
+            _ = async { retry.as_mut().expect("a retry scheduled").await }, if retry.is_some() => {
+                retry = None;
+                reload = source.as_ref().map(|s| s.load());
             }
             frame = out_rx.recv() => {
                 let frame = frame?;
@@ -1014,7 +1292,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
             }
             shared.emit(Event::Trades(Trades {
                 symbol_id,
-                symbol: shared.cfg.pairs.symbol(symbol_id),
+                symbol: shared.pairs().symbol(symbol_id),
                 book_epoch: epoch,
                 update_id,
                 transact_ts_ns: transact_ns,
@@ -1069,7 +1347,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                 }
                 let quote = BestBidOffer {
                     symbol_id,
-                    symbol: shared.cfg.pairs.symbol(symbol_id),
+                    symbol: shared.pairs().symbol(symbol_id),
                     book_epoch: epoch,
                     update_id,
                     transact_ts_ns: transact_ns,
@@ -1121,7 +1399,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
             if changed {
                 shared.emit(Event::DepthSnapshot(DepthSnapshot {
                     symbol_id,
-                    symbol: shared.cfg.pairs.symbol(symbol_id),
+                    symbol: shared.pairs().symbol(symbol_id),
                     stream,
                     book_epoch: epoch,
                     update_id,
@@ -1179,7 +1457,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
             }
             shared.emit(Event::DepthUpdate(DepthUpdate {
                 symbol_id,
-                symbol: shared.cfg.pairs.symbol(symbol_id),
+                symbol: shared.pairs().symbol(symbol_id),
                 book_epoch: epoch,
                 first_update_id: first,
                 last_update_id: last,
@@ -1237,9 +1515,13 @@ fn emit_gaps(shared: &Arc<Shared>, gaps: Vec<TradesGap>) {
         if inner.closed || inner.err.is_some() {
             return;
         }
+        // The recovery belongs to this connection and its catalog: a result
+        // that arrives under a newer connection is dropped.
+        let started = shared.generation.load(Ordering::SeqCst);
+        let pairs = shared.pairs();
         let handle = tokio::spawn(async move {
-            let trades = backfill_paced(history.as_ref(), gap, pacing).await;
-            task_shared.emit(Event::TradesBackfill(TradesBackfill { gap, trades }));
+            let trades = backfill_paced(history.as_ref(), Some(pairs.as_ref()), gap, pacing).await;
+            task_shared.emit_backfill(started, gap, trades);
         });
         inner.backfills.retain(|h| !h.is_finished());
         inner.backfills.push(handle.abort_handle());
@@ -1297,7 +1579,10 @@ fn on_subscribe_response(
                 applied.push(topic);
                 match apply(owner, &mut state, topic, r.result, sent.unsubscribe, want) {
                     Applied::Done => {}
-                    Applied::Refused => inner.wanted.retain(|w| *w != topic),
+                    Applied::Refused => {
+                        inner.wanted.retain(|w| *w != topic);
+                        inner.symbols.remove(&topic);
+                    }
                     Applied::Unknown => {
                         broken.get_or_insert(Error::MarketStream(StreamError::Unsubscribe {
                             topic,
@@ -1559,6 +1844,22 @@ pub(crate) fn recovery_requested(shared: &Shared, topic: Topic) -> bool {
         .is_some_and(|o| o.recovering)
 }
 
+/// Installs pairs reloaded for connection `generation`; false when it is not
+/// the current connection's.
+#[cfg(test)]
+pub(crate) fn install_pairs(shared: &Shared, generation: u64, pairs: Arc<dyn Pairs>) -> bool {
+    shared
+        .install(generation, LoadedPairs::new(pairs))
+        .unwrap()
+        .is_some()
+}
+
+/// The current connection's generation.
+#[cfg(test)]
+pub(crate) fn generation(shared: &Shared) -> u64 {
+    shared.generation.load(Ordering::SeqCst)
+}
+
 /// Whether a depth stream is recovering.
 #[cfg(test)]
 pub(crate) fn recovering(shared: &Shared, topic: Topic) -> bool {
@@ -1593,7 +1894,10 @@ pub(crate) fn record_subscribe(shared: &Shared, request_id: u64, topics: Vec<Top
 #[cfg(test)]
 pub(crate) fn wire(shared: &Shared) -> mpsc::UnboundedReceiver<Vec<u8>> {
     let (tx, rx) = mpsc::unbounded_channel();
-    lock_unpoisoned(&shared.inner).out = Some(tx);
+    let mut inner = lock_unpoisoned(&shared.inner);
+    inner.out = Some(tx);
+    inner.paused = shared.cfg.reload.is_some();
+    shared.generation.fetch_add(1, Ordering::SeqCst);
     rx
 }
 
@@ -1659,6 +1963,8 @@ pub(crate) fn offline(config: Config) -> (Arc<Shared>, mpsc::Receiver<Event>) {
     let (events, rx) = mpsc::channel(config.queue_size.max(1));
     let (stop, _) = watch::channel(false);
     let shared = Arc::new(Shared {
+        pairs: RwLock::new(config.pairs.clone()),
+        generation: AtomicU64::new(0),
         cfg: config,
         ids: AtomicU64::new(0),
         healthy: AtomicBool::new(false),

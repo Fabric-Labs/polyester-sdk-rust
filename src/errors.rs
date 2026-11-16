@@ -353,6 +353,13 @@ pub enum Error {
     /// update its book could not apply.
     #[error(transparent)]
     MarketStream(crate::marketstream::StreamError),
+    /// The trading WebSocket refused a command, lost its answer, refused to
+    /// send it, or refused the connection. An unknown outcome
+    /// ([`crate::tradews::TradeError::OutcomeUnknown`], or a refusal whose code
+    /// ends in `_OUTCOME_UNKNOWN`) makes [`Self::mutation_outcome_unknown`]
+    /// true.
+    #[error(transparent)]
+    TradeSession(crate::tradews::TradeError),
     /// Realtime subscription queue was full; the subscription fails instead of
     /// silently dropping updates.
     #[error("{0}")]
@@ -1151,6 +1158,7 @@ impl Error {
             // Template IDs, pair IDs and protocol positions only: nothing to
             // redact.
             Self::MarketStream(err) => Self::MarketStream(err),
+            Self::TradeSession(err) => Self::TradeSession(err.redacted()),
             Self::QueueOverflow(message) => Self::QueueOverflow(text(message)),
             Self::RealtimeSetupTimeout { channel, deadline } => {
                 Self::RealtimeSetupTimeout { channel, deadline }
@@ -1225,6 +1233,7 @@ impl Error {
             return false;
         }
         match self {
+            Self::TradeSession(trade) => trade.is_retryable(),
             Self::RateLimit { .. }
             | Self::AdmissionUnavailable { .. }
             | Self::TimestampSkew { .. } => true,
@@ -1260,6 +1269,7 @@ impl Error {
             Self::Api { code, .. } => {
                 is_outcome_unknown_code(code) || code == alert_codes::SERVICE_UNAVAILABLE
             }
+            Self::TradeSession(trade) => trade.mutation_outcome_unknown(),
             _ => false,
         }
     }
@@ -1301,6 +1311,7 @@ impl Error {
                 retry_after: Some(seconds),
                 ..
             } => Some(*seconds),
+            Self::TradeSession(trade) => trade.retry_after().map(|d| d.as_secs_f64()),
             _ => self.answer().and_then(|answer| answer.retry_after),
         }
     }
@@ -1470,7 +1481,13 @@ impl Error {
     /// ([`order_codes::REQUEST_DEADLINE_EXCEEDED`]). Nothing changed;
     /// retryable.
     pub fn is_request_deadline_exceeded(&self) -> bool {
-        matches!(self, Self::Api { code, .. } if code == order_codes::REQUEST_DEADLINE_EXCEEDED)
+        match self {
+            Self::Api { code, .. } => code == order_codes::REQUEST_DEADLINE_EXCEEDED,
+            Self::TradeSession(crate::tradews::TradeError::Rejected(reject)) => {
+                reject.code == crate::tradews::RejectCode::REQUEST_DEADLINE_EXCEEDED
+            }
+            _ => false,
+        }
     }
 
     /// True when a wallet login was refused because the wallet is already

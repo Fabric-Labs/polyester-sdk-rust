@@ -150,6 +150,29 @@ impl MarketDataService {
         .await
     }
 
+    /// The trades of pair `symbol_id` after `after_trade_id`, decoded with
+    /// `quantity_scale` rather than the client's catalog: the market-data
+    /// stream reads its trade gaps with the catalog of the connection that
+    /// found them.
+    pub(crate) async fn trades_after_scaled(
+        &self,
+        symbol_id: u32,
+        quantity_scale: u32,
+        after_trade_id: u64,
+        limit: u32,
+    ) -> Result<MarketTradesResult> {
+        let req = GetTradesRequest {
+            symbol_id,
+            limit,
+            after_trade_id: Some(after_trade_id),
+            ..Default::default()
+        };
+        let resp = unary::await_public(self.client().get_trades(req))
+            .await?
+            .into_owned();
+        market_trades_from_proto(&resp, quantity_scale)
+    }
+
     pub async fn get_trades_with(&self, opts: GetTradesOpts) -> Result<MarketTradesResult> {
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
