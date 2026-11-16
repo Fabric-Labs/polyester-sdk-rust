@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.31.1
 
-- Public lifecycle-flow reads work without an API key again. `lifecycle.list_flows`, `get_flow`, `list_flows_by_tx` and `get_flow_by_tx` are public in the contract but were signed, so a client without an API key refused them with `Error::Auth("This endpoint requires Polyester API-key credentials")` before sending. They are now sent unsigned, like the other public reads, whether or not the client has a key. `lifecycle.list_account_flows` and `get_account_flow` stay signed. A test now checks every RPC the SDK sends against the contract's public or signed marking (`testdata/rpc_auth.tsv`), and sends every public read from a client without a key.
+Package version: `0.31.1`. Git tag: `v0.31.1`. Released 2026-11-16. Built on public contract `1945423`.
+
+- Public lifecycle-flow reads work without an API key. `lifecycle.list_flows`, `get_flow`, `list_flows_by_tx` and `get_flow_by_tx` are public in the contract but were signed, so a client without an API key refused them with `Error::Auth("This endpoint requires Polyester API-key credentials")` before sending. They are now sent unsigned, like the other public reads, whether or not the client has a key. `lifecycle.list_account_flows` and `get_account_flow` stay signed. A test now checks every RPC the SDK sends against the contract's public or signed marking (`testdata/rpc_auth.tsv`), and sends every public read from a client without a key.
 
 ## 0.31.0
 
