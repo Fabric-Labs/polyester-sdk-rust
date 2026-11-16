@@ -346,8 +346,13 @@ pub enum Error {
         message: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
-    #[error("{0}")]
-    Realtime(String),
+    #[error("{message}")]
+    Realtime {
+        message: String,
+        /// The HTTP answer behind the error, when there was one: a realtime
+        /// token or subscription answer. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
+    },
     /// The binary market-data stream refused a message: one of another
     /// schema, one whose layout or values break the protocol, or a depth
     /// update its book could not apply.
@@ -1154,7 +1159,10 @@ impl Error {
                 problem: problem(p),
                 answer,
             },
-            Self::Realtime(message) => Self::Realtime(text(message)),
+            Self::Realtime { message, answer } => Self::Realtime {
+                message: text(message),
+                answer,
+            },
             // Template IDs, pair IDs and protocol positions only: nothing to
             // redact.
             Self::MarketStream(err) => Self::MarketStream(err),
@@ -1213,7 +1221,10 @@ impl Error {
     }
 
     pub fn realtime(msg: impl Into<String>) -> Self {
-        Self::Realtime(msg.into())
+        Self::Realtime {
+            message: msg.into(),
+            answer: None,
+        }
     }
 
     pub fn queue_overflow(msg: impl Into<String>) -> Self {
@@ -1295,7 +1306,8 @@ impl Error {
             | Self::NotImplemented { answer, .. }
             | Self::TimestampSkew { answer, .. }
             | Self::ApiKeyRejected { answer, .. }
-            | Self::SessionRequired { answer, .. } => answer.as_deref(),
+            | Self::SessionRequired { answer, .. }
+            | Self::Realtime { answer, .. } => answer.as_deref(),
             _ => None,
         }
     }
@@ -1319,6 +1331,13 @@ impl Error {
     /// This error carrying `answer`, the HTTP answer it came from, unless it
     /// already carries one or cannot come from an answer.
     pub(crate) fn with_answer(mut self, meta: AnswerMeta) -> Self {
+        // A variant's own status reports the answer's real one too.
+        match &mut self {
+            Self::PermissionDenied { status, .. }
+            | Self::TimestampSkew { status, .. }
+            | Self::ApiKeyRejected { status, .. } => *status = meta.status,
+            _ => {}
+        }
         match &mut self {
             Self::Auth { answer, .. }
             | Self::PermissionDenied { answer, .. }
@@ -1332,7 +1351,8 @@ impl Error {
             | Self::NotImplemented { answer, .. }
             | Self::TimestampSkew { answer, .. }
             | Self::ApiKeyRejected { answer, .. }
-            | Self::SessionRequired { answer, .. } => {
+            | Self::SessionRequired { answer, .. }
+            | Self::Realtime { answer, .. } => {
                 if answer.is_none() {
                     *answer = Some(Box::new(meta));
                 }
@@ -1902,10 +1922,17 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     // (a classified answer) or connectrpc kept (a decoded ConnectRPC error).
     // An error with no answer behind it, such as a refused connection, has no
     // response headers.
-    let answer = (!err.response_headers().is_empty()).then(|| AnswerMeta {
-        status: err.http_status().as_u16(),
-        retry_after: retry_after_seconds(&err),
-    });
+    // The status is the answer's own, recorded by the transport, never one
+    // inferred from the error's code; an error the transport saw no answer
+    // for, such as a refused connection, has none.
+    let answer = err
+        .response_headers()
+        .get(crate::transport::ANSWER_STATUS_HEADER)
+        .and_then(|value| value.to_str().ok()?.parse::<u16>().ok())
+        .map(|status| AnswerMeta {
+            status,
+            retry_after: retry_after_seconds(&err),
+        });
     let mapped = map_connect_error_inner(err);
     let mapped = match answer {
         Some(answer) => mapped.with_answer(answer),

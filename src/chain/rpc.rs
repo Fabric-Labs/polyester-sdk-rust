@@ -118,12 +118,13 @@ impl JsonRpcClient {
         let allow_http = self.url.starts_with("http://");
         let client = http_client(allow_http).await?;
         let timeout = self.timeout;
-        let (status, bytes) = tokio::time::timeout(timeout, async {
+        let (status, bytes, answer) = tokio::time::timeout(timeout, async {
             let resp = client
                 .request(req)
                 .await
                 .map_err(|e| Error::transport(format!("jsonrpc HTTP request failed: {e}")))?;
             let status = resp.status();
+            let answer = crate::errors::answer_from_headers(status.as_u16(), resp.headers());
             if content_length_exceeds_limit(resp.headers(), MAX_JSONRPC_RESPONSE_BYTES) {
                 return Err(Error::transport(format!(
                     "jsonrpc response exceeds {MAX_JSONRPC_RESPONSE_BYTES} bytes"
@@ -134,17 +135,19 @@ impl JsonRpcClient {
                 .await
                 .map_err(|e| Error::transport(format!("jsonrpc read body: {e}")))?
                 .to_bytes();
-            Ok::<_, Error>((status, bytes))
+            Ok::<_, Error>((status, bytes, answer))
         })
         .await
         .map_err(|_| Error::transport(format!("jsonrpc timeout calling {method}")))??;
 
         if !status.is_success() {
+            // The endpoint's failed answer: its status and delay ride along.
             return Err(Error::transport(format!(
                 "jsonrpc HTTP {}: {}",
                 status.as_u16(),
                 String::from_utf8_lossy(&bytes)
-            )));
+            ))
+            .with_answer(answer));
         }
 
         let body: Value = serde_json::from_slice(&bytes)
@@ -220,6 +223,35 @@ pub fn parse_jsonrpc_result(body: &Value, expected_id: u64, method: &str) -> Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A JSON-RPC endpoint's failed answer keeps its status and Retry-After.
+    #[tokio::test]
+    async fn failed_answer_carries_its_metadata() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            if let Ok((mut stream, _)) = listener.accept().await {
+                let mut buf = vec![0u8; 16 * 1024];
+                let _ = stream.read(&mut buf).await;
+                let _ = stream
+                    .write_all(
+                        b"HTTP/1.1 503 Busy\r\nRetry-After: 30\r\nContent-Length: 4\r\nConnection: close\r\n\r\nbusy",
+                    )
+                    .await;
+            }
+        });
+        let client =
+            JsonRpcClient::new_insecure(format!("http://{addr}"), Duration::from_secs(5)).unwrap();
+        let err = client.request("eth_chainId", json!([])).await.unwrap_err();
+        assert!(err.to_string().contains("jsonrpc HTTP 503"), "{err:?}");
+        assert_eq!(
+            err.answer()
+                .map(|answer| (answer.status, answer.retry_after)),
+            Some((503, Some(30.0))),
+            "{err:?}"
+        );
+    }
 
     #[test]
     fn envelope_rejects_both_result_and_error() {

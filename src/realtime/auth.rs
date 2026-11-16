@@ -146,9 +146,13 @@ pub(super) async fn signed_get(
         let status = resp.status();
         let answer = crate::errors::answer_from_headers(status.as_u16(), resp.headers());
         if content_length_exceeds_limit(resp.headers(), max_bytes) {
-            return Err(Error::realtime(format!(
-                "{label}: response exceeds {max_bytes} bytes"
-            )));
+            let err = Error::realtime(format!("{label}: response exceeds {max_bytes} bytes"));
+            // A failed answer's metadata rides along.
+            return Err(if status.is_success() {
+                err
+            } else {
+                err.with_answer(answer)
+            });
         }
         let body = Limited::new(resp.into_body(), max_bytes)
             .collect()
@@ -200,7 +204,7 @@ pub(super) async fn signed_get(
         ));
     }
     if !status.is_success() {
-        return Err(Error::realtime(format!(
+        return refuse(Error::realtime(format!(
             "{label}: HTTP {status_code}: {}",
             truncate_body(&body)
         )));

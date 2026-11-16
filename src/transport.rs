@@ -455,7 +455,14 @@ impl ClientTransport for GatewayTransport {
             let Some(is_json) = inspected_failure(&response) else {
                 return Ok(response.map(Either::Left));
             };
-            let (parts, body) = response.into_parts();
+            let (mut parts, body) = response.into_parts();
+            // The answer's real status, captured here for every failed
+            // answer: a ConnectRPC error connectrpc decodes keeps it in its
+            // response headers, where its code alone implies another.
+            parts.headers.insert(
+                http::HeaderName::from_static(ANSWER_STATUS_HEADER),
+                http::HeaderValue::from(parts.status.as_u16()),
+            );
             let body = Limited::new(body, MAX_CONNECT_RESPONSE_BYTES)
                 .collect()
                 .await
@@ -487,6 +494,11 @@ impl ClientTransport for GatewayTransport {
         })
     }
 }
+
+/// Carries a failed answer's real HTTP status in the response headers of the
+/// error made from it. The transport sets it on every failed answer; it never
+/// leaves the client.
+pub(crate) const ANSWER_STATUS_HEADER: &str = "polyester-sdk-answer-status";
 
 /// For a failed response that may need classifying, whether its body is
 /// JSON; `None` for everything else, which streams through untouched.

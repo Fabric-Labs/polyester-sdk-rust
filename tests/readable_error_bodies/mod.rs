@@ -1731,3 +1731,88 @@ async fn round4_answer_status_and_no_answer() {
     assert!(err.answer().is_none(), "{err:?}");
     assert_eq!(err.retry_after(), None, "{err:?}");
 }
+
+/// A final refusal is still an HTTP answer: an authentication refusal at 503
+/// and a permission refusal at 403 keep the answer's status and Retry-After.
+#[tokio::test(flavor = "multi_thread")]
+async fn round4_auth_and_permission_refusals_keep_their_answer() {
+    let (err, calls) = call_with_headers(
+        "write",
+        503,
+        JSON,
+        r#"{"code":"unauthenticated","message":"temporarily unavailable"}"#,
+        None,
+        &[("Retry-After", "30")],
+    )
+    .await;
+    let err = err.expect("auth refusal");
+    assert!(matches!(err, Error::Auth { .. }), "{err:?}");
+    assert_eq!(
+        err.answer()
+            .map(|answer| (answer.status, answer.retry_after)),
+        Some((503, Some(30.0))),
+        "{err:?}"
+    );
+    assert_eq!(err.retry_after(), Some(30.0));
+    assert_eq!(calls, 1);
+    let (err, calls) = call_with_headers(
+        "write",
+        403,
+        PROBLEM,
+        r#"{"code":"SUBACCOUNT_READ_FORBIDDEN","status":403,"detail":"denied"}"#,
+        None,
+        &[("Retry-After", "30")],
+    )
+    .await;
+    let err = err.expect("permission refusal");
+    assert!(matches!(err, Error::PermissionDenied { .. }), "{err:?}");
+    assert_eq!(
+        err.answer()
+            .map(|answer| (answer.status, answer.retry_after)),
+        Some((403, Some(30.0))),
+        "{err:?}"
+    );
+    assert_eq!(calls, 1);
+}
+
+/// The status an error reports is the answer's own HTTP status, never one its
+/// ConnectRPC code implies; the delay rides along.
+#[tokio::test(flavor = "multi_thread")]
+async fn round5_status_is_the_answers_own() {
+    for (status, body) in [
+        (503, r#"{"code":"unavailable","message":"busy"}"#),
+        (429, r#"{"code":"unavailable","message":"busy"}"#),
+        (
+            503,
+            r#"{"code":"unauthenticated","message":"temporarily unavailable"}"#,
+        ),
+    ] {
+        let (err, _) =
+            call_with_headers("write", status, JSON, body, None, &[("Retry-After", "30")]).await;
+        let err = err.unwrap_or_else(|| panic!("{status} {body}: expected an error"));
+        assert_eq!(
+            err.answer()
+                .map(|answer| (answer.status, answer.retry_after)),
+            Some((status, Some(30.0))),
+            "{status} {body}: {err:?}"
+        );
+    }
+}
+
+/// A variant's own status field is the answer's real status as well.
+#[tokio::test(flavor = "multi_thread")]
+async fn round5_variant_status_is_the_answers_own() {
+    let (err, _) = call(
+        "write",
+        503,
+        JSON,
+        r#"{"code":"unauthenticated","message":"TIMESTAMP_SKEW"}"#,
+        None,
+    )
+    .await;
+    let err = err.expect("skew");
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 503, .. }),
+        "{err:?}"
+    );
+}

@@ -1181,7 +1181,7 @@ mod tests {
             MAX_REQUEST_REFRESH_ATTEMPTS
         );
         assert!(!sts.is_ready());
-        assert!(matches!(sts.err(), Some(Error::Realtime(_))));
+        assert!(matches!(sts.err(), Some(Error::Realtime { .. })));
         lock_unpoisoned(&stream_slot).take();
     }
 

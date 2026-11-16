@@ -141,7 +141,7 @@ impl Transport for LiveTransport {
             )
             .await
             .map_err(|_| Error::realtime("private WebSocket connect timed out"))?
-            .map_err(|e| Error::realtime(format!("private WebSocket connect: {e}")))?;
+            .map_err(|e| super::upgrade_error(format!("private WebSocket connect: {e}"), &e))?;
             if response
                 .headers()
                 .get(SEC_WEBSOCKET_PROTOCOL)
