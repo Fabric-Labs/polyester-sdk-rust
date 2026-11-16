@@ -40,7 +40,7 @@ pub fn jwt_session_only(err: &Error) -> bool {
         || msg.contains("permission_denied")
         || msg.contains("api keys cannot");
     match err {
-        Error::Auth(_) => sessionish,
+        Error::Auth { .. } => sessionish,
         Error::Api { code, .. } => {
             let c = code.to_ascii_lowercase();
             sessionish || c.contains("unauthenticated") || c.contains("permission_denied")
@@ -211,7 +211,7 @@ mod tests {
             code: "AUTH_UNSPECIFIED".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
         assert!(is_permission_denied(&api));
         assert!(!jwt_session_only(&api));
@@ -233,7 +233,7 @@ mod tests {
             code: "ERROR_CODE_POLICY_MAX_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
         assert!(!is_notional_validation(&maximum));
 
@@ -242,7 +242,7 @@ mod tests {
             code: "ERROR_CODE_MIN_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
         assert!(is_notional_validation(&minimum));
     }

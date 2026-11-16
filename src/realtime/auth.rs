@@ -144,6 +144,7 @@ pub(super) async fn signed_get(
             .await
             .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
         let status = resp.status();
+        let answer = crate::errors::answer_from_headers(status.as_u16(), resp.headers());
         if content_length_exceeds_limit(resp.headers(), max_bytes) {
             return Err(Error::realtime(format!(
                 "{label}: response exceeds {max_bytes} bytes"
@@ -154,25 +155,27 @@ pub(super) async fn signed_get(
             .await
             .map_err(|e| Error::realtime(format!("{label}: read bounded body: {e}")))?
             .to_bytes();
-        Ok::<_, Error>((status, body))
+        Ok::<_, Error>((status, body, answer))
     })
     .await
     .map_err(|_| Error::realtime(format!("{label}: HTTP request timed out after {timeout:?}")))??;
 
-    let (status, body) = outcome;
+    let (status, body, answer) = outcome;
+    // Every error from this answer carries its status and delay.
+    let refuse = |err: Error| Err(err.with_answer(answer.clone()));
     let status_code = status.as_u16();
     let gateway_code = gateway_code(&body);
     if !status.is_success() && gateway_code.as_deref() == Some(auth_codes::TIMESTAMP_SKEW) {
-        return Err(Error::TimestampSkew {
+        return refuse(Error::TimestampSkew {
             problem: crate::problem::decode_http_problem(&body, status_code).map(Box::new),
             status: status_code,
-            retry_after: None,
+            answer: None,
         });
     }
     if status_code == 401 {
         if let Some(code) = gateway_code {
             let err = gateway_rejection_error(status_code, &code);
-            return Err(
+            return refuse(
                 if let Some(problem) = crate::problem::decode_http_problem(&body, status_code) {
                     err.with_http_problem(problem)
                 } else {
@@ -180,16 +183,16 @@ pub(super) async fn signed_get(
                 },
             );
         }
-        return Err(Error::auth(format!(
+        return refuse(Error::auth(format!(
             "{label}: authentication failed (HTTP 401)"
         )));
     }
     if status_code == 403 {
         let text = String::from_utf8_lossy(&body);
         if is_cloudflare_browser_ban(&text) {
-            return Err(Error::Transport(cloudflare_1010_message()));
+            return refuse(Error::transport(cloudflare_1010_message()));
         }
-        return Err(map_permission_denied(
+        return refuse(map_permission_denied(
             label,
             &crate::transport::url_for_error(url),
             status_code,
@@ -209,7 +212,7 @@ pub(super) async fn signed_get(
 pub(super) fn is_refusal(err: &Error) -> bool {
     matches!(
         err,
-        Error::Auth(_) | Error::ApiKeyRejected { .. } | Error::PermissionDenied { .. }
+        Error::Auth { .. } | Error::ApiKeyRejected { .. } | Error::PermissionDenied { .. }
     )
 }
 
@@ -247,6 +250,7 @@ fn map_permission_denied(label: &str, endpoint: &str, status: u16, body: &[u8]) 
         context: label.to_owned(),
         endpoint: endpoint.to_owned(),
         problem: problem.map(Box::new),
+        answer: None,
     }
 }
 

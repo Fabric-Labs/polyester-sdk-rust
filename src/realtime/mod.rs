@@ -1123,7 +1123,7 @@ mod tests {
             Err(err) => err,
             Ok(_) => panic!("private subscribe without credentials must fail"),
         };
-        assert!(matches!(err, Error::Auth(_)));
+        assert!(matches!(err, Error::Auth { .. }));
         assert!(err.to_string().contains("without API-key credentials"));
     }
 

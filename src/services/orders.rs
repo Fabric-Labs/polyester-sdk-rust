@@ -107,7 +107,7 @@ fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &
             rule_id: rule_id.to_owned(),
             message: message.to_owned(),
         }],
-        retry_after: None,
+        answer: None,
     }
 }
 
@@ -612,7 +612,7 @@ impl OrdersService {
                     code: "ERROR_CODE_FEE_ASSET_NOT_ALLOWED".to_owned(),
                     metadata: Vec::new(),
                     violations: Vec::new(),
-                    retry_after: None,
+                    answer: None,
                 });
             }
         };
@@ -3241,7 +3241,7 @@ mod tests {
             )
             .await
             .expect_err("missing credentials should be reached for allowed empty ids");
-        assert!(matches!(err, Error::Auth(_)), "unexpected error: {err}");
+        assert!(matches!(err, Error::Auth { .. }), "unexpected error: {err}");
     }
 
     #[test]

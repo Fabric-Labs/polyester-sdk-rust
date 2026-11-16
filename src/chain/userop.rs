@@ -632,7 +632,7 @@ mod tests {
             "0xé",
         ] {
             assert!(
-                matches!(as_u64(&json!(raw)), Err(Error::Transport(_))),
+                matches!(as_u64(&json!(raw)), Err(Error::Transport { .. })),
                 "{raw:?}"
             );
         }

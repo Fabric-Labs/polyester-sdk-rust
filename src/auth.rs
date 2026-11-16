@@ -112,6 +112,7 @@ fn signing_capacity_error(wait_ms: u64) -> Error {
         detail: None,
         cause_code: None,
         level_index: None,
+        answer: None,
     }
 }
 
@@ -846,13 +847,13 @@ mod tests {
     fn credentials_reject_empty_key_id() {
         let (seed, _) = generate_ed25519_keypair();
         let err = Credentials::new("  ", &seed).unwrap_err();
-        assert!(matches!(err, Error::Auth(_)));
+        assert!(matches!(err, Error::Auth { .. }));
     }
 
     #[test]
     fn load_credentials_requires_both() {
         let err = Credentials::load(Some("ak_test"), Some(""), false).unwrap_err();
-        assert!(matches!(err, Error::Auth(_)));
+        assert!(matches!(err, Error::Auth { .. }));
     }
 
     #[test]
@@ -865,7 +866,7 @@ mod tests {
         let malformed = "do-not-echo-this-private-key";
         let err = Credentials::new("ak_test", malformed).unwrap_err();
         let rendered = err.to_string();
-        assert!(matches!(err, Error::Auth(_)));
+        assert!(matches!(err, Error::Auth { .. }));
         assert!(!rendered.contains(malformed));
     }
 
@@ -903,7 +904,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             timestamp_ms_from(before_epoch),
-            Err(Error::Transport(_))
+            Err(Error::Transport { .. })
         ));
     }
 }

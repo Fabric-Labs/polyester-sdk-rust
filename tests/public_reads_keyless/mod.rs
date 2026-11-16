@@ -427,7 +427,7 @@ async fn keyless_client_sends_every_public_read_unsigned() {
         log.lock().unwrap().clear();
         for (method, result) in call_public(&client, procedure).await {
             match result {
-                Err(err @ Error::Auth(_)) => {
+                Err(err @ Error::Auth { .. }) => {
                     failures.push(format!("{method} ({procedure}) needs a key: {err}"));
                 }
                 Err(err) if procedure.contains("/chain.lifecycle.v1.") => {
@@ -456,12 +456,12 @@ async fn keyless_client_refuses_signed_lifecycle_reads_before_sending() {
         .lifecycle
         .list_account_flows(ListAccountFlowsRequest::default())
         .await;
-    assert!(matches!(list, Err(Error::Auth(_))), "{list:?}");
+    assert!(matches!(list, Err(Error::Auth { .. })), "{list:?}");
     let get = client
         .lifecycle
         .get_account_flow(FLOW_ID, SubAccountScope::Default)
         .await;
-    assert!(matches!(get, Err(Error::Auth(_))), "{get:?}");
+    assert!(matches!(get, Err(Error::Auth { .. })), "{get:?}");
     let seen = log.lock().unwrap().clone();
     assert!(
         !seen

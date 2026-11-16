@@ -455,7 +455,7 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
         code: code.into(),
         metadata: Vec::new(),
         violations: Vec::new(),
-        retry_after: None,
+        answer: None,
     };
     assert!(!api("PAYLOAD_TOO_LARGE").is_request_too_large());
     assert!(
@@ -466,6 +466,7 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
             detail: None,
             cause_code: None,
             level_index: None,
+            answer: None,
         }
         .is_request_too_large()
     );

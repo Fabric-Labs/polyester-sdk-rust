@@ -716,7 +716,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(withdraw_error, Error::Transport(_)));
+    assert!(matches!(withdraw_error, Error::Transport { .. }));
 
     let transfer_error = client
         .internal_transfers
@@ -732,7 +732,7 @@ async fn singular_mutation_default_connect_responses_fail_closed() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(transfer_error, Error::Transport(_)));
+    assert!(matches!(transfer_error, Error::Transport { .. }));
 
     assert!(
         client
@@ -3906,7 +3906,7 @@ async fn l2_connect_json_errors_and_other_json_bodies_keep_their_mapping() {
     })
     .await;
     assert!(
-        matches!(&err, Error::Auth(message) if message.contains("missing signature")),
+        matches!(&err, Error::Auth { message, .. } if message.contains("missing signature")),
         "{err:?}"
     );
     let err = auth_me_error(|| {
@@ -5026,7 +5026,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
         .await
         .expect_err("still admitted");
     assert!(
-        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        matches!(&err, Error::Transport { message, .. } if message.contains("reconcile")),
         "{err:?}"
     );
 
@@ -5049,7 +5049,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
         .await
         .expect_err("never found");
     assert!(
-        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        matches!(&err, Error::Transport { message, .. } if message.contains("reconcile")),
         "{err:?}"
     );
 
@@ -5067,7 +5067,7 @@ async fn l2_wait_batch_replace_stops_at_its_deadline_and_surfaces_errors() {
         .wait_batch_replace("2", SubAccountScope::Default, None)
         .await
         .expect_err("denied");
-    assert!(!matches!(err, Error::Transport(_)), "{err:?}");
+    assert!(!matches!(err, Error::Transport { .. }), "{err:?}");
     assert_eq!(http.requests.load(Ordering::SeqCst), 1);
 }
 
@@ -5164,7 +5164,7 @@ async fn l2_wait_batch_replace_reports_a_transport_failure_during_its_window() {
         .await
         .expect_err("nothing listens");
     assert!(
-        matches!(&err, Error::Transport(message) if message.contains("reconcile")),
+        matches!(&err, Error::Transport { message, .. } if message.contains("reconcile")),
         "{err:?}"
     );
     assert!(err.mutation_outcome_unknown(), "{err:?}");
@@ -5812,7 +5812,8 @@ async fn l2_stop_all_trading_reports_refused_trigger_and_oco_cancels() {
     assert_eq!(failed, [id(21), id(22), id(12)]);
     for failure in &result.trigger_failures {
         assert!(
-            matches!(failure.error, Error::Auth(_)) && !failure.error.is_trigger_already_ended(),
+            matches!(failure.error, Error::Auth { .. })
+                && !failure.error.is_trigger_already_ended(),
             "{:?}",
             failure.error
         );
@@ -6193,7 +6194,7 @@ async fn l2_rest_order_unavailable_classification() {
             ),
             "{code}: {err:?}"
         );
-        assert!(!matches!(err, Error::Auth(_)));
+        assert!(!matches!(err, Error::Auth { .. }));
         assert_eq!(err.is_retryable(), known, "{code}: {err:?}");
         assert_eq!(
             err.mutation_outcome_unknown(),

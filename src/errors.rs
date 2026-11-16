@@ -113,11 +113,29 @@ impl std::error::Error for CatalogLoadFailure {
 /// Root result alias for the SDK.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// The HTTP answer an error came from: its status and the delay it asked for
+/// with `Retry-After` (or `Retry-After-Ms`), in seconds. Every
+/// [`Error`] variant that can come from an answer carries it, captured once
+/// where the SDK maps the answer; an error with no answer behind it, such as
+/// a refused connection or a check made before sending, carries none.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnswerMeta {
+    /// The answer's HTTP status.
+    pub status: u16,
+    /// The delay in seconds the answer asked for, when it named one.
+    pub retry_after: Option<f64>,
+}
+
 /// Polyester SDK error.
 #[derive(Debug, Clone, Error)]
 pub enum Error {
-    #[error("{0}")]
-    Auth(String),
+    #[error("{message}")]
+    Auth {
+        message: String,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
+    },
     /// The credentials were accepted, but the operation is not allowed: a
     /// REST 403 problem with a contract code such as
     /// `SUBACCOUNT_READ_FORBIDDEN` or `QUICKSWAP_NOT_PERMITTED`, or a refused
@@ -127,6 +145,9 @@ pub enum Error {
     /// it. A refused credential is [`Error::ApiKeyRejected`] instead.
     #[error("{context}: permission denied (HTTP {status}, code {code}): {message} [{endpoint}]")]
     PermissionDenied {
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         message: String,
         status: u16,
         code: String,
@@ -153,8 +174,13 @@ pub enum Error {
     /// the last failure as its [`std::error::Error::source`].
     #[error(transparent)]
     CatalogLoad(Box<CatalogLoadFailure>),
-    #[error("{0}")]
-    Transport(String),
+    #[error("{message}")]
+    Transport {
+        message: String,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
+    },
     /// A successful RPC returned a payload that violates the documented
     /// response contract.
     ///
@@ -165,6 +191,9 @@ pub enum Error {
     ResponseContract { context: String, message: String },
     #[error("{message}")]
     RateLimit {
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         /// Structured service code, or None without a service detail.
         /// An orders detail without a code uses `ERROR_CODE_UNSPECIFIED`.
         /// Known order codes use the `ERROR_CODE_` prefix.
@@ -207,15 +236,16 @@ pub enum Error {
     Server {
         message: String,
         code: Option<String>,
-        status: Option<u16>,
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
     },
     /// A structured orders-service refusal: the request was not admitted.
     #[error("{message}")]
     AdmissionUnavailable {
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         message: String,
         code: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
@@ -230,14 +260,16 @@ pub enum Error {
     GatewayTimeout {
         message: String,
         code: Option<String>,
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
     #[error("{message}")]
     Api {
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         message: String,
         code: String,
         metadata: Vec<(String, String)>,
@@ -253,9 +285,9 @@ pub enum Error {
     )]
     RouteNotFound {
         procedure: String,
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
     },
     /// The server does not implement this call: Connect `unimplemented` or a
     /// bare HTTP 501. A bare HTTP 404 is [`Error::RouteNotFound`] instead.
@@ -263,9 +295,9 @@ pub enum Error {
     #[error("not implemented: {message}")]
     NotImplemented {
         message: String,
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
     },
     /// The API-key request timestamp is outside the server's allowed skew
     /// window (`TIMESTAMP_SKEW`), usually because the local clock is off.
@@ -278,9 +310,9 @@ pub enum Error {
         "API-key request timestamp is outside the allowed skew window (HTTP {status}); check the local clock"
     )]
     TimestampSkew {
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         status: u16,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
@@ -293,9 +325,9 @@ pub enum Error {
     /// `code`, [`Error::auth_code`] the typed reason.
     #[error("API-key request rejected (HTTP {status}, code {code})")]
     ApiKeyRejected {
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         status: u16,
         code: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
@@ -308,9 +340,9 @@ pub enum Error {
     /// retryable: call the method with a session token.
     #[error("{message}")]
     SessionRequired {
-        /// The delay in seconds the answer asked for with `Retry-After` (or
-        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
-        retry_after: Option<f64>,
+        /// The HTTP answer behind the error, when there was one: its status
+        /// and the delay it asked for. See [`Error::answer`].
+        answer: Option<Box<AnswerMeta>>,
         message: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
@@ -729,14 +761,14 @@ pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
         Error::TimestampSkew {
             status,
             problem: None,
-            retry_after: None,
+            answer: None,
         }
     } else {
         Error::ApiKeyRejected {
             status,
             code: code.to_owned(),
             problem: None,
-            retry_after: None,
+            answer: None,
         }
     }
 }
@@ -927,13 +959,10 @@ impl Error {
             | Self::PermissionDenied { problem, .. }
             | Self::TimestampSkew { problem, .. }
             | Self::SessionRequired { problem, .. } => *problem = Some(Box::new(value)),
-            Self::Server { code, status, .. } => {
+            Self::Server { code, .. } => {
                 // A REST problem's code, such as a 503's UPSTREAM_ERROR.
                 if code.is_none() && !value.code.is_empty() {
                     *code = Some(value.code);
-                }
-                if status.is_none() && value.status != 0 {
-                    *status = Some(value.status);
                 }
             }
             Self::Api { metadata, .. } => {
@@ -965,7 +994,10 @@ impl Error {
             })
         }
         match self {
-            Self::Auth(message) => Self::Auth(text(message)),
+            Self::Auth { message, answer } => Self::Auth {
+                message: text(message),
+                answer,
+            },
             Self::PermissionDenied {
                 message,
                 status,
@@ -973,6 +1005,7 @@ impl Error {
                 context,
                 endpoint,
                 problem: p,
+                answer,
             } => Self::PermissionDenied {
                 message: text(message),
                 status,
@@ -980,6 +1013,7 @@ impl Error {
                 context: text(context),
                 endpoint: text(endpoint),
                 problem: problem(p),
+                answer,
             },
             Self::Validation(message) => Self::Validation(text(message)),
             Self::CatalogHydration(inner) => Self::CatalogHydration(Box::new(inner.redacted())),
@@ -987,7 +1021,10 @@ impl Error {
                 failure.source = failure.source.redacted();
                 Self::CatalogLoad(failure)
             }
-            Self::Transport(message) => Self::Transport(text(message)),
+            Self::Transport { message, answer } => Self::Transport {
+                message: text(message),
+                answer,
+            },
             Self::ResponseContract { context, message } => Self::ResponseContract {
                 context: text(context),
                 message: text(message),
@@ -999,6 +1036,7 @@ impl Error {
                 detail,
                 cause_code,
                 level_index,
+                answer,
             } => Self::RateLimit {
                 code,
                 cause_code,
@@ -1017,38 +1055,37 @@ impl Error {
                     }
                     detail
                 }),
+                answer,
             },
             Self::Server {
                 message,
                 code,
-                status,
-                retry_after,
+                answer,
             } => Self::Server {
                 message: text(message),
                 code,
-                status,
-                retry_after,
+                answer,
             },
             Self::AdmissionUnavailable {
                 message,
                 code,
                 problem: p,
-                retry_after,
+                answer,
             } => Self::AdmissionUnavailable {
                 message: text(message),
                 code,
                 problem: problem(p),
-                retry_after,
+                answer,
             },
             Self::GatewayTimeout {
                 message,
                 code,
-                retry_after,
                 problem: p,
+                answer,
             } => Self::GatewayTimeout {
                 message: text(message),
                 code,
-                retry_after,
+                answer,
                 problem: problem(p),
             },
             Self::Api {
@@ -1056,7 +1093,7 @@ impl Error {
                 code,
                 metadata,
                 violations,
-                retry_after,
+                answer,
             } => Self::Api {
                 message: text(message),
                 code,
@@ -1071,50 +1108,44 @@ impl Error {
                         violation
                     })
                     .collect(),
-                retry_after,
+                answer,
             },
-            Self::RouteNotFound {
-                procedure,
-                retry_after,
-            } => Self::RouteNotFound {
+            Self::RouteNotFound { procedure, answer } => Self::RouteNotFound {
                 procedure: text(procedure),
-                retry_after,
+                answer,
             },
-            Self::NotImplemented {
-                message,
-                retry_after,
-            } => Self::NotImplemented {
+            Self::NotImplemented { message, answer } => Self::NotImplemented {
                 message: text(message),
-                retry_after,
+                answer,
             },
             Self::TimestampSkew {
                 status,
                 problem: p,
-                retry_after,
+                answer,
             } => Self::TimestampSkew {
                 status,
                 problem: problem(p),
-                retry_after,
+                answer,
             },
             Self::ApiKeyRejected {
                 status,
                 code,
                 problem: p,
-                retry_after,
+                answer,
             } => Self::ApiKeyRejected {
                 status,
                 code,
                 problem: problem(p),
-                retry_after,
+                answer,
             },
             Self::SessionRequired {
                 message,
                 problem: p,
-                retry_after,
+                answer,
             } => Self::SessionRequired {
                 message: text(message),
                 problem: problem(p),
-                retry_after,
+                answer,
             },
             Self::Realtime(message) => Self::Realtime(text(message)),
             // Template IDs, pair IDs and protocol positions only: nothing to
@@ -1141,7 +1172,10 @@ impl Error {
     }
 
     pub fn auth(msg: impl Into<String>) -> Self {
-        Self::Auth(msg.into())
+        Self::Auth {
+            message: msg.into(),
+            answer: None,
+        }
     }
 
     /// [`Error::CatalogHydration`] for a hydration failure, unless it is one.
@@ -1157,7 +1191,10 @@ impl Error {
     }
 
     pub fn transport(msg: impl Into<String>) -> Self {
-        Self::Transport(msg.into())
+        Self::Transport {
+            message: msg.into(),
+            answer: None,
+        }
     }
 
     pub fn response_contract(context: impl Into<String>, message: impl Into<String>) -> Self {
@@ -1215,7 +1252,7 @@ impl Error {
     /// is necessary.
     pub fn mutation_outcome_unknown(&self) -> bool {
         match self {
-            Self::Transport(_)
+            Self::Transport { .. }
             | Self::ResponseContract { .. }
             | Self::Server { .. }
             | Self::GatewayTimeout { .. }
@@ -1227,48 +1264,69 @@ impl Error {
         }
     }
 
-    /// The delay in seconds the answer behind this error asked for with
-    /// `Retry-After` (or `Retry-After-Ms`, or a rate-limit detail's
-    /// `retry_after_ms`), when it named one: on every variant that comes from
-    /// an answer, an `AUTH_TEMPORARILY_UNAVAILABLE` refusal ([`Error::Api`])
-    /// included. `None` for an error with no answer behind it, and for the
-    /// bare-message variants [`Error::Auth`], [`Error::Transport`] and
-    /// [`Error::Validation`], and for [`Error::PermissionDenied`], a final
-    /// refusal of the operation. The SDK captures it once, where it maps the
-    /// answer, and its own retries of safe reads wait at least this long.
-    pub fn retry_after(&self) -> Option<f64> {
+    /// The HTTP answer this error came from, its status and the delay it
+    /// asked for: on every variant that can come from an answer, a server
+    /// deadline ([`Error::Transport`]), an authentication or permission
+    /// refusal and an answer whose body cannot be read included. `None` for an
+    /// error with no answer behind it, such as a refused connection or a check
+    /// made before sending. The SDK captures it once, where it maps the
+    /// answer.
+    pub fn answer(&self) -> Option<&AnswerMeta> {
         match self {
-            Self::RateLimit { retry_after, .. }
-            | Self::Server { retry_after, .. }
-            | Self::GatewayTimeout { retry_after, .. }
-            | Self::Api { retry_after, .. }
-            | Self::AdmissionUnavailable { retry_after, .. }
-            | Self::RouteNotFound { retry_after, .. }
-            | Self::NotImplemented { retry_after, .. }
-            | Self::TimestampSkew { retry_after, .. }
-            | Self::ApiKeyRejected { retry_after, .. }
-            | Self::SessionRequired { retry_after, .. } => *retry_after,
+            Self::Auth { answer, .. }
+            | Self::PermissionDenied { answer, .. }
+            | Self::Transport { answer, .. }
+            | Self::RateLimit { answer, .. }
+            | Self::Server { answer, .. }
+            | Self::AdmissionUnavailable { answer, .. }
+            | Self::GatewayTimeout { answer, .. }
+            | Self::Api { answer, .. }
+            | Self::RouteNotFound { answer, .. }
+            | Self::NotImplemented { answer, .. }
+            | Self::TimestampSkew { answer, .. }
+            | Self::ApiKeyRejected { answer, .. }
+            | Self::SessionRequired { answer, .. } => answer.as_deref(),
             _ => None,
         }
     }
 
-    /// This error carrying `seconds`, the delay its answer asked for, unless
-    /// it already carries one.
-    pub(crate) fn with_retry_after(mut self, seconds: Option<f64>) -> Self {
-        if let (Some(seconds), None) = (seconds, self.retry_after()) {
-            match &mut self {
-                Self::RateLimit { retry_after, .. }
-                | Self::Server { retry_after, .. }
-                | Self::GatewayTimeout { retry_after, .. }
-                | Self::Api { retry_after, .. }
-                | Self::AdmissionUnavailable { retry_after, .. }
-                | Self::RouteNotFound { retry_after, .. }
-                | Self::NotImplemented { retry_after, .. }
-                | Self::TimestampSkew { retry_after, .. }
-                | Self::ApiKeyRejected { retry_after, .. }
-                | Self::SessionRequired { retry_after, .. } => *retry_after = Some(seconds),
-                _ => {}
+    /// The delay in seconds the answer behind this error asked for with
+    /// `Retry-After` (or `Retry-After-Ms`), or a rate-limit detail's
+    /// `retry_after_ms` first for [`Error::RateLimit`]; `None` when it named
+    /// none or there was no answer. The SDK's own retries of safe reads wait
+    /// at least this long.
+    pub fn retry_after(&self) -> Option<f64> {
+        match self {
+            Self::RateLimit {
+                retry_after: Some(seconds),
+                ..
+            } => Some(*seconds),
+            _ => self.answer().and_then(|answer| answer.retry_after),
+        }
+    }
+
+    /// This error carrying `answer`, the HTTP answer it came from, unless it
+    /// already carries one or cannot come from an answer.
+    pub(crate) fn with_answer(mut self, meta: AnswerMeta) -> Self {
+        match &mut self {
+            Self::Auth { answer, .. }
+            | Self::PermissionDenied { answer, .. }
+            | Self::Transport { answer, .. }
+            | Self::RateLimit { answer, .. }
+            | Self::Server { answer, .. }
+            | Self::AdmissionUnavailable { answer, .. }
+            | Self::GatewayTimeout { answer, .. }
+            | Self::Api { answer, .. }
+            | Self::RouteNotFound { answer, .. }
+            | Self::NotImplemented { answer, .. }
+            | Self::TimestampSkew { answer, .. }
+            | Self::ApiKeyRejected { answer, .. }
+            | Self::SessionRequired { answer, .. } => {
+                if answer.is_none() {
+                    *answer = Some(Box::new(meta));
+                }
             }
+            _ => {}
         }
         self
     }
@@ -1352,6 +1410,7 @@ impl Error {
                 context,
                 endpoint,
                 problem,
+                answer,
             } if endpoint.is_empty() => Self::PermissionDenied {
                 message,
                 status,
@@ -1363,6 +1422,7 @@ impl Error {
                 },
                 endpoint: procedure.to_owned(),
                 problem,
+                answer,
             },
             other => other,
         }
@@ -1770,12 +1830,32 @@ fn rate_limit_error(
         detail: detail.map(Box::new),
         cause_code: None,
         level_index: None,
+        answer: None,
     }
 }
 
 fn parse_nonnegative_f64(value: &http::HeaderValue) -> Option<f64> {
     let parsed = value.to_str().ok()?.trim().parse::<f64>().ok()?;
     (parsed.is_finite() && parsed >= 0.0).then_some(parsed)
+}
+
+/// The answer metadata of an HTTP answer the SDK reads outside ConnectRPC:
+/// its status and the delay its headers ask for.
+pub(crate) fn answer_from_headers(status: u16, headers: &http::HeaderMap) -> AnswerMeta {
+    AnswerMeta {
+        status,
+        retry_after: retry_after_from_headers(headers),
+    }
+}
+
+fn retry_after_from_headers(headers: &http::HeaderMap) -> Option<f64> {
+    if let Some(seconds) = headers.get("retry-after").and_then(parse_nonnegative_f64) {
+        return Some(seconds);
+    }
+    ["retry-after-ms", "grpc-retry-pushback-ms"]
+        .into_iter()
+        .find_map(|name| headers.get(name).and_then(parse_nonnegative_f64))
+        .map(|milliseconds| milliseconds / 1_000.0)
 }
 
 fn retry_after_seconds(err: &ConnectError) -> Option<f64> {
@@ -1800,11 +1880,20 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
         .and_then(|d| d.debug.as_ref())
         .and_then(|v| serde_json::from_value(v.clone()).ok());
-    // The answer's delay, captured once from the response headers the
-    // transport attached (or a ConnectRPC answer's metadata), rides on
-    // whatever error it maps to.
-    let header_retry = retry_after_seconds(&err);
-    let mapped = map_connect_error_inner(err).with_retry_after(header_retry);
+    // The HTTP answer behind the error, captured once: its status and the
+    // delay it asked for, from the response headers the transport attached
+    // (a classified answer) or connectrpc kept (a decoded ConnectRPC error).
+    // An error with no answer behind it, such as a refused connection, has no
+    // response headers.
+    let answer = (!err.response_headers().is_empty()).then(|| AnswerMeta {
+        status: err.http_status().as_u16(),
+        retry_after: retry_after_seconds(&err),
+    });
+    let mapped = map_connect_error_inner(err);
+    let mapped = match answer {
+        Some(answer) => mapped.with_answer(answer),
+        None => mapped,
+    };
     let mapped = if let Some(problem) = problem {
         mapped.with_http_problem(problem)
     } else {
@@ -1898,6 +1987,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             context: endpoint.trim_start_matches('/').to_owned(),
             endpoint,
             problem: None,
+            answer: None,
         };
     }
     if has_marker(crate::transport::BARE_HTTP_ERROR_TYPE) {
@@ -1906,19 +1996,19 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return if status == 404 {
             Error::RouteNotFound {
                 procedure: String::new(),
-                retry_after: None,
+                answer: None,
             }
         } else if status == 504 {
             Error::GatewayTimeout {
                 message: fallback_message,
                 code: None,
-                retry_after: header_retry,
+                answer: None,
                 problem: None,
             }
         } else {
             Error::NotImplemented {
                 message: fallback_message,
-                retry_after: None,
+                answer: None,
             }
         };
     }
@@ -1926,7 +2016,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return Error::TimestampSkew {
             status,
             problem: None,
-            retry_after: None,
+            answer: None,
         };
     }
     let mut details: Vec<_> = err.details.iter().collect();
@@ -1960,7 +2050,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             code: error_code_from_name(raw_message),
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
     }
     // A detail with no code says nothing about the outcome, but its field
@@ -2000,7 +2090,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     return Error::TimestampSkew {
                         status,
                         problem: None,
-                        retry_after: None,
+                        answer: None,
                     };
                 }
                 Some(AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED) => {
@@ -2025,7 +2115,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         } else {
                             auth_detail.message
                         },
-                        retry_after: None,
+                        answer: None,
                     };
                 }
                 Some(known) if API_KEY_REJECTIONS.contains(&known) => {
@@ -2033,7 +2123,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         status,
                         code: known.proto_name().trim_start_matches("AUTH_").to_owned(),
                         problem: None,
-                        retry_after: None,
+                        answer: None,
                     };
                 }
                 _ => {}
@@ -2058,7 +2148,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata,
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             };
         }
         if let Some(rl) = decode_rate_limit_detail(detail) {
@@ -2105,14 +2195,13 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         message: fallback_message.clone(),
                         code,
                         problem: None,
-                        retry_after: None,
+                        answer: None,
                     }
                 } else {
                     Error::Server {
                         message: fallback_message.clone(),
                         code: Some(code),
-                        status: Some(503),
-                        retry_after: header_retry,
+                        answer: None,
                     }
                 };
             }
@@ -2133,10 +2222,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     context: String::new(),
                     endpoint: String::new(),
                     problem: None,
+                    answer: None,
                 };
             }
             if is_auth_like_error_code(&code) {
-                return Error::Auth(fallback_message.clone());
+                return Error::auth(fallback_message.clone());
             }
             let mut metadata = order_detail
                 .existing_order_id
@@ -2168,7 +2258,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata,
                 violations,
-                retry_after: None,
+                answer: None,
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
@@ -2186,19 +2276,18 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 return Error::Server {
                     message: fallback_message.clone(),
                     code: Some(code),
-                    status: Some(503),
-                    retry_after: header_retry,
+                    answer: None,
                 };
             }
             if is_auth_like_error_code(&code) {
-                return Error::Auth(fallback_message.clone());
+                return Error::auth(fallback_message.clone());
             }
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
                 metadata: withdraw_detail_metadata(&withdraw_detail),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             };
         }
         if let Some(alert_detail) = decode_alert_error_detail(detail) {
@@ -2214,6 +2303,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     context: "alerts.v1.PriceAlertService".to_owned(),
                     endpoint: String::new(),
                     problem: None,
+                    answer: None,
                 };
             }
             return Error::Api {
@@ -2221,7 +2311,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             };
         }
         if let Some(ledger_detail) = decode_ledger_error_detail(detail) {
@@ -2233,19 +2323,18 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 return Error::Server {
                     message: fallback_message.clone(),
                     code: Some(code),
-                    status: Some(503),
-                    retry_after: header_retry,
+                    answer: None,
                 };
             }
             if is_auth_like_error_code(&code) {
-                return Error::Auth(fallback_message.clone());
+                return Error::auth(fallback_message.clone());
             }
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
@@ -2263,19 +2352,18 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 return Error::Server {
                     message: fallback_message.clone(),
                     code: Some(code),
-                    status: Some(503),
-                    retry_after: header_retry,
+                    answer: None,
                 };
             }
             if is_auth_like_error_code(&code) {
-                return Error::Auth(fallback_message.clone());
+                return Error::auth(fallback_message.clone());
             }
             return Error::Api {
                 message: fallback_message.clone(),
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             };
         }
     }
@@ -2302,7 +2390,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             message: fallback_message,
             code: normalized_code,
             problem: None,
-            retry_after: None,
+            answer: None,
         };
     }
     if (err.code == ErrorCode::Unavailable
@@ -2319,16 +2407,16 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             code: error_code_from_name(named_code),
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
     }
     let code = err.code;
     let message = fallback_message;
     if is_cloudflare_browser_ban(&message) {
-        return Error::Transport(cloudflare_1010_message());
+        return Error::transport(cloudflare_1010_message());
     }
     match code {
-        ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::Auth(message),
+        ErrorCode::Unauthenticated | ErrorCode::PermissionDenied => Error::auth(message),
         ErrorCode::ResourceExhausted => {
             let code = error_code_from_name(named_code);
             let code = OrderErrorCode::from_proto_name(&code).map(|_| code);
@@ -2347,15 +2435,12 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             },
             // A code this SDK can't name, kept for diagnosis only.
             code: future_code,
-            status: (status != 0).then_some(status),
-            retry_after: (code == ErrorCode::Unavailable)
-                .then_some(header_retry)
-                .flatten(),
+            answer: None,
         },
-        ErrorCode::DeadlineExceeded => Error::Transport(message),
+        ErrorCode::DeadlineExceeded => Error::transport(message),
         ErrorCode::Unimplemented => Error::NotImplemented {
             message,
-            retry_after: None,
+            answer: None,
         },
         _ => Error::Api {
             message,
@@ -2366,7 +2451,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             },
             metadata: Vec::new(),
             violations: placeholder_violations,
-            retry_after: None,
+            answer: None,
         },
     }
 }
@@ -2455,7 +2540,7 @@ mod tests {
     fn map_connect_error_never_returns_an_empty_auth_message() {
         let mapped = map_connect_error(ConnectError::unauthenticated(""));
         match mapped {
-            Error::Auth(message) => assert!(!message.trim().is_empty()),
+            Error::Auth { message, .. } => assert!(!message.trim().is_empty()),
             other => panic!("unexpected error: {other:?}"),
         }
     }
@@ -2570,6 +2655,7 @@ mod tests {
             detail: None,
             cause_code: None,
             level_index: None,
+            answer: None,
         };
         assert!(limited.is_retryable());
         assert!(!limited.mutation_outcome_unknown());
@@ -2607,7 +2693,7 @@ mod tests {
                 ),
                 "{code:?}: {mapped:?}"
             );
-            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(!matches!(mapped, Error::Auth { .. }));
             assert_eq!(
                 mapped.is_retryable(),
                 known_admission_refusal(name),
@@ -2642,7 +2728,7 @@ mod tests {
                 ),
             );
             assert!(matches!(mapped, Error::Server { .. }), "{name}: {mapped:?}");
-            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(!matches!(mapped, Error::Auth { .. }));
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
             assert!(mapped.mutation_outcome_unknown());
         }
@@ -2666,7 +2752,7 @@ mod tests {
                 ),
             );
             assert!(matches!(mapped, Error::Server { .. }), "{name}: {mapped:?}");
-            assert!(!matches!(mapped, Error::Auth(_)));
+            assert!(!matches!(mapped, Error::Auth { .. }));
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
             assert!(mapped.mutation_outcome_unknown());
         }
@@ -2744,7 +2830,7 @@ mod tests {
             ErrorCode::Unauthenticated,
         );
         assert!(
-            matches!(unauthenticated, Error::Auth(_)),
+            matches!(unauthenticated, Error::Auth { .. }),
             "{unauthenticated:?}"
         );
         // A call names its procedure on the refusal, as a REST problem does.
@@ -3179,7 +3265,7 @@ mod tests {
                     &detail,
                 )),
         );
-        assert!(matches!(err, Error::Auth(_)), "{err:?}");
+        assert!(matches!(err, Error::Auth { .. }), "{err:?}");
         assert!(
             err.to_string()
                 .contains("api key policy does not allow READ_AUTO_WITHDRAW"),
@@ -3443,7 +3529,7 @@ mod tests {
         match map_connect_error(ConnectError::permission_denied("denied").with_detail(
             ErrorDetail::from_message("transfer.v1.ErrorDetail", &transfer),
         )) {
-            Error::Auth(_) => {}
+            Error::Auth { .. } => {}
             other => panic!("unexpected transfer error: {other:?}"),
         }
 
@@ -3504,14 +3590,14 @@ mod tests {
 
     #[test]
     fn mfa_predicates_ignore_message_text() {
-        assert!(!Error::Auth("must enroll mfa".into()).is_mfa_enrollment_required());
+        assert!(!Error::auth("must enroll mfa").is_mfa_enrollment_required());
         assert!(
             !Error::Api {
                 message: "step-up required".into(),
                 code: "permission_denied".into(),
                 metadata: Vec::new(),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             }
             .is_step_up_required()
         );
@@ -3521,7 +3607,7 @@ mod tests {
                 code: "AUTH_API_KEY_MFA_REQUIRED".into(),
                 metadata: Vec::new(),
                 violations: Vec::new(),
-                retry_after: None,
+                answer: None,
             }
             .is_mfa_enrollment_required()
         );

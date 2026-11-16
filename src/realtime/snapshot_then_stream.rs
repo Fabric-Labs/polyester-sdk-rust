@@ -1124,7 +1124,7 @@ mod tests {
         );
         assert_eq!(max_active.load(Ordering::SeqCst), 1);
         assert!(!sts.is_ready());
-        assert!(matches!(sts.err(), Some(Error::Transport(_))));
+        assert!(matches!(sts.err(), Some(Error::Transport { .. })));
     }
 
     #[tokio::test]

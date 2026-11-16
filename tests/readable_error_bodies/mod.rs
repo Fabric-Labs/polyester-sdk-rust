@@ -246,7 +246,7 @@ async fn status_401_and_403_stay_definite_auth_refusals() {
                 let (err, calls) = call(op, status, content_type, body, None).await;
                 let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
                 assert!(
-                    matches!(err, Error::Auth(_) | Error::ApiKeyRejected { .. }),
+                    matches!(err, Error::Auth { .. } | Error::ApiKeyRejected { .. }),
                     "{case}: {err:?}"
                 );
                 assert_flags(&err, false, false, &case);
@@ -309,7 +309,7 @@ async fn rest_503_problems_read_as_connect_unavailable_and_504_stays_unknown() {
         assert!(
             matches!(
                 err,
-                Error::Server { .. } | Error::Transport(_) | Error::GatewayTimeout { .. }
+                Error::Server { .. } | Error::Transport { .. } | Error::GatewayTimeout { .. }
             ),
             "{case}: {err:?}"
         );
@@ -461,7 +461,7 @@ async fn expect_auth(status: u16, content_type: &str, body: &str, case: &str) {
     let (err, calls) = call("write", status, content_type, body, None).await;
     let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
     assert!(
-        matches!(err, Error::Auth(_) | Error::ApiKeyRejected { .. }),
+        matches!(err, Error::Auth { .. } | Error::ApiKeyRejected { .. }),
         "{case}: {err:?}"
     );
     assert_flags(&err, false, false, case);
@@ -727,7 +727,7 @@ async fn body_the_client_cannot_decode_is_not_a_known_failure() {
             assert_eq!(calls.load(Ordering::SeqCst), 1, "{case}");
             assert!(!err.is_retryable(), "{case}: {err:?}");
             let definite = matches!(status, 401 | 403)
-                && matches!(err, Error::Auth(_) | Error::ApiKeyRejected { .. });
+                && matches!(err, Error::Auth { .. } | Error::ApiKeyRejected { .. });
             assert!(
                 definite || err.mutation_outcome_unknown(),
                 "{case}: {err:?}"
@@ -1334,8 +1334,8 @@ async fn service_unavailable_keeps_its_code_and_retry_after() {
     assert!(
         matches!(
             &err,
-            Error::Server { code: Some(code), status: Some(503), retry_after: Some(seconds), .. }
-                if code == "UPSTREAM_ERROR" && *seconds == 30.0
+            Error::Server { code: Some(code), answer: Some(answer), .. }
+                if code == "UPSTREAM_ERROR" && answer.status == 503 && answer.retry_after == Some(30.0)
         ),
         "{err:?}"
     );
@@ -1570,11 +1570,164 @@ async fn round3_connect_deadline_at_504_is_the_deadline() {
         let body = json!({"code": "deadline_exceeded", "message": message}).to_string();
         let (err, calls) = call("write", 504, JSON, &body, None).await;
         let err = err.unwrap_or_else(|| panic!("{message}: expected an error"));
-        assert!(matches!(err, Error::Transport(_)), "{message}: {err:?}");
+        assert!(matches!(err, Error::Transport { .. }), "{message}: {err:?}");
         assert_flags(&err, false, true, message);
         assert_eq!(calls, 1, "{message}");
         let (err, calls) = call("read", 504, JSON, &body, Some(1)).await;
         assert!(err.is_none(), "{message}: a safe read retries it: {err:?}");
         assert_eq!(calls, 2, "{message}");
     }
+}
+
+const ROUND4_ANSWERS: [(&str, u16, &str, &str, bool); 8] = [
+    (
+        "deadline 504",
+        504,
+        JSON,
+        r#"{"code":"deadline_exceeded","message":"context deadline exceeded"}"#,
+        true,
+    ),
+    (
+        "auth 503",
+        503,
+        PROBLEM,
+        r#"{"code":"AUTH_TEMPORARILY_UNAVAILABLE","status":503}"#,
+        true,
+    ),
+    (
+        "permission denied 403",
+        403,
+        PROBLEM,
+        r#"{"code":"PERMISSION_DENIED","status":403,"detail":"denied"}"#,
+        false,
+    ),
+    (
+        "malformed message 503",
+        503,
+        JSON,
+        r#"{"code":"unavailable","message":5}"#,
+        true,
+    ),
+    (
+        "malformed message 504",
+        504,
+        JSON,
+        r#"{"code":"unavailable","message":5}"#,
+        true,
+    ),
+    (
+        "malformed detail 503",
+        503,
+        JSON,
+        r#"{"code":"unavailable","message":"m","details":"nope"}"#,
+        true,
+    ),
+    (
+        "malformed detail 504",
+        504,
+        JSON,
+        r#"{"code":"unavailable","message":"m","details":[{"type":"orders.v1.ErrorDetail","value":"!!"}]}"#,
+        true,
+    ),
+    ("broken json 503", 503, JSON, "{broken", true),
+];
+
+/// Every error that came from an answer carries the answer's Retry-After,
+/// whatever variant it maps to.
+#[tokio::test(flavor = "multi_thread")]
+async fn round4_every_answer_carries_its_retry_after() {
+    for (name, status, content_type, body, _) in ROUND4_ANSWERS {
+        let (err, _) = call_with_headers(
+            "write",
+            status,
+            content_type,
+            body,
+            None,
+            &[("Retry-After", "30")],
+        )
+        .await;
+        let err = err.unwrap_or_else(|| panic!("{name}: expected an error"));
+        assert_eq!(err.retry_after(), Some(30.0), "{name}: {err:?}");
+    }
+}
+
+/// A read retried after any of these answers waits for its Retry-After
+/// (0.4 s), and returns at once with the delay on its error when the delay is
+/// past the budget (30 s). A refusal is never retried.
+#[tokio::test(flavor = "multi_thread")]
+async fn round4_read_retry_honours_every_answers_delay() {
+    for (name, status, content_type, body, retried) in ROUND4_ANSWERS {
+        for delay in ["30", "0.4"] {
+            let started = std::time::Instant::now();
+            let (err, calls) = call_with_headers(
+                "read",
+                status,
+                content_type,
+                body,
+                Some(1),
+                &[("Retry-After", delay)],
+            )
+            .await;
+            let elapsed = started.elapsed();
+            if !retried || delay == "30" {
+                assert_eq!(calls, 1, "{name}/{delay}");
+                assert!(
+                    elapsed < std::time::Duration::from_millis(1500),
+                    "{name}/{delay}"
+                );
+                let err = err.unwrap_or_else(|| panic!("{name}/{delay}: expected an error"));
+                assert_eq!(
+                    err.retry_after(),
+                    Some(delay.parse().expect("delay")),
+                    "{name}/{delay}: {err:?}"
+                );
+            } else {
+                assert!(err.is_none(), "{name}/{delay}: {err:?}");
+                assert_eq!(calls, 2, "{name}/{delay}");
+                assert!(
+                    elapsed >= std::time::Duration::from_millis(400),
+                    "{name}/{delay}"
+                );
+            }
+        }
+    }
+}
+
+/// Every error that came from an answer carries the answer's status too; an
+/// error with no answer behind it, a refused connection, carries none.
+#[tokio::test(flavor = "multi_thread")]
+async fn round4_answer_status_and_no_answer() {
+    for (name, status, content_type, body, _) in ROUND4_ANSWERS {
+        let (err, _) = call_with_headers(
+            "write",
+            status,
+            content_type,
+            body,
+            None,
+            &[("Retry-After", "30")],
+        )
+        .await;
+        let err = err.unwrap_or_else(|| panic!("{name}: expected an error"));
+        let answer = err
+            .answer()
+            .unwrap_or_else(|| panic!("{name}: no answer on {err:?}"));
+        assert_eq!(answer.status, status, "{name}: {err:?}");
+        assert_eq!(answer.retry_after, Some(30.0), "{name}: {err:?}");
+    }
+    // Port 1 on the loopback refuses the connection: no answer at all.
+    let client = Client::new(Config {
+        api_url: "http://127.0.0.1:1".into(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+    let err = client
+        .triggers
+        .get_by_id("9", SubAccountScope::Default)
+        .await
+        .expect_err("refused connection");
+    assert!(err.answer().is_none(), "{err:?}");
+    assert_eq!(err.retry_after(), None, "{err:?}");
 }

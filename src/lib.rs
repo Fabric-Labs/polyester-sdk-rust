@@ -77,7 +77,7 @@ pub use environment::{
     environment_from_name,
 };
 pub use errors::{
-    CatalogLoadFailure, Error, Result, SubscriptionEndReason, auth_codes, order_codes,
+    AnswerMeta, CatalogLoadFailure, Error, Result, SubscriptionEndReason, auth_codes, order_codes,
     problem_codes,
 };
 pub use services::{

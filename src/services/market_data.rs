@@ -1565,7 +1565,7 @@ mod tests {
                 .await
                 .expect("recv must not hang after close");
         assert!(finished.is_none());
-        assert!(matches!(sub.err(), Some(Error::Transport(_))));
+        assert!(matches!(sub.err(), Some(Error::Transport { .. })));
         assert_eq!(errors.lock().unwrap().len(), 1);
         assert_eq!(
             sub.err().unwrap().to_string(),

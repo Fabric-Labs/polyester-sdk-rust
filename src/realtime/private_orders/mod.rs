@@ -486,7 +486,7 @@ fn backoff(attempt: u32, jitter: &mut u64) -> Duration {
 fn is_terminal_token_error(error: &Error) -> bool {
     matches!(
         error,
-        Error::Auth(_)
+        Error::Auth { .. }
             | Error::ApiKeyRejected { .. }
             | Error::PermissionDenied { .. }
             | Error::Validation(_)
@@ -1200,7 +1200,7 @@ impl Actor {
             code,
             metadata: Vec::new(),
             violations: Vec::new(),
-            retry_after: None,
+            answer: None,
         };
         let account = request
             .map(|request| request.account)
