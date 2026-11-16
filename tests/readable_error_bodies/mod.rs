@@ -1816,3 +1816,188 @@ async fn round5_variant_status_is_the_answers_own() {
         "{err:?}"
     );
 }
+
+/// One public call (a read or a create) against a server answering its
+/// procedure with `script`, with this client timeout. Returns the error, the
+/// requests the procedure got and the time the call took.
+async fn scripted_call(
+    op: &str,
+    timeout: std::time::Duration,
+    script: impl Fn() -> HttpScript + Send + Sync + 'static,
+) -> (Option<Error>, usize, std::time::Duration) {
+    let path = if op == "read" { READ_PATH } else { WRITE_PATH };
+    let calls = Arc::new(AtomicUsize::new(0));
+    let seen = calls.clone();
+    let http = MockHttpServer::spawn(move |req| {
+        if req.path != path {
+            return HttpScript::NotFound;
+        }
+        seen.fetch_add(1, Ordering::SeqCst);
+        script()
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        timeout,
+        ..Default::default()
+    })
+    .expect("client");
+    client
+        .catalogs
+        .hydrate_spot_config_json(
+            json!({"pairs": [{"symbol": "BTC-USDT", "symbol_id": 1, "base_quantity_scale": 8}]}),
+        )
+        .expect("catalog");
+    let started = std::time::Instant::now();
+    let error = if op == "read" {
+        client
+            .triggers
+            .get_by_id("9", SubAccountScope::Default)
+            .await
+            .err()
+    } else {
+        let mut params =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Limit);
+        params.quantity = Some(
+            Quantity::from_scaled(
+                1,
+                Some(8),
+                QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(1),
+            )
+            .expect("quantity"),
+        );
+        params.price = Some(Price::from_ticks(1, Some("BTC-USDT".into())).expect("price"));
+        params.time_in_force = Some(CreateTimeInForce::Gtc);
+        client.orders.create(params).await.err()
+    };
+    (error, calls.load(Ordering::SeqCst), started.elapsed())
+}
+
+fn round6_headers(content_length: usize) -> Vec<(String, String)> {
+    vec![
+        ("Content-Type".into(), JSON.into()),
+        ("Content-Length".into(), content_length.to_string()),
+        ("Retry-After".into(), "30".into()),
+    ]
+}
+
+/// A failed answer's metadata is read from its headers before its body. A
+/// 503 with Retry-After 30 whose body is cut short (Content-Length 100, then
+/// one byte and a close), is larger than the SDK reads, or is still arriving
+/// at the client's deadline leaves an error that carries 503 and 30: one
+/// request, and a read returns at once since the delay is past its budget. A
+/// refused connection is no answer and carries none.
+#[tokio::test(flavor = "multi_thread")]
+async fn round6_unreadable_bodies_keep_their_answer() {
+    let too_large = polyester::transport::MAX_CONNECT_RESPONSE_BYTES + 1;
+    for op in OPS {
+        for case in ["truncated", "oversized", "body-deadline"] {
+            let script = move || match case {
+                "truncated" => HttpScript::Raw {
+                    status: 503,
+                    headers: round6_headers(100),
+                    body: b"{".to_vec(),
+                },
+                "oversized" => HttpScript::Raw {
+                    status: 503,
+                    headers: round6_headers(too_large),
+                    body: vec![b' '; too_large],
+                },
+                _ => HttpScript::HeadersThenStall {
+                    status: 503,
+                    headers: round6_headers(100),
+                    stall: std::time::Duration::from_secs(10),
+                },
+            };
+            let (err, calls, elapsed) =
+                scripted_call(op, std::time::Duration::from_millis(400), script).await;
+            let err = err.unwrap_or_else(|| panic!("{op}/{case}: expected an error"));
+            assert_eq!(calls, 1, "{op}/{case}: {err:?}");
+            assert!(
+                elapsed < std::time::Duration::from_secs(3),
+                "{op}/{case}: {elapsed:?}"
+            );
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((503, Some(30.0))),
+                "{op}/{case}: {err:?}"
+            );
+        }
+    }
+    let refused = super::hardening_support::RefusedPort::bind();
+    let client = Client::new(Config {
+        api_url: refused.http_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        timeout: std::time::Duration::from_millis(400),
+        ..Default::default()
+    })
+    .expect("client");
+    let err = client
+        .triggers
+        .get_by_id("9", SubAccountScope::Default)
+        .await
+        .expect_err("refused connection");
+    assert!(err.answer().is_none(), "{err:?}");
+}
+
+/// A redirect is never followed. A 307 with Retry-After 30, to a valid or a
+/// malformed `Location`, leaves an error that carries 307 and 30, after one
+/// request; the redirect's target gets nothing.
+#[tokio::test(flavor = "multi_thread")]
+async fn round6_refused_redirects_keep_their_answer() {
+    let target = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("target");
+    let target_addr = target.local_addr().expect("addr");
+    let target_hits = Arc::new(AtomicUsize::new(0));
+    let hits = target_hits.clone();
+    tokio::spawn(async move {
+        while let Ok((_stream, _)) = target.accept().await {
+            hits.fetch_add(1, Ordering::SeqCst);
+        }
+    });
+    for op in OPS {
+        for location in [
+            format!("http://{target_addr}{READ_PATH}"),
+            "http://[::1".to_owned(),
+        ] {
+            let case = location.clone();
+            let script = move || HttpScript::Raw {
+                status: 307,
+                headers: vec![
+                    ("Location".into(), location.clone()),
+                    ("Retry-After".into(), "30".into()),
+                    ("Content-Length".into(), "0".into()),
+                ],
+                body: Vec::new(),
+            };
+            let (err, calls, elapsed) =
+                scripted_call(op, std::time::Duration::from_secs(5), script).await;
+            let err = err.unwrap_or_else(|| panic!("{op} {case}: expected an error"));
+            assert_eq!(calls, 1, "{op} {case}: {err:?}");
+            assert!(
+                elapsed < std::time::Duration::from_secs(3),
+                "{op} {case}: {elapsed:?}"
+            );
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((307, Some(30.0))),
+                "{op} {case}: {err:?}"
+            );
+        }
+    }
+    assert_eq!(
+        target_hits.load(Ordering::SeqCst),
+        0,
+        "a redirect was followed"
+    );
+}

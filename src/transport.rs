@@ -448,6 +448,9 @@ impl ClientTransport for GatewayTransport {
         request: Request<ClientBody>,
     ) -> BoxFuture<'static, std::result::Result<Response<Self::ResponseBody>, ConnectError>> {
         let path = request.uri().path().to_owned();
+        // The call's deadline, which connectrpc set from this budget just
+        // before sending: a failed answer's body is read within it.
+        let body_deadline = body_deadline(request.headers());
         let response = self.inner.send(request);
         let compression = self.compression.clone();
         Box::pin(async move {
@@ -457,17 +460,25 @@ impl ClientTransport for GatewayTransport {
             };
             let (mut parts, body) = response.into_parts();
             // The answer's real status, captured here for every failed
-            // answer: a ConnectRPC error connectrpc decodes keeps it in its
-            // response headers, where its code alone implies another.
+            // answer as soon as its headers arrive, before its body is read:
+            // a ConnectRPC error connectrpc decodes keeps it in its response
+            // headers, where its code alone implies another, and an error
+            // made here carries the same headers.
             parts.headers.insert(
                 http::HeaderName::from_static(ANSWER_STATUS_HEADER),
                 http::HeaderValue::from(parts.status.as_u16()),
             );
-            let body = Limited::new(body, MAX_CONNECT_RESPONSE_BYTES)
-                .collect()
-                .await
-                .map_err(|e| ConnectError::unavailable(format!("read error response: {e}")))?
-                .to_bytes();
+            let read = Limited::new(body, MAX_CONNECT_RESPONSE_BYTES).collect();
+            let read = match body_deadline {
+                Some(deadline) => tokio::time::timeout_at(deadline, read)
+                    .await
+                    .unwrap_or_else(|_| Err("the call's deadline passed".into())),
+                None => read.await,
+            };
+            let body = match read {
+                Ok(collected) => collected.to_bytes(),
+                Err(e) => return Err(unreadable_answer(parts, &path, &e.to_string())),
+            };
             // Classify the decoded body; an encoding this client cannot
             // decode leaves no readable Connect error, so it reads as empty.
             let decoded = match parts
@@ -500,23 +511,70 @@ impl ClientTransport for GatewayTransport {
 /// leaves the client.
 pub(crate) const ANSWER_STATUS_HEADER: &str = "polyester-sdk-answer-status";
 
-/// For a failed response that may need classifying, whether its body is
-/// JSON; `None` for everything else, which streams through untouched.
-/// Gateway rejections are JSON; an answer with no code has any body.
+/// For a failed response, whether its body is JSON; `None` for a success,
+/// which streams through untouched. Every other answer, a redirect included,
+/// is a failed answer the transport reads and classifies itself.
 fn inspected_failure<B>(response: &Response<B>) -> Option<bool> {
-    let status = response.status();
-    if status.is_success() {
+    if response.status().is_success() {
         return None;
     }
-    let is_json = response
-        .headers()
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_ascii_lowercase)
-        .is_some_and(|value| {
-            value.starts_with("application/json") || value.starts_with("application/problem+json")
+    Some(
+        response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_ascii_lowercase)
+            .is_some_and(|value| {
+                value.starts_with("application/json")
+                    || value.starts_with("application/problem+json")
+            }),
+    )
+}
+
+/// How much earlier than the call's own deadline a failed answer's body
+/// must be read, so that the error made from it, with the answer's
+/// headers, is the call's error rather than connectrpc's bare deadline.
+const BODY_DEADLINE_MARGIN: Duration = Duration::from_millis(20);
+
+/// When reading a failed answer's body must stop: the call's budget, sent as
+/// `connect-timeout-ms`, from now, less [`BODY_DEADLINE_MARGIN`]. connectrpc
+/// started the same budget just before, so this is never after its deadline.
+/// `None` when the call has no deadline.
+fn body_deadline(headers: &http::HeaderMap) -> Option<tokio::time::Instant> {
+    let budget = Duration::from_millis(
+        headers
+            .get("connect-timeout-ms")?
+            .to_str()
+            .ok()?
+            .trim()
+            .parse()
+            .ok()?,
+    );
+    let margin = BODY_DEADLINE_MARGIN.min(budget / 4);
+    Some(tokio::time::Instant::now() + budget.saturating_sub(margin))
+}
+
+/// The error for a failed answer whose body could not be read: cut short,
+/// larger than [`MAX_CONNECT_RESPONSE_BYTES`], or still arriving at the
+/// call's deadline. It reads by the answer's status, as an answer with no
+/// readable body, and carries the answer's headers, so its status and
+/// Retry-After ride along. A redirect reads as one.
+fn unreadable_answer(parts: http::response::Parts, path: &str, reason: &str) -> ConnectError {
+    let status = parts.status;
+    let reason = format!("unreadable body: {reason}");
+    let mut err =
+        classify_failed_response(status, false, reason.as_bytes(), path).unwrap_or_else(|| {
+            // Statuses connectrpc reads by its own table.
+            let code = match status.as_u16() {
+                401 => ErrorCode::Unauthenticated,
+                403 => ErrorCode::PermissionDenied,
+                _ => ErrorCode::Unavailable,
+            };
+            ConnectError::new(code, bare_http_message(status, reason.as_bytes()))
+                .with_http_status(status)
         });
-    (is_json || status.is_client_error() || status.is_server_error()).then_some(is_json)
+    err.set_response_headers(parts.headers);
+    err
 }
 
 /// The Connect error for a failed response that Connect would misreport, or
@@ -595,6 +653,14 @@ fn classify_failed_response_inner(
                 .cloned()
         })
         .unwrap_or_else(|| bare_http_message(status, body));
+    // A redirect is never followed: the request was not processed where it
+    // was sent, and its Location is not repeated, since it may name anything.
+    if status.is_redirection() {
+        return Some(no_recognised_code_error(
+            status,
+            format!("HTTP {}: redirect not followed", status.as_u16()),
+        ));
+    }
     // The HTTP status decides outcome certainty first. A 504 never proves a
     // refusal: the API answers it only where a write's outcome is unknown,
     // and an edge answers it for a request that may have reached the API. So

@@ -18,7 +18,7 @@ type HyperClient = Client<
 
 /// Default when callers do not pass an SDK config timeout.
 pub const DEFAULT_TOKEN_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
-const MAX_TOKEN_RESPONSE_BYTES: usize = 64 * 1024;
+pub(super) const MAX_TOKEN_RESPONSE_BYTES: usize = 64 * 1024;
 const MAX_ERROR_BODY_CHARS: usize = 256;
 
 pub fn connection_token_url(api_url: &str) -> String {
@@ -137,6 +137,10 @@ pub(super) async fn signed_get(
         req.headers_mut().insert(name, value);
     }
 
+    // A failed answer's metadata, read from its headers as soon as they
+    // arrive: every error from that answer carries it, one its body causes
+    // (cut short, too large, or still arriving at the deadline) included.
+    let mut failed_answer = None;
     // One deadline covers headers + bounded body collect (F-18).
     let outcome = tokio::time::timeout(timeout, async {
         let resp = client
@@ -145,14 +149,13 @@ pub(super) async fn signed_get(
             .map_err(|e| Error::realtime(format!("{label}: HTTP request failed: {e}")))?;
         let status = resp.status();
         let answer = crate::errors::answer_from_headers(status.as_u16(), resp.headers());
+        if !status.is_success() {
+            failed_answer = Some(answer.clone());
+        }
         if content_length_exceeds_limit(resp.headers(), max_bytes) {
-            let err = Error::realtime(format!("{label}: response exceeds {max_bytes} bytes"));
-            // A failed answer's metadata rides along.
-            return Err(if status.is_success() {
-                err
-            } else {
-                err.with_answer(answer)
-            });
+            return Err(Error::realtime(format!(
+                "{label}: response exceeds {max_bytes} bytes"
+            )));
         }
         let body = Limited::new(resp.into_body(), max_bytes)
             .collect()
@@ -162,7 +165,15 @@ pub(super) async fn signed_get(
         Ok::<_, Error>((status, body, answer))
     })
     .await
-    .map_err(|_| Error::realtime(format!("{label}: HTTP request timed out after {timeout:?}")))??;
+    .unwrap_or_else(|_| {
+        Err(Error::realtime(format!(
+            "{label}: HTTP request timed out after {timeout:?}"
+        )))
+    })
+    .map_err(|err| match failed_answer.take() {
+        Some(answer) => err.with_answer(answer),
+        None => err,
+    })?;
 
     let (status, body, answer) = outcome;
     // Every error from this answer carries its status and delay.

@@ -1253,6 +1253,100 @@ mod tests {
         );
     }
 
+    /// A token answer's metadata is read from its headers before its body: a
+    /// body cut short, too large or still arriving at the deadline, and a
+    /// redirect the SDK never follows (a valid or a malformed `Location`), all
+    /// leave an error carrying the answer's status and Retry-After, after one
+    /// request and at once. A refused connection carries no answer.
+    #[tokio::test]
+    async fn token_body_failures_and_redirects_carry_their_answer_through_subscribe_raw() {
+        use crate::answer_test_server::{
+            Answer, AnswerBody, MALFORMED_LOCATION, answering, counting_target,
+        };
+        let (target, target_hits) = counting_target().await;
+        let too_large = auth::MAX_TOKEN_RESPONSE_BYTES + 1;
+        let cases = [
+            ("truncated", Answer::unavailable(AnswerBody::Truncated)),
+            (
+                "oversized",
+                Answer::unavailable(AnswerBody::Sized(too_large)),
+            ),
+            (
+                "oversized-chunked",
+                Answer::unavailable(AnswerBody::Chunked(too_large)),
+            ),
+            ("body-deadline", Answer::unavailable(AnswerBody::Stalled)),
+            (
+                "redirect",
+                Answer::redirect(format!("http://{target}/v1/rt/token")),
+            ),
+            (
+                "redirect-malformed",
+                Answer::redirect(MALFORMED_LOCATION.to_owned()),
+            ),
+        ];
+        for (name, answer) in cases {
+            let status = answer.status;
+            let (host, requests) = answering(answer, true).await;
+            let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+            let client = Client::with_timeout(
+                format!("ws://{host}/connection/websocket"),
+                format!("http://{host}"),
+                Some(Credentials::new("key_answer", &secret_hex).unwrap()),
+                None,
+                Duration::from_millis(400),
+            );
+            let started = std::time::Instant::now();
+            let err = match tokio::time::timeout(
+                Duration::from_secs(10),
+                client.subscribe_raw("private:spot:trades:acct:proto"),
+            )
+            .await
+            {
+                Ok(Err(err)) => err,
+                Ok(Ok(_)) => panic!("{name}: the answer refuses the subscription"),
+                Err(_) => panic!("{name}: the subscription neither failed nor succeeded"),
+            };
+            assert!(
+                started.elapsed() < Duration::from_secs(3),
+                "{name}: {:?}",
+                started.elapsed()
+            );
+            assert_eq!(requests.load(Ordering::SeqCst), 1, "{name}: {err:?}");
+            assert_eq!(
+                err.answer()
+                    .map(|answer| (answer.status, answer.retry_after)),
+                Some((status, Some(30.0))),
+                "{name}: {err:?}"
+            );
+        }
+        assert_eq!(
+            target_hits.load(Ordering::SeqCst),
+            0,
+            "a redirect was followed"
+        );
+        // Port 1 on the loopback refuses the connection: no answer at all.
+        let host = "127.0.0.1:1";
+        let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
+        let client = Client::with_timeout(
+            format!("ws://{host}/connection/websocket"),
+            format!("http://{host}"),
+            Some(Credentials::new("key_answer", &secret_hex).unwrap()),
+            None,
+            Duration::from_millis(400),
+        );
+        let err = tokio::time::timeout(
+            Duration::from_secs(10),
+            client.subscribe_raw("private:spot:trades:acct:proto"),
+        )
+        .await
+        .expect("a refused connection fails at once");
+        let Err(err) = err else {
+            panic!("no server, no subscription");
+        };
+        assert!(err.answer().is_none(), "{err:?}");
+    }
+
     #[test]
     fn rwlock_helpers_recover_from_poison() {
         let lock = RwLock::new(7u32);
