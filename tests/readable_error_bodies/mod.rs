@@ -1396,3 +1396,168 @@ async fn read_retry_honours_retry_after() {
     assert_eq!(calls, 2);
     assert!(started.elapsed() >= std::time::Duration::from_millis(400));
 }
+
+/// The HTTP status decides outcome certainty first: a 504 is an unknown
+/// outcome before any message, code or typed detail is read. The review's
+/// probes: ConnectRPC bodies at 504 whose message or detail names a retryable
+/// refusal, and plain server failures.
+#[tokio::test(flavor = "multi_thread")]
+async fn round3_connect_bodies_at_504_are_unknown() {
+    let rate = ErrorDetail {
+        code: OrderErrorCode::ERROR_CODE_RATE_LIMIT_EXCEEDED.into(),
+        ..Default::default()
+    }
+    .encode_to_bytes();
+    let limit = RateLimitDetail {
+        retry_after_ms: Some(1500),
+        ..Default::default()
+    }
+    .encode_to_bytes();
+    let bodies = [
+        (
+            "unavailable+skew",
+            json!({"code": "unavailable", "message": "TIMESTAMP_SKEW"}).to_string(),
+        ),
+        (
+            "unavailable+rate detail",
+            detail_body("orders.v1.ErrorDetail", &rate, Some("unavailable")),
+        ),
+        (
+            "unavailable+limit detail",
+            detail_body(
+                "polyester.ratelimit.v1.RateLimitDetail",
+                &limit,
+                Some("unavailable"),
+            ),
+        ),
+        (
+            "resource_exhausted+rate detail",
+            detail_body("orders.v1.ErrorDetail", &rate, Some("resource_exhausted")),
+        ),
+        (
+            "unavailable+auth unavailable",
+            json!({"code": "unavailable", "message": "AUTH_TEMPORARILY_UNAVAILABLE"}).to_string(),
+        ),
+        (
+            "unavailable",
+            json!({"code": "unavailable", "message": "temporarily unavailable"}).to_string(),
+        ),
+        (
+            "internal",
+            json!({"code": "internal", "message": "boom"}).to_string(),
+        ),
+        (
+            "unknown",
+            json!({"code": "unknown", "message": "?"}).to_string(),
+        ),
+    ];
+    for (case, body) in &bodies {
+        let (err, calls) = call("write", 504, JSON, body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+        assert_flags(&err, false, true, case);
+        assert_eq!(calls, 1, "{case}");
+        let (err, calls) = call("read", 504, JSON, body, Some(1)).await;
+        assert!(err.is_none(), "{case}: a safe read retries it: {err:?}");
+        assert_eq!(calls, 2, "{case}");
+    }
+    // An outcome-unknown code at 504 keeps its code even beside a rate-limit
+    // detail, and stays unknown.
+    let mut body: Value = serde_json::from_str(&detail_body(
+        "polyester.ratelimit.v1.RateLimitDetail",
+        &limit,
+        Some("resource_exhausted"),
+    ))
+    .expect("json");
+    body["message"] = json!("ORDER_CREATE_OUTCOME_UNKNOWN");
+    let (err, _) = call("write", 504, JSON, &body.to_string(), None).await;
+    let err = err.expect("outcome unknown");
+    assert!(
+        matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_ORDER_CREATE_OUTCOME_UNKNOWN"),
+        "{err:?}"
+    );
+    assert_flags(
+        &err,
+        false,
+        true,
+        "outcome unknown beside a rate-limit detail",
+    );
+}
+
+/// Retry-After is captured once for every answer and carried by whatever
+/// error it maps to, an authentication refusal included.
+#[tokio::test(flavor = "multi_thread")]
+async fn round3_retry_after_on_every_answer() {
+    for (status, content_type, body) in [
+        (
+            503,
+            PROBLEM,
+            r#"{"code":"AUTH_TEMPORARILY_UNAVAILABLE","status":503}"#,
+        ),
+        (
+            503,
+            PROBLEM,
+            r#"{"code":"ACCOUNT_ROUTING_INVALID","status":503}"#,
+        ),
+        (503, PROBLEM, r#"{"code":"PAIR_BACKLOGGED","status":503}"#),
+        (
+            503,
+            JSON,
+            r#"{"code":"unavailable","message":"AUTH_TEMPORARILY_UNAVAILABLE"}"#,
+        ),
+        (
+            429,
+            PROBLEM,
+            r#"{"code":"RATE_LIMIT_EXCEEDED","status":429}"#,
+        ),
+        (
+            504,
+            PROBLEM,
+            r#"{"code":"ORDER_CREATE_OUTCOME_UNKNOWN","status":504}"#,
+        ),
+    ] {
+        let (err, _) = call_with_headers(
+            "write",
+            status,
+            content_type,
+            body,
+            None,
+            &[("Retry-After", "30")],
+        )
+        .await;
+        let err = err.unwrap_or_else(|| panic!("{status} {body}: expected an error"));
+        assert_eq!(err.retry_after(), Some(30.0), "{status} {body}: {err:?}");
+    }
+}
+
+/// An authentication refusal that changed nothing waits for its Retry-After
+/// too, or gives up when that would end past the budget.
+#[tokio::test(flavor = "multi_thread")]
+async fn round3_auth_unavailable_read_retry_honours_retry_after() {
+    let body = r#"{"code":"AUTH_TEMPORARILY_UNAVAILABLE","status":503}"#;
+    let started = std::time::Instant::now();
+    let (err, calls) = call_with_headers(
+        "read",
+        503,
+        PROBLEM,
+        body,
+        Some(1),
+        &[("Retry-After", "30")],
+    )
+    .await;
+    assert!(started.elapsed() < std::time::Duration::from_millis(1500));
+    assert_eq!(calls, 1);
+    assert_eq!(err.expect("past the budget").retry_after(), Some(30.0));
+    let started = std::time::Instant::now();
+    let (err, calls) = call_with_headers(
+        "read",
+        503,
+        PROBLEM,
+        body,
+        Some(1),
+        &[("Retry-After", "0.4")],
+    )
+    .await;
+    assert!(err.is_none(), "{err:?}");
+    assert_eq!(calls, 2);
+    assert!(started.elapsed() >= std::time::Duration::from_millis(400));
+}

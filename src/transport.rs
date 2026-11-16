@@ -583,58 +583,76 @@ fn classify_failed_response_inner(
                 .cloned()
         })
         .unwrap_or_else(|| bare_http_message(status, body));
-    // A 504 never proves a refusal. The API answers it only where a write's
-    // outcome is unknown, and an edge answers it for a request that may have
-    // reached the API. So whatever code its body names, a retryable
-    // rate-limit, admission or authentication code included, it stays an
-    // unknown outcome ([`crate::Error::GatewayTimeout`]) that safe reads
-    // retry. An explicit outcome-unknown code, in a problem's code or a
-    // ConnectRPC error's message or order detail, keeps that code below.
+    // The HTTP status decides outcome certainty first. A 504 never proves a
+    // refusal: the API answers it only where a write's outcome is unknown,
+    // and an edge answers it for a request that may have reached the API. So
+    // before any code, message or typed detail is read for a refusal, a 504
+    // is an unknown outcome that safe reads retry: the outcome-unknown code
+    // the answer names (a problem's code, a ConnectRPC error's code-only
+    // message, or an order detail's code), else
+    // [`crate::Error::GatewayTimeout`]. No body, a ConnectRPC code, a
+    // retryable rate-limit, admission or authentication code, or a typed
+    // detail included, changes that.
     if status == StatusCode::GATEWAY_TIMEOUT {
-        let names_outcome_unknown = code
-            .as_deref()
-            .is_some_and(|code| code.ends_with("_OUTCOME_UNKNOWN"))
-            || parsed
-                .as_ref()
-                .and_then(|body| body.message.as_deref())
-                .is_some_and(|message| message.trim().ends_with("_OUTCOME_UNKNOWN"))
-            || body_details
-                .iter()
-                .any(crate::errors::names_outcome_unknown);
-        // A ConnectRPC server-failure code already reads as an unknown
-        // outcome, with any future code its detail names.
-        let server_failure = code
-            .as_deref()
-            .and_then(|c| c.parse::<ErrorCode>().ok())
-            .is_some_and(|c| {
-                matches!(
-                    c,
-                    ErrorCode::Unavailable
-                        | ErrorCode::DeadlineExceeded
-                        | ErrorCode::Internal
-                        | ErrorCode::Unknown
-                        | ErrorCode::DataLoss
-                        | ErrorCode::Canceled
-                )
+        let outcome = code
+            .clone()
+            .filter(|code| code.ends_with("_OUTCOME_UNKNOWN"))
+            .or_else(|| {
+                parsed
+                    .as_ref()
+                    .and_then(|body| body.message.as_deref())
+                    .map(str::trim)
+                    .filter(|message| message.ends_with("_OUTCOME_UNKNOWN"))
+                    .map(str::to_owned)
+            })
+            .or_else(|| {
+                body_details
+                    .iter()
+                    .find_map(crate::errors::outcome_unknown_code)
             });
-        if !names_outcome_unknown && !server_failure {
-            let message = parsed
-                .as_ref()
-                .and_then(|body| {
-                    [&body.detail, &body.title, &body.message]
-                        .into_iter()
-                        .flatten()
-                        .find(|message| !message.is_empty())
-                        .cloned()
-                })
-                .unwrap_or_else(|| bare_http_message(status, body));
-            return Some(sdk_marked_error(
-                ErrorCode::Unavailable,
-                message,
-                status,
-                BARE_HTTP_ERROR_TYPE,
-            ));
+        let message = parsed
+            .as_ref()
+            .and_then(|body| {
+                [&body.detail, &body.title, &body.message]
+                    .into_iter()
+                    .flatten()
+                    .find(|message| !message.is_empty())
+                    .cloned()
+            })
+            .or_else(|| outcome.clone())
+            .unwrap_or_else(|| bare_http_message(status, body));
+        if let Some(outcome) = outcome {
+            use crate::proto::orders::v1::{
+                ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail,
+            };
+            let order_name = if outcome.starts_with("ERROR_CODE_") {
+                outcome.clone()
+            } else {
+                format!("ERROR_CODE_{outcome}")
+            };
+            let err =
+                ConnectError::new(ErrorCode::DeadlineExceeded, message).with_http_status(status);
+            return Some(match OrderErrorCode::from_proto_name(&order_name) {
+                Some(order_code) => err.with_detail(ErrorDetail::from_message(
+                    "orders.v1.ErrorDetail",
+                    &OrderErrorDetail {
+                        code: order_code.into(),
+                        ..Default::default()
+                    },
+                )),
+                // A code newer than this SDK: the mapping reads it from the
+                // message, as for a REST problem.
+                None => {
+                    ConnectError::new(ErrorCode::DeadlineExceeded, outcome).with_http_status(status)
+                }
+            });
         }
+        return Some(sdk_marked_error(
+            ErrorCode::Unavailable,
+            message,
+            status,
+            BARE_HTTP_ERROR_TYPE,
+        ));
     }
     if let Some(code) = code {
         // Connect error codes are lowercase names such as `unimplemented`.

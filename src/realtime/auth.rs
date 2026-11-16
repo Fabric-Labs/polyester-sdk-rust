@@ -166,6 +166,7 @@ pub(super) async fn signed_get(
         return Err(Error::TimestampSkew {
             problem: crate::problem::decode_http_problem(&body, status_code).map(Box::new),
             status: status_code,
+            retry_after: None,
         });
     }
     if status_code == 401 {

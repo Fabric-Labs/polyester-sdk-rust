@@ -211,6 +211,7 @@ mod tests {
             code: "AUTH_UNSPECIFIED".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
         assert!(is_permission_denied(&api));
         assert!(!jwt_session_only(&api));
@@ -232,6 +233,7 @@ mod tests {
             code: "ERROR_CODE_POLICY_MAX_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
         assert!(!is_notional_validation(&maximum));
 
@@ -240,6 +242,7 @@ mod tests {
             code: "ERROR_CODE_MIN_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
         assert!(is_notional_validation(&minimum));
     }

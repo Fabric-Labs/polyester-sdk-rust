@@ -455,6 +455,7 @@ fn request_size_and_wallet_predicates_read_only_their_codes() {
         code: code.into(),
         metadata: Vec::new(),
         violations: Vec::new(),
+        retry_after: None,
     };
     assert!(!api("PAYLOAD_TOO_LARGE").is_request_too_large());
     assert!(

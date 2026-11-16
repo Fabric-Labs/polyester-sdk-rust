@@ -3939,7 +3939,7 @@ async fn l2_unimplemented_and_bare_501_map_to_not_implemented() {
     })
     .await;
     assert!(
-        matches!(&err, Error::NotImplemented { message } if message.contains("not implemented")),
+        matches!(&err, Error::NotImplemented { message, .. } if message.contains("not implemented")),
         "{err:?}"
     );
     assert!(err.is_not_implemented() && !err.is_retryable(), "{err:?}");

@@ -1200,6 +1200,7 @@ impl Actor {
             code,
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
         let account = request
             .map(|request| request.account)

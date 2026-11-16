@@ -107,6 +107,7 @@ fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &
             rule_id: rule_id.to_owned(),
             message: message.to_owned(),
         }],
+        retry_after: None,
     }
 }
 
@@ -611,6 +612,7 @@ impl OrdersService {
                     code: "ERROR_CODE_FEE_ASSET_NOT_ALLOWED".to_owned(),
                     metadata: Vec::new(),
                     violations: Vec::new(),
+                    retry_after: None,
                 });
             }
         };
@@ -1546,6 +1548,7 @@ impl OrdersService {
         let client = self.read_client();
         let mut delay = FIRST_DELAY;
         loop {
+            let mut wait = delay;
             let attempt = tokio::time::timeout_at(
                 deadline,
                 unary::try_auth(
@@ -1576,14 +1579,18 @@ impl OrdersService {
                         connectrpc::ErrorCode::Unavailable
                             | connectrpc::ErrorCode::DeadlineExceeded
                             | connectrpc::ErrorCode::NotFound
-                    ) => {}
+                    ) =>
+                {
+                    // Never sooner than the Retry-After the answer asked for.
+                    wait = super::unary::retry_wait(&err, delay);
+                }
                 Err(err) => return Err(crate::transport::Factory::map_error(err)),
             }
             let now = tokio::time::Instant::now();
-            if now + delay >= deadline {
+            if now + wait >= deadline {
                 return Err(timed_out());
             }
-            tokio::time::sleep(delay).await;
+            tokio::time::sleep(wait).await;
             delay = (delay * 2).min(MAX_DELAY);
         }
     }

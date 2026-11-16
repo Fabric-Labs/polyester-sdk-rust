@@ -90,6 +90,7 @@ fn field_refusal(code: &str, message: impl Into<String>) -> Error {
         code: code.to_owned(),
         metadata: Vec::new(),
         violations: Vec::new(),
+        retry_after: None,
     }
 }
 

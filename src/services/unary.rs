@@ -130,6 +130,21 @@ fn is_real_unavailability(err: &ConnectError) -> bool {
         || !matches!(mapped, Error::Api { .. } | Error::RateLimit { .. })
 }
 
+/// How long a retry of a safe read waits after `err`: `fallback`, or the
+/// delay the answer asked for with `Retry-After` when that is longer. Every
+/// retry loop reads the delay here, from the one place the SDK keeps it:
+/// [`Error::retry_after`] of the mapped error.
+pub(crate) fn retry_wait(err: &ConnectError, fallback: Duration) -> Duration {
+    const MAX_WAIT: Duration = Duration::from_secs(24 * 60 * 60);
+    match Factory::map_error(err.clone()).retry_after() {
+        Some(seconds) => Duration::try_from_secs_f64(seconds)
+            .unwrap_or(MAX_WAIT)
+            .min(MAX_WAIT)
+            .max(fallback),
+        None => fallback,
+    }
+}
+
 /// [`await_auth`] for a read without side effects: Connect `unavailable` or deadlines
 /// are retried with the same request, signed again, under
 /// `policy`. Other errors, and `unavailable` once the budget is spent,
@@ -153,16 +168,9 @@ where
             Err(err) if is_real_unavailability(&err) => {
                 // Never sooner than the Retry-After the answer asked for, and
                 // not at all when that would end past the budget.
-                let mapped = Factory::map_error(err);
-                let wait = match mapped.retry_after() {
-                    Some(seconds) if seconds > policy.budget.as_secs_f64() => {
-                        return Err(mapped.for_procedure(procedure));
-                    }
-                    Some(seconds) => delay.max(Duration::from_secs_f64(seconds)),
-                    None => delay,
-                };
+                let wait = retry_wait(&err, delay);
                 if start.elapsed() + wait > policy.budget {
-                    return Err(mapped.for_procedure(procedure));
+                    return Err(Factory::map_error(err).for_procedure(procedure));
                 }
                 tokio::time::sleep(wait).await;
                 delay = policy.next_delay(delay);

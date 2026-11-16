@@ -213,6 +213,9 @@ pub enum Error {
     /// A structured orders-service refusal: the request was not admitted.
     #[error("{message}")]
     AdmissionUnavailable {
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
         message: String,
         code: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
@@ -232,6 +235,9 @@ pub enum Error {
     },
     #[error("{message}")]
     Api {
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
         message: String,
         code: String,
         metadata: Vec<(String, String)>,
@@ -245,12 +251,22 @@ pub enum Error {
         "RPC not exposed on this API host{procedure}. The procedure may be unimplemented on \
          devnet or disabled in this environment."
     )]
-    RouteNotFound { procedure: String },
+    RouteNotFound {
+        procedure: String,
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
+    },
     /// The server does not implement this call: Connect `unimplemented` or a
     /// bare HTTP 501. A bare HTTP 404 is [`Error::RouteNotFound`] instead.
     /// Not retryable.
     #[error("not implemented: {message}")]
-    NotImplemented { message: String },
+    NotImplemented {
+        message: String,
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
+    },
     /// The API-key request timestamp is outside the server's allowed skew
     /// window (`TIMESTAMP_SKEW`), usually because the local clock is off.
     ///
@@ -262,6 +278,9 @@ pub enum Error {
         "API-key request timestamp is outside the allowed skew window (HTTP {status}); check the local clock"
     )]
     TimestampSkew {
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
         status: u16,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
@@ -274,6 +293,9 @@ pub enum Error {
     /// `code`, [`Error::auth_code`] the typed reason.
     #[error("API-key request rejected (HTTP {status}, code {code})")]
     ApiKeyRejected {
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
         status: u16,
         code: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
@@ -286,6 +308,9 @@ pub enum Error {
     /// retryable: call the method with a session token.
     #[error("{message}")]
     SessionRequired {
+        /// The delay in seconds the answer asked for with `Retry-After` (or
+        /// `Retry-After-Ms`), when it named one. See [`Error::retry_after`].
+        retry_after: Option<f64>,
         message: String,
         problem: Option<Box<crate::problem::HttpProblem>>,
     },
@@ -704,12 +729,14 @@ pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
         Error::TimestampSkew {
             status,
             problem: None,
+            retry_after: None,
         }
     } else {
         Error::ApiKeyRejected {
             status,
             code: code.to_owned(),
             problem: None,
+            retry_after: None,
         }
     }
 }
@@ -799,15 +826,15 @@ fn future_code_label(detail: &ErrorDetail) -> Option<String> {
 
 /// Whether a detail is a service detail with a code this SDK can name. One that
 /// is empty or undecodable proves nothing.
-/// Whether a detail is an order detail whose code ends in `_OUTCOME_UNKNOWN`:
-/// a write that may have applied.
-pub(crate) fn names_outcome_unknown(detail: &ErrorDetail) -> bool {
-    decode_order_error_detail(detail).is_some_and(|order| {
-        is_outcome_unknown_code(&known_or_unknown_code(
-            order.code.as_known().map(|c| c.proto_name()),
-            order.code.to_i32(),
-        ))
-    })
+/// The code of an order detail whose code ends in `_OUTCOME_UNKNOWN`, a
+/// write that may have applied, or `None`.
+pub(crate) fn outcome_unknown_code(detail: &ErrorDetail) -> Option<String> {
+    let order = decode_order_error_detail(detail)?;
+    let code = known_or_unknown_code(
+        order.code.as_known().map(|c| c.proto_name()),
+        order.code.to_i32(),
+    );
+    is_outcome_unknown_code(&code).then_some(code)
 }
 
 pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
@@ -1006,10 +1033,12 @@ impl Error {
                 message,
                 code,
                 problem: p,
+                retry_after,
             } => Self::AdmissionUnavailable {
                 message: text(message),
                 code,
                 problem: problem(p),
+                retry_after,
             },
             Self::GatewayTimeout {
                 message,
@@ -1027,6 +1056,7 @@ impl Error {
                 code,
                 metadata,
                 violations,
+                retry_after,
             } => Self::Api {
                 message: text(message),
                 code,
@@ -1041,32 +1071,50 @@ impl Error {
                         violation
                     })
                     .collect(),
+                retry_after,
             },
-            Self::RouteNotFound { procedure } => Self::RouteNotFound {
+            Self::RouteNotFound {
+                procedure,
+                retry_after,
+            } => Self::RouteNotFound {
                 procedure: text(procedure),
+                retry_after,
             },
-            Self::NotImplemented { message } => Self::NotImplemented {
+            Self::NotImplemented {
+                message,
+                retry_after,
+            } => Self::NotImplemented {
                 message: text(message),
+                retry_after,
             },
-            Self::TimestampSkew { status, problem: p } => Self::TimestampSkew {
+            Self::TimestampSkew {
+                status,
+                problem: p,
+                retry_after,
+            } => Self::TimestampSkew {
                 status,
                 problem: problem(p),
+                retry_after,
             },
             Self::ApiKeyRejected {
                 status,
                 code,
                 problem: p,
+                retry_after,
             } => Self::ApiKeyRejected {
                 status,
                 code,
                 problem: problem(p),
+                retry_after,
             },
             Self::SessionRequired {
                 message,
                 problem: p,
+                retry_after,
             } => Self::SessionRequired {
                 message: text(message),
                 problem: problem(p),
+                retry_after,
             },
             Self::Realtime(message) => Self::Realtime(text(message)),
             // Template IDs, pair IDs and protocol positions only: nothing to
@@ -1179,16 +1227,50 @@ impl Error {
         }
     }
 
-    /// Server-requested retry delay in seconds, when supplied: a rate
-    /// refusal's, or a temporary failure's `Retry-After` ([`Error::Server`],
-    /// [`Error::GatewayTimeout`]).
+    /// The delay in seconds the answer behind this error asked for with
+    /// `Retry-After` (or `Retry-After-Ms`, or a rate-limit detail's
+    /// `retry_after_ms`), when it named one: on every variant that comes from
+    /// an answer, an `AUTH_TEMPORARILY_UNAVAILABLE` refusal ([`Error::Api`])
+    /// included. `None` for an error with no answer behind it, and for the
+    /// bare-message variants [`Error::Auth`], [`Error::Transport`] and
+    /// [`Error::Validation`], and for [`Error::PermissionDenied`], a final
+    /// refusal of the operation. The SDK captures it once, where it maps the
+    /// answer, and its own retries of safe reads wait at least this long.
     pub fn retry_after(&self) -> Option<f64> {
         match self {
             Self::RateLimit { retry_after, .. }
             | Self::Server { retry_after, .. }
-            | Self::GatewayTimeout { retry_after, .. } => *retry_after,
+            | Self::GatewayTimeout { retry_after, .. }
+            | Self::Api { retry_after, .. }
+            | Self::AdmissionUnavailable { retry_after, .. }
+            | Self::RouteNotFound { retry_after, .. }
+            | Self::NotImplemented { retry_after, .. }
+            | Self::TimestampSkew { retry_after, .. }
+            | Self::ApiKeyRejected { retry_after, .. }
+            | Self::SessionRequired { retry_after, .. } => *retry_after,
             _ => None,
         }
+    }
+
+    /// This error carrying `seconds`, the delay its answer asked for, unless
+    /// it already carries one.
+    pub(crate) fn with_retry_after(mut self, seconds: Option<f64>) -> Self {
+        if let (Some(seconds), None) = (seconds, self.retry_after()) {
+            match &mut self {
+                Self::RateLimit { retry_after, .. }
+                | Self::Server { retry_after, .. }
+                | Self::GatewayTimeout { retry_after, .. }
+                | Self::Api { retry_after, .. }
+                | Self::AdmissionUnavailable { retry_after, .. }
+                | Self::RouteNotFound { retry_after, .. }
+                | Self::NotImplemented { retry_after, .. }
+                | Self::TimestampSkew { retry_after, .. }
+                | Self::ApiKeyRejected { retry_after, .. }
+                | Self::SessionRequired { retry_after, .. } => *retry_after = Some(seconds),
+                _ => {}
+            }
+        }
+        self
     }
 
     /// Structured error code: the auth.v1.AuthErrorDetail (or other service)
@@ -1718,7 +1800,11 @@ pub fn map_connect_error(err: ConnectError) -> Error {
         .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
         .and_then(|d| d.debug.as_ref())
         .and_then(|v| serde_json::from_value(v.clone()).ok());
-    let mapped = map_connect_error_inner(err);
+    // The answer's delay, captured once from the response headers the
+    // transport attached (or a ConnectRPC answer's metadata), rides on
+    // whatever error it maps to.
+    let header_retry = retry_after_seconds(&err);
+    let mapped = map_connect_error_inner(err).with_retry_after(header_retry);
     let mapped = if let Some(problem) = problem {
         mapped.with_http_problem(problem)
     } else {
@@ -1820,6 +1906,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return if status == 404 {
             Error::RouteNotFound {
                 procedure: String::new(),
+                retry_after: None,
             }
         } else if status == 504 {
             Error::GatewayTimeout {
@@ -1831,6 +1918,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         } else {
             Error::NotImplemented {
                 message: fallback_message,
+                retry_after: None,
             }
         };
     }
@@ -1838,6 +1926,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         return Error::TimestampSkew {
             status,
             problem: None,
+            retry_after: None,
         };
     }
     let mut details: Vec<_> = err.details.iter().collect();
@@ -1871,6 +1960,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             code: error_code_from_name(raw_message),
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
     }
     // A detail with no code says nothing about the outcome, but its field
@@ -1910,6 +2000,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                     return Error::TimestampSkew {
                         status,
                         problem: None,
+                        retry_after: None,
                     };
                 }
                 Some(AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED) => {
@@ -1934,6 +2025,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         } else {
                             auth_detail.message
                         },
+                        retry_after: None,
                     };
                 }
                 Some(known) if API_KEY_REJECTIONS.contains(&known) => {
@@ -1941,6 +2033,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         status,
                         code: known.proto_name().trim_start_matches("AUTH_").to_owned(),
                         problem: None,
+                        retry_after: None,
                     };
                 }
                 _ => {}
@@ -1965,6 +2058,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata,
                 violations: Vec::new(),
+                retry_after: None,
             };
         }
         if let Some(rl) = decode_rate_limit_detail(detail) {
@@ -2011,6 +2105,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         message: fallback_message.clone(),
                         code,
                         problem: None,
+                        retry_after: None,
                     }
                 } else {
                     Error::Server {
@@ -2073,6 +2168,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata,
                 violations,
+                retry_after: None,
             };
         }
         if let Some(withdraw_detail) = decode_withdraw_error_detail(detail) {
@@ -2102,6 +2198,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata: withdraw_detail_metadata(&withdraw_detail),
                 violations: Vec::new(),
+                retry_after: None,
             };
         }
         if let Some(alert_detail) = decode_alert_error_detail(detail) {
@@ -2124,6 +2221,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
+                retry_after: None,
             };
         }
         if let Some(ledger_detail) = decode_ledger_error_detail(detail) {
@@ -2147,6 +2245,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
+                retry_after: None,
             };
         }
         if let Some(transfer_detail) = decode_transfer_error_detail(detail) {
@@ -2176,6 +2275,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 code,
                 metadata: Vec::new(),
                 violations: Vec::new(),
+                retry_after: None,
             };
         }
     }
@@ -2202,6 +2302,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             message: fallback_message,
             code: normalized_code,
             problem: None,
+            retry_after: None,
         };
     }
     if (err.code == ErrorCode::Unavailable
@@ -2218,6 +2319,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             code: error_code_from_name(named_code),
             metadata: Vec::new(),
             violations: Vec::new(),
+            retry_after: None,
         };
     }
     let code = err.code;
@@ -2251,7 +2353,10 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 .flatten(),
         },
         ErrorCode::DeadlineExceeded => Error::Transport(message),
-        ErrorCode::Unimplemented => Error::NotImplemented { message },
+        ErrorCode::Unimplemented => Error::NotImplemented {
+            message,
+            retry_after: None,
+        },
         _ => Error::Api {
             message,
             code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) {
@@ -2261,6 +2366,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             },
             metadata: Vec::new(),
             violations: placeholder_violations,
+            retry_after: None,
         },
     }
 }
@@ -3405,6 +3511,7 @@ mod tests {
                 code: "permission_denied".into(),
                 metadata: Vec::new(),
                 violations: Vec::new(),
+                retry_after: None,
             }
             .is_step_up_required()
         );
@@ -3414,6 +3521,7 @@ mod tests {
                 code: "AUTH_API_KEY_MFA_REQUIRED".into(),
                 metadata: Vec::new(),
                 violations: Vec::new(),
+                retry_after: None,
             }
             .is_mfa_enrollment_required()
         );
