@@ -602,6 +602,31 @@ pub type SmartAccount = PolyesterSmartAccount;
 mod tests {
     use super::*;
 
+    /// A hex string is a JSON-RPC quantity: `0x` and at least one hex digit,
+    /// with no sign and no leading zero (`"0x0"` is zero).
+    #[test]
+    fn as_u64_reads_hex_strings_as_json_rpc_quantities() {
+        for (raw, want) in [
+            ("0x0", 0),
+            ("0x1", 1),
+            ("0X1f", 31),
+            ("0xABCdef", 11_259_375),
+            (" 0x10 ", 16),
+            ("0xffffffffffffffff", u64::MAX),
+        ] {
+            assert_eq!(as_u64(&json!(raw)).unwrap(), want, "{raw:?}");
+        }
+        for raw in [
+            "0x", "0X", " 0x ", "0x00", "0x01", "0x0f", "0x+1", "0x-1", "0x 1", "0xg", "0x1_0",
+            "0xé",
+        ] {
+            assert!(
+                matches!(as_u64(&json!(raw)), Err(Error::Transport(_))),
+                "{raw:?}"
+            );
+        }
+    }
+
     #[test]
     fn execute_user_op_selector() {
         // executeUserOpWithErrorString
