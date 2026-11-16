@@ -1335,6 +1335,34 @@ pub(crate) fn feed_of(shared: &Shared, symbol_id: u32) -> Option<FeedState> {
         .copied()
 }
 
+/// A stream with no connection, fed by [`handle`] in tests.
+#[cfg(test)]
+pub(crate) fn offline_stream(config: Config) -> MarketStream {
+    let (shared, rx) = offline(config);
+    MarketStream {
+        rx,
+        shared,
+        task: tokio::spawn(async {}),
+    }
+}
+
+#[cfg(test)]
+impl MarketStream {
+    pub(crate) fn shared(&self) -> &Arc<Shared> {
+        &self.shared
+    }
+    pub(crate) fn owe_ping(&self, request_id: u64) {
+        lock_unpoisoned(&self.shared.inner).ping = Some((request_id, Instant::now()));
+    }
+    pub(crate) fn queued(&mut self) -> Vec<Event> {
+        let mut out = Vec::new();
+        while let Ok(e) = self.rx.try_recv() {
+            out.push(e);
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 pub(crate) fn force_feed(shared: &Shared, symbol_id: u32, feed: FeedState) {
     write_unpoisoned(&shared.state)
