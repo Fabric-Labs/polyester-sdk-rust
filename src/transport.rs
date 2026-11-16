@@ -647,6 +647,20 @@ fn classify_failed_response_inner(
                 }
             });
         }
+        if code.as_deref() == Some("deadline_exceeded") {
+            // ConnectRPC answers its own deadline_exceeded with 504: the
+            // request's deadline passed, read as the deadline it is
+            // ([`crate::Error::Transport`], an unknown outcome that reads
+            // retry), whatever its message or detail says. The prefix keeps
+            // a code-like message from reading as a refusal.
+            return Some(
+                ConnectError::new(
+                    ErrorCode::DeadlineExceeded,
+                    format!("deadline exceeded: {message}"),
+                )
+                .with_http_status(status),
+            );
+        }
         return Some(sdk_marked_error(
             ErrorCode::Unavailable,
             message,

@@ -1561,3 +1561,20 @@ async fn round3_auth_unavailable_read_retry_honours_retry_after() {
     assert_eq!(calls, 2);
     assert!(started.elapsed() >= std::time::Duration::from_millis(400));
 }
+
+/// ConnectRPC answers a server-side deadline_exceeded with HTTP 504: the
+/// request's deadline, whatever its message says, never a refusal.
+#[tokio::test(flavor = "multi_thread")]
+async fn round3_connect_deadline_at_504_is_the_deadline() {
+    for message in ["context deadline exceeded", "TIMESTAMP_SKEW"] {
+        let body = json!({"code": "deadline_exceeded", "message": message}).to_string();
+        let (err, calls) = call("write", 504, JSON, &body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{message}: expected an error"));
+        assert!(matches!(err, Error::Transport(_)), "{message}: {err:?}");
+        assert_flags(&err, false, true, message);
+        assert_eq!(calls, 1, "{message}");
+        let (err, calls) = call("read", 504, JSON, &body, Some(1)).await;
+        assert!(err.is_none(), "{message}: a safe read retries it: {err:?}");
+        assert_eq!(calls, 2, "{message}");
+    }
+}
