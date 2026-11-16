@@ -2466,26 +2466,39 @@ good-till-cancelled limit orders.
   and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
   (reconcile the pair through the Orders API).
 
-This example connects, arms the dead-man switch and reads events; `quote`
-shows how an order is placed and is not called.
+- **Concurrency.** `TradeSession::split` divides a session into a
+  `TradeSender` and a `TradeEvents`, as a WebSocket stream splits into its
+  sink and stream. The sender is `Clone + Send + Sync` and has every command
+  method, so many tasks can keep commands in flight, each awaiting its own
+  answer, while one task drains `TradeEvents::recv`. No lock is needed, and a
+  lock around the whole session would hold commands behind `recv` and let the
+  bounded event queue overflow. The events half owns the session: dropping it
+  closes the session, so every command sent and unanswered becomes
+  `TradeError::OutcomeUnknown` and later ones `NotSent::Closed`. Dropping every
+  sender ends nothing. The unsplit `TradeSession` keeps every method.
+
+This example connects, splits the session, arms the dead-man switch and reads
+events; `quote` shows how an order is placed from any task and is not called.
 
 ```rust,no_run
 # async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
 use std::time::Duration;
 
 use polyester::auth::Credentials;
-use polyester::tradews::{self, Deadline, Event, PostOnlyOrder, TradeSession};
+use polyester::tradews::{self, Deadline, Event, PostOnlyOrder, TradeSender};
 
 let credentials = Credentials::load(None, None, true)?.expect("POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY");
 let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
-let mut session = tradews::connect(tradews::Config::new(url, credentials)).await?;
+let session = tradews::connect(tradews::Config::new(url, credentials)).await?;
 session.ready().await?;
-let timer = session
+// Commands from any number of tasks, events drained by this one.
+let (sender, mut events) = session.split();
+let timer = sender
     .cancel_all_after(Duration::from_secs(30), Deadline::within(Duration::from_secs(1))?)
     .await?;
 println!("cancel-all-after armed until {:?}", timer.expires_at);
 
-while let Some(event) = session.recv().await {
+while let Some(event) = events.recv().await {
     match event {
         Event::Ready { connection } => println!("connection {connection} ready; arm the timer again"),
         Event::Order(o) => println!("order {} v{} {:?} {:?}", o.order_id, o.version, o.status, o.cancel_reason),
@@ -2498,8 +2511,8 @@ while let Some(event) = session.recv().await {
     }
 }
 
-async fn quote(session: &TradeSession, order: &PostOnlyOrder) -> polyester::Result<()> {
-    match session.create_order(order, Deadline::within(Duration::from_millis(500))?).await {
+async fn quote(sender: &TradeSender, order: &PostOnlyOrder) -> polyester::Result<()> {
+    match sender.create_order(order, Deadline::within(Duration::from_millis(500))?).await {
         Ok(ack) => println!("order {:?} accepted", ack.order_id),
         Err(e) if e.mutation_outcome_unknown() => {
             // It may rest on the book: look it up by its client order ID.
