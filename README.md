@@ -953,6 +953,12 @@ balance (see below).
 and `after_match_id`. When `after_match_id` is set, a resolved non-zero
 `symbol_id` is required (display `symbol` or numeric id).
 
+`ListOrderHistoryOpts` and `ListUserTradesOpts` take an inclusive time window,
+`start_ts_ns` and `end_ts_ns` (Unix nanoseconds), sent only when set, so a
+restart can read the last hour rather than the whole history; an explicit
+`end_ts_ns: Some(0)` returns an empty page, and a start after any other end is
+`Error::Validation` before sending.
+
 `UserTrade` fee fields are fixed **18-decimal** magnitudes of `fee_asset`
 (`fee_amount_e18`, `referral_share_amount_e18`), not catalog asset-scaled
 integers. Convert e18 → the fee asset's catalog scale before subtracting from a
