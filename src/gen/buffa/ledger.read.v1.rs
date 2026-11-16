@@ -539,7 +539,8 @@ pub enum ErrorCode {
     ERROR_CODE_MISSING_WALLET = 7i32,
     ERROR_CODE_WALLET_RESOLUTION_UNAVAILABLE = 8i32,
     ERROR_CODE_WALLET_NOT_FOUND = 9i32,
-    /// Upstream dependency error (e.g., transfers store, wallet resolver).
+    /// Ledger data needed to answer the request is temporarily unavailable.
+    /// Retry later.
     ERROR_CODE_UPSTREAM_ERROR = 10i32,
     /// subaccount_id is zero or not an encoded public subaccount identifier.
     ERROR_CODE_INVALID_SUBACCOUNT_ID = 11i32,

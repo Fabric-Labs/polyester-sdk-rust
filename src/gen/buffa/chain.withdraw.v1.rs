@@ -5290,7 +5290,7 @@ pub enum ErrorCode {
     ERROR_CODE_SUBACCOUNT_NOT_FOUND = 9i32,
     /// The requested withdraw action is invalid for this endpoint.
     ERROR_CODE_INVALID_ACTION = 10i32,
-    /// The requested ledger is not supported for withdrawals.
+    /// asset_id does not identify a known asset.
     ERROR_CODE_UNSUPPORTED_LEDGER = 11i32,
     /// The requested asset or withdraw route is not supported.
     ERROR_CODE_UNSUPPORTED_ASSET = 12i32,
@@ -5334,7 +5334,8 @@ pub enum ErrorCode {
     ERROR_CODE_IDEMPOTENCY_CONFLICT = 31i32,
     /// The funds lock conflicts with an existing or finalized reservation.
     ERROR_CODE_FUNDS_LOCK_CONFLICT = 32i32,
-    /// The authoritative capital view is not ready or is stale.
+    /// The account's available balance cannot be confirmed right now. Retry
+    /// later.
     ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE = 33i32,
     /// Required chain or contract metadata is unavailable.
     ERROR_CODE_CHAIN_METADATA_UNAVAILABLE = 34i32,

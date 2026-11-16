@@ -1862,9 +1862,13 @@ pub enum ErrorCode {
     OWNER_IMMUTABLE = 30i32,
     /// No pending invite with this ID is addressed to the caller.
     INVITE_NOT_FOUND = 31i32,
-    /// The fees are not valid: more than three affiliates, an affiliate without
-    /// a valid account_id or with bps outside 1 to 300, a vault named twice, or
-    /// broker_bps and the affiliates' bps totalling more than 300.
+    /// The fees are not valid in a way the request rules cannot check: an
+    /// affiliate account_id that is not a public sub-account ID, or a
+    /// referral_code whose discount and commission for the route exceed
+    /// broker_bps. Fees that break the request rules (at most three distinct
+    /// affiliates of 1 to 300 bps, broker_bps at most 300, all together at most
+    /// 300, no affiliates with a referral_code) fail with INVALID_ARGUMENT
+    /// before this check.
     FEES_INVALID = 32i32,
     /// The broker stats cannot be read: a QuickSwap in the window, named by
     /// ErrorDetail.swap_id, is missing a record they need. Contact Polyester
@@ -9401,9 +9405,8 @@ pub struct QuoteQuickSwapRequest {
     )]
     pub terms: ::buffa::MessageField<QuickSwapTerms>,
     /// Broker fee in basis points of what each leg receives, charged on top of
-    /// the service fee and credited to the broker's default vault; 0 for none.
-    /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-    /// rules fail with FEES_INVALID.
+    /// the service fee and credited to the broker's default vault; 0 for none,
+    /// at most 300. broker_bps and the affiliates' bps total at most 300.
     ///
     /// Field 2: `broker_bps`
     #[serde(
@@ -9756,7 +9759,8 @@ pub struct AffiliateShare {
     /// Public sub-account ID of an active affiliate vault of the broker
     /// (QuickSwapBrokerService.CreateAffiliateVault). Create the vault first: an
     /// unknown, disabled or other broker's vault, or the default vault, fails
-    /// with AFFILIATE_VAULT_UNKNOWN.
+    /// with AFFILIATE_VAULT_UNKNOWN; an ID that is not a public sub-account ID
+    /// fails with FEES_INVALID.
     ///
     /// Field 1: `account_id`
     #[serde(
@@ -10043,9 +10047,8 @@ pub struct CreateQuickSwapRequest {
     )]
     pub affiliates: ::buffa::alloc::vec::Vec<AffiliateShare>,
     /// Broker fee in basis points of what each leg receives, charged on top of
-    /// the service fee and credited to the broker's default vault; 0 for none.
-    /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-    /// rules fail with FEES_INVALID.
+    /// the service fee and credited to the broker's default vault; 0 for none,
+    /// at most 300. broker_bps and the affiliates' bps total at most 300.
     ///
     /// Field 12: `broker_bps`
     #[serde(
@@ -10057,7 +10060,7 @@ pub struct CreateQuickSwapRequest {
     pub broker_bps: u32,
     /// Optional referral partner code from a referral link, case-insensitive,
     /// at most 64 bytes; empty for none. Only a broker with a referral program may send one
-    /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates (FEES_INVALID).
+    /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates.
     /// It must be a valid code (REFERRAL_CODE_INVALID) that is a partner's
     /// current code (REFERRAL_CODE_UNKNOWN), and the partner must be active
     /// (REFERRAL_PARTNER_INACTIVE). The program's rates
@@ -13352,7 +13355,7 @@ pub struct Broker {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub read_rps: u32,
-    /// Unfunded Quick Swaps the broker may hold at once: Quick Swaps whose
+    /// Unfunded QuickSwaps the broker may hold at once: QuickSwaps whose
     /// deposit address is being issued or is still awaiting a deposit within
     /// its funding window. At the limit, CreateQuickSwap fails with
     /// RESOURCE_EXHAUSTED / BROKER_LIMIT; a deposit or the end of a funding
@@ -13366,7 +13369,7 @@ pub struct Broker {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub max_unfunded_addresses: u32,
-    /// Quick Swaps the broker may create in any rolling hour. At the limit,
+    /// QuickSwaps the broker may create in any rolling hour. At the limit,
     /// CreateQuickSwap fails with RESOURCE_EXHAUSTED / BROKER_LIMIT until the
     /// oldest create of the hour is more than an hour old.
     ///
@@ -13680,7 +13683,7 @@ pub const __BROKER_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::typ
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BrokerUsage {
-    /// Unfunded Quick Swaps held now, counted against
+    /// Unfunded QuickSwaps held now, counted against
     /// Broker.max_unfunded_addresses.
     ///
     /// Field 1: `unfunded_addresses`
@@ -13691,7 +13694,7 @@ pub struct BrokerUsage {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub unfunded_addresses: u32,
-    /// Quick Swaps created in the last hour, counted against
+    /// QuickSwaps created in the last hour, counted against
     /// Broker.max_creates_per_hour.
     ///
     /// Field 2: `creates_last_hour`
@@ -17728,7 +17731,8 @@ pub struct CreateKeyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub broker: ::buffa::alloc::string::String,
-    /// Label, 1 to 64 characters without leading or trailing whitespace.
+    /// Label, 1 to 64 characters without leading or trailing whitespace,
+    /// Unicode spaces such as the no-break space included.
     ///
     /// Field 2: `label`
     #[serde(
@@ -20715,8 +20719,8 @@ pub struct ListQuickSwapsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Only QuickSwaps created before end_time (exclusive); unset for no upper
-    /// bound.
+    /// Only QuickSwaps created before end_time (exclusive); after start_time
+    /// when both are set; unset for no upper bound.
     ///
     /// Field 5: `end_time`
     #[serde(
@@ -24849,8 +24853,8 @@ pub struct ListPayoutsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Only runs scheduled before end_time (exclusive); unset for no upper
-    /// bound.
+    /// Only runs scheduled before end_time (exclusive); after start_time when
+    /// both are set; unset for no upper bound.
     ///
     /// Field 5: `end_time`
     #[serde(
@@ -29707,8 +29711,8 @@ pub struct ListVaultLedgerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Only entries that occurred before end_time (exclusive); unset for no
-    /// upper bound.
+    /// Only entries that occurred before end_time (exclusive); after start_time
+    /// when both are set; unset for no upper bound.
     ///
     /// Field 4: `end_time`
     #[serde(
@@ -32024,10 +32028,10 @@ pub enum ReferralPartnerStatus {
     /// Enrolled and waiting for Polyester's review. The code is reserved for the
     /// partner but earns nothing yet.
     PARTNER_PENDING = 1i32,
-    /// Approved: Quick Swaps made with the partner's code earn the commission.
+    /// Approved: QuickSwaps made with the partner's code earn the commission.
     PARTNER_ACTIVE = 2i32,
-    /// Disabled by Polyester: new Quick Swaps with the code earn nothing and the
-    /// code cannot be changed. Quick Swaps already created keep their terms.
+    /// Disabled by Polyester: new QuickSwaps with the code earn nothing and the
+    /// code cannot be changed. QuickSwaps already created keep their terms.
     PARTNER_DISABLED = 3i32,
 }
 impl ReferralPartnerStatus {
@@ -32660,8 +32664,8 @@ pub const __REFERRAL_RATES_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::bu
     is_wkt: false,
 };
 /// ReferralProgram is the referral rates of every route category. Polyester
-/// can change them at any time; a change applies to Quick Swaps created after
-/// it, and Quick Swaps already created keep their rates.
+/// can change them at any time; a change applies to QuickSwaps created after
+/// it, and QuickSwaps already created keep their rates.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -32917,7 +32921,7 @@ pub struct ReferralPartner {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub code: ::buffa::alloc::string::String,
-    /// Path of the share link on Polyester's Quick Swap app: "/r/" followed by
+    /// Path of the share link on Polyester's QuickSwap app: "/r/" followed by
     /// the code.
     ///
     /// Field 6: `link_path`
@@ -33239,8 +33243,8 @@ pub struct EnrollReferralPartnerRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub earnings_subaccount_id: u64,
-    /// Name shown for the partner, 1 to 64 characters without leading or
-    /// trailing spaces.
+    /// Name shown for the partner, at most 64 characters. Leading and trailing
+    /// spaces are removed; at least one other character must remain.
     ///
     /// Field 2: `display_name`
     #[serde(
@@ -34463,7 +34467,7 @@ pub const __REFERRAL_COMMISSION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<ReferralCommission>,
     is_wkt: false,
 };
-/// ReferralCredit is one commission credit of a Quick Swap: a settled trade
+/// ReferralCredit is one commission credit of a QuickSwap: a settled trade
 /// of one of its legs, or its bridge payout.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -34660,7 +34664,7 @@ pub const __REFERRAL_CREDIT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<ReferralCredit>,
     is_wkt: false,
 };
-/// ReferredQuickSwap is a Quick Swap the caller referred, as its referral
+/// ReferredQuickSwap is a QuickSwap the caller referred, as its referral
 /// partner sees it. It carries no identity of the person who swapped and no
 /// account, address, memo, transaction hash or flow ID. Amounts are exact;
 /// every time is rounded down to the minute.
@@ -34698,7 +34702,7 @@ pub struct ReferredQuickSwap {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_terminal: bool,
-    /// When the Quick Swap was created, rounded down to the minute.
+    /// When the QuickSwap was created, rounded down to the minute.
     ///
     /// Field 4: `created_at`
     #[serde(
@@ -34815,7 +34819,7 @@ pub struct ReferredQuickSwap {
     )]
     pub commission_bps: u32,
     /// Commission credited so far, one entry per asset in asset_id order. Grows
-    /// while the Quick Swap executes or pays out a bridge; empty until the
+    /// while the QuickSwap executes or pays out a bridge; empty until the
     /// first credit. Each credit is commission_bps applied to what its leg
     /// actually received, so it can differ from an estimate.
     ///
@@ -35239,7 +35243,7 @@ pub const __REFERRED_QUICK_SWAP_JSON_ANY: ::buffa::type_registry::JsonAnyEntry =
     from_json: ::buffa::type_registry::any_from_json::<ReferredQuickSwap>,
     is_wkt: false,
 };
-/// ReferralCommissionValue is the US dollar value of a Quick Swap's commission
+/// ReferralCommissionValue is the US dollar value of a QuickSwap's commission
 /// at a current price.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -35404,9 +35408,9 @@ pub const __REFERRAL_COMMISSION_VALUE_JSON_ANY: ::buffa::type_registry::JsonAnyE
     from_json: ::buffa::type_registry::any_from_json::<ReferralCommissionValue>,
     is_wkt: false,
 };
-/// ReferralBreakdown shows how a referred Quick Swap's fee and the partner's
+/// ReferralBreakdown shows how a referred QuickSwap's fee and the partner's
 /// commission were worked out. Rates are in basis points of what each leg
-/// receives and are fixed when the Quick Swap is created; a two-leg route
+/// receives and are fixed when the QuickSwap is created; a two-leg route
 /// shows the sum of both legs' rates. For example, on a one-leg route with a
 /// 30 bps fee, a 3 bps discount and a 6 bps commission, the user pays 27 bps
 /// and the partner earns 6 bps, 20% of the fee before the discount.
@@ -35742,12 +35746,12 @@ pub const __REFERRAL_BREAKDOWN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = 
     from_json: ::buffa::type_registry::any_from_json::<ReferralBreakdown>,
     is_wkt: false,
 };
-/// ListReferredQuickSwapsRequest lists the Quick Swaps the caller referred.
+/// ListReferredQuickSwapsRequest lists the QuickSwaps the caller referred.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListReferredQuickSwapsRequest {
-    /// Only Quick Swaps created at or after start_time, rounded down to the
+    /// Only QuickSwaps created at or after start_time, rounded down to the
     /// minute; unset for no lower bound.
     ///
     /// Field 1: `start_time`
@@ -35757,8 +35761,8 @@ pub struct ListReferredQuickSwapsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Only Quick Swaps created before end_time (exclusive), rounded up to the
-    /// minute; unset for no upper bound.
+    /// Only QuickSwaps created before end_time (exclusive), rounded up to the
+    /// minute; after start_time when both are set; unset for no upper bound.
     ///
     /// Field 2: `end_time`
     #[serde(
@@ -35767,7 +35771,7 @@ pub struct ListReferredQuickSwapsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub end_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Only Quick Swaps in one of these statuses, at most 16; empty for every
+    /// Only QuickSwaps in one of these statuses, at most 16; empty for every
     /// status.
     ///
     /// Field 3: `statuses`
@@ -35777,7 +35781,7 @@ pub struct ListReferredQuickSwapsRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub statuses: ::buffa::alloc::vec::Vec<::buffa::EnumValue<QuickSwapStatus>>,
-    /// Maximum number of Quick Swaps to return; 0 means 100, at most 200.
+    /// Maximum number of QuickSwaps to return; 0 means 100, at most 200.
     ///
     /// Field 4: `limit`
     #[serde(
@@ -35788,7 +35792,7 @@ pub struct ListReferredQuickSwapsRequest {
     pub limit: u32,
     /// Opaque keyset cursor from a previous next_page_token, exclusive, bound
     /// to the caller's partner record, the filters and the list order. It
-    /// names only the swap_id of the previous page's last Quick Swap. Reuse it
+    /// names only the swap_id of the previous page's last QuickSwap. Reuse it
     /// with the same filters. Empty for the first page.
     ///
     /// Field 5: `page_token`
@@ -36037,16 +36041,16 @@ pub const __LIST_REFERRED_QUICK_SWAPS_REQUEST_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<ListReferredQuickSwapsRequest>,
     is_wkt: false,
 };
-/// ListReferredQuickSwapsResponse lists Quick Swaps newest minute first.
+/// ListReferredQuickSwapsResponse lists QuickSwaps newest minute first.
 /// Within a minute the order is fixed but does not follow creation time.
-/// Every Quick Swap whose creation was complete when the first page was read
+/// Every QuickSwap whose creation was complete when the first page was read
 /// is listed exactly once. One whose creation completed later may be missing
 /// from later pages, even if its created_at is earlier than theirs.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListReferredQuickSwapsResponse {
-    /// The Quick Swaps.
+    /// The QuickSwaps.
     ///
     /// Field 1: `quick_swaps`
     #[serde(
@@ -36204,7 +36208,7 @@ pub const __LIST_REFERRED_QUICK_SWAPS_RESPONSE_JSON_ANY: ::buffa::type_registry:
     from_json: ::buffa::type_registry::any_from_json::<ListReferredQuickSwapsResponse>,
     is_wkt: false,
 };
-/// GetReferredQuickSwapRequest reads one Quick Swap the caller referred.
+/// GetReferredQuickSwapRequest reads one QuickSwap the caller referred.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -36332,13 +36336,13 @@ pub const __GET_REFERRED_QUICK_SWAP_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     from_json: ::buffa::type_registry::any_from_json::<GetReferredQuickSwapRequest>,
     is_wkt: false,
 };
-/// GetReferredQuickSwapResponse returns the Quick Swap with its fee
+/// GetReferredQuickSwapResponse returns the QuickSwap with its fee
 /// breakdown, in progress or done.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct GetReferredQuickSwapResponse {
-    /// The Quick Swap.
+    /// The QuickSwap.
     ///
     /// Field 1: `quick_swap`
     #[serde(
@@ -48184,9 +48188,8 @@ pub mod __buffa {
                 super::super::__buffa::view::QuickSwapTermsView<'a>,
             >,
             /// Broker fee in basis points of what each leg receives, charged on top of
-            /// the service fee and credited to the broker's default vault; 0 for none.
-            /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-            /// rules fail with FEES_INVALID.
+            /// the service fee and credited to the broker's default vault; 0 for none,
+            /// at most 300. broker_bps and the affiliates' bps total at most 300.
             ///
             /// Field 2: `broker_bps`
             pub broker_bps: u32,
@@ -48555,9 +48558,8 @@ pub mod __buffa {
                 &self.0.reborrow().terms
             }
             /// Broker fee in basis points of what each leg receives, charged on top of
-            /// the service fee and credited to the broker's default vault; 0 for none.
-            /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-            /// rules fail with FEES_INVALID.
+            /// the service fee and credited to the broker's default vault; 0 for none,
+            /// at most 300. broker_bps and the affiliates' bps total at most 300.
             ///
             /// Field 2: `broker_bps`
             #[must_use]
@@ -48946,7 +48948,8 @@ pub mod __buffa {
             /// Public sub-account ID of an active affiliate vault of the broker
             /// (QuickSwapBrokerService.CreateAffiliateVault). Create the vault first: an
             /// unknown, disabled or other broker's vault, or the default vault, fails
-            /// with AFFILIATE_VAULT_UNKNOWN.
+            /// with AFFILIATE_VAULT_UNKNOWN; an ID that is not a public sub-account ID
+            /// fails with FEES_INVALID.
             ///
             /// Field 1: `account_id`
             pub account_id: u64,
@@ -49203,7 +49206,8 @@ pub mod __buffa {
             /// Public sub-account ID of an active affiliate vault of the broker
             /// (QuickSwapBrokerService.CreateAffiliateVault). Create the vault first: an
             /// unknown, disabled or other broker's vault, or the default vault, fails
-            /// with AFFILIATE_VAULT_UNKNOWN.
+            /// with AFFILIATE_VAULT_UNKNOWN; an ID that is not a public sub-account ID
+            /// fails with FEES_INVALID.
             ///
             /// Field 1: `account_id`
             #[must_use]
@@ -49328,15 +49332,14 @@ pub mod __buffa {
                 super::super::__buffa::view::AffiliateShareView<'a>,
             >,
             /// Broker fee in basis points of what each leg receives, charged on top of
-            /// the service fee and credited to the broker's default vault; 0 for none.
-            /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-            /// rules fail with FEES_INVALID.
+            /// the service fee and credited to the broker's default vault; 0 for none,
+            /// at most 300. broker_bps and the affiliates' bps total at most 300.
             ///
             /// Field 12: `broker_bps`
             pub broker_bps: u32,
             /// Optional referral partner code from a referral link, case-insensitive,
             /// at most 64 bytes; empty for none. Only a broker with a referral program may send one
-            /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates (FEES_INVALID).
+            /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates.
             /// It must be a valid code (REFERRAL_CODE_INVALID) that is a partner's
             /// current code (REFERRAL_CODE_UNKNOWN), and the partner must be active
             /// (REFERRAL_PARTNER_INACTIVE). The program's rates
@@ -50005,9 +50008,8 @@ pub mod __buffa {
                 &self.0.reborrow().affiliates
             }
             /// Broker fee in basis points of what each leg receives, charged on top of
-            /// the service fee and credited to the broker's default vault; 0 for none.
-            /// broker_bps and the affiliates' bps total at most 300. Fees outside these
-            /// rules fail with FEES_INVALID.
+            /// the service fee and credited to the broker's default vault; 0 for none,
+            /// at most 300. broker_bps and the affiliates' bps total at most 300.
             ///
             /// Field 12: `broker_bps`
             #[must_use]
@@ -50016,7 +50018,7 @@ pub mod __buffa {
             }
             /// Optional referral partner code from a referral link, case-insensitive,
             /// at most 64 bytes; empty for none. Only a broker with a referral program may send one
-            /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates (FEES_INVALID).
+            /// (REFERRAL_NOT_SUPPORTED otherwise), never with affiliates.
             /// It must be a valid code (REFERRAL_CODE_INVALID) that is a partner's
             /// current code (REFERRAL_CODE_UNKNOWN), and the partner must be active
             /// (REFERRAL_PARTNER_INACTIVE). The program's rates
@@ -51571,7 +51573,7 @@ pub mod __buffa {
             ///
             /// Field 10: `read_rps`
             pub read_rps: u32,
-            /// Unfunded Quick Swaps the broker may hold at once: Quick Swaps whose
+            /// Unfunded QuickSwaps the broker may hold at once: QuickSwaps whose
             /// deposit address is being issued or is still awaiting a deposit within
             /// its funding window. At the limit, CreateQuickSwap fails with
             /// RESOURCE_EXHAUSTED / BROKER_LIMIT; a deposit or the end of a funding
@@ -51579,7 +51581,7 @@ pub mod __buffa {
             ///
             /// Field 11: `max_unfunded_addresses`
             pub max_unfunded_addresses: u32,
-            /// Quick Swaps the broker may create in any rolling hour. At the limit,
+            /// QuickSwaps the broker may create in any rolling hour. At the limit,
             /// CreateQuickSwap fails with RESOURCE_EXHAUSTED / BROKER_LIMIT until the
             /// oldest create of the hour is more than an hour old.
             ///
@@ -52160,7 +52162,7 @@ pub mod __buffa {
             pub fn read_rps(&self) -> u32 {
                 self.0.reborrow().read_rps
             }
-            /// Unfunded Quick Swaps the broker may hold at once: Quick Swaps whose
+            /// Unfunded QuickSwaps the broker may hold at once: QuickSwaps whose
             /// deposit address is being issued or is still awaiting a deposit within
             /// its funding window. At the limit, CreateQuickSwap fails with
             /// RESOURCE_EXHAUSTED / BROKER_LIMIT; a deposit or the end of a funding
@@ -52171,7 +52173,7 @@ pub mod __buffa {
             pub fn max_unfunded_addresses(&self) -> u32 {
                 self.0.reborrow().max_unfunded_addresses
             }
-            /// Quick Swaps the broker may create in any rolling hour. At the limit,
+            /// QuickSwaps the broker may create in any rolling hour. At the limit,
             /// CreateQuickSwap fails with RESOURCE_EXHAUSTED / BROKER_LIMIT until the
             /// oldest create of the hour is more than an hour old.
             ///
@@ -52218,12 +52220,12 @@ pub mod __buffa {
         /// right after with concurrent creates, deposits and expiring funding windows.
         #[derive(Clone, Debug, Default)]
         pub struct BrokerUsageView<'a> {
-            /// Unfunded Quick Swaps held now, counted against
+            /// Unfunded QuickSwaps held now, counted against
             /// Broker.max_unfunded_addresses.
             ///
             /// Field 1: `unfunded_addresses`
             pub unfunded_addresses: u32,
-            /// Quick Swaps created in the last hour, counted against
+            /// QuickSwaps created in the last hour, counted against
             /// Broker.max_creates_per_hour.
             ///
             /// Field 2: `creates_last_hour`
@@ -52515,7 +52517,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Unfunded Quick Swaps held now, counted against
+            /// Unfunded QuickSwaps held now, counted against
             /// Broker.max_unfunded_addresses.
             ///
             /// Field 1: `unfunded_addresses`
@@ -52523,7 +52525,7 @@ pub mod __buffa {
             pub fn unfunded_addresses(&self) -> u32 {
                 self.0.reborrow().unfunded_addresses
             }
-            /// Quick Swaps created in the last hour, counted against
+            /// QuickSwaps created in the last hour, counted against
             /// Broker.max_creates_per_hour.
             ///
             /// Field 2: `creates_last_hour`
@@ -60379,7 +60381,8 @@ pub mod __buffa {
             ///
             /// Field 1: `broker`
             pub broker: &'a str,
-            /// Label, 1 to 64 characters without leading or trailing whitespace.
+            /// Label, 1 to 64 characters without leading or trailing whitespace,
+            /// Unicode spaces such as the no-break space included.
             ///
             /// Field 2: `label`
             pub label: &'a str,
@@ -60631,7 +60634,8 @@ pub mod __buffa {
             pub fn broker(&self) -> &'_ str {
                 self.0.reborrow().broker
             }
-            /// Label, 1 to 64 characters without leading or trailing whitespace.
+            /// Label, 1 to 64 characters without leading or trailing whitespace,
+            /// Unicode spaces such as the no-break space included.
             ///
             /// Field 2: `label`
             #[must_use]
@@ -66388,8 +66392,8 @@ pub mod __buffa {
             pub start_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Only QuickSwaps created before end_time (exclusive); unset for no upper
-            /// bound.
+            /// Only QuickSwaps created before end_time (exclusive); after start_time
+            /// when both are set; unset for no upper bound.
             ///
             /// Field 5: `end_time`
             pub end_time: ::buffa::MessageFieldView<
@@ -66908,8 +66912,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().start_time
             }
-            /// Only QuickSwaps created before end_time (exclusive); unset for no upper
-            /// bound.
+            /// Only QuickSwaps created before end_time (exclusive); after start_time
+            /// when both are set; unset for no upper bound.
             ///
             /// Field 5: `end_time`
             #[must_use]
@@ -74490,8 +74494,8 @@ pub mod __buffa {
             pub start_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Only runs scheduled before end_time (exclusive); unset for no upper
-            /// bound.
+            /// Only runs scheduled before end_time (exclusive); after start_time when
+            /// both are set; unset for no upper bound.
             ///
             /// Field 5: `end_time`
             pub end_time: ::buffa::MessageFieldView<
@@ -75007,8 +75011,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().start_time
             }
-            /// Only runs scheduled before end_time (exclusive); unset for no upper
-            /// bound.
+            /// Only runs scheduled before end_time (exclusive); after start_time when
+            /// both are set; unset for no upper bound.
             ///
             /// Field 5: `end_time`
             #[must_use]
@@ -83566,8 +83570,8 @@ pub mod __buffa {
             pub start_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Only entries that occurred before end_time (exclusive); unset for no
-            /// upper bound.
+            /// Only entries that occurred before end_time (exclusive); after start_time
+            /// when both are set; unset for no upper bound.
             ///
             /// Field 4: `end_time`
             pub end_time: ::buffa::MessageFieldView<
@@ -84010,8 +84014,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().start_time
             }
-            /// Only entries that occurred before end_time (exclusive); unset for no
-            /// upper bound.
+            /// Only entries that occurred before end_time (exclusive); after start_time
+            /// when both are set; unset for no upper bound.
             ///
             /// Field 4: `end_time`
             #[must_use]
@@ -88348,8 +88352,8 @@ pub mod __buffa {
             }
         }
         /// ReferralProgram is the referral rates of every route category. Polyester
-        /// can change them at any time; a change applies to Quick Swaps created after
-        /// it, and Quick Swaps already created keep their rates.
+        /// can change them at any time; a change applies to QuickSwaps created after
+        /// it, and QuickSwaps already created keep their rates.
         #[derive(Clone, Debug, Default)]
         pub struct ReferralProgramView<'a> {
             /// Swaps between two assets, at least one of them not a stablecoin.
@@ -88828,7 +88832,7 @@ pub mod __buffa {
             ///
             /// Field 5: `code`
             pub code: &'a str,
-            /// Path of the share link on Polyester's Quick Swap app: "/r/" followed by
+            /// Path of the share link on Polyester's QuickSwap app: "/r/" followed by
             /// the code.
             ///
             /// Field 6: `link_path`
@@ -89373,7 +89377,7 @@ pub mod __buffa {
             pub fn code(&self) -> &'_ str {
                 self.0.reborrow().code
             }
-            /// Path of the share link on Polyester's Quick Swap app: "/r/" followed by
+            /// Path of the share link on Polyester's QuickSwap app: "/r/" followed by
             /// the code.
             ///
             /// Field 6: `link_path`
@@ -89453,8 +89457,8 @@ pub mod __buffa {
             ///
             /// Field 1: `earnings_subaccount_id`
             pub earnings_subaccount_id: u64,
-            /// Name shown for the partner, 1 to 64 characters without leading or
-            /// trailing spaces.
+            /// Name shown for the partner, at most 64 characters. Leading and trailing
+            /// spaces are removed; at least one other character must remain.
             ///
             /// Field 2: `display_name`
             pub display_name: &'a str,
@@ -89726,8 +89730,8 @@ pub mod __buffa {
             pub fn earnings_subaccount_id(&self) -> u64 {
                 self.0.reborrow().earnings_subaccount_id
             }
-            /// Name shown for the partner, 1 to 64 characters without leading or
-            /// trailing spaces.
+            /// Name shown for the partner, at most 64 characters. Leading and trailing
+            /// spaces are removed; at least one other character must remain.
             ///
             /// Field 2: `display_name`
             #[must_use]
@@ -92187,7 +92191,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ReferralCredit is one commission credit of a Quick Swap: a settled trade
+        /// ReferralCredit is one commission credit of a QuickSwap: a settled trade
         /// of one of its legs, or its bridge payout.
         #[derive(Clone, Debug, Default)]
         pub struct ReferralCreditView<'a> {
@@ -92607,7 +92611,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ReferredQuickSwap is a Quick Swap the caller referred, as its referral
+        /// ReferredQuickSwap is a QuickSwap the caller referred, as its referral
         /// partner sees it. It carries no identity of the person who swapped and no
         /// account, address, memo, transaction hash or flow ID. Amounts are exact;
         /// every time is rounded down to the minute.
@@ -92626,7 +92630,7 @@ pub mod __buffa {
             ///
             /// Field 3: `is_terminal`
             pub is_terminal: bool,
-            /// When the Quick Swap was created, rounded down to the minute.
+            /// When the QuickSwap was created, rounded down to the minute.
             ///
             /// Field 4: `created_at`
             pub created_at: ::buffa::MessageFieldView<
@@ -92695,7 +92699,7 @@ pub mod __buffa {
             /// Field 14: `commission_bps`
             pub commission_bps: u32,
             /// Commission credited so far, one entry per asset in asset_id order. Grows
-            /// while the Quick Swap executes or pays out a bridge; empty until the
+            /// while the QuickSwap executes or pays out a bridge; empty until the
             /// first credit. Each credit is commission_bps applied to what its leg
             /// actually received, so it can differ from an estimate.
             ///
@@ -93521,7 +93525,7 @@ pub mod __buffa {
             pub fn is_terminal(&self) -> bool {
                 self.0.reborrow().is_terminal
             }
-            /// When the Quick Swap was created, rounded down to the minute.
+            /// When the QuickSwap was created, rounded down to the minute.
             ///
             /// Field 4: `created_at`
             #[must_use]
@@ -93635,7 +93639,7 @@ pub mod __buffa {
                 self.0.reborrow().commission_bps
             }
             /// Commission credited so far, one entry per asset in asset_id order. Grows
-            /// while the Quick Swap executes or pays out a bridge; empty until the
+            /// while the QuickSwap executes or pays out a bridge; empty until the
             /// first credit. Each credit is commission_bps applied to what its leg
             /// actually received, so it can differ from an estimate.
             ///
@@ -93680,7 +93684,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ReferralCommissionValue is the US dollar value of a Quick Swap's commission
+        /// ReferralCommissionValue is the US dollar value of a QuickSwap's commission
         /// at a current price.
         #[derive(Clone, Debug, Default)]
         pub struct ReferralCommissionValueView<'a> {
@@ -94032,9 +94036,9 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ReferralBreakdown shows how a referred Quick Swap's fee and the partner's
+        /// ReferralBreakdown shows how a referred QuickSwap's fee and the partner's
         /// commission were worked out. Rates are in basis points of what each leg
-        /// receives and are fixed when the Quick Swap is created; a two-leg route
+        /// receives and are fixed when the QuickSwap is created; a two-leg route
         /// shows the sum of both legs' rates. For example, on a one-leg route with a
         /// 30 bps fee, a 3 bps discount and a 6 bps commission, the user pays 27 bps
         /// and the partner earns 6 bps, 20% of the fee before the discount.
@@ -94622,24 +94626,24 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ListReferredQuickSwapsRequest lists the Quick Swaps the caller referred.
+        /// ListReferredQuickSwapsRequest lists the QuickSwaps the caller referred.
         #[derive(Clone, Debug, Default)]
         pub struct ListReferredQuickSwapsRequestView<'a> {
-            /// Only Quick Swaps created at or after start_time, rounded down to the
+            /// Only QuickSwaps created at or after start_time, rounded down to the
             /// minute; unset for no lower bound.
             ///
             /// Field 1: `start_time`
             pub start_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Only Quick Swaps created before end_time (exclusive), rounded up to the
-            /// minute; unset for no upper bound.
+            /// Only QuickSwaps created before end_time (exclusive), rounded up to the
+            /// minute; after start_time when both are set; unset for no upper bound.
             ///
             /// Field 2: `end_time`
             pub end_time: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Only Quick Swaps in one of these statuses, at most 16; empty for every
+            /// Only QuickSwaps in one of these statuses, at most 16; empty for every
             /// status.
             ///
             /// Field 3: `statuses`
@@ -94647,13 +94651,13 @@ pub mod __buffa {
                 'a,
                 ::buffa::EnumValue<super::super::QuickSwapStatus>,
             >,
-            /// Maximum number of Quick Swaps to return; 0 means 100, at most 200.
+            /// Maximum number of QuickSwaps to return; 0 means 100, at most 200.
             ///
             /// Field 4: `limit`
             pub limit: u32,
             /// Opaque keyset cursor from a previous next_page_token, exclusive, bound
             /// to the caller's partner record, the filters and the list order. It
-            /// names only the swap_id of the previous page's last Quick Swap. Reuse it
+            /// names only the swap_id of the previous page's last QuickSwap. Reuse it
             /// with the same filters. Empty for the first page.
             ///
             /// Field 5: `page_token`
@@ -95081,7 +95085,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Only Quick Swaps created at or after start_time, rounded down to the
+            /// Only QuickSwaps created at or after start_time, rounded down to the
             /// minute; unset for no lower bound.
             ///
             /// Field 1: `start_time`
@@ -95093,8 +95097,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().start_time
             }
-            /// Only Quick Swaps created before end_time (exclusive), rounded up to the
-            /// minute; unset for no upper bound.
+            /// Only QuickSwaps created before end_time (exclusive), rounded up to the
+            /// minute; after start_time when both are set; unset for no upper bound.
             ///
             /// Field 2: `end_time`
             #[must_use]
@@ -95105,7 +95109,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().end_time
             }
-            /// Only Quick Swaps in one of these statuses, at most 16; empty for every
+            /// Only QuickSwaps in one of these statuses, at most 16; empty for every
             /// status.
             ///
             /// Field 3: `statuses`
@@ -95118,7 +95122,7 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().statuses
             }
-            /// Maximum number of Quick Swaps to return; 0 means 100, at most 200.
+            /// Maximum number of QuickSwaps to return; 0 means 100, at most 200.
             ///
             /// Field 4: `limit`
             #[must_use]
@@ -95127,7 +95131,7 @@ pub mod __buffa {
             }
             /// Opaque keyset cursor from a previous next_page_token, exclusive, bound
             /// to the caller's partner record, the filters and the list order. It
-            /// names only the swap_id of the previous page's last Quick Swap. Reuse it
+            /// names only the swap_id of the previous page's last QuickSwap. Reuse it
             /// with the same filters. Empty for the first page.
             ///
             /// Field 5: `page_token`
@@ -95172,14 +95176,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ListReferredQuickSwapsResponse lists Quick Swaps newest minute first.
+        /// ListReferredQuickSwapsResponse lists QuickSwaps newest minute first.
         /// Within a minute the order is fixed but does not follow creation time.
-        /// Every Quick Swap whose creation was complete when the first page was read
+        /// Every QuickSwap whose creation was complete when the first page was read
         /// is listed exactly once. One whose creation completed later may be missing
         /// from later pages, even if its created_at is earlier than theirs.
         #[derive(Clone, Debug, Default)]
         pub struct ListReferredQuickSwapsResponseView<'a> {
-            /// The Quick Swaps.
+            /// The QuickSwaps.
             ///
             /// Field 1: `quick_swaps`
             pub quick_swaps: ::buffa::RepeatedView<
@@ -95457,7 +95461,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// The Quick Swaps.
+            /// The QuickSwaps.
             ///
             /// Field 1: `quick_swaps`
             #[must_use]
@@ -95513,7 +95517,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetReferredQuickSwapRequest reads one Quick Swap the caller referred.
+        /// GetReferredQuickSwapRequest reads one QuickSwap the caller referred.
         #[derive(Clone, Debug, Default)]
         pub struct GetReferredQuickSwapRequestView<'a> {
             /// Public QuickSwap identifier.
@@ -95793,11 +95797,11 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetReferredQuickSwapResponse returns the Quick Swap with its fee
+        /// GetReferredQuickSwapResponse returns the QuickSwap with its fee
         /// breakdown, in progress or done.
         #[derive(Clone, Debug, Default)]
         pub struct GetReferredQuickSwapResponseView<'a> {
-            /// The Quick Swap.
+            /// The QuickSwap.
             ///
             /// Field 1: `quick_swap`
             pub quick_swap: ::buffa::MessageFieldView<
@@ -96129,7 +96133,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// The Quick Swap.
+            /// The QuickSwap.
             ///
             /// Field 1: `quick_swap`
             #[must_use]
