@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.32.0
+
+Package version: `0.32.0`. Git tag: `v0.32.0`. Released 2026-11-16. Built on public contract `1945423`.
 
 - **Breaking:** A zero `new_price` on `orders.modify` or a batch replace item is refused with `Error::Validation` (`new_price must be positive`) before sending, in every form: `Price::from_ticks(0, ..)`, `Price::from_decimal_str("0", ..)` and `Price::from_decimal(Decimal::ZERO, ..)`. It was sent as a price of 0. A zero `new_qty` (`Quantity::from_scaled(0, ..)`; the decimal constructors already refuse 0) is refused as `new_qty must be positive` where it read `qty must be positive`. Affected: `orders.modify` (`ModifyOrderParams.new_price`, `new_qty`), `orders.batch_replace` (`BatchReplaceItem.new_price`, `new_qty`). Migration: leave `new_price` or `new_qty` `None` to keep the order's price or quantity.
 - `chain::quote_zipper_fee` returns `Error::Transport` for a malformed `eth_call` result instead of panicking: non-ASCII text from the RPC endpoint panicked with "byte index is not a char boundary". Each result must be `0x` and exactly one 32-byte ABI word (64 hex digits); a short, odd-length, non-hex or empty result is refused, as is an address result whose upper 12 bytes are not zero, where a short or non-hex address result was accepted. Affected: `chain::quote_zipper_fee`.
