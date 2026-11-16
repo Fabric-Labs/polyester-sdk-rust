@@ -877,7 +877,7 @@ fn upgrade_error(e: tungstenite::Error) -> Error {
 /// Whether a failure to connect stops the session instead of a retry.
 fn fatal(e: &Error) -> bool {
     match e {
-        Error::ApiKeyRejected { .. } | Error::Auth(_) | Error::Validation(_) => true,
+        Error::ApiKeyRejected { .. } | Error::Auth { .. } | Error::Validation(_) => true,
         Error::QueueOverflow(_) => true,
         Error::TradeSession(t) => match t {
             TradeError::NotProtected | TradeError::Schema { .. } => true,

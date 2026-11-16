@@ -226,7 +226,7 @@ async fn structured_diagnostics_are_redacted() {
             serde_json::json!({
                 "code": "RATE_LIMIT_EXCEEDED",
                 "detail": format!("upstream {}", proxy_url()),
-                "rate_limit": {"reason": "ip", "operation_id": proxy_url()},
+                "rateLimit": {"reason": "ip", "operationId": proxy_url()},
             }),
         ),
     ];

@@ -3,9 +3,9 @@ use super::unary;
 use crate::codecs::decode::{
     asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
     currency_conversion_config_from_proto, currency_conversion_rates_from_proto,
-    depth_enum_for_levels, market_overview_list_from_proto, market_trades_from_proto,
-    orderbook_from_proto, orderbook_snapshot_depth, orderbook_stream_tier,
-    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
+    market_overview_list_from_proto, market_trades_from_proto, orderbook_from_proto,
+    orderbook_snapshot_depth, orderbook_stream_tier, require_published_stream_depth,
+    spot_config_from_proto, spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -857,17 +857,25 @@ impl OrderbookService {
         Self { ctx }
     }
 
-    /// Snapshot orderbook for `symbol`. `depth` is a snapshot depth (1, 5, 10, 20,
-    /// 50, 100, 200, 500 or 1000); any other depth up to 1000 requests the smallest
-    /// one covering it, and `None` or 0 means 50. The result's `depth` is the depth
-    /// requested. A depth above 1000 is a validation error before any request.
+    /// Snapshot orderbook for `symbol`, `depth` levels per side. `depth` is sent
+    /// as given, from 1 to the `max_depth` every snapshot reports (5,000 by
+    /// default); `None` or 0 asks for the default of 50. The result's `depth` is
+    /// the depth requested, 50 for the default. A depth above the server's
+    /// `max_depth` is refused by the server with `invalid_argument`
+    /// ([`Error::Api`] with code `InvalidArgument`), never truncated: ask for at
+    /// most `max_depth`.
+    ///
+    /// Order snapshots by `(book_epoch, book_seq)` with
+    /// [`crate::codecs::decode::compare_snapshots`]. A snapshot is a frozen view:
+    /// never apply stream updates to it, and fetch it again to refresh it.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
-        let depth = orderbook_snapshot_depth(depth.unwrap_or(0))?;
+        let wire_depth = depth.unwrap_or(0);
+        let depth = orderbook_snapshot_depth(wire_depth);
         // Levels are decoded with the pair's catalog quantity scale.
         self.ctx.wait_for_catalogs().await?;
         let req = GetOrderBookRequest {
             symbol_id: self.ctx.catalogs.require_symbol_id(symbol)?,
-            depth: depth_enum_for_levels(depth).into(),
+            depth: wire_depth,
             ..Default::default()
         };
         let quantity_scale = self
@@ -1459,6 +1467,8 @@ mod tests {
                             symbol: "BTC-USDT".into(),
                             depth: 1,
                             book_seq: "1".into(),
+                            book_epoch: "1".into(),
+                            max_depth: 5000,
                             bids: vec![],
                             asks: vec![],
                             available: true,
@@ -1520,6 +1530,8 @@ mod tests {
                             symbol: "BTC-USDT".into(),
                             depth: 1,
                             book_seq: "1".into(),
+                            book_epoch: "1".into(),
+                            max_depth: 5000,
                             bids: vec![],
                             asks: vec![],
                             available: true,
@@ -1555,6 +1567,8 @@ mod tests {
                 symbol: "BTC-USDT".into(),
                 depth: 1,
                 book_seq: "1".into(),
+                book_epoch: String::new(),
+                max_depth: 0,
                 bids: vec![],
                 asks: vec![],
                 available: true,
@@ -1574,7 +1588,7 @@ mod tests {
                 .await
                 .expect("recv must not hang after close");
         assert!(finished.is_none());
-        assert!(matches!(sub.err(), Some(Error::Transport(_))));
+        assert!(matches!(sub.err(), Some(Error::Transport { .. })));
         assert_eq!(errors.lock().unwrap().len(), 1);
         assert_eq!(
             sub.err().unwrap().to_string(),

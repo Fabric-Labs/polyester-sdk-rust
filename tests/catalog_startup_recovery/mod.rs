@@ -479,7 +479,7 @@ async fn persistently_dropped_funding_read_names_a_closed_connection() {
         "{err}"
     );
     assert!(
-        matches!(failure.source, Error::Server(_)),
+        matches!(failure.source, Error::Server { .. }),
         "{:?}",
         failure.source
     );

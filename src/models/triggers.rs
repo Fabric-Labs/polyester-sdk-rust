@@ -41,6 +41,8 @@ pub struct CreateTriggerParams {
     pub time_in_force: Option<CreateTimeInForce>,
     pub subaccount_id: SubAccountScope,
     /// Stable identity for this logical trigger. Persist and reuse it on retries.
+    /// 1 to 36 bytes of UTF-8, sent exactly as given; an empty or longer ID is
+    /// refused before sending with `ERROR_CODE_CLIENT_TRIGGER_ID_INVALID`.
     pub client_trigger_id: String,
     pub post_only: bool,
     pub activation_price: Option<Price>,

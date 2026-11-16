@@ -40,7 +40,7 @@ pub fn jwt_session_only(err: &Error) -> bool {
         || msg.contains("permission_denied")
         || msg.contains("api keys cannot");
     match err {
-        Error::Auth(_) => sessionish,
+        Error::Auth { .. } => sessionish,
         Error::Api { code, .. } => {
             let c = code.to_ascii_lowercase();
             sessionish || c.contains("unauthenticated") || c.contains("permission_denied")
@@ -64,7 +64,7 @@ pub fn devnet_unavailable(err: &Error) -> bool {
         return true;
     }
     match err {
-        Error::Server(msg) => {
+        Error::Server { message: msg, .. } => {
             let m = msg.to_ascii_lowercase();
             m.contains("temporarily unavailable") || m.contains("unavailable")
         }
@@ -81,7 +81,7 @@ pub fn is_internal_order_error(err: &Error) -> bool {
     match err {
         // Connect maps ErrorCode::Internal → Error::Server with messages like
         // "internal: can't scan into dest[N] ... cannot scan NULL into *int64".
-        Error::Server(msg) => {
+        Error::Server { message: msg, .. } => {
             let m = msg.to_ascii_lowercase();
             m.contains("internal") || m.contains("can't scan") || m.contains("cannot scan")
         }
@@ -211,6 +211,7 @@ mod tests {
             code: "AUTH_UNSPECIFIED".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            answer: None,
         };
         assert!(is_permission_denied(&api));
         assert!(!jwt_session_only(&api));
@@ -232,6 +233,7 @@ mod tests {
             code: "ERROR_CODE_POLICY_MAX_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            answer: None,
         };
         assert!(!is_notional_validation(&maximum));
 
@@ -240,6 +242,7 @@ mod tests {
             code: "ERROR_CODE_MIN_NOTIONAL".into(),
             metadata: Vec::new(),
             violations: Vec::new(),
+            answer: None,
         };
         assert!(is_notional_validation(&minimum));
     }

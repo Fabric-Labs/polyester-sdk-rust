@@ -172,7 +172,9 @@ where
             Ok(response) => return Ok((response, attempt, started.elapsed())),
             Err(err) => err,
         };
-        if !retryable(&err) || attempt >= STARTUP_ATTEMPTS || Instant::now() + delay >= deadline {
+        // Never sooner than the Retry-After the answer asked for.
+        let wait = crate::services::unary::retry_wait(&err, delay);
+        if !retryable(&err) || attempt >= STARTUP_ATTEMPTS || Instant::now() + wait >= deadline {
             return Err(read_failure(
                 catalog,
                 operation,
@@ -181,7 +183,7 @@ where
                 started.elapsed(),
             ));
         }
-        tokio::time::sleep(delay).await;
+        tokio::time::sleep(wait).await;
         delay = (delay * 2).min(MAX_BACKOFF);
     }
 }

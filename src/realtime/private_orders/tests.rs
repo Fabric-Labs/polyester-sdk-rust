@@ -863,13 +863,13 @@ async fn close_4403_is_terminal() {
 
     server.close(4403).await;
     let error = expect_error(&mut consumer).await;
-    assert!(matches!(error, Error::Realtime(_)), "{error:?}");
+    assert!(matches!(error, Error::Realtime { .. }), "{error:?}");
     assert!(error.to_string().contains("4403"), "{error}");
     expect_disconnected(&mut consumer).await;
     expect_end(&mut consumer).await;
     assert!(matches!(
         consumer.recv_result().await,
-        Err(Error::Realtime(_))
+        Err(Error::Realtime { .. })
     ));
 
     // No reconnect follows.
@@ -986,7 +986,7 @@ async fn a_transient_subscribe_token_failure_is_reported_and_retried() {
     server.auth().await;
     assert!(matches!(
         expect_error(&mut consumer).await,
-        Error::Realtime(_)
+        Error::Realtime { .. }
     ));
     let request = server.subscribe().await;
     assert_eq!(request.token, "sub-2");

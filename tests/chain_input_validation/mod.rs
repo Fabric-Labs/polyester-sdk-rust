@@ -137,7 +137,7 @@ async fn get_nonce_refuses_a_result_that_is_not_one_abi_word() {
     ] {
         let (_http, account) = account_answering(json!(bad)).await;
         match account.get_nonce(Some(0)).await {
-            Err(Error::Transport(message)) => {
+            Err(Error::Transport { message, .. }) => {
                 assert!(message.contains("eth_call"), "{bad:?}: {message}")
             }
             other => panic!("result {bad:?}: {other:?}, want Error::Transport"),

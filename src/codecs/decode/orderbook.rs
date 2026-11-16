@@ -5,39 +5,24 @@ use crate::errors::{Error, Result};
 use crate::models::{OrderbookData, OrderbookLevel};
 use crate::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
 
-/// Depths the server publishes on the delta stream, fewer than the snapshot enum.
-/// It also accepts a subscribe at any other depth, and then never sends anything on it.
+/// Depths the server publishes on the delta stream. It also accepts a
+/// subscribe at any other depth, and then never sends anything on it.
 pub const ORDERBOOK_STREAM_DEPTHS: [u32; 5] = [1, 20, 50, 200, 500];
 
-/// Depths `orderbook.get` can request, ascending.
-pub const ORDERBOOK_SNAPSHOT_DEPTHS: [u32; 9] = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
+/// Depth per side a snapshot request with depth 0 (unset) receives.
+pub const ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH: u32 = 50;
 
-const ORDERBOOK_SNAPSHOT_MAX_DEPTH: u32 = 1000;
-const ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH: u32 = 50;
-
-/// Snapshot depth `orderbook.get` requests for `depth`: `depth` itself when it is
-/// a snapshot depth, else the smallest one covering it, so a snapshot never holds
-/// fewer levels than asked. 0 is the default 50. A depth above 1000 is a
-/// validation error.
-pub fn orderbook_snapshot_depth(depth: u32) -> Result<u32> {
-    covering_snapshot_depth(depth, "orderbook snapshot depth")
-}
-
-/// `depth` when it is a snapshot depth, else the smallest one covering it; 0 is
-/// the default 50. `what` names the depth in the refusal.
-pub(crate) fn covering_snapshot_depth(depth: u32, what: &str) -> Result<u32> {
+/// The depth a snapshot of `depth` levels per side reports: `depth` itself, or
+/// [`ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH`] for 0, which the server reads as unset.
+/// The largest depth the server accepts is its own setting, reported as
+/// `max_depth` in every snapshot; a deeper request is refused by the server,
+/// never truncated.
+pub fn orderbook_snapshot_depth(depth: u32) -> u32 {
     if depth == 0 {
-        return Ok(ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH);
+        ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
+    } else {
+        depth
     }
-    ORDERBOOK_SNAPSHOT_DEPTHS
-        .into_iter()
-        .find(|supported| *supported >= depth)
-        .ok_or_else(|| {
-            Error::validation(format!(
-                "{what} {depth} is above the deepest snapshot depth \
-                 ({ORDERBOOK_SNAPSHOT_MAX_DEPTH})"
-            ))
-        })
 }
 
 fn deepest_stream_depth() -> u32 {
@@ -58,7 +43,7 @@ pub fn orderbook_stream_tier(depth: u32) -> Result<u32> {
         .ok_or_else(|| {
             Error::validation(format!(
                 "orderbook subscription depth {depth} is above the deepest published stream tier \
-                 ({}); use orderbook.get for a snapshot of up to {ORDERBOOK_SNAPSHOT_MAX_DEPTH} levels",
+                 ({}); use orderbook.get for a deeper snapshot",
                 deepest_stream_depth()
             ))
         })
@@ -78,22 +63,6 @@ pub fn require_published_stream_depth(depth: u32) -> Result<u32> {
          orderbook.create_subscription for a book trimmed to any depth up to {}",
         deepest_stream_depth()
     )))
-}
-
-pub fn depth_enum_for_levels(depth: u32) -> crate::proto::orderbook::v1::Depth {
-    use crate::proto::orderbook::v1::Depth;
-    match depth {
-        0 => Depth::Depth5,
-        1 => Depth::Depth1,
-        2..=5 => Depth::Depth5,
-        6..=10 => Depth::Depth10,
-        11..=20 => Depth::Depth20,
-        21..=50 => Depth::Depth50,
-        51..=100 => Depth::Depth100,
-        101..=200 => Depth::Depth200,
-        201..=500 => Depth::Depth500,
-        _ => Depth::Depth1000,
-    }
 }
 
 pub fn levels_from_proto(
@@ -129,10 +98,45 @@ pub fn orderbook_from_proto(
         symbol: symbol.to_owned(),
         depth,
         book_seq: msg.book_seq.to_string(),
+        book_epoch: msg.book_epoch.to_string(),
+        max_depth: msg.max_depth,
         bids: levels_from_proto(&msg.bids, symbol, quantity_scale)?,
         asks: levels_from_proto(&msg.asks, symbol, quantity_scale)?,
         available: msg.available,
     })
+}
+
+/// Orders two [`OrderbookData`] snapshots from `orderbook.get` by
+/// `(book_epoch, book_seq)`: a higher `book_epoch` is newer whatever its
+/// `book_seq`, since a new epoch may restart the sequence, and sequences are
+/// compared only within one epoch. Keep the newest snapshot seen for a symbol
+/// and discard one that orders before it. An unavailable snapshot has epoch 0,
+/// so it orders before every available one of a later epoch.
+///
+/// A view of a managed [`crate::orderbook::Subscription`] is not a snapshot:
+/// its `book_epoch` is empty, and comparing it, or a `book_epoch` or
+/// `book_seq` that is not a decimal u64, is a validation error.
+pub fn compare_snapshots(a: &OrderbookData, b: &OrderbookData) -> Result<std::cmp::Ordering> {
+    Ok(snapshot_position(a)?.cmp(&snapshot_position(b)?))
+}
+
+fn snapshot_position(book: &OrderbookData) -> Result<(u64, u64)> {
+    let parse = |value: &str, field: &str| {
+        if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+            return Err(Error::validation(format!(
+                "orderbook snapshot {field} must be a decimal u64 from orderbook.get, got {value:?}"
+            )));
+        }
+        value.parse::<u64>().map_err(|_| {
+            Error::validation(format!(
+                "orderbook snapshot {field} must be a decimal u64 from orderbook.get, got {value:?}"
+            ))
+        })
+    };
+    Ok((
+        parse(&book.book_epoch, "book_epoch")?,
+        parse(&book.book_seq, "book_seq")?,
+    ))
 }
 
 #[cfg(test)]
@@ -198,13 +202,100 @@ mod tests {
     }
 
     #[test]
-    fn depth_mapping_preserves_protocol_boundaries() {
-        use crate::proto::orderbook::v1::Depth;
+    fn snapshot_depth_is_sent_as_is_and_zero_reports_the_default() {
+        assert_eq!(orderbook_snapshot_depth(0), 50);
+        for depth in [1, 2, 7, 50, 1000, 2500, 5000, 6000, u32::MAX] {
+            assert_eq!(orderbook_snapshot_depth(depth), depth);
+        }
+    }
 
-        assert_eq!(depth_enum_for_levels(1), Depth::Depth1);
-        assert_eq!(depth_enum_for_levels(5), Depth::Depth5);
-        assert_eq!(depth_enum_for_levels(500), Depth::Depth500);
-        assert_eq!(depth_enum_for_levels(1000), Depth::Depth1000);
+    #[test]
+    fn orderbook_maps_epoch_and_max_depth() {
+        let book = orderbook_from_proto(
+            &GetOrderBookResponse {
+                book_seq: 984_321,
+                book_epoch: u64::MAX,
+                max_depth: 5000,
+                available: true,
+                ..Default::default()
+            },
+            "BTC-USDT",
+            2500,
+            8,
+        )
+        .unwrap();
+        assert_eq!(book.book_epoch, u64::MAX.to_string());
+        assert_eq!(book.max_depth, 5000);
+        assert_eq!(book.depth, 2500);
+        assert_eq!(book.book_seq, "984321");
+    }
+
+    fn snapshot(epoch: &str, seq: &str) -> OrderbookData {
+        OrderbookData {
+            symbol: "BTC-USDT".into(),
+            depth: 50,
+            book_seq: seq.into(),
+            book_epoch: epoch.into(),
+            max_depth: 5000,
+            bids: vec![],
+            asks: vec![],
+            available: true,
+        }
+    }
+
+    #[test]
+    fn snapshots_order_by_epoch_then_sequence() {
+        use std::cmp::Ordering;
+        // A newer epoch wins even when it restarted the sequence.
+        assert_eq!(
+            compare_snapshots(&snapshot("4", "1"), &snapshot("3", "984321")).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_snapshots(&snapshot("3", "984321"), &snapshot("4", "1")).unwrap(),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_snapshots(&snapshot("3", "10"), &snapshot("3", "9")).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_snapshots(&snapshot("3", "9"), &snapshot("3", "9")).unwrap(),
+            Ordering::Equal
+        );
+        // Compared as integers, not text.
+        assert_eq!(
+            compare_snapshots(&snapshot("10", "1"), &snapshot("9", "1")).unwrap(),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_snapshots(&snapshot("18446744073709551615", "0"), &snapshot("1", "1")).unwrap(),
+            Ordering::Greater
+        );
+    }
+
+    #[test]
+    fn comparing_a_managed_view_or_malformed_position_is_refused() {
+        for (epoch, seq) in [
+            ("", "1"),
+            ("1", ""),
+            ("-1", "1"),
+            ("+1", "1"),
+            (" 1", "1"),
+            ("1", "x"),
+            ("18446744073709551616", "1"),
+        ] {
+            let err = compare_snapshots(&snapshot(epoch, seq), &snapshot("1", "1")).unwrap_err();
+            assert!(
+                matches!(err, Error::Validation(_)),
+                "{epoch:?}/{seq:?}: {err:?}"
+            );
+            let err = compare_snapshots(&snapshot("1", "1"), &snapshot(epoch, seq)).unwrap_err();
+            assert!(
+                matches!(err, Error::Validation(_)),
+                "{epoch:?}/{seq:?}: {err:?}"
+            );
+        }
     }
 
     #[test]

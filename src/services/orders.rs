@@ -127,6 +127,7 @@ fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &
             rule_id: rule_id.to_owned(),
             message: message.to_owned(),
         }],
+        answer: None,
     }
 }
 
@@ -628,9 +629,14 @@ impl OrdersService {
             FeeAsset::Quote => ProtoFeeAsset::Quote.into(),
             FeeAsset::Base if matches!(params.side, CreateSide::Buy) => ProtoFeeAsset::Base.into(),
             FeeAsset::Base => {
-                return Err(Error::validation(
-                    "fee_asset=base is only valid for BUY orders",
-                ));
+                // The server's code for the same refusal.
+                return Err(Error::Api {
+                    message: "fee_asset=base is only valid for BUY orders".to_owned(),
+                    code: "ERROR_CODE_FEE_ASSET_NOT_ALLOWED".to_owned(),
+                    metadata: Vec::new(),
+                    violations: Vec::new(),
+                    answer: None,
+                });
             }
         };
         intent.self_trade_prevention_mode = match params
@@ -1565,6 +1571,7 @@ impl OrdersService {
         let client = self.read_client();
         let mut delay = FIRST_DELAY;
         loop {
+            let mut wait = delay;
             let attempt = tokio::time::timeout_at(
                 deadline,
                 unary::try_auth(
@@ -1595,14 +1602,18 @@ impl OrdersService {
                         connectrpc::ErrorCode::Unavailable
                             | connectrpc::ErrorCode::DeadlineExceeded
                             | connectrpc::ErrorCode::NotFound
-                    ) => {}
+                    ) =>
+                {
+                    // Never sooner than the Retry-After the answer asked for.
+                    wait = super::unary::retry_wait(&err, delay);
+                }
                 Err(err) => return Err(crate::transport::Factory::map_error(err)),
             }
             let now = tokio::time::Instant::now();
-            if now + delay >= deadline {
+            if now + wait >= deadline {
                 return Err(timed_out());
             }
-            tokio::time::sleep(delay).await;
+            tokio::time::sleep(wait).await;
             delay = (delay * 2).min(MAX_DELAY);
         }
     }
@@ -3256,7 +3267,7 @@ mod tests {
             )
             .await
             .expect_err("missing credentials should be reached for allowed empty ids");
-        assert!(matches!(err, Error::Auth(_)), "unexpected error: {err}");
+        assert!(matches!(err, Error::Auth { .. }), "unexpected error: {err}");
     }
 
     #[test]
@@ -3456,6 +3467,18 @@ mod tests {
             intent.self_trade_prevention_mode.as_known(),
             Some(SelfTradePreventionMode::ExpireBoth)
         );
+        // A sell pays its fee in quote: base is refused with the server's code.
+        let mut sell = params.clone();
+        sell.side = CreateSide::Sell;
+        match client.orders.encode_create_params(&sell) {
+            Err(Error::Api {
+                code, violations, ..
+            }) => {
+                assert_eq!(code, "ERROR_CODE_FEE_ASSET_NOT_ALLOWED");
+                assert!(violations.is_empty());
+            }
+            other => panic!("expected FEE_ASSET_NOT_ALLOWED, got {other:?}"),
+        }
         let Some(order_intent::Execution::MarketIoc(market)) = intent.execution.as_ref() else {
             panic!("expected market execution");
         };

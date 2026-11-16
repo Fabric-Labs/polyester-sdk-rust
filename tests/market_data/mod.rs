@@ -199,7 +199,7 @@ async fn heatmap_subscribe_live_refuses_intervals_the_server_does_not_publish() 
     assert_eq!(ws.connects.load(std::sync::atomic::Ordering::SeqCst), 0);
 }
 
-// POLY-8782: the snapshot rule of orderbook.get (POLY-8586).
+// A heatmap depth between the HeatmapDepth values rides the smallest one covering it.
 #[tokio::test]
 async fn heatmap_get_requests_the_smallest_supported_depth_covering_the_request() {
     let cases = [
