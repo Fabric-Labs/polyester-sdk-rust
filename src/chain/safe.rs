@@ -63,6 +63,29 @@ fn parse_address(value: &str) -> Result<Address> {
     Ok(Address::from_slice(&raw))
 }
 
+/// A Safe owner: 40 hex digits after an optional `0x`, surrounding whitespace
+/// ignored, and not the zero address. The Safe contract refuses the zero address
+/// as an owner, so a Safe predicted for it could never be deployed or
+/// controlled. Anything else is an [`Error::Validation`] naming `field`.
+fn parse_owner(value: &str, field: &str) -> Result<Address> {
+    let text = value.trim();
+    let hex = text.strip_prefix("0x").unwrap_or(text);
+    if hex.len() != 40 {
+        return Err(Error::validation(format!(
+            "{field} must be a 20-byte hex address"
+        )));
+    }
+    let raw = hex::decode(hex)
+        .map_err(|_| Error::validation(format!("{field} is not a valid hex address")))?;
+    let owner = Address::from_slice(&raw);
+    if owner == Address::ZERO {
+        return Err(Error::validation(format!(
+            "{field} must not be the zero address: a Safe owner must be an address someone controls"
+        )));
+    }
+    Ok(owner)
+}
+
 fn encode_internal_tx(to: Address, data: &[u8], value: U256, operation: u8) -> Vec<u8> {
     let mut out = Vec::with_capacity(1 + 20 + 32 + 32 + data.len());
     out.push(operation);
@@ -113,6 +136,11 @@ fn get_initializer(
 }
 
 /// Deterministic CREATE2 Safe address + factory deploy data (zero RPC).
+///
+/// Each owner must be a 20-byte hex address, with or without `0x`, and not the
+/// zero address, which the Safe contract refuses as an owner. Any other owner is
+/// an [`Error::Validation`] naming it, such as `owners[1]`: a Safe is never
+/// predicted for an address nobody controls.
 pub fn predict_safe_address_with_data(
     owners: &[&str],
     salt_nonce: u64,
@@ -125,8 +153,11 @@ pub fn predict_safe_address_with_data(
     }
     let env = environment.unwrap_or(&POLYESTER_DEVNET_ENVIRONMENT);
     let cfg = safe.unwrap_or(&env.account_abstraction.safe);
-    let owner_addrs: Result<Vec<Address>> = owners.iter().map(|o| parse_address(o)).collect();
-    let owner_addrs = owner_addrs?;
+    let owner_addrs = owners
+        .iter()
+        .enumerate()
+        .map(|(i, owner)| parse_owner(owner, &format!("owners[{i}]")))
+        .collect::<Result<Vec<Address>>>()?;
     let thresh = threshold.unwrap_or(owner_addrs.len() as u64);
     let initializer = get_initializer(&owner_addrs, thresh, cfg)?;
     let singleton = parse_address(&cfg.safe_singleton_address)?;
@@ -159,11 +190,16 @@ pub fn predict_safe_address_with_data(
 }
 
 /// Predict the Polyester Safe for a single owner (main account = salt 0).
+///
+/// `owner_address` must be a 20-byte hex address, with or without `0x`, and not
+/// the zero address; any other value is an [`Error::Validation`] naming
+/// `owner_address`.
 pub fn predict_safe_address(
     owner_address: &str,
     salt_nonce: u64,
     environment: Option<&PolyesterChainEnvironment>,
 ) -> Result<String> {
+    parse_owner(owner_address, "owner_address")?;
     Ok(
         predict_safe_address_with_data(&[owner_address], salt_nonce, None, None, environment)?
             .address,

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** Safe address prediction refuses the zero address as an owner with `Error::Validation` naming it (`owner_address`, or `owners[i]` for `predict_safe_address_with_data`). The Safe contract refuses the zero address as an owner, so the Safe predicted for it could never be deployed or controlled. An owner that is not 20 bytes of hex was already refused; its error now names the owner too. Affected: `chain::predict_safe_address`, `chain::predict_polyester_smart_account_address`, `chain::predict_safe_address_with_data`. Migration: pass each owner's 20-byte address; there is no usable Safe for the zero address.
+- **Breaking:** `PolyesterSmartAccount::get_nonce` decodes the EntryPoint `eth_call` result as `0x` and exactly one 32-byte ABI word, like `chain::quote_zipper_fee`, and returns `Error::Transport` for anything else. An empty result `"0x"`, which an `eth_call` to an address without code returns, was read as nonce 0, as was any result shorter than a word, such as `"0x1"`. Affected: `chain::PolyesterSmartAccount::get_nonce`, `chain::PolyesterSmartAccount::send_calls`. Migration: none for a standard Ethereum JSON-RPC endpoint and EntryPoint, which return a whole word; check the environment's EntryPoint address if this error appears.
+- **Breaking:** `PolyesterSmartAccount::send_calls` reads a hex gas value from the paymaster as a JSON-RPC quantity: `0x` and at least one hex digit, with no sign and no leading zero (`"0x0"` is zero). A leading zero such as `"0x01"` or a sign such as `"0x+1"` was accepted; it is now `Error::Transport`. An empty `"0x"` was already refused. Affected: `chain::PolyesterSmartAccount::send_calls` (`pimlico_getUserOperationGasPrice` and `pm_sponsorUserOperation` gas fields). Migration: none for a paymaster that encodes quantities as the JSON-RPC specification requires.
+- **Breaking:** A whitespace-only order book `bucket`, such as `" "`, is refused with `Error::Validation`, as the Go and Python SDKs refuse it; it was read as no bucketing. Only `""` (or no bucket) means no bucketing. As for every price input, whitespace around a valid bucket such as `" 0.01 "` is still ignored, and a whitespace-only price is refused. Affected: `orderbook.create_subscription` (`CreateSubscriptionOptions.bucket`), `orderbook::Subscription::set_bucket`, `orderbook::parse_bucket_ticks`. Migration: pass `""` or `None` for no bucketing.
+
 ## 0.32.0
 
 Package version: `0.32.0`. Git tag: `v0.32.0`. Released 2026-11-16. Built on public contract `1945423`.

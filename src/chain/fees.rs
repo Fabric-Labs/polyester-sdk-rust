@@ -119,7 +119,7 @@ fn u256_from_eth_call_result(raw: &str) -> Result<U256> {
 /// static value answers: `0x` and exactly 64 hex digits. Anything else, such as
 /// non-ASCII, short, odd-length or non-hex text from the RPC endpoint, is an
 /// [`Error::Transport`]; the text is not echoed.
-fn eth_call_word(raw: &str, kind: &str) -> Result<[u8; 32]> {
+pub(super) fn eth_call_word(raw: &str, kind: &str) -> Result<[u8; 32]> {
     let malformed = || {
         Error::transport(format!(
             "eth_call {kind} result is not a 0x-prefixed 32-byte hex word ({} bytes of text)",
