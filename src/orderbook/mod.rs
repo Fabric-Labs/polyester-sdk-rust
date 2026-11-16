@@ -31,8 +31,10 @@ pub fn apply_side_delta(book: &mut BookSide, pairs: &[(i64, i64)]) {
 ///
 /// Any other bucket must be a positive price with at most 9 decimal places,
 /// such as `"0.01"`; anything else is an [`Error::Validation`] that says so.
+/// Like every price, surrounding whitespace is ignored and a whitespace-only
+/// bucket is refused: only `""` means no bucketing.
 pub fn parse_bucket_ticks(bucket: &str) -> Result<i64> {
-    if bucket.trim().is_empty() {
+    if bucket.is_empty() {
         return Ok(0);
     }
     match crate::codecs::scalars::parse_price_ticks_str(bucket, "bucket") {

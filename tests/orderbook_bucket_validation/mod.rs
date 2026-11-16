@@ -7,7 +7,19 @@ use polyester::orderbook::{Subscription, parse_bucket_ticks};
 use polyester::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
 use polyester::services::CreateSubscriptionOptions;
 
-const INVALID: [&str; 7] = ["abc", "-1", "0", "0.000", "0.0000000001", "1e3", "NaN"];
+/// A whitespace-only bucket is not empty: like a whitespace-only price, it is
+/// refused. Whitespace around a valid price is ignored, as for every price.
+const INVALID: [&str; 9] = [
+    "abc",
+    "-1",
+    "0",
+    "0.000",
+    " ",
+    "\t \n",
+    "0.0000000001",
+    "1e3",
+    "NaN",
+];
 
 fn assert_bucket_refused(result: Result<(), Error>, bucket: &str) {
     match result {
@@ -24,6 +36,7 @@ fn parse_bucket_ticks_accepts_empty_and_positive_prices_only() {
     for (bucket, ticks) in [
         ("", 0),
         ("0.01", 10_000_000),
+        (" 0.01\t", 10_000_000),
         ("1", 1_000_000_000),
         ("0.000000001", 1),
     ] {

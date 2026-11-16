@@ -14,6 +14,8 @@ mod catalog_startup_recovery;
 #[allow(dead_code)]
 #[path = "hardening_support/centrifugo.rs"]
 mod centrifugo;
+#[path = "chain_input_validation/mod.rs"]
+mod chain_input_validation;
 #[path = "changelog_revisions/mod.rs"]
 mod changelog_revisions;
 #[path = "clear_attached_risk/mod.rs"]

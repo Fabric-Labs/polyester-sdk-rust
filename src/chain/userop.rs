@@ -155,8 +155,7 @@ fn as_u64(value: &Value) -> Result<u64> {
         Value::String(s) => {
             let text = s.trim();
             if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-                u64::from_str_radix(hex, 16)
-                    .map_err(|e| Error::transport(format!("invalid hex int: {e}")))
+                hex_quantity(hex)
             } else {
                 text.parse::<u64>()
                     .map_err(|e| Error::transport(format!("invalid int: {e}")))
@@ -164,6 +163,21 @@ fn as_u64(value: &Value) -> Result<u64> {
         }
         _ => Err(Error::transport(format!("cannot convert {value} to int"))),
     }
+}
+
+/// The digits of a JSON-RPC quantity after its `0x`: at least one hex digit,
+/// no sign and no leading zero, so `"0x0"` is zero and `"0x"` and `"0x01"` are
+/// refused.
+fn hex_quantity(digits: &str) -> Result<u64> {
+    let canonical = !digits.is_empty()
+        && digits.bytes().all(|b| b.is_ascii_hexdigit())
+        && (digits == "0" || !digits.starts_with('0'));
+    if !canonical {
+        return Err(Error::transport(
+            "invalid hex quantity: want 0x and hex digits with no sign or leading zero",
+        ));
+    }
+    u64::from_str_radix(digits, 16).map_err(|e| Error::transport(format!("invalid hex int: {e}")))
 }
 
 fn encode_hex(data: &[u8]) -> String {
@@ -309,6 +323,9 @@ impl PolyesterSmartAccount {
     /// Matches viem/permissionless: when `key` is `None`, use a fresh
     /// timestamp-based nonce key (`Date.now()` millis) so ops are not stuck on
     /// key `0` (Polyester's bundler rejects some key-0 mempool submissions).
+    ///
+    /// The `eth_call` result must be `0x` and exactly one 32-byte ABI word; any
+    /// other result, such as `"0x"`, is an [`Error::Transport`].
     pub async fn get_nonce(&self, key: Option<u128>) -> Result<U256> {
         // u128 always fits in uint192 (2^192-1).
         let nonce_key = match key {
@@ -333,14 +350,8 @@ impl PolyesterSmartAccount {
             .await?;
         let hex = result
             .as_str()
-            .ok_or_else(|| Error::transport("eth_call returned non-string"))?;
-        let raw = decode_hex_bytes(hex)?;
-        if raw.len() > 32 {
-            return Err(Error::transport("eth_call nonce overflow"));
-        }
-        let mut word = [0u8; 32];
-        word[32 - raw.len()..].copy_from_slice(&raw);
-        Ok(U256::from_be_bytes(word))
+            .ok_or_else(|| Error::transport("eth_call getNonce result is not a hex string"))?;
+        crate::chain::fees::eth_call_word(hex, "getNonce").map(U256::from_be_bytes)
     }
 
     pub async fn send_calls(
@@ -601,6 +612,31 @@ pub type SmartAccount = PolyesterSmartAccount;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A hex string is a JSON-RPC quantity: `0x` and at least one hex digit,
+    /// with no sign and no leading zero (`"0x0"` is zero).
+    #[test]
+    fn as_u64_reads_hex_strings_as_json_rpc_quantities() {
+        for (raw, want) in [
+            ("0x0", 0),
+            ("0x1", 1),
+            ("0X1f", 31),
+            ("0xABCdef", 11_259_375),
+            (" 0x10 ", 16),
+            ("0xffffffffffffffff", u64::MAX),
+        ] {
+            assert_eq!(as_u64(&json!(raw)).unwrap(), want, "{raw:?}");
+        }
+        for raw in [
+            "0x", "0X", " 0x ", "0x00", "0x01", "0x0f", "0x+1", "0x-1", "0x 1", "0xg", "0x1_0",
+            "0xé",
+        ] {
+            assert!(
+                matches!(as_u64(&json!(raw)), Err(Error::Transport(_))),
+                "{raw:?}"
+            );
+        }
+    }
 
     #[test]
     fn execute_user_op_selector() {
