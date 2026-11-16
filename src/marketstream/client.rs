@@ -424,8 +424,8 @@ impl MarketStream {
     }
 
     /// Whether a topic is current: the connection holds it, its state arrived
-    /// on that connection (a depth book's snapshot, a quote, the trades
-    /// stream's baseline) and the pair's feed is not stale. A lost connection
+    /// from the subscription it holds now (a depth book's snapshot, a quote,
+    /// the trades stream's baseline) and the pair's feed is not stale. A lost connection
     /// makes every topic not live at once, before its
     /// [`Event::Disconnected`].
     pub fn live(&self, topic: Topic) -> bool {
@@ -448,6 +448,7 @@ impl Shared {
     fn live(&self, topic: Topic) -> bool {
         let state = read_unpoisoned(&self.state);
         if !state.active.contains(&topic)
+            || !state.initial.contains(&topic)
             || state.feeds.get(&topic.symbol_id) == Some(&FeedState::Stale)
         {
             return false;
@@ -1379,8 +1380,6 @@ fn apply(
         state.active.remove(&topic);
         if !want {
             drop_topic(state, topic);
-        } else if let Some(book) = state.books.get_mut(&topic) {
-            book.synced = false;
         }
         return Applied::Done;
     }
@@ -1429,7 +1428,9 @@ fn apply(
 /// whether or not the answer is applied: an unsubscribe answered OK or
 /// NOT_SUBSCRIBED ended it, a subscribe answered OK made a new one, whose
 /// initial state is still to come, and ALREADY_SUBSCRIBED kept the one held.
-/// Any other answer changed nothing.
+/// Any other answer changed nothing. Whatever the client took from a
+/// subscription that ended or was replaced is no longer current
+/// ([`invalidate`]).
 fn observe(
     owner: &mut Owner,
     state: &mut State,
@@ -1441,19 +1442,44 @@ fn observe(
         (true, SubscribeResult::Ok | SubscribeResult::NotSubscribed) => {
             owner.held = false;
             owner.recovering = false;
-            state.initial.remove(&topic);
+            invalidate(state, topic);
         }
         (false, SubscribeResult::Ok) => {
             owner.held = true;
             owner.recovering = false;
-            state.initial.remove(&topic);
+            invalidate(state, topic);
             if let Some(book) = state.books.get_mut(&topic) {
-                book.synced = false;
                 book.recovering = false;
             }
         }
         (false, SubscribeResult::AlreadySubscribed) => owner.held = true,
         _ => {}
+    }
+}
+
+/// Makes a topic not ready once the subscription its state came from ended
+/// or was replaced: it waits for the initial state of the next one. A book
+/// waits for its snapshot and a quote stays, stale, until one at least as
+/// new; trade accounting is kept, so the next baseline reconciles against
+/// what was delivered.
+fn invalidate(state: &mut State, topic: Topic) {
+    state.initial.remove(&topic);
+    match topic.stream {
+        Stream::Trades => {
+            if let Some(tracker) = state.trackers.get_mut(&topic.symbol_id) {
+                tracker.restart();
+            }
+        }
+        Stream::Bbo => {
+            if let Some(quote) = state.quotes.get_mut(&topic.symbol_id) {
+                quote.stale = true;
+            }
+        }
+        Stream::Depth20 | Stream::Depth => {
+            if let Some(book) = state.books.get_mut(&topic) {
+                book.synced = false;
+            }
+        }
     }
 }
 

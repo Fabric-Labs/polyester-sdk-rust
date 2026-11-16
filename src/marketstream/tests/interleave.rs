@@ -18,6 +18,7 @@ use crate::errors::Error;
 use crate::marketstream::client::{
     depth_book, handle, issue, live_of, offline_stream, reconnect, settled, wire,
 };
+use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::subscribe_result::SubscribeResult as Wire;
 use crate::marketstream::{
     Config, Event, FeedState, MarketStream, Stream, StreamError, SubscribeResult, Topic,
@@ -74,6 +75,12 @@ struct Sim {
     trade: HashMap<u32, u64>,
     /// Connections after the first.
     reconnects: usize,
+    /// Which answered requests were unsubscribes.
+    unsubscribes: HashMap<u64, bool>,
+    /// Topics the client received state of since the last answer it received
+    /// that ended or replaced the topic's subscription. Only a ready topic
+    /// may be live.
+    ready: HashSet<Topic>,
 }
 
 impl Sim {
@@ -95,6 +102,8 @@ impl Sim {
             refused: HashSet::new(),
             trade: HashMap::from([(7, 100), (9, 100)]),
             reconnects: 0,
+            unsubscribes: HashMap::new(),
+            ready: HashSet::new(),
         };
         (sim, stream)
     }
@@ -167,6 +176,7 @@ impl Sim {
             };
             results.push((t.symbol_id, t.stream, r));
         }
+        self.unsubscribes.insert(m.request_id, m.unsubscribe);
         self.log
             .push(format!("server answers {} {results:?}", m.request_id));
         self.out
@@ -241,6 +251,31 @@ impl Sim {
         self.out.push_back(trades(symbol, 1, id, &[fill(id)]));
     }
 
+    /// Sends what a held subscription repeats on its own: the trades frontier,
+    /// a quote, a depth20 snapshot.
+    fn refresh(&mut self, symbol: u32) {
+        self.log.push(format!("server refreshes {symbol}"));
+        if self.held.contains(&Topic::new(symbol, Stream::Trades)) {
+            let last = self.trade[&symbol];
+            self.out.push_back(trades_through(symbol, 1, last));
+        }
+        if self.held.contains(&Topic::new(symbol, Stream::Bbo)) {
+            let f = self.bbo(symbol);
+            self.out.push_back(f);
+        }
+        if self.held.contains(&Topic::new(symbol, Stream::Depth20)) {
+            let p = self.pos[&symbol];
+            self.out.push_back(depth_snapshot(
+                symbol,
+                Stream::Depth20,
+                1,
+                p,
+                &[lv(100, p as i64)],
+                &[],
+            ));
+        }
+    }
+
     /// Replaces the connection: the server holds nothing on the new one and
     /// what was in flight is gone; the client marks everything stale and
     /// subscribes what it wants, as its session does.
@@ -248,6 +283,7 @@ impl Sim {
         self.reconnects += 1;
         self.log.push("connection replaced".into());
         self.held.clear();
+        self.ready.clear();
         self.inbox.clear();
         self.out.clear();
         self.wire = reconnect(stream.shared());
@@ -257,7 +293,47 @@ impl Sim {
     /// held stream ends the connection, which the client replaces.
     fn deliver(&mut self, stream: &mut MarketStream) {
         let frame = self.out.pop_front().expect("a frame");
-        match handle(stream.shared(), &frame) {
+        match codec::decode(&frame) {
+            Ok(Some(Msg::SubscribeResponse {
+                request_id,
+                results,
+            })) => {
+                let unsubscribe = self.unsubscribes.get(&request_id).copied().unwrap_or(false);
+                for (symbol_id, s, result) in results {
+                    let ends =
+                        result == Wire::OK || (unsubscribe && result == Wire::NOT_SUBSCRIBED);
+                    if let (true, Some(s)) = (ends, s) {
+                        self.ready.remove(&Topic::new(symbol_id, s));
+                    }
+                }
+            }
+            Ok(Some(Msg::TradesThrough { symbol_id, .. })) => {
+                self.ready.insert(Topic::new(symbol_id, Stream::Trades));
+            }
+            Ok(Some(Msg::Bbo { symbol_id, .. })) => {
+                self.ready.insert(Topic::new(symbol_id, Stream::Bbo));
+            }
+            Ok(Some(Msg::DepthSnapshot {
+                symbol_id,
+                stream: Some(s),
+                ..
+            })) => {
+                self.ready.insert(Topic::new(symbol_id, s));
+            }
+            _ => {}
+        }
+        self.apply(stream, &frame);
+        for t in TOPICS {
+            assert!(
+                !stream.live(t) || self.ready.contains(&t),
+                "{t} live without state of the subscription it holds\n{}",
+                self.trace()
+            );
+        }
+    }
+
+    fn apply(&mut self, stream: &mut MarketStream, frame: &[u8]) {
+        match handle(stream.shared(), frame) {
             Ok(()) => {}
             Err(e @ Error::MarketStream(StreamError::Unsubscribe { .. })) => {
                 self.log.push(format!("client ends the connection: {e}"));
@@ -485,6 +561,83 @@ async fn a_stream_held_without_its_initial_state_is_subscribed_again() {
     }
 }
 
+/// The old subscription's state arrives while the stream, held without its
+/// initial state, is being subscribed again: a quote, the periodic trades
+/// frontier, a depth20 snapshot. The replacement subscription is not live on
+/// it: only its own initial state makes it live, and the trades accounting
+/// carries on across it.
+#[tokio::test]
+async fn a_replacement_subscription_is_not_live_on_its_predecessors_state() {
+    for topic in [
+        topic(7, Stream::Bbo),
+        topic(9, Stream::Trades),
+        topic(9, Stream::Depth20),
+    ] {
+        let (mut sim, mut stream) = Sim::new();
+        sim.caller(&stream, topic, false);
+        sim.caller(&stream, topic, false);
+        sim.process();
+        sim.process();
+        sim.deliver(&mut stream); // OK, superseded
+        sim.deliver(&mut stream); // the initial state, before the stream is held
+        sim.deliver(&mut stream); // ALREADY_SUBSCRIBED: the stream is subscribed again
+        // The old subscription carries on until the unsubscribe.
+        sim.refresh(topic.symbol_id);
+        sim.deliver(&mut stream);
+        assert!(
+            stream.live(topic),
+            "{topic} not live on the held subscription's state\n{}",
+            sim.trace()
+        );
+        sim.process(); // the unsubscribe
+        sim.deliver(&mut stream);
+        assert!(
+            !stream.live(topic),
+            "{topic} live once its subscription ended"
+        );
+        sim.process(); // the subscribe: OK, then the initial state
+        sim.deliver(&mut stream);
+        assert!(
+            !stream.live(topic),
+            "{topic} live on the previous subscription's state\n{}",
+            sim.trace()
+        );
+        if topic.stream == Stream::Bbo {
+            assert!(
+                stream
+                    .best_bid_offer(topic.symbol_id)
+                    .is_some_and(|q| q.stale),
+                "the previous subscription's quote not stale"
+            );
+        }
+        sim.deliver(&mut stream);
+        assert!(
+            stream.live(topic),
+            "{topic} not live on its own initial state\n{}",
+            sim.trace()
+        );
+        if topic.stream == Stream::Trades {
+            // A trade after the new baseline is delivered, with no gap.
+            sim.trades(topic.symbol_id);
+            let frame = sim.out.pop_back().expect("a trade");
+            handle(stream.shared(), &frame).expect("the trade");
+            let mut delivered = false;
+            for e in stream.queued() {
+                match e {
+                    Event::TradesGap(g) => panic!("gap {g:?} across the resubscription"),
+                    Event::Trades(t) => {
+                        delivered = t.trades[0].trade_id == sim.trade[&topic.symbol_id]
+                    }
+                    _ => {}
+                }
+            }
+            assert!(delivered, "the trade after the new baseline not delivered");
+        }
+        sim.quiesce(&mut stream);
+        sim.settled(&stream, &HashSet::from([topic]));
+    }
+}
+
 /// A Subscribe answered OK but superseded by an Unsubscribe, which the
 /// server refuses: the server may still hold the stream, so the connection
 /// ends, as for a refused unsubscribe of a held stream.
@@ -570,7 +723,8 @@ async fn random_interleavings_settle_on_the_callers_intent() {
                 }
                 75..82 => sim.update(symbol, false),
                 82..88 => sim.update(symbol, true),
-                88..93 => sim.trades(symbol),
+                88..91 => sim.trades(symbol),
+                91..93 => sim.refresh(symbol),
                 93..95 => {
                     sim.log.push(format!(
                         "server will refuse the next unsubscribe of {topic}"

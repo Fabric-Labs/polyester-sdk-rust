@@ -2366,11 +2366,13 @@ request of the same topic overtook is delivered as an
 server to what the caller last asked for. What the server holds is followed
 from every answer, applied or not. Every stream is live only once the
 subscription it holds delivered its initial state (snapshot, quote or trades
-baseline): a stream answered `SubscribeResult::AlreadySubscribed` whose
-subscription's initial state the client never took is unsubscribed and
-subscribed again, and its trades meanwhile are dropped. A request that was sent takes effect
-even if the caller stops waiting for its answer, and an Unsubscribe the
-connection drops before answering counts as done.
+baseline); what an earlier subscription delivered stays stale until then, and
+trade accounting carries on across it. A stream answered
+`SubscribeResult::AlreadySubscribed` whose subscription's initial state the
+client never took is unsubscribed and subscribed again, and its trades
+meanwhile are dropped. A request that was sent takes effect even if the caller
+stops waiting for its answer, and an Unsubscribe the connection drops before
+answering counts as done.
 
 Decoders are generated from the published schema with Real Logic's sbe-tool
 (`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the
