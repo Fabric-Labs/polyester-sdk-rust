@@ -12,6 +12,11 @@
 //! connection. It reconnects on its own; a new connection starts again at
 //! `seq` 1, unarmed, with nothing in flight.
 //!
+//! [`TradeSession::split`] divides the session into a [`TradeSender`], which
+//! any number of tasks clone to keep commands in flight, and the
+//! [`TradeEvents`] one task drains; dropping the events half closes the
+//! session.
+//!
 //! Every write is answered by exactly one of:
 //!
 //! - its acknowledgement, the method's `Ok` value;
@@ -49,7 +54,7 @@ use crate::errors::{Error, Result};
 use crate::types::{Price, Quantity, QuantityDomain};
 
 pub use codec::{SCHEMA_ID, SCHEMA_VERSION};
-pub use session::{Config, TimerGate, TradeSession, connect, url};
+pub use session::{Config, TimerGate, TradeEvents, TradeSender, TradeSession, connect, url};
 
 /// The trading WebSocket's SBE path on the API's WebSocket host.
 pub const PATH: &str = "/ws/trade.sbe";

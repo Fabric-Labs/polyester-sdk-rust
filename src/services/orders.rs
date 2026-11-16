@@ -94,6 +94,26 @@ fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
     Ok(())
 }
 
+/// The contract's ordered time range (`orders_history_bin.ordered_time_range`,
+/// `user_trades_bin.ordered_time_range`): when both bounds are set, the start
+/// must not be after the end, except an explicit end of 0, which the server
+/// answers with an empty page.
+fn validate_time_range(
+    method: &str,
+    start_ts_ns: Option<u64>,
+    end_ts_ns: Option<u64>,
+) -> Result<()> {
+    if let (Some(start), Some(end)) = (start_ts_ns, end_ts_ns)
+        && end != 0
+        && start > end
+    {
+        return Err(Error::validation(format!(
+            "{method} start_ts_ns ({start}) must be <= end_ts_ns ({end}) when both are set"
+        )));
+    }
+    Ok(())
+}
+
 /// A refusal the SDK raises before sending, with the code, field path and
 /// rule ID the server answers for the same mistake, so both read the same
 /// ([`Error::Api`] with one violation).
@@ -217,6 +237,7 @@ impl OrdersService {
     }
 
     pub async fn list_history_with(&self, opts: ListOrderHistoryOpts) -> Result<OrdersList> {
+        validate_time_range("orders.list_history", opts.start_ts_ns, opts.end_ts_ns)?;
         // A market name is resolved, or checked against the ID given with it,
         // through the catalog.
         if opts
@@ -266,6 +287,8 @@ impl OrdersService {
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             trigger_id,
+            start_ts_ns: opts.start_ts_ns,
+            end_ts_ns: opts.end_ts_ns,
             ..Default::default()
         };
         let client = self.read_client();
@@ -1906,6 +1929,7 @@ impl TradesService {
     }
 
     pub async fn list_with(&self, opts: ListUserTradesOpts) -> Result<UserTradesList> {
+        validate_time_range("trades.list", opts.start_ts_ns, opts.end_ts_ns)?;
         if opts.order_id.is_some() && opts.lineage_id.is_some() {
             return Err(Error::validation(
                 "trades.list order_id and lineage_id are mutually exclusive",
@@ -1959,6 +1983,8 @@ impl TradesService {
             through_generation: opts.through_generation,
             include_transfers: opts.include_transfers,
             execution_scope,
+            start_ts_ns: opts.start_ts_ns,
+            end_ts_ns: opts.end_ts_ns,
             ..Default::default()
         };
         let client = OrdersReadServiceClient::new(

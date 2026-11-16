@@ -1022,6 +1022,14 @@ pub struct ListOrderHistoryOpts {
     pub include_attached_risk_state: bool,
     /// When set, only child orders created by this trigger are returned.
     pub trigger_id: Option<String>,
+    /// Inclusive start of the time range, in nanoseconds since the Unix epoch
+    /// (UTC). `None` sends no lower bound.
+    pub start_ts_ns: Option<u64>,
+    /// Inclusive end of the time range, in nanoseconds since the Unix epoch
+    /// (UTC). `None` sends no upper bound; `Some(0)` is sent and the server
+    /// answers an empty page. Any other end earlier than `start_ts_ns` is
+    /// refused with [`crate::Error::Validation`] before sending.
+    pub end_ts_ns: Option<u64>,
 }
 
 /// Options for [`crate::services::TradesService::list_with`].
@@ -1041,6 +1049,14 @@ pub struct ListUserTradesOpts {
     pub include_transfers: bool,
     pub limit: Option<u32>,
     pub page_token: Option<String>,
+    /// Inclusive start of the time range, in nanoseconds since the Unix epoch
+    /// (UTC). `None` sends no lower bound.
+    pub start_ts_ns: Option<u64>,
+    /// Inclusive end of the time range, in nanoseconds since the Unix epoch
+    /// (UTC). `None` sends no upper bound; `Some(0)` is sent and the server
+    /// answers an empty page. Any other end earlier than `start_ts_ns` is
+    /// refused with [`crate::Error::Validation`] before sending.
+    pub end_ts_ns: Option<u64>,
 }
 
 /// Options for [`crate::services::OrdersService::get_with`].
