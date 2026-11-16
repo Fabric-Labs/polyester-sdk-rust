@@ -552,6 +552,16 @@ impl Client {
             crate::marketstream::url(&self.ws_url)?,
             self.catalogs.clone(),
         );
+        // A client that hydrates its catalogs re-reads the spot config on
+        // every connection; one configured without hydration keeps the
+        // catalogs it was given.
+        if self.hydrate_catalogs_enabled {
+            config.reload = Some(Arc::new(SpotPairs {
+                factory: self.factory.clone(),
+                timeout: self.catalog_timeout,
+                catalogs: self.catalogs.clone(),
+            }));
+        }
         config.history = Some(Arc::new(self.market_data.clone()));
         configure(&mut config);
         crate::marketstream::connect(config).await
@@ -761,6 +771,42 @@ fn stop_all_already_ended(error: &Error) -> bool {
 }
 
 /// One of the two catalogs the client loads when it is created.
+/// Re-reads the spot config for the market-data stream on every connection.
+/// A read is validated in a catalog of its own, an immutable snapshot that
+/// the connection decodes with, live and in trade recovery, for its whole
+/// life. Installing it, which the stream does only while its connection is
+/// current, also refreshes the client's catalog for its other users; no
+/// stream reads that shared catalog mid-connection.
+struct SpotPairs {
+    factory: Factory,
+    timeout: Duration,
+    catalogs: Arc<CatalogManager>,
+}
+
+impl crate::marketstream::PairsSource for SpotPairs {
+    fn load(
+        &self,
+    ) -> futures_util::future::BoxFuture<'_, Result<crate::marketstream::LoadedPairs>> {
+        Box::pin(async move {
+            let deadline = tokio::time::Instant::now() + self.timeout;
+            let (snapshot, raw) =
+                crate::catalog_startup::read_spot(&self.factory, deadline).await?;
+            let catalogs = self.catalogs.clone();
+            let snapshot: Arc<dyn crate::marketstream::Pairs> = Arc::new(snapshot);
+            let decode = snapshot.clone();
+            Ok(crate::marketstream::LoadedPairs::with_install(
+                snapshot,
+                move || {
+                    // Fresh for the client's other users; the stream keeps
+                    // decoding with its own snapshot, which nothing changes.
+                    catalogs.hydrate_spot_config_json(raw)?;
+                    Ok(decode)
+                },
+            ))
+        })
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CatalogKind {
     Spot,

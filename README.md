@@ -2290,6 +2290,13 @@ while let Some(event) = stream.recv().await {
         }
         Event::MarketStatus(s) => eprintln!("pair {} feed {:?}", s.symbol_id, s.feed),
         Event::Disconnected { error, delay } => eprintln!("market stream reconnecting in {delay:?}: {error}"),
+        Event::PairsReloaded { renumbered } => {
+            for r in &renumbered {
+                println!("{} is now pair {} (was {})", r.symbol, r.to, r.from);
+            }
+        }
+        Event::PairsReloadFailed { error, delay } => eprintln!("spot config read failed, retrying in {delay:?}: {error}"),
+        Event::Ended { topic, error } => eprintln!("{topic} ended: {error}"),
         _ => {}
     }
 }
@@ -2373,6 +2380,28 @@ client never took is unsubscribed and subscribed again, and its trades
 meanwhile are dropped. A request that was sent takes effect even if the caller
 stops waiting for its answer, and an Unsubscribe the connection drops before
 answering counts as done.
+
+The pair IDs on the stream are only valid for the spot config they come
+from, and an environment reset can renumber pairs. So on every connection
+after the first, the client reads the spot config again
+(`marketstream::Config::reload`; `Client::market_stream` sets it when the
+client hydrates its catalogs; each read is an immutable snapshot that the
+connection's live decoding and trade recovery both use, and it also refreshes
+`Client::catalogs`) before it subscribes anything: every book and
+quote is stale from the moment the connection is lost, and the new connection
+sends nothing until the read succeeds. A failed read is reported as
+`Event::PairsReloadFailed` and retried with backoff while every stream stays
+not live. Each subscribed stream is remembered by its pair's symbol and follows it: a
+pair whose ID
+changed is subscribed under its new ID (`Event::PairsReloaded` lists it), and
+the state of any pair whose ID, symbol or scale changed is dropped, so a new
+ID is never read with an old pair's symbol or scale. A stream whose pair is no
+longer listed ends with `Event::Ended` and
+`StreamError::PairNotListed`. `marketstream::connect` reads the first
+connection's pairs before it returns. A read made for a connection that has
+since been replaced installs nothing, and a trades recovery that answers
+after its connection was replaced is dropped: its `TradesBackfill` carries
+`StreamError::Superseded` instead of trades read with an older catalog.
 
 Decoders are generated from the published schema with Real Logic's sbe-tool
 (`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the

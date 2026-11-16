@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::time::Duration;
 
 use super::trades::{epoch_base, epoch_of};
-use super::{Side, Trade, TradesGap};
+use super::{Pairs, Side, Trade, TradesGap};
 use crate::errors::{Error, Result};
 use crate::models::GetTradesOpts;
 use crate::services::MarketDataService;
@@ -20,6 +20,21 @@ pub trait TradeHistory: Send + Sync {
     /// The pair's trades with an ID above `after_trade_id`, ascending, up to
     /// `limit`.
     fn trades_after(&self, symbol_id: u32, after_trade_id: u64, limit: u32) -> HistoryFuture<'_>;
+
+    /// [`Self::trades_after`] decoded with `pairs`, the catalog of the stream
+    /// connection that found the gap, rather than any catalog the history
+    /// reads on its own, which may change meanwhile. The default ignores
+    /// `pairs`.
+    fn trades_after_with(
+        &self,
+        pairs: &dyn Pairs,
+        symbol_id: u32,
+        after_trade_id: u64,
+        limit: u32,
+    ) -> HistoryFuture<'_> {
+        let _ = pairs;
+        self.trades_after(symbol_id, after_trade_id, limit)
+    }
 }
 
 /// One page of a gap-free trade walk.
@@ -56,47 +71,72 @@ impl TradeHistory for MarketDataService {
                     ..Default::default()
                 })
                 .await?;
-            let mut page = HistoryPage {
-                complete_through_trade_id: res.complete_through_trade_id,
-                next_after_trade_id: res.next_after_trade_id,
-                epoch_ends: res
-                    .epoch_ends
-                    .iter()
-                    .map(|e| EpochEnd {
-                        epoch: e.epoch,
-                        last_trade_id: e.last_trade_id,
-                    })
-                    .collect(),
-                trades: Vec::with_capacity(res.trades.len()),
-            };
-            for t in res.trades {
-                let trade_id = t.match_id.parse::<u64>().map_err(|_| {
-                    Error::response_contract(
-                        "get_trades",
-                        format!("match_id {:?} is not a trade ID", t.match_id),
-                    )
-                })?;
-                let (Some(price), Some(qty)) = (t.price, t.qty) else {
-                    return Err(Error::response_contract(
-                        "get_trades",
-                        format!("trade {trade_id} without a price or quantity"),
-                    ));
-                };
-                let taker_side = match t.side.as_str() {
-                    "buy" => Side::Buy,
-                    "sell" => Side::Sell,
-                    _ => Side::Unknown,
-                };
-                page.trades.push(Trade {
-                    trade_id,
-                    price,
-                    qty,
-                    taker_side,
-                });
-            }
-            Ok(page)
+            history_page(res)
         })
     }
+
+    fn trades_after_with(
+        &self,
+        pairs: &dyn Pairs,
+        symbol_id: u32,
+        after_trade_id: u64,
+        limit: u32,
+    ) -> HistoryFuture<'_> {
+        let scale = pairs.base_quantity_scale(symbol_id);
+        Box::pin(async move {
+            let scale = scale.ok_or_else(|| {
+                Error::validation(format!(
+                    "trade history of pair {symbol_id}: the stream connection's catalog has no scale for it"
+                ))
+            })?;
+            history_page(
+                self.trades_after_scaled(symbol_id, scale, after_trade_id, limit)
+                    .await?,
+            )
+        })
+    }
+}
+
+fn history_page(res: crate::models::MarketTradesResult) -> Result<HistoryPage> {
+    let mut page = HistoryPage {
+        complete_through_trade_id: res.complete_through_trade_id,
+        next_after_trade_id: res.next_after_trade_id,
+        epoch_ends: res
+            .epoch_ends
+            .iter()
+            .map(|e| EpochEnd {
+                epoch: e.epoch,
+                last_trade_id: e.last_trade_id,
+            })
+            .collect(),
+        trades: Vec::with_capacity(res.trades.len()),
+    };
+    for t in res.trades {
+        let trade_id = t.match_id.parse::<u64>().map_err(|_| {
+            Error::response_contract(
+                "get_trades",
+                format!("match_id {:?} is not a trade ID", t.match_id),
+            )
+        })?;
+        let (Some(price), Some(qty)) = (t.price, t.qty) else {
+            return Err(Error::response_contract(
+                "get_trades",
+                format!("trade {trade_id} without a price or quantity"),
+            ));
+        };
+        let taker_side = match t.side.as_str() {
+            "buy" => Side::Buy,
+            "sell" => Side::Sell,
+            _ => Side::Unknown,
+        };
+        page.trades.push(Trade {
+            trade_id,
+            price,
+            qty,
+            taker_side,
+        });
+    }
+    Ok(page)
 }
 
 const PAGE_LIMIT: u32 = 1000;
@@ -129,11 +169,13 @@ impl Default for Pacing {
 /// (a trade that does not continue the cursor, or a cursor that moves
 /// backwards or skips trades) is [`Error::ResponseContract`].
 pub async fn backfill(history: &dyn TradeHistory, gap: TradesGap) -> Result<Vec<Trade>> {
-    backfill_paced(history, gap, Pacing::default()).await
+    backfill_paced(history, None, gap, Pacing::default()).await
 }
 
+/// `pairs`: decode with this catalog ([`TradeHistory::trades_after_with`]).
 pub(crate) async fn backfill_paced(
     history: &dyn TradeHistory,
+    pairs: Option<&dyn Pairs>,
     gap: TradesGap,
     pacing: Pacing,
 ) -> Result<Vec<Trade>> {
@@ -150,10 +192,11 @@ pub(crate) async fn backfill_paced(
     let mut delay = pacing.first;
     let mut failures = 0;
     while !walk.done(&gap) {
-        match history
-            .trades_after(gap.symbol_id, walk.cursor, PAGE_LIMIT)
-            .await
-        {
+        let page = match pairs {
+            Some(pairs) => history.trades_after_with(pairs, gap.symbol_id, walk.cursor, PAGE_LIMIT),
+            None => history.trades_after(gap.symbol_id, walk.cursor, PAGE_LIMIT),
+        };
+        match page.await {
             Err(err) => {
                 failures += 1;
                 if failures >= FETCH_ATTEMPTS {

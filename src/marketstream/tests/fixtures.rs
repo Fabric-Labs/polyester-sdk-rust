@@ -148,6 +148,9 @@ impl Pairs for AnyPairs {
     fn symbol(&self, _: u32) -> Option<String> {
         None
     }
+    fn symbol_id(&self, _: &str) -> Option<u32> {
+        None
+    }
 }
 
 /// A stream with the fixture Subscribe sent and its response applied, as a
