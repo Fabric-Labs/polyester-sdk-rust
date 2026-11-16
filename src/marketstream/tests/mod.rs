@@ -1,3 +1,4 @@
+mod catalogs;
 mod client;
 mod derive;
 mod fixtures;

@@ -552,6 +552,15 @@ impl Client {
             crate::marketstream::url(&self.ws_url)?,
             self.catalogs.clone(),
         );
+        // A client that hydrates its catalogs re-reads the spot config on
+        // every connection; one configured without hydration keeps the
+        // catalogs it was given.
+        if self.hydrate_catalogs_enabled {
+            config.reload = Some(Arc::new(SpotPairs {
+                factory: self.factory.clone(),
+                timeout: self.catalog_timeout,
+            }));
+        }
         config.history = Some(Arc::new(self.market_data.clone()));
         configure(&mut config);
         crate::marketstream::connect(config).await
@@ -761,6 +770,27 @@ fn stop_all_already_ended(error: &Error) -> bool {
 }
 
 /// One of the two catalogs the client loads when it is created.
+/// Reads the spot config into a catalog of its own for the market-data
+/// stream, which re-reads it on every connection; the client's catalogs are
+/// left as they are.
+struct SpotPairs {
+    factory: Factory,
+    timeout: Duration,
+}
+
+impl crate::marketstream::PairsSource for SpotPairs {
+    fn load(
+        &self,
+    ) -> futures_util::future::BoxFuture<'_, Result<Arc<dyn crate::marketstream::Pairs>>> {
+        Box::pin(async move {
+            let catalogs = CatalogManager::new();
+            let deadline = tokio::time::Instant::now() + self.timeout;
+            crate::catalog_startup::load_spot(&self.factory, &catalogs, deadline).await?;
+            Ok(Arc::new(catalogs) as Arc<dyn crate::marketstream::Pairs>)
+        })
+    }
+}
+
 #[derive(Clone, Copy)]
 enum CatalogKind {
     Spot,

@@ -33,6 +33,9 @@ impl Pairs for TestPairs {
     fn symbol(&self, symbol_id: u32) -> Option<String> {
         (symbol_id == 7).then(|| "BTC-USDC".to_owned())
     }
+    fn symbol_id(&self, symbol: &str) -> Option<u32> {
+        (symbol == "BTC-USDC").then_some(7)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,17 +96,17 @@ impl ServerConn {
             let _ = self.tx.send(Some(f.clone()));
         }
     }
-    fn close(&self) {
+    pub(super) fn close(&self) {
         let _ = self.tx.send(None);
     }
-    async fn next(&mut self) -> ClientMsg {
+    pub(super) async fn next(&mut self) -> ClientMsg {
         tokio::time::timeout(Duration::from_secs(5), self.rx.recv())
             .await
             .expect("a client message")
             .expect("connection open")
     }
     /// The next Subscribe or Unsubscribe, skipping pings.
-    async fn request(&mut self) -> ClientMsg {
+    pub(super) async fn request(&mut self) -> ClientMsg {
         loop {
             let m = self.next().await;
             if !m.ping {
@@ -111,7 +114,7 @@ impl ServerConn {
             }
         }
     }
-    async fn quiet(&mut self, wait: Duration) -> Option<ClientMsg> {
+    pub(super) async fn quiet(&mut self, wait: Duration) -> Option<ClientMsg> {
         tokio::time::timeout(wait, self.rx.recv())
             .await
             .ok()
@@ -120,7 +123,7 @@ impl ServerConn {
 }
 
 pub(super) struct FakeServer {
-    url: String,
+    pub(super) url: String,
     conns: mpsc::UnboundedReceiver<ServerConn>,
     pub(super) count: Arc<AtomicUsize>,
 }
@@ -194,7 +197,10 @@ pub(super) async fn dial(server: &FakeServer, f: impl FnOnce(&mut Config)) -> Ma
 }
 
 /// Reads events until `pick` returns a value.
-async fn expect<T>(stream: &mut MarketStream, mut pick: impl FnMut(Event) -> Option<T>) -> T {
+pub(super) async fn expect<T>(
+    stream: &mut MarketStream,
+    mut pick: impl FnMut(Event) -> Option<T>,
+) -> T {
     let found = tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             match stream.recv().await {
@@ -211,7 +217,7 @@ async fn expect<T>(stream: &mut MarketStream, mut pick: impl FnMut(Event) -> Opt
     found.expect("the expected event")
 }
 
-fn respond(m: &ClientMsg, result: Wire) -> Vec<u8> {
+pub(super) fn respond(m: &ClientMsg, result: Wire) -> Vec<u8> {
     subscribe_response(
         m.request_id,
         &m.topics
