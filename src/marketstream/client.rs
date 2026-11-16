@@ -56,7 +56,61 @@ impl Pairs for crate::catalogs::Manager {
 /// Reads the spot pairs afresh: the client calls it on every connection,
 /// before it subscribes anything on it.
 pub trait PairsSource: Send + Sync {
-    fn load(&self) -> futures_util::future::BoxFuture<'_, Result<Arc<dyn Pairs>>>;
+    /// Reads the pairs without making them current anywhere.
+    fn load(&self) -> futures_util::future::BoxFuture<'_, Result<LoadedPairs>>;
+}
+
+type Install = Box<dyn FnOnce() -> Result<Arc<dyn Pairs>> + Send>;
+
+/// Pairs a [`PairsSource`] read for one connection. The stream installs them
+/// only while that connection is current: it runs their install step, which
+/// makes them current wherever else they are read (`Client::market_stream`
+/// refreshes the client's catalogs, which its trade history reads), and
+/// decodes with the pairs the step returns.
+pub struct LoadedPairs {
+    pairs: Arc<dyn Pairs>,
+    install: Option<Install>,
+}
+
+impl LoadedPairs {
+    /// Pairs that are current once the stream decodes with them.
+    pub fn new(pairs: Arc<dyn Pairs>) -> Self {
+        Self {
+            pairs,
+            install: None,
+        }
+    }
+
+    /// Pairs whose install step `install` makes them current and returns the
+    /// pairs to decode with. A failed step installs nothing and is retried
+    /// as a failed read.
+    pub fn with_install(
+        pairs: Arc<dyn Pairs>,
+        install: impl FnOnce() -> Result<Arc<dyn Pairs>> + Send + 'static,
+    ) -> Self {
+        Self {
+            pairs,
+            install: Some(Box::new(install)),
+        }
+    }
+
+    /// The pairs read.
+    pub fn pairs(&self) -> &Arc<dyn Pairs> {
+        &self.pairs
+    }
+
+    fn install(self) -> Result<Arc<dyn Pairs>> {
+        match self.install {
+            Some(install) => install(),
+            None => Ok(self.pairs),
+        }
+    }
+}
+
+impl std::fmt::Debug for LoadedPairs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadedPairs").finish_non_exhaustive()
+    }
 }
 
 /// Configures a [`MarketStream`].
@@ -316,7 +370,7 @@ pub async fn connect(mut config: Config) -> Result<MarketStream> {
     // The first connection's pairs are read before connect returns, so a
     // subscribe right after it uses them.
     if let Some(source) = &shared.cfg.reload {
-        let pairs = source.load().await?;
+        let pairs = source.load().await?.install()?;
         *write_unpoisoned(&shared.pairs) = pairs;
     }
     // Subscribe may run as soon as connect returns: the connection is the
@@ -558,47 +612,45 @@ impl Shared {
     /// to the pair's new ID; one whose pair is gone ends. Each pair whose ID,
     /// symbol or scale changed loses its state, so no new ID is ever read
     /// with an old pair's symbol or scale. Returns the events to deliver.
-    fn install(&self, generation: u64, pairs: Arc<dyn Pairs>) -> Option<Vec<Event>> {
+    fn install(&self, generation: u64, loaded: LoadedPairs) -> Result<Option<Vec<Event>>> {
         let mut inner = lock_unpoisoned(&self.inner);
         if inner.closed
             || inner.err.is_some()
             || self.generation.load(Ordering::SeqCst) != generation
         {
-            return None;
+            return Ok(None);
         }
+        // Everything is compared with the pairs read before their install
+        // step runs, which may change the catalog the old pairs are read
+        // from.
         let old = self.pairs();
-        let same = |id: u32| {
-            old.symbol(id).is_some()
-                && old.symbol(id) == pairs.symbol(id)
-                && old.base_quantity_scale(id) == pairs.base_quantity_scale(id)
-        };
+        let pairs = loaded.pairs.clone();
         let mut renumbered: Vec<Renumbered> = Vec::new();
         let mut ended = Vec::new();
         let mut wanted: Vec<Topic> = Vec::new();
-        {
-            let mut state = write_unpoisoned(&self.state);
-            for topic in std::mem::take(&mut inner.wanted) {
-                let symbol = old.symbol(topic.symbol_id);
-                let Some(id) = symbol.as_deref().and_then(|s| pairs.symbol_id(s)) else {
-                    drop_topic(&mut state, topic);
-                    ended.push((topic, symbol));
-                    continue;
-                };
-                if id != topic.symbol_id
-                    && let Some(symbol) = symbol
-                    && !renumbered.iter().any(|r| r.symbol == symbol)
-                {
-                    renumbered.push(Renumbered {
-                        symbol,
-                        from: topic.symbol_id,
-                        to: id,
-                    });
-                }
-                let moved = Topic::new(id, topic.stream);
-                if !wanted.contains(&moved) {
-                    wanted.push(moved);
-                }
+        for topic in &inner.wanted {
+            let symbol = old.symbol(topic.symbol_id);
+            let Some(id) = symbol.as_deref().and_then(|s| pairs.symbol_id(s)) else {
+                ended.push((*topic, symbol));
+                continue;
+            };
+            if id != topic.symbol_id
+                && let Some(symbol) = symbol
+                && !renumbered.iter().any(|r| r.symbol == symbol)
+            {
+                renumbered.push(Renumbered {
+                    symbol,
+                    from: topic.symbol_id,
+                    to: id,
+                });
             }
+            let moved = Topic::new(id, topic.stream);
+            if !wanted.contains(&moved) {
+                wanted.push(moved);
+            }
+        }
+        let changed: Vec<u32> = {
+            let state = read_unpoisoned(&self.state);
             let held: HashSet<u32> = state
                 .books
                 .keys()
@@ -607,23 +659,37 @@ impl Shared {
                 .chain(state.trackers.keys().copied())
                 .chain(state.feeds.keys().copied())
                 .collect();
-            for id in held {
-                if !same(id) {
-                    for stream in Stream::ALL {
-                        drop_topic(&mut state, Topic::new(id, stream));
-                    }
+            held.into_iter()
+                .filter(|id| {
+                    old.symbol(*id).is_none()
+                        || old.symbol(*id) != pairs.symbol(*id)
+                        || old.base_quantity_scale(*id) != pairs.base_quantity_scale(*id)
+                })
+                .collect()
+        };
+        // A failed install step changes nothing and is retried as a failed
+        // read.
+        let current = loaded.install()?;
+        {
+            let mut state = write_unpoisoned(&self.state);
+            for (topic, _) in &ended {
+                drop_topic(&mut state, *topic);
+            }
+            for id in changed {
+                for stream in Stream::ALL {
+                    drop_topic(&mut state, Topic::new(id, stream));
                 }
             }
         }
         inner.wanted = wanted;
         inner.paused = false;
-        *write_unpoisoned(&self.pairs) = pairs;
+        *write_unpoisoned(&self.pairs) = current;
         let mut events = vec![Event::PairsReloaded { renumbered }];
         events.extend(ended.into_iter().map(|(topic, symbol)| Event::Ended {
             topic,
             error: Error::MarketStream(StreamError::PairNotListed { topic, symbol }),
         }));
-        Some(events)
+        Ok(Some(events))
     }
 
     /// Ends a connection: everything it fed becomes stale before the client
@@ -788,6 +854,40 @@ impl Shared {
             if inner.closed || inner.err.is_some() {
                 return false;
             }
+            match inner.events.as_ref().map(|tx| tx.try_send(event)) {
+                Some(Ok(())) => return true,
+                Some(Err(mpsc::error::TrySendError::Full(_))) => true,
+                _ => false,
+            }
+        };
+        if overflow {
+            self.shutdown(Some(Error::queue_overflow(
+                "market stream event queue full; consumer too slow",
+            )));
+        }
+        false
+    }
+
+    /// Delivers a trades recovery started under connection `started`. Under a
+    /// newer connection its trades are dropped, never delivered: they were
+    /// read and decoded with that connection's catalog, which the pairs read
+    /// since may have replaced, so the gap's recovery fails instead
+    /// ([`StreamError::Superseded`]). The check and the delivery are atomic
+    /// with the start of a new connection.
+    fn emit_backfill(&self, started: u64, gap: TradesGap, trades: Result<Vec<Trade>>) -> bool {
+        let overflow = {
+            let inner = lock_unpoisoned(&self.inner);
+            if inner.closed || inner.err.is_some() {
+                return false;
+            }
+            let trades = if self.generation.load(Ordering::SeqCst) == started {
+                trades
+            } else {
+                Err(Error::MarketStream(StreamError::Superseded {
+                    symbol_id: gap.symbol_id,
+                }))
+            };
+            let event = Event::TradesBackfill(TradesBackfill { gap, trades });
             match inner.events.as_ref().map(|tx| tx.try_send(event)) {
                 Some(Ok(())) => return true,
                 Some(Err(mpsc::error::TrySendError::Full(_))) => true,
@@ -970,18 +1070,17 @@ async fn session(
             }
             loaded = async { reload.as_mut().expect("a read in progress").await }, if reload.is_some() => {
                 reload = None;
-                match loaded {
-                    Ok(pairs) => {
-                        // `None`: superseded, or the stream stopped.
-                        if let Some(events) = shared.install(generation, pairs) {
-                            for event in events {
-                                if !shared.emit(event) {
-                                    return None;
-                                }
+                match loaded.and_then(|loaded| shared.install(generation, loaded)) {
+                    Ok(Some(events)) => {
+                        for event in events {
+                            if !shared.emit(event) {
+                                return None;
                             }
-                            shared.reconcile(|inner| inner.wanted.clone());
                         }
+                        shared.reconcile(|inner| inner.wanted.clone());
                     }
+                    // Superseded, or the stream stopped.
+                    Ok(None) => {}
                     Err(error) => {
                         let delay = reload_backoff.next_delay();
                         if !shared.emit(Event::PairsReloadFailed { error, delay }) {
@@ -1397,9 +1496,12 @@ fn emit_gaps(shared: &Arc<Shared>, gaps: Vec<TradesGap>) {
         if inner.closed || inner.err.is_some() {
             return;
         }
+        // The recovery belongs to this connection and its catalog: a result
+        // that arrives under a newer connection is dropped.
+        let started = shared.generation.load(Ordering::SeqCst);
         let handle = tokio::spawn(async move {
             let trades = backfill_paced(history.as_ref(), gap, pacing).await;
-            task_shared.emit(Event::TradesBackfill(TradesBackfill { gap, trades }));
+            task_shared.emit_backfill(started, gap, trades);
         });
         inner.backfills.retain(|h| !h.is_finished());
         inner.backfills.push(handle.abort_handle());
@@ -1723,7 +1825,10 @@ pub(crate) fn recovery_requested(shared: &Shared, topic: Topic) -> bool {
 /// the current connection's.
 #[cfg(test)]
 pub(crate) fn install_pairs(shared: &Shared, generation: u64, pairs: Arc<dyn Pairs>) -> bool {
-    shared.install(generation, pairs).is_some()
+    shared
+        .install(generation, LoadedPairs::new(pairs))
+        .unwrap()
+        .is_some()
 }
 
 /// The current connection's generation.

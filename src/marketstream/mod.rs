@@ -38,7 +38,7 @@ use crate::types::{Price, Quantity};
 
 pub use backfill::{EpochEnd, HistoryPage, TradeHistory, backfill};
 pub use book::OrderBook;
-pub use client::{Config, MarketStream, Pairs, PairsSource, connect, url};
+pub use client::{Config, LoadedPairs, MarketStream, Pairs, PairsSource, connect, url};
 pub use codec::{SCHEMA_ID, SCHEMA_VERSION};
 
 /// The market-data stream's path on the API's WebSocket host.
@@ -439,6 +439,12 @@ pub enum StreamError {
         topic: Topic,
         symbol: Option<String>,
     },
+    /// A trades recovery of pair `symbol_id` answered after its connection
+    /// was replaced. It was read with that connection's catalog, which the
+    /// pairs read since may have replaced, so its trades were dropped:
+    /// recover the gap from the trade history API again if it is needed.
+    #[error("market stream pair {symbol_id}: trades recovery from a replaced connection dropped")]
+    Superseded { symbol_id: u32 },
 }
 
 impl StreamError {

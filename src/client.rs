@@ -559,6 +559,7 @@ impl Client {
             config.reload = Some(Arc::new(SpotPairs {
                 factory: self.factory.clone(),
                 timeout: self.catalog_timeout,
+                catalogs: self.catalogs.clone(),
             }));
         }
         config.history = Some(Arc::new(self.market_data.clone()));
@@ -770,23 +771,33 @@ fn stop_all_already_ended(error: &Error) -> bool {
 }
 
 /// One of the two catalogs the client loads when it is created.
-/// Reads the spot config into a catalog of its own for the market-data
-/// stream, which re-reads it on every connection; the client's catalogs are
-/// left as they are.
+/// Re-reads the spot config for the market-data stream on every connection.
+/// A read is validated in a catalog of its own; installing it, which the
+/// stream does only while its connection is current, puts it into the
+/// client's one catalog, so the stream's live decoding and the trade history
+/// it recovers gaps from read the same pairs and scales.
 struct SpotPairs {
     factory: Factory,
     timeout: Duration,
+    catalogs: Arc<CatalogManager>,
 }
 
 impl crate::marketstream::PairsSource for SpotPairs {
     fn load(
         &self,
-    ) -> futures_util::future::BoxFuture<'_, Result<Arc<dyn crate::marketstream::Pairs>>> {
+    ) -> futures_util::future::BoxFuture<'_, Result<crate::marketstream::LoadedPairs>> {
         Box::pin(async move {
-            let catalogs = CatalogManager::new();
             let deadline = tokio::time::Instant::now() + self.timeout;
-            crate::catalog_startup::load_spot(&self.factory, &catalogs, deadline).await?;
-            Ok(Arc::new(catalogs) as Arc<dyn crate::marketstream::Pairs>)
+            let (snapshot, raw) =
+                crate::catalog_startup::read_spot(&self.factory, deadline).await?;
+            let catalogs = self.catalogs.clone();
+            Ok(crate::marketstream::LoadedPairs::with_install(
+                Arc::new(snapshot),
+                move || {
+                    catalogs.hydrate_spot_config_json(raw)?;
+                    Ok(catalogs as Arc<dyn crate::marketstream::Pairs>)
+                },
+            ))
         })
     }
 }

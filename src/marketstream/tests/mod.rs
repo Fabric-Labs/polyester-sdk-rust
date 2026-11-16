@@ -1,5 +1,6 @@
 mod catalogs;
 mod client;
+mod client_catalogs;
 mod derive;
 mod fixtures;
 mod frames;

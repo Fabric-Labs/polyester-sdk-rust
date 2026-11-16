@@ -2385,7 +2385,9 @@ The pair IDs on the stream are only valid for the spot config they come
 from, and an environment reset can renumber pairs. So on every connection
 after the first, the client reads the spot config again
 (`marketstream::Config::reload`; `Client::market_stream` sets it when the
-client hydrates its catalogs) before it subscribes anything: every book and
+client hydrates its catalogs, and installs each read into the client's one
+catalog, which live decoding and trade recovery both read) before it
+subscribes anything: every book and
 quote is stale from the moment the connection is lost, and the new connection
 sends nothing until the read succeeds. A failed read is reported as
 `Event::PairsReloadFailed` and retried with backoff while every stream stays
@@ -2396,7 +2398,9 @@ ID is never read with an old pair's symbol or scale. A stream whose pair is no
 longer listed ends with `Event::Ended` and
 `StreamError::PairNotListed`. `marketstream::connect` reads the first
 connection's pairs before it returns. A read made for a connection that has
-since been replaced installs nothing.
+since been replaced installs nothing, and a trades recovery that answers
+after its connection was replaced is dropped: its `TradesBackfill` carries
+`StreamError::Superseded` instead of trades read with an older catalog.
 
 Decoders are generated from the published schema with Real Logic's sbe-tool
 (`sbe/marketstream-v<version>.xml`, schema id 20). Messages of templates the

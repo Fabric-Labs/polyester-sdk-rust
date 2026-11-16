@@ -15,8 +15,8 @@ use crate::errors::{Error, Result};
 use crate::marketstream::client::{generation, install_pairs, offline};
 use crate::marketstream::sbe::subscribe_result::SubscribeResult as Wire;
 use crate::marketstream::{
-    Config, Event, MarketStream, Pairs, PairsSource, Renumbered, Stream, StreamError, Topic,
-    connect,
+    Config, Event, LoadedPairs, MarketStream, Pairs, PairsSource, Renumbered, Stream, StreamError,
+    Topic, connect,
 };
 
 /// A spot config: each pair's ID, symbol and base quantity scale.
@@ -91,7 +91,7 @@ impl Scripted {
 }
 
 impl PairsSource for Scripted {
-    fn load(&self) -> BoxFuture<'_, Result<Arc<dyn Pairs>>> {
+    fn load(&self) -> BoxFuture<'_, Result<LoadedPairs>> {
         Box::pin(async move {
             *self.loads.lock().unwrap() += 1;
             if self.gated {
@@ -101,10 +101,12 @@ impl PairsSource for Scripted {
             match next {
                 Some(Ok(pairs)) => {
                     *self.last.lock().unwrap() = Some(pairs.clone());
-                    Ok(pairs)
+                    Ok(LoadedPairs::new(pairs))
                 }
                 Some(Err(e)) => Err(e),
-                None => Ok(self.last.lock().unwrap().clone().expect("a pairs answer")),
+                None => Ok(LoadedPairs::new(
+                    self.last.lock().unwrap().clone().expect("a pairs answer"),
+                )),
             }
         })
     }
