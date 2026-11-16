@@ -903,9 +903,12 @@ impl OrderbookService {
         use std::sync::{Arc, Mutex};
         use tokio::sync::mpsc;
 
-        let symbol = opts.symbol;
+        let mut symbol = opts.symbol;
         let depth = opts.depth.unwrap_or(50);
         let stream_depth = orderbook_stream_tier(depth)?;
+        let bucket_ticks = Arc::new(Mutex::new(parse_bucket_ticks(
+            opts.bucket.as_deref().unwrap_or(""),
+        )?));
         let mut resolved_symbol_id = opts.symbol_id;
         if self.ctx.hydrate_catalogs_enabled {
             // Levels are decoded with the pair's catalog quantity scale.
@@ -928,6 +931,20 @@ impl OrderbookService {
                 "orderbook symbol {symbol:?} does not match symbol_id {symbol_id}"
             )));
         }
+        if symbol.trim().is_empty() {
+            // Selected by symbol_id alone: the catalog names the pair, whose
+            // quantity scale decodes the levels.
+            symbol = self
+                .ctx
+                .catalogs
+                .symbol_for_symbol_id(symbol_id)
+                .ok_or_else(|| {
+                    Error::validation(format!(
+                        "orderbook subscription for symbol_id {symbol_id} needs that pair in \
+                         the spot catalog; wait_for_catalogs or hydrate the spot catalog first"
+                    ))
+                })?;
+        }
         let channel =
             format!("public:spot:orderbook:deltas:depth:{stream_depth}:{symbol_id}:proto");
         let quantity_scale = self
@@ -940,9 +957,6 @@ impl OrderbookService {
                      wait_for_catalogs or hydrate the spot catalog first"
                 ))
             })?;
-        let bucket_ticks = Arc::new(Mutex::new(parse_bucket_ticks(
-            opts.bucket.as_deref().unwrap_or(""),
-        )?));
 
         let state = Arc::new(Mutex::new(BookState {
             bids: BookSide::new(),

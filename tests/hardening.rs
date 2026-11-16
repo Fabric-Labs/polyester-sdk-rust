@@ -37,6 +37,8 @@ mod live_write_gates;
 mod market_data;
 #[path = "market_tif/mod.rs"]
 mod market_tif;
+#[path = "modify_zero_values/mod.rs"]
+mod modify_zero_values;
 #[path = "order_by_symbol_id/mod.rs"]
 mod order_by_symbol_id;
 #[path = "order_read_scales/mod.rs"]
@@ -45,8 +47,12 @@ mod order_read_scales;
 mod order_trades_wait;
 #[path = "order_write_results/mod.rs"]
 mod order_write_results;
+#[path = "orderbook_bucket_validation/mod.rs"]
+mod orderbook_bucket_validation;
 #[path = "orderbook_depths/mod.rs"]
 mod orderbook_depths;
+#[path = "orderbook_symbol_id_only/mod.rs"]
+mod orderbook_symbol_id_only;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
 #[path = "public_reads_keyless/mod.rs"]
@@ -75,6 +81,8 @@ mod url_userinfo;
 mod ws_url_query;
 #[path = "zero_public_ids/mod.rs"]
 mod zero_public_ids;
+#[path = "zipper_fee_rpc_results/mod.rs"]
+mod zipper_fee_rpc_results;
 #[path = "zipper_supply/mod.rs"]
 mod zipper_supply;
 

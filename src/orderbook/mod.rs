@@ -28,17 +28,20 @@ pub fn apply_side_delta(book: &mut BookSide, pairs: &[(i64, i64)]) {
 }
 
 /// Parse a bucket string into a positive tick size. Empty means no bucketing.
+///
+/// Any other bucket must be a positive price with at most 9 decimal places,
+/// such as `"0.01"`; anything else is an [`Error::Validation`] that says so.
 pub fn parse_bucket_ticks(bucket: &str) -> Result<i64> {
     if bucket.trim().is_empty() {
         return Ok(0);
     }
-    let ticks = crate::codecs::scalars::parse_price_ticks_str(bucket, "bucket")?;
-    if ticks <= 0 {
-        return Err(Error::validation(
-            "bucket must be a positive price increment",
-        ));
+    match crate::codecs::scalars::parse_price_ticks_str(bucket, "bucket") {
+        Ok(ticks) if ticks > 0 => Ok(ticks),
+        _ => Err(Error::validation(format!(
+            "invalid orderbook bucket {bucket:?}: a bucket is a positive price with at most \
+             9 decimal places, such as \"0.01\", or empty for no bucketing"
+        ))),
     }
-    Ok(ticks)
 }
 
 /// Aggregate levels into executable-side-safe price buckets.
