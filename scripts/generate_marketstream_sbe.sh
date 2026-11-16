@@ -132,19 +132,6 @@ for f in "$work/crate/marketstream/src"/*.rs; do
   [[ "$name" == "lib.rs" ]] && name="mod.rs"
   sed -e 's/\bcrate::/super::/g' "$f" >"$work/out/marketstream/$name"
 done
-# TEMPORARY, until the frozen schema renames the group: the Trades message's
-# repeating group is named "trades", so sbe-tool's Rust generator declares the
-# message's and the group's TradesEncoder and TradesDecoder in one module,
-# which does not compile. The group's types and accessors are renamed to the
-# names the schema's rename to "entries" gives them; no codec logic changes.
-# Drop this step once the schema no longer has a group named "trades".
-if python3 -I -c 'import sys, xml.etree.ElementTree as ET; r = ET.parse(sys.argv[1]).getroot(); sys.exit(0 if any(m.get("name") == "Trades" and g.get("name") == "trades" for m in r.iter("{http://fixprotocol.io/2016/sbe}message") for g in m.iter("group")) or any(m.get("name") == "Trades" and g.get("name") == "trades" for m in r.iter("message") for g in m.iter("group")) else 1)' "$work/$schema_name"; then
-  sed -i -E \
-    -e 's/Trades(En|De)coder<(Self|P)>/Entries\1coder<\2>/g' \
-    -e 's/TradesDecoder::default\(\)/EntriesDecoder::default()/g' \
-    -e 's/\btrades_(en|de)coder\b/entries_\1coder/g' \
-    "$work/out/marketstream/trades_codec.rs"
-fi
 rustfmt --edition 2024 --config-path "$ROOT/rustfmt.toml" "$work/out/marketstream/mod.rs"
 # rustfmt keeps trailing whitespace inside comments; sbe-tool writes some.
 sed -i -E 's/[[:space:]]+$//' "$work/out/marketstream"/*.rs

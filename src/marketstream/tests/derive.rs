@@ -576,7 +576,9 @@ impl Rewrite {
             (m.first, m.last) = (Self::trade(m.first), Self::trade(m.last));
         }
         if m.template == trades_through_codec::SBE_TEMPLATE_ID {
-            m.last_trade = Self::trade(m.last_trade);
+            // A frontier moves with the trades it accounts for, an epoch's
+            // base (0 for epoch 1) included: it is a position, never a null.
+            m.last_trade += TRADE_OFFSET;
         }
         (m.transact, m.send) = (self.time(m.transact), self.time(m.send));
         (m.bids, m.asks) = (self.levels(&m.bids), self.levels(&m.asks));
@@ -671,25 +673,13 @@ impl Deriver {
             f.message == "MarketStatus" && f.m.feed == FEED_LIVE
         });
         self.trades();
-        self.one(
-            "trades-skipped",
-            "a TradesSkipped",
-            is("server", "TradesSkipped"),
-        );
+        self.trades_skipped();
         self.depth20();
         self.one("depth-snapshot", "a depth-stream DepthSnapshot", |f| {
             f.message == "DepthSnapshot" && f.m.stream == STREAM_DEPTH
         });
-        self.one(
-            "depth-snapshot-levels",
-            "a depth-stream DepthSnapshot holding levels",
-            |f| {
-                f.message == "DepthSnapshot"
-                    && f.m.stream == STREAM_DEPTH
-                    && f.m.bids.len() + f.m.asks.len() > 0
-            },
-        );
         self.chains();
+        self.levels_chain();
     }
 
     fn trades(&mut self) {
@@ -732,6 +722,75 @@ impl Deriver {
             "trades",
             "trades",
             "TODO: no captured trades after a baseline yet",
+            None,
+        );
+    }
+
+    fn trades_skipped(&mut self) {
+        for ci in 0..self.captures.len() {
+            let mut through: HashMap<u32, usize> = HashMap::new();
+            for i in 0..self.captures[ci].len() {
+                let f = &self.captures[ci][i];
+                match f.message.as_str() {
+                    "TradesThrough" => {
+                        through.insert(f.m.symbol, i);
+                    }
+                    "TradesSkipped" => {
+                        if let Some(&j) = through.get(&f.m.symbol) {
+                            self.add(
+                                "trades-skipped-through",
+                                "trades-skipped",
+                                "the pair's baseline",
+                                Some((ci, j)),
+                            );
+                            self.add(
+                                "trades-skipped",
+                                "trades-skipped",
+                                "trades the subscription will not receive live",
+                                Some((ci, i)),
+                            );
+                            return;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        self.add(
+            "trades-skipped",
+            "trades-skipped",
+            "TODO: no captured TradesSkipped after a baseline yet",
+            None,
+        );
+    }
+
+    fn levels_chain(&mut self) {
+        for ci in 0..self.captures.len() {
+            for ch in Self::chains_of(&self.captures[ci], ci) {
+                let s = &self.captures[ch[0].0][ch[0].1].m;
+                if s.bids.len() + s.asks.len() == 0 {
+                    continue;
+                }
+                for (i, at) in ch.into_iter().take(1 + MAX_CHAIN_UPDATES).enumerate() {
+                    let note = if i == 0 {
+                        "a depth-stream DepthSnapshot holding levels"
+                    } else {
+                        "contiguous DepthUpdate"
+                    };
+                    self.add(
+                        format!("depth-levels-chain-{i:02}"),
+                        "depth-levels-chain",
+                        note,
+                        Some(at),
+                    );
+                }
+                return;
+            }
+        }
+        self.add(
+            "depth-levels-chain",
+            "depth-levels-chain",
+            "TODO: no captured depth-stream DepthSnapshot holding levels yet",
             None,
         );
     }

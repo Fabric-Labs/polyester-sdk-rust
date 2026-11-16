@@ -2,7 +2,7 @@
   "schemaFile": "sbe/marketstream-v0.xml",
   "schemaId": 20,
   "schemaVersion": 0,
-  "sha256": "9be329710b09af4b0557a5e6b9131fb255ec0c7c9bdf466327fa2f0e0d81791e",
+  "sha256": "636459c00081d2bc81eb1a12c3b11b980109289039cdfbd00c8ee1df4ce9d588",
   "source": "unpublished",
   "manifestBlock": "marketDataWebSocketSbe",
   "generator": {

@@ -7,10 +7,13 @@
 use std::sync::Arc;
 
 use super::derive::fixtures_dir;
+use crate::errors::Error;
 use crate::marketstream::client::{handle, offline_stream, record_subscribe};
 use crate::marketstream::codec::{self, Msg};
 use crate::marketstream::sbe::{ReadBuf, message_header_codec, ping_codec, subscribe_codec};
-use crate::marketstream::{Config, Event, FeedState, MarketStream, Pairs, Stream, Topic};
+use crate::marketstream::{
+    Config, Event, FeedState, GapCause, MarketStream, Pairs, Stream, StreamError, Topic, TradesGap,
+};
 
 struct Fixture {
     file: String,
@@ -258,8 +261,12 @@ async fn fixture_trades_after_their_baseline() {
     let (frames, _) = load();
     let mut stream = subscribed(&frames);
     replay(&stream, &group(&frames, "trades"));
-    let trades: Vec<_> = stream
-        .queued()
+    let events = stream.queued();
+    assert!(
+        !events.iter().any(|e| matches!(e, Event::TradesGap(_))),
+        "a gap between the baseline and its trades"
+    );
+    let trades: Vec<_> = events
         .into_iter()
         .filter_map(|e| {
             if let Event::Trades(t) = e {
@@ -314,4 +321,141 @@ async fn fixture_pong_answers_its_ping() {
             .iter()
             .any(|e| matches!(e, Event::Pong(p) if p.request_id == id))
     );
+}
+
+/// A depth snapshot holding levels, then its contiguous updates: the window
+/// is the snapshot's, each update applies at its base, and the last one, a
+/// range without levels, advances the position to its end.
+#[tokio::test]
+async fn fixture_depth_with_levels() {
+    let (frames, _) = load();
+    let stream = subscribed(&frames);
+    let chain = group(&frames, "depth-levels-chain");
+    let Msg::DepthSnapshot {
+        symbol_id,
+        levels_per_side,
+        bids,
+        asks,
+        ..
+    } = decode(chain[0])
+    else {
+        panic!("not a snapshot")
+    };
+    assert!(
+        !bids.is_empty() && !asks.is_empty(),
+        "the snapshot holds no levels"
+    );
+    replay(&stream, &chain[..1]);
+    let book = stream
+        .order_book(symbol_id, Stream::Depth, 0)
+        .expect("a book");
+    assert!(
+        book.levels_per_side == levels_per_side
+            && book.bids.len() == bids.len()
+            && book.asks.len() == asks.len()
+            && !book.stale,
+        "{book:?}"
+    );
+    replay(&stream, &chain[1..]);
+    let Msg::DepthUpdate {
+        first,
+        last,
+        bids,
+        asks,
+        ..
+    } = decode(chain[chain.len() - 1])
+    else {
+        panic!("not an update")
+    };
+    assert!(
+        last > first && bids.is_empty() && asks.is_empty(),
+        "the chain's last update is not a bridging range"
+    );
+    let book = stream
+        .order_book(symbol_id, Stream::Depth, 0)
+        .expect("a book");
+    let window = book.levels_per_side as usize;
+    assert!(
+        book.update_id == last
+            && !book.stale
+            && book.bids.len() <= window
+            && book.asks.len() <= window,
+        "{book:?}"
+    );
+    assert!(
+        book.bids
+            .windows(2)
+            .all(|w| w[1].price.as_ticks() < w[0].price.as_ticks()),
+        "bids out of order"
+    );
+    assert!(
+        book.asks
+            .windows(2)
+            .all(|w| w[1].price.as_ticks() > w[0].price.as_ticks()),
+        "asks out of order"
+    );
+}
+
+/// An update missing from the chain is a gap: the book is stale, and the
+/// connection is ended so a new subscription's snapshot replaces it.
+#[tokio::test]
+async fn fixture_depth_gap_marks_the_book_stale() {
+    let (frames, _) = load();
+    let stream = subscribed(&frames);
+    let chain = group(&frames, "depth-levels-chain");
+    replay(&stream, &chain[..2]);
+    let err =
+        handle(stream.shared(), &chain[3].data).expect_err("an update past a missing one applied");
+    assert!(
+        matches!(err, Error::MarketStream(StreamError::BookGap { .. })),
+        "{err}"
+    );
+    let Msg::DepthSnapshot { symbol_id, .. } = decode(chain[0]) else {
+        panic!("not a snapshot")
+    };
+    assert!(
+        stream
+            .order_book(symbol_id, Stream::Depth, 0)
+            .expect("a book")
+            .stale
+    );
+    assert!(!stream.live(Topic::new(symbol_id, Stream::Depth)));
+}
+
+/// TradesSkipped after the pair's baseline names exactly the trades the
+/// subscription will not receive live.
+#[tokio::test]
+async fn fixture_trades_skipped_after_the_baseline() {
+    let (frames, _) = load();
+    let mut stream = subscribed(&frames);
+    let skipped = group(&frames, "trades-skipped");
+    replay(&stream, &skipped);
+    let Msg::TradesSkipped {
+        symbol_id,
+        first,
+        last,
+        ..
+    } = decode(skipped[1])
+    else {
+        panic!("not a TradesSkipped")
+    };
+    let gaps: Vec<TradesGap> = stream
+        .queued()
+        .into_iter()
+        .filter_map(|e| {
+            if let Event::TradesGap(g) = e {
+                Some(g)
+            } else {
+                None
+            }
+        })
+        .collect();
+    let want = TradesGap {
+        symbol_id,
+        after_trade_id: first - 1,
+        through_trade_id: last.expect("a bounded range"),
+        tail_epoch: 0,
+        cause: GapCause::Skipped,
+    };
+    assert_eq!(gaps, vec![want]);
 }

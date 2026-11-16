@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<messageSchema package="marketstream" id="20" version="0" byteOrder="littleEndian" description="Public SBE WebSocket contract for real-time market data: trades, best bid and offer, top-20 order book depth, and a live order book window kept by snapshot and incremental updates">
+<messageSchema package="marketstream" id="20" version="0" semanticVersion="1.0.0" byteOrder="littleEndian" description="Public SBE WebSocket contract for real-time market data: trades, best bid and offer, top-20 order book depth, and a live order book window kept by snapshot and incremental updates">
   <types>
     <composite name="messageHeader" description="Eight-byte SBE header that prefixes every WebSocket binary message">
       <type name="blockLength" primitiveType="uint16" description="Encoded length in bytes of the message fixed block, excluding this header and repeating groups"/>
@@ -30,11 +30,11 @@
     </enum>
 
     <enum name="SubscribeResult" encodingType="uint8" description="Outcome of one subscription item">
-      <validValue name="OK" description="The stream is subscribed; its messages follow on this connection">1</validValue>
+      <validValue name="OK" description="For a Subscribe item, the stream is subscribed and its messages follow on this connection. For an Unsubscribe item, the stream is unsubscribed and none of its messages follow the response; subscribing again starts the stream afresh, with a new DepthSnapshot for depth and a new TradesThrough baseline for trades">1</validValue>
       <validValue name="UNKNOWN_SYMBOL" description="The trading pair is not served on this endpoint">2</validValue>
       <validValue name="LIMIT_EXCEEDED" description="The connection already holds the most subscriptions it may; this item is not subscribed and the connection is unchanged">3</validValue>
       <validValue name="ALREADY_SUBSCRIBED" description="The connection already holds this subscription; it is unchanged">4</validValue>
-      <validValue name="NOT_SUBSCRIBED" description="The connection does not hold this subscription, so there is nothing to unsubscribe; it is unchanged">5</validValue>
+      <validValue name="NOT_SUBSCRIBED" description="Answers an Unsubscribe item the connection does not hold; the connection is unchanged">5</validValue>
       <validValue name="SYMBOL_DISABLED" description="The trading pair is listed but disabled; subscribe again once it is enabled">7</validValue>
     </enum>
 
@@ -52,7 +52,7 @@
     </group>
   </message>
 
-  <message name="Unsubscribe" id="2" description="Client request to end subscriptions; answered by one SubscribeResponse with one result per item, in order: OK when the stream was subscribed and has ended, NOT_SUBSCRIBED when the connection did not hold it">
+  <message name="Unsubscribe" id="2" description="Client request to end subscriptions; answered by one SubscribeResponse with one result per item, in order. No message of an unsubscribed stream follows the response">
     <field name="requestId" id="1" type="uint64" description="Client-chosen identifier echoed in the SubscribeResponse"/>
     <group name="items" id="2" dimensionType="groupSizeEncoding" description="Streams to unsubscribe from">
       <field name="symbolId" id="1" type="uint32" description="Numeric trading pair identifier as returned by the spot configuration API"/>
@@ -64,8 +64,8 @@
     <field name="requestId" id="1" type="uint64" description="Client-chosen identifier echoed in the Pong"/>
   </message>
 
-  <message name="SubscribeResponse" id="20" description="Server answer to one Subscribe; a stream's first message follows its OK result">
-    <field name="requestId" id="1" type="uint64" description="The Subscribe request's requestId"/>
+  <message name="SubscribeResponse" id="20" description="Server answer to one Subscribe or Unsubscribe; a subscribed stream's first message follows its OK result, and an unsubscribed stream's messages end before it">
+    <field name="requestId" id="1" type="uint64" description="The Subscribe or Unsubscribe request's requestId"/>
     <group name="results" id="2" dimensionType="groupSizeEncoding" description="One result per requested item, in request order">
       <field name="symbolId" id="1" type="uint32" description="The item's trading pair identifier"/>
       <field name="stream" id="2" type="StreamType" description="The item's stream"/>
@@ -84,7 +84,7 @@
     <field name="updateId" id="3" type="uint64" description="Book update that executed the trades; the depth stream numbers its state with the same sequence within bookEpoch"/>
     <field name="transactTsNs" id="4" type="uint64" epoch="unix" timeUnit="nanosecond" description="Time of the book update that executed the trades, in Unix nanoseconds UTC"/>
     <field name="sendTsNs" id="5" type="uint64" epoch="unix" timeUnit="nanosecond" description="Server time at which this message was encoded, in Unix nanoseconds UTC; minus transactTsNs, an estimate of server-side latency"/>
-    <group name="trades" id="6" dimensionType="groupSizeEncoding" description="Trades in ascending tradeId order">
+    <group name="entries" id="6" dimensionType="groupSizeEncoding" description="Trades in ascending tradeId order">
       <field name="tradeId" id="1" type="uint64" description="Trade identifier, the matchId the trade history API returns. Contiguous per pair within a bookEpoch, starting at (bookEpoch-1)*2^40+1; trades of a later bookEpoch have higher identifiers"/>
       <field name="priceTicks" id="2" type="int64" description="Execution price in quote-asset units scaled by 1e9"/>
       <field name="qtyScaled" id="3" type="int64" description="Executed quantity in base-asset units scaled by the pair's base_quantity_scale"/>
@@ -122,7 +122,7 @@
     </group>
   </message>
 
-  <message name="DepthUpdate" id="25" description="Incremental update of a depth subscription's window. Apply it only to a book at exactly firstUpdateId-1 of the same bookEpoch: the previous DepthUpdate's lastUpdateId, or the DepthSnapshot's updateId. On any other position, discard the book and subscribe again; never apply it to a book taken from another source or to a position inside the range. Each level is a SET of its total quantity, and quantity 0 removes the level. After applying it, truncate each side to the DepthSnapshot's levelsPerSide best levels: a level pushed out of the window by better levels is not removed on the wire">
+  <message name="DepthUpdate" id="25" description="Incremental update of a depth subscription's window. Apply it only to a book at exactly firstUpdateId-1 of the same bookEpoch: the previous DepthUpdate's lastUpdateId, or the DepthSnapshot's updateId. On any other position, discard the book and resubscribe (Unsubscribe, then Subscribe); never apply it to a book taken from another source or to a position inside the range. Each level is a SET of its total quantity, and quantity 0 removes the level. After applying it, truncate each side to the DepthSnapshot's levelsPerSide best levels: a level pushed out of the window by better levels is not removed on the wire">
     <field name="symbolId" id="1" type="uint32" description="Numeric trading pair identifier"/>
     <field name="bookEpoch" id="2" type="uint64" description="Book epoch; it increases when the pair's book is rebuilt, and a new epoch always starts with a DepthSnapshot"/>
     <field name="firstUpdateId" id="3" type="uint64" description="First book update this message covers: the update after the position it applies to"/>

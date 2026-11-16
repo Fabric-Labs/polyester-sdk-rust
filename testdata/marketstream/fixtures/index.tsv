@@ -10,10 +10,10 @@ file	direction	message	group	note
 07-market-status-live.bin	server	MarketStatus	market-status-live	MarketStatus LIVE
 08-trades-through.bin	server	TradesThrough	trades	the pair's baseline
 09-trades.bin	server	Trades	trades	trades after the baseline
--	-	-	trades-skipped	TODO: no captured frame yet; a TradesSkipped
-11-depth20-snapshot.bin	server	DepthSnapshot	depth20-snapshot	the depth20 snapshot with the most levels
-12-depth-snapshot.bin	server	DepthSnapshot	depth-snapshot	a depth-stream DepthSnapshot
--	-	-	depth-snapshot-levels	TODO: no captured frame yet; a depth-stream DepthSnapshot holding levels
+10-trades-skipped-through.bin	server	TradesThrough	trades-skipped	the pair's baseline
+11-trades-skipped.bin	server	TradesSkipped	trades-skipped	trades the subscription will not receive live
+12-depth20-snapshot.bin	server	DepthSnapshot	depth20-snapshot	the depth20 snapshot with the most levels
+13-depth-snapshot.bin	server	DepthSnapshot	depth-snapshot	a depth-stream DepthSnapshot
 14-depth-chain-00.bin	server	DepthSnapshot	depth-chain	the chain's DepthSnapshot
 15-depth-chain-01.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
 16-depth-chain-02.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
@@ -25,3 +25,10 @@ file	direction	message	group	note
 22-depth-chain-08.bin	server	DepthUpdate	depth-chain	contiguous DepthUpdate
 23-depth-bridge-00.bin	server	DepthSnapshot	depth-bridge	the DepthSnapshot the bridging range starts after
 24-depth-bridge-01.bin	server	DepthUpdate	depth-bridge	a bridging DepthUpdate: a range without levels
+25-depth-levels-chain-00.bin	server	DepthSnapshot	depth-levels-chain	a depth-stream DepthSnapshot holding levels
+26-depth-levels-chain-01.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+27-depth-levels-chain-02.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+28-depth-levels-chain-03.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+29-depth-levels-chain-04.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+30-depth-levels-chain-05.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate
+31-depth-levels-chain-06.bin	server	DepthUpdate	depth-levels-chain	contiguous DepthUpdate

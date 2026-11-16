@@ -26,7 +26,7 @@ pub mod unsubscribe_codec;
 
 pub const SBE_SCHEMA_ID: u16 = 20;
 pub const SBE_SCHEMA_VERSION: u16 = 0;
-pub const SBE_SEMANTIC_VERSION: &str = "";
+pub const SBE_SEMANTIC_VERSION: &str = "1.0.0";
 
 pub type SbeResult<T> = core::result::Result<T, SbeErr>;
 
