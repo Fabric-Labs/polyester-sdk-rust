@@ -1118,14 +1118,14 @@ impl OrdersService {
             ..Default::default()
         };
         if let Some(price) = params.new_price.as_ref() {
-            req.new_price_ticks = Some(resolve_price_ticks(price, Some(symbol))?);
+            req.new_price_ticks = Some(resolve_new_price_ticks(price, symbol)?);
         }
         if let Some(qty) = params.new_qty.as_ref() {
-            req.new_qty_scaled = Some(resolve_qty_scaled(
+            req.new_qty_scaled = Some(resolve_new_qty_scaled(
                 qty,
                 market.base_quantity_scale,
-                Some(symbol),
-                Some(market.symbol_id),
+                symbol,
+                market.symbol_id,
             )?);
         }
         if let Some(risk) = self.encode_replacement_risk(
@@ -1415,15 +1415,10 @@ impl OrdersService {
                 ..Default::default()
             };
             if let Some(price) = item.new_price.as_ref() {
-                proto.new_price_ticks = Some(resolve_price_ticks(price, Some(symbol))?);
+                proto.new_price_ticks = Some(resolve_new_price_ticks(price, symbol)?);
             }
             if let Some(qty) = item.new_qty.as_ref() {
-                proto.new_qty_scaled = Some(resolve_qty_scaled(
-                    qty,
-                    scale,
-                    Some(symbol),
-                    Some(symbol_id),
-                )?);
+                proto.new_qty_scaled = Some(resolve_new_qty_scaled(qty, scale, symbol, symbol_id)?);
             }
             if let Some(risk) = self.encode_replacement_risk(
                 item.new_attached_risk.as_ref(),
@@ -2115,6 +2110,29 @@ fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
         trade_sum = sum;
     }
     trade_sum == cum
+}
+
+/// A modify or batch replace price. The API reads a new price of 0 as no
+/// change, so 0 is refused: leave `new_price` `None` to keep the price.
+fn resolve_new_price_ticks(price: &Price, symbol: &str) -> Result<i64> {
+    let ticks = resolve_price_ticks(price, Some(symbol))?;
+    if ticks <= 0 {
+        return Err(Error::validation(
+            "new_price must be positive; leave it None to keep the order's price",
+        ));
+    }
+    Ok(ticks)
+}
+
+/// A modify or batch replace quantity. As for the price, 0 would read as no
+/// change: leave `new_qty` `None` to keep the quantity.
+fn resolve_new_qty_scaled(qty: &Quantity, scale: u32, symbol: &str, symbol_id: u32) -> Result<i64> {
+    if qty.as_scaled() <= 0 {
+        return Err(Error::validation(
+            "new_qty must be positive; leave it None to keep the order's quantity",
+        ));
+    }
+    resolve_qty_scaled(qty, scale, Some(symbol), Some(symbol_id))
 }
 
 #[cfg(test)]

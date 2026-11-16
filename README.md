@@ -2354,8 +2354,11 @@ subscribe there:
   snapshot, and trims each view to 10 levels. Its update rate is that of the depth it
   rides, and each published update adds a view, also when only levels outside yours
   changed. With `bucket`, levels are aggregated first and the depth then counts
-  buckets. A depth above 500, or `Some(0)`, is `Error::Validation` before connecting;
-  for more than 500 levels, read a snapshot with `orderbook.get`.
+  buckets. `bucket` is empty for no bucketing or a positive price with at most 9
+  decimal places, such as `"0.01"`; any other bucket is `Error::Validation` before
+  connecting, and `set_bucket` returns it and keeps the current bucket. A depth above
+  500, or `Some(0)`, is `Error::Validation` before connecting; for more than 500
+  levels, read a snapshot with `orderbook.get`.
 - `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
   only a published depth and returns `Error::Validation` for any other.
 

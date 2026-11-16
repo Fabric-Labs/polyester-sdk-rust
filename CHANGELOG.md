@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** A zero `new_price` on `orders.modify` or a batch replace item is refused with `Error::Validation` (`new_price must be positive`) before sending, in every form: `Price::from_ticks(0, ..)`, `Price::from_decimal_str("0", ..)` and `Price::from_decimal(Decimal::ZERO, ..)`. It was sent as a price of 0. A zero `new_qty` (`Quantity::from_scaled(0, ..)`; the decimal constructors already refuse 0) is refused as `new_qty must be positive` where it read `qty must be positive`. Affected: `orders.modify` (`ModifyOrderParams.new_price`, `new_qty`), `orders.batch_replace` (`BatchReplaceItem.new_price`, `new_qty`). Migration: leave `new_price` or `new_qty` `None` to keep the order's price or quantity.
+- `chain::quote_zipper_fee` returns `Error::Transport` for a malformed `eth_call` result instead of panicking: non-ASCII text from the RPC endpoint panicked with "byte index is not a char boundary". Each result must be `0x` and exactly one 32-byte ABI word (64 hex digits); a short, odd-length, non-hex or empty result is refused, as is an address result whose upper 12 bytes are not zero, where a short or non-hex address result was accepted. Affected: `chain::quote_zipper_fee`.
+- `orderbook.create_subscription` with only `symbol_id` works: the pair's symbol and quantity scale come from the spot catalog, and each view carries the catalog symbol. It returned `Error::Validation` asking for a catalog quantity scale for an empty symbol. A `symbol_id` that is not in the catalog is `Error::Validation` naming it, before connecting. Affected: `orderbook.create_subscription` (`CreateSubscriptionOptions.symbol_id`).
+- An invalid order book `bucket` (such as `"abc"`, `"-1"` or `"0"`) is still refused with `Error::Validation`, by `orderbook.create_subscription` before connecting and by `Subscription::set_bucket`, which keeps the current bucket; the message now says what is valid: a positive price with at most 9 decimal places, such as `"0.01"`, or empty for no bucketing. Affected: `orderbook.create_subscription` (`CreateSubscriptionOptions.bucket`), `orderbook::Subscription::set_bucket`, `orderbook::parse_bucket_ticks`.
+
 ## 0.31.1
 
 Package version: `0.31.1`. Git tag: `v0.31.1`. Released 2026-11-16. Built on public contract `1945423`.
