@@ -7,6 +7,12 @@
 - The stream's decoders are generated from the published schema (`sbe/marketstream-v<version>.xml`, schema id 20) with Real Logic's sbe-tool, pinned by `sbe/marketstream.lock.json`; `scripts/generate_marketstream_sbe.sh` regenerates and checks them. Messages of unknown templates are skipped; a message of a newer schema version is read by its declared block lengths, and one whose layout cannot be read that way is refused, as is a message of another schema.
 - **Breaking:** `Error` gains the variant `MarketStream(marketstream::StreamError)`, which reports a market-data stream message the client refused: `StreamError::Schema` (another schema; the stream stops), `StreamError::Frame` (a malformed message) or `StreamError::BookGap` (a depth book that could not follow the stream; the client reconnects). Migration: add an `Error::MarketStream` arm where you match `Error` exhaustively.
 
+## 0.31.1
+
+Package version: `0.31.1`. Git tag: `v0.31.1`. Released 2026-11-16. Built on public contract `1945423`.
+
+- Public lifecycle-flow reads work without an API key. `lifecycle.list_flows`, `get_flow`, `list_flows_by_tx` and `get_flow_by_tx` are public in the contract but were signed, so a client without an API key refused them with `Error::Auth("This endpoint requires Polyester API-key credentials")` before sending. They are now sent unsigned, like the other public reads, whether or not the client has a key. `lifecycle.list_account_flows` and `get_account_flow` stay signed. A test now checks every RPC the SDK sends against the contract's public or signed marking (`testdata/rpc_auth.tsv`), and sends every public read from a client without a key.
+
 ## 0.31.0
 
 Package version: `0.31.0`. Git tag: `v0.31.0`. Released 2026-11-16. Built on public contract `1945423`.

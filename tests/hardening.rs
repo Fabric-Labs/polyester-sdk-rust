@@ -49,6 +49,8 @@ mod order_write_results;
 mod orderbook_depths;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
+#[path = "public_reads_keyless/mod.rs"]
+mod public_reads_keyless;
 #[path = "read_model_retention/mod.rs"]
 mod read_model_retention;
 #[path = "readable_error_bodies/mod.rs"]
