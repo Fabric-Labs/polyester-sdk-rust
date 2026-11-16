@@ -758,7 +758,11 @@ def sync_release(
         elif f"v{target}" not in stable_tags:
             log.append(f"remove {tag}: {target} never shipped and is no longer the target")
             orphaned.append(["gh", "release", "delete", tag, "--yes", *cleanup])
-    planned: list[list[str]] = []
+    # When this snapshot's release already exists (a re-run), the older
+    # releases of the target still go: a Go run creates its release before it
+    # deletes the previous one, and that deletion may have failed. Rust and
+    # Python hold one release per target tag, so they have none left over.
+    planned: list[list[str]] = [*replaced]
     if not current:
         create = ["gh", "release", "create", p.tag, "--prerelease", "--latest=false"]
         create += ["--title", p.title, "--notes-file", str(notes)]

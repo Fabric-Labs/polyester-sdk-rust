@@ -396,6 +396,33 @@ class FakeGh:
         return ""
 
 
+class StatefulGh:
+    """A release list that create and delete change; the first deletes can fail."""
+
+    def __init__(self, releases: list[dict[str, str]], fail_deletes: int = 0) -> None:
+        self.releases = list(releases)
+        self.fail_deletes = fail_deletes
+        self.writes: list[list[str]] = []
+
+    def tags(self) -> list[str]:
+        return [r["tagName"] for r in self.releases]
+
+    def __call__(self, args: Sequence[str]) -> str:
+        args = list(args)
+        if args[:3] == ["gh", "release", "list"]:
+            return json.dumps(self.releases)
+        if args[2] == "delete" and self.fail_deletes:
+            self.fail_deletes -= 1
+            raise dr.ReleaseError(f"{' '.join(args)} failed (1): HTTP 502")
+        self.writes.append(args)
+        if args[2] == "create":
+            title = args[args.index("--title") + 1]
+            self.releases.append({"tagName": args[3], "name": title})
+        elif args[2] == "delete":
+            self.releases = [r for r in self.releases if r["tagName"] != args[3]]
+        return ""
+
+
 def snapshot(ecosystem: str, target: str, ts: str) -> object:
     version = dr.package_version(target, ts, ecosystem)
     return dr.Plan(
@@ -545,6 +572,19 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual(
             gh.calls, [["gh", "release", "delete", "v0.34.1-devnet.20261116000000", "--yes"]]
         )
+
+    def test_go_rerun_finishes_a_replacement_whose_delete_failed(self) -> None:
+        p = snapshot("go", "0.35.0", "20261117093000")
+        old = "v0.35.0-devnet.20261117080000"
+        gh = StatefulGh([{"tagName": old, "name": old}], fail_deletes=1)
+        with self.assertRaises(dr.ReleaseError):
+            dr.sync_release("go", p, self.notes, set(), gh, dry_run=False)
+        self.assertEqual(gh.tags(), [old, p.tag])  # created, previous one kept
+        dr.sync_release("go", p, self.notes, set(), gh, dry_run=False)
+        self.assertEqual(gh.tags(), [p.tag])
+        self.assertEqual(gh.writes[-1], ["gh", "release", "delete", old, "--yes"])
+        self.assertEqual([w[2] for w in gh.writes].count("create"), 1)
+        self.assertFalse(any("--cleanup-tag" in w for w in gh.writes))
 
     def test_dry_run_only_lists(self) -> None:
         gh = FakeGh([{"tagName": "v0.35.0-devnet", "name": "v0.35.0-devnet.20261117080000"}])
