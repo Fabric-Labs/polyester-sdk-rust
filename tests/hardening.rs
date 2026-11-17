@@ -7,6 +7,8 @@
 mod api_key_display;
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
+#[path = "blank_ids/mod.rs"]
+mod blank_ids;
 #[path = "catalog_hydration_wait/mod.rs"]
 mod catalog_hydration_wait;
 #[path = "catalog_startup_recovery/mod.rs"]
