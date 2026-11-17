@@ -380,8 +380,10 @@ pub enum Event {
     /// upgrade, [`crate::Error::answer`] holds its status and the delay it
     /// asked for with `Retry-After`, and `delay` is at least that delay: a
     /// server's `Retry-After` is never shortened, and the backoff's 30-second
-    /// ceiling applies to the backoff alone. A caller that will not wait that
-    /// long can close the stream.
+    /// ceiling applies to the backoff alone. With a
+    /// [`Config::reconnect_limiter`], the upgrade then waits for a slot too,
+    /// which adds to `delay` and never shortens it. A caller that will not
+    /// wait that long can close the stream.
     Disconnected {
         error: crate::Error,
         delay: std::time::Duration,

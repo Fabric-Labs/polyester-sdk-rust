@@ -2592,6 +2592,64 @@ server speaks exactly one schema version: a message of another schema or
 version stops the session with `TradeError::Schema`, and a message whose bytes
 do not match its layout ends the connection with `TradeError::Frame`.
 
+## Many sessions per process
+
+A process that runs many trading sessions or market-data streams, such as one
+trading session per sub-account, can share one `ReconnectLimiter` among them.
+Each session reconnects on its own with jittered backoff and waits at least the
+`Retry-After` of a refused upgrade. When many sessions drop together, the jitter
+spreads their reconnects out but does not bound them. A shared limiter does: at
+most `max_concurrent_upgrades` upgrades of the sessions that share it are in
+flight at once, and the rest wait their turn.
+
+- **Slots for upgrades only.** A session takes a slot after its backoff and
+  `Retry-After` wait have run out, and gives it back as soon as the upgrade
+  ends: accepted, refused or timed out. It holds no slot while it waits to
+  reconnect or while it is connected.
+- **`Retry-After` is never shortened.** The wait for a slot comes after the
+  session's own wait and adds to it. `Event::Disconnected`'s `delay` is the
+  session's own wait, without the time spent waiting for a slot.
+- **Fair.** Sessions waiting for a slot get one first in, first out, so none
+  starves.
+- **First connections too.** `tradews::connect` and `marketstream::connect`
+  take a slot for their first upgrade as well, so a process that starts
+  thousands of sessions at once is bounded the same way as one whose sessions
+  all drop.
+- **Closing ends the wait.** Closing a session, or dropping its events half,
+  while it waits for a slot ends the wait, and the session makes no upgrade
+  afterwards. Dropping a `connect` future that waits does the same.
+- **Opt-in.** Without a limiter (`reconnect_limiter: None`, the default), a
+  session connects as soon as its own wait ends, as before.
+
+`ReconnectLimiter::upgrades_in_flight` reports how many slots are taken.
+
+```rust,no_run
+# async fn _readme(
+#     client: polyester::Client,
+#     keys: Vec<polyester::auth::Credentials>,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+use polyester::{ReconnectLimiter, tradews};
+
+// One limiter for the whole process: at most 32 upgrades at once.
+let limiter = ReconnectLimiter::new(32)?;
+
+let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
+let mut sessions = Vec::new();
+for credentials in keys {
+    let mut config = tradews::Config::new(url.clone(), credentials);
+    config.reconnect_limiter = Some(limiter.clone());
+    sessions.push(tradews::connect(config).await?);
+}
+
+// Market-data streams can share the same limiter.
+let stream = client
+    .market_stream_with(|config| config.reconnect_limiter = Some(limiter.clone()))
+    .await?;
+# let _ = (sessions, stream);
+# Ok(())
+# }
+```
+
 ## Realtime
 
 Realtime is binary-only. Account orders stream over the private WebSocket;
@@ -2881,6 +2939,7 @@ CI rejects private `ledger.write` symbols in public gen (same gate as Go/Python)
 | `src/realtime` | WebSocket subscriptions (always included; `realtime`/`chain` are empty compat flags) |
 | `src/catalogs`, `src/orderbook` | Catalog cache + local book helpers |
 | `src/marketstream` | Binary market-data stream client, local depth book, trade recovery; `sbe/` holds its schema and `src/marketstream/sbe` the generated SBE decoders |
+| `src/reconnect.rs` | `ReconnectLimiter`, a cap on concurrent WebSocket upgrades shared by many sessions |
 
 Proto stubs are updated when a new `src/gen/` bundle is landed. Day-to-day SDK
 work does not require local `buf` generation. After replacing gen files, run:

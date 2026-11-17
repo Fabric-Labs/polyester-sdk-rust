@@ -55,6 +55,7 @@ use super::{
 use crate::auth::Credentials;
 use crate::errors::{Error, Result};
 use crate::realtime::{ReconnectBackoff, lock_unpoisoned};
+use crate::reconnect::{ReconnectLimiter, upgrade_slot};
 
 type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
@@ -128,6 +129,15 @@ pub struct Config {
     pub answer_timeout: Duration,
     /// Permit a `ws://` URL on a host that is not loopback.
     pub allow_insecure_http: bool,
+    /// Shares a cap on concurrent upgrades with every other session and
+    /// stream given the same limiter ([`ReconnectLimiter`]): each upgrade,
+    /// the first included, waits for a slot once its backoff and any
+    /// `Retry-After` have run out, and holds it only until the upgrade ends.
+    /// `None`, the default, connects as soon as the session's own wait ends.
+    pub reconnect_limiter: Option<ReconnectLimiter>,
+    /// How long an upgrade may take before it fails and is retried.
+    #[cfg(test)]
+    pub(crate) connect_timeout: Duration,
 }
 
 impl Config {
@@ -141,7 +151,21 @@ impl Config {
             ping_interval: Duration::ZERO,
             answer_timeout: Duration::ZERO,
             allow_insecure_http: false,
+            reconnect_limiter: None,
+            #[cfg(test)]
+            connect_timeout: CONNECT_TIMEOUT,
         }
+    }
+
+    /// How long an upgrade may take before it fails.
+    #[cfg(not(test))]
+    fn connect_timeout(&self) -> Duration {
+        CONNECT_TIMEOUT
+    }
+
+    #[cfg(test)]
+    fn connect_timeout(&self) -> Duration {
+        self.connect_timeout
     }
 }
 
@@ -155,6 +179,7 @@ impl std::fmt::Debug for Config {
             .field("queue_size", &self.queue_size)
             .field("ping_interval", &self.ping_interval)
             .field("answer_timeout", &self.answer_timeout)
+            .field("reconnect_limiter", &self.reconnect_limiter)
             .finish_non_exhaustive()
     }
 }
@@ -328,7 +353,12 @@ pub async fn connect(mut config: Config) -> Result<TradeSession> {
     if config.answer_timeout.is_zero() {
         config.answer_timeout = DEFAULT_ANSWER;
     }
-    let ws = dial(&config, config.cancel_on_disconnect).await?;
+    // The first upgrade takes a slot of a shared limiter too, so the cap
+    // holds for sessions started together as for sessions dropped together.
+    let slot = upgrade_slot(config.reconnect_limiter.as_ref()).await;
+    let ws = dial(&config, config.cancel_on_disconnect).await;
+    drop(slot);
+    let ws = ws?;
     let (events, rx) = mpsc::channel(config.queue_size);
     let (commands, cmd_rx) = mpsc::channel(COMMAND_QUEUE);
     let (link, _) = watch::channel(Link::default());
@@ -851,7 +881,7 @@ async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws
         .max_message_size(Some(MAX_MESSAGE_BYTES))
         .max_frame_size(Some(MAX_MESSAGE_BYTES));
     let (mut ws, response) = tokio::time::timeout(
-        CONNECT_TIMEOUT,
+        cfg.connect_timeout(),
         connect_async_with_config(request, Some(config), true),
     )
     .await
@@ -1177,9 +1207,24 @@ async fn run(
                 Emitted::Gone => break 'session None,
                 Emitted::Full => break 'session Some(overflow()),
             }
-            if !wait(&shared, &mut cmds, delay).await {
+            if wait(&shared, &mut cmds, tokio::time::sleep(delay))
+                .await
+                .is_none()
+            {
                 break 'session None;
             }
+            // Only now, with the whole wait over, does the upgrade queue for
+            // a slot of a shared limiter: the queue adds to the wait and
+            // never shortens it. A close ends the queueing.
+            let Some(slot) = wait(
+                &shared,
+                &mut cmds,
+                upgrade_slot(shared.cfg.reconnect_limiter.as_ref()),
+            )
+            .await
+            else {
+                break 'session None;
+            };
             // The shutdown fence again, right before the upgrade, and the
             // upgrade itself ends when the session closes: no upgrade starts
             // or completes after a close.
@@ -1187,8 +1232,8 @@ async fn run(
                 break 'session None;
             }
             let mut stop = shared.stop.subscribe();
-            // The switch is read here, once, after the wait: a
-            // `disable_cancel_on_disconnect` that returned during the wait
+            // The switch is read here, once, after the waits: a
+            // `disable_cancel_on_disconnect` that returned during them
             // applies to this upgrade.
             let cancel_on_disconnect = shared.cancel_on_disconnect();
             let dialed = tokio::select! {
@@ -1196,6 +1241,9 @@ async fn run(
                 () = stopped(&mut stop) => break 'session None,
                 dialed = dial(&shared.cfg, cancel_on_disconnect) => dialed,
             };
+            // The upgrade has ended, accepted, refused or timed out: its
+            // slot goes back before anything else.
+            drop(slot);
             match dialed {
                 Ok(next) => break next,
                 Err(e) if fatal(&e) => break 'session Some(e),
@@ -1212,23 +1260,26 @@ async fn stopped(stop: &mut watch::Receiver<bool>) {
     let _ = stop.wait_for(|s| *s).await;
 }
 
-/// Sleeps `delay` between connections, refusing every command as stale;
-/// false when the session was closed meanwhile.
-async fn wait(shared: &Shared, cmds: &mut mpsc::Receiver<Cmd>, delay: Duration) -> bool {
-    let sleep = tokio::time::sleep(delay);
-    tokio::pin!(sleep);
+/// Waits for `until` between connections, refusing every command as stale;
+/// `None` when the session was closed meanwhile, which drops `until`.
+async fn wait<T>(
+    shared: &Shared,
+    cmds: &mut mpsc::Receiver<Cmd>,
+    until: impl std::future::Future<Output = T>,
+) -> Option<T> {
+    tokio::pin!(until);
     let mut stop = shared.stop.subscribe();
     loop {
         tokio::select! {
             biased;
-            () = stopped(&mut stop) => return false,
-            () = &mut sleep => return true,
+            () = stopped(&mut stop) => return None,
+            done = &mut until => return Some(done),
             cmd = cmds.recv() => match cmd {
                 Some(c) => {
                     let reason = if shared.is_closed() { NotSent::Closed } else { NotSent::Stale };
                     let _ = c.answer.send(Err(not_sent(c.command, reason)));
                 }
-                None => return false,
+                None => return None,
             },
         }
     }
