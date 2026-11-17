@@ -1306,6 +1306,10 @@ async fn a_write_the_peer_never_reads_ends_the_connection_in_time() {
 const WRITERS: u64 = 4;
 const COMMANDS_EACH: u64 = 150;
 const EVENTS_PER_ANSWER: u64 = 4;
+/// A small event queue, and the order events it may hold: the rest is room
+/// for the connection's own events.
+const LOADED_QUEUE: usize = 64;
+const ORDER_CREDIT: usize = LOADED_QUEUE - 16;
 
 async fn loaded(queue_size: usize) -> (TradeSession, Record) {
     let script = Script {
@@ -1321,18 +1325,28 @@ async fn loaded(queue_size: usize) -> (TradeSession, Record) {
     (session, record)
 }
 
+/// Every writer keeps a command in flight while one task drains the events.
+/// The commands' events come from the writers, not from the drain, so a
+/// drain the OS sets aside for a millisecond on a busy machine falls a few
+/// dozen events behind and overflows the queue, as a consumer that falls
+/// behind must. The drain grants the writers credit for each order event it
+/// takes, so the queue never holds more than it can, however the threads are
+/// scheduled; at full speed the credit is never short.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn commands_in_flight_while_events_drain_under_load() {
-    // A small event queue: the drain must keep up while every writer keeps
-    // a command in flight.
-    let (session, record) = loaded(64).await;
+    let (session, record) = loaded(LOADED_QUEUE).await;
     let (sender, mut events) = session.split();
     let total = WRITERS * COMMANDS_EACH * EVENTS_PER_ANSWER;
+    let credit = Arc::new(tokio::sync::Semaphore::new(ORDER_CREDIT));
+    let granted = credit.clone();
     let drain = tokio::spawn(async move {
         let mut orders = 0;
         while orders < total {
             match events.recv().await {
-                Some(Event::Order(_)) => orders += 1,
+                Some(Event::Order(_)) => {
+                    orders += 1;
+                    granted.add_permits(1);
+                }
                 Some(_) => {}
                 None => break,
             }
@@ -1342,8 +1356,14 @@ async fn commands_in_flight_while_events_drain_under_load() {
     let writers: Vec<_> = (0..WRITERS)
         .map(|w| {
             let sender = sender.clone();
+            let credit = credit.clone();
             tokio::spawn(async move {
                 for i in 0..COMMANDS_EACH {
+                    credit
+                        .acquire_many(EVENTS_PER_ANSWER as u32)
+                        .await
+                        .expect("credit")
+                        .forget();
                     sender
                         .cancel_order(7, &OrderRef::Id(w * 10_000 + i + 1), within(5_000))
                         .await
