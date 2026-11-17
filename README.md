@@ -90,7 +90,10 @@ empty when unset), `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
 for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
 `sub_accounts.get`, `READ_SUBACCOUNT_ACTIVITY` for
-`sub_accounts.list_activity`, `READ_SUBACCOUNT_MEMBERS` for
+`sub_accounts.list_activity`, `READ_ACCOUNT_ACTIVITY` for
+`sub_accounts.list_account_activity` (the main account's and every
+sub-account's security and activity events in one feed, newest first; a key
+scoped to a sub-account reads only that sub-account's), `READ_SUBACCOUNT_MEMBERS` for
 `sub_accounts.list_members` (and the members of `sub_accounts.get`),
 `READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
 `sub_accounts.get`, which leaves out an expansion the key may not read rather
@@ -1224,6 +1227,16 @@ nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
 cancel outcome unknown, so send it again with the same idempotency key
 (`cancel` is idempotent) or read the alerts back.
 
+`AlertChannel::Telegram` needs a Telegram account linked to the account and
+an environment that offers Telegram alerts. Otherwise a `create`, or an
+`update` that changes an alert whose channels then include Telegram, is
+refused (`failed_precondition`, nothing changed, final) with
+`TELEGRAM_NOT_LINKED` (link Telegram in the account settings, or send in-app
+only) or `TELEGRAM_UNAVAILABLE` (send in-app only); an update that changes
+nothing, or repeats an earlier idempotency key, answers as before. A fired
+alert whose Telegram message could not be delivered shows in the account's
+notification inbox, which this SDK does not wrap.
+
 A price bound to a market (`Price::from_ticks(t, Some("ETH-USDT".into()))`)
 is checked against the catalogs' name for the market's ID; when the catalogs
 don't know that ID (never loaded, failed to load, or not listed) `create`
@@ -1592,15 +1605,23 @@ SDK notes:
 - **Trading → external destination check:**
   `client.withdraw.validate_destination(chain_id, address).await?` returns
   user-safe `valid` / `code` / `message` / `canonical_destination_address`
-  without creating a withdraw (create RPCs remain authoritative). An API key
+  without creating a withdraw (create RPCs remain authoritative). `chain_id`,
+  like every withdrawal's `destination_chain_id`, is the Polyester chain ID
+  (`ZipperChainConfig::chain_id` from `zipper.get_deposit_withdraw_config`), not the
+  network's `native_chain_id`: a native ID answers `valid: false` with
+  `UNSUPPORTED_CHAIN`, and a withdrawal naming one is refused with
+  `ERROR_CODE_INVALID_DESTINATION_CHAIN` (not retryable). An API key
   needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
   opens it.
 - **Smart account wallet:** `client.withdraw.get_wallet_balances(SubAccountScope::Default).await?`
   lists the zTokens the account's smart account wallet holds on Polyester
   Chain, such as the refund of a withdrawal Zipper rejected (the amount less
   the fee Zipper kept), with each balance in 18-decimal units (`amount_e18`)
-  and whole units (`amount`). Pass a sub-account ID to read that sub-account's
-  wallet. An API key needs `READ_BALANCES`.
+  and whole units (`amount`). An asset whose balance could not be read is in
+  `unavailable_assets` with its `reason` (`no_contract`, `read_failed` or
+  `invalid_balance`): its balance is unknown, not zero, so check
+  `is_complete()` and read again later. Pass a sub-account ID to read that
+  sub-account's wallet. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The result's `flow_id` names the transfer's lifecycle flow
   (`client.lifecycle.get_account_flow`). Looking a transfer up by its request or
@@ -2280,8 +2301,14 @@ unsigned: a plain-text `description`, official links (`website_url`,
 (an exact decimal `amount` in `USD`; `None` when unknown, distinct from a known
 zero). Pass the numeric asset IDs (the spot config's `ledger_id`), or none for
 every saved entry. The result is complete, in ascending `asset_id` order, with
-no paging; assets never edited are left out. Empty strings and lists mean
-unknown: hide them.
+no paging; assets with neither an editorial nor market datapoints are left
+out. Empty strings and lists mean unknown: hide them. `market_stats` holds the
+asset's market datapoints when it has any: `circulating_supply`,
+`total_supply`, `max_supply` (or the `max_supply_unlimited` flag),
+`market_cap_usd`, `fully_diluted_market_cap_usd` and `rank`, each an exact
+decimal `value` string with its `source` (`coinmarketcap`, shown as "Source:
+CoinMarketCap", or `polyester`) and `as_of` time. An absent value is unknown;
+a value stays until a newer observation replaces it, so show its `as_of`.
 
 Merged market overview stream (snapshot + live updates):
 

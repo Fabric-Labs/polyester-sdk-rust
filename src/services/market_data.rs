@@ -123,14 +123,17 @@ impl MarketDataService {
         spot_config_from_proto(&resp)
     }
 
-    /// Team-maintained asset information: descriptions, official links and
-    /// known launch dates and prices (`marketdata.v1.MarketDataService/ListAssetInfo`).
+    /// Asset information (`marketdata.v1.MarketDataService/ListAssetInfo`):
+    /// team-maintained descriptions, official links and known launch dates
+    /// and prices, and market datapoints (supply, market capitalization,
+    /// rank) with their source and observation time.
     /// Public: no API key is needed and the request is never signed.
     ///
     /// Pass the numeric asset IDs to read (the spot config's `ledger_id`), or
     /// none for every saved entry. Duplicate and unknown IDs are ignored, and
-    /// assets never edited are left out. The result is complete, with no
-    /// paging, in ascending `asset_id` order.
+    /// assets with neither an editorial nor market datapoints are left out;
+    /// an asset with datapoints only has an empty editorial. The result is
+    /// complete, with no paging, in ascending `asset_id` order.
     ///
     /// At most 1000 IDs, each from 1 to 2147483647, as the contract allows;
     /// any other list is refused with [`Error::Validation`] before sending.

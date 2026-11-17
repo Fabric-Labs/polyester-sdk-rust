@@ -58,10 +58,15 @@ pub struct ApiPolicy {
     /// `READ_REWARDS`, `CREATE_DEPOSIT_ADDRESS`, `READ_DEPOSIT_ADDRESSES`,
     /// `READ_SUBACCOUNTS`, `READ_SUBACCOUNT_ACTIVITY`,
     /// `READ_SUBACCOUNT_MEMBERS`, `READ_SUBACCOUNT_INVITES`,
-    /// `READ_GUARD_SIGNER_STATUS`, `READ_STATEMENTS`, `CONVERT_DUST` (quote
-    /// and convert dust, read conversions) and `READ_FUNDING_FLOWS` (the
-    /// account's own lifecycle flows). Tell them apart by name, not by
-    /// number: `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
+    /// `READ_GUARD_SIGNER_STATUS`, `READ_STATEMENTS`,
+    /// `READ_NOTIFICATIONS` (list, read and count the main account's
+    /// notifications; main-account keys only) and `READ_ACCOUNT_ACTIVITY`
+    /// (the security and activity events of the main account and its
+    /// sub-accounts within the key's scope). `CONVERT_DUST` (quote and
+    /// convert dust, read conversions) and `READ_FUNDING_FLOWS` (the
+    /// account's own lifecycle flows) are product actions, valid on both
+    /// policy kinds. Tell them apart by name, not by number:
+    /// `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
     pub actions: Vec<String>,
 }
 

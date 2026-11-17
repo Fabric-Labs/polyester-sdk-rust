@@ -550,6 +550,14 @@ pub mod alert_codes {
     /// The root account's API key was refused because it is scoped to a
     /// sub-account.
     pub const SUBACCOUNT_KEY_REFUSED: &str = "SUBACCOUNT_KEY_REFUSED";
+    /// A create, or an update that changes an alert whose channels then
+    /// include Telegram, for an account without a linked Telegram account.
+    /// Nothing changed. Final: link Telegram in the account settings, or
+    /// send the alert in-app only.
+    pub const TELEGRAM_NOT_LINKED: &str = "TELEGRAM_NOT_LINKED";
+    /// Telegram alerts are not offered in this environment. Nothing changed.
+    /// Final: send the alert in-app only.
+    pub const TELEGRAM_UNAVAILABLE: &str = "TELEGRAM_UNAVAILABLE";
 }
 
 /// Stable REST problem codes that every service answers alike.
@@ -574,6 +582,11 @@ pub mod withdraw_codes {
     /// suspended (REST `ROUTE_SUSPENDED`, Connect `failed_precondition`, HTTP
     /// 400); see [`super::Error::is_withdraw_route_suspended`].
     pub const ROUTE_SUSPENDED: &str = "ERROR_CODE_ROUTE_SUSPENDED";
+    /// The withdrawal names a `destination_chain_id` that is not a Polyester
+    /// chain ID, such as the network's native chain ID (`invalid_argument`,
+    /// HTTP 400). Final: send `ZipperChainConfig::chain_id` from the deposit and
+    /// withdraw config.
+    pub const INVALID_DESTINATION_CHAIN: &str = "ERROR_CODE_INVALID_DESTINATION_CHAIN";
 }
 
 /// `transfer.v1.ErrorCode` names of dust conversion and batch transfer

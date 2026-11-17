@@ -395,6 +395,13 @@ impl WithdrawService {
     /// `READ_WITHDRAW_VALIDATION` on its policy (`EXTERNAL_WITHDRAW` alone no
     /// longer opens it), and is refused with `permission_denied` and the
     /// withdraw code `ERROR_CODE_PERMISSION_DENIED` without it.
+    ///
+    /// `destination_chain_id`, like every withdrawal's, is the Polyester chain
+    /// ID ([`crate::models::ZipperChainConfig::chain_id`] from the deposit and
+    /// withdraw config), not the network's `native_chain_id`: a native ID
+    /// answers `valid: false` with `UNSUPPORTED_CHAIN`, and a withdrawal that
+    /// names one is refused with
+    /// [`crate::errors::withdraw_codes::INVALID_DESTINATION_CHAIN`].
     pub async fn validate_destination(
         &self,
         destination_chain_id: u64,

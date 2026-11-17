@@ -85,6 +85,9 @@ pub(crate) const MARKET_OVERVIEW_LIMIT_MAX: u32 = 2_000;
 /// Largest sub-account activity page: the `uint32.lte` rule on
 /// `ListSubaccountEventsRequest.limit`.
 pub(crate) const SUBACCOUNT_EVENTS_LIMIT_MAX: u32 = 200;
+/// Largest account activity page: the `uint32.lte` rule on
+/// `ListAccountActivityRequest.limit`.
+pub(crate) const ACCOUNT_ACTIVITY_LIMIT_MAX: u32 = 200;
 /// Largest `ListTriggers` and `ListTriggerEvents` page: the `uint32.lte` rule
 /// on their `limit`.
 pub(crate) const TRIGGER_LIST_LIMIT_MAX: u32 = 1_000;
@@ -365,6 +368,11 @@ mod tests {
                 auth,
                 "ListSubaccountEventsRequest",
                 maximum_is(SUBACCOUNT_EVENTS_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListAccountActivityRequest",
+                maximum_is(ACCOUNT_ACTIVITY_LIMIT_MAX),
             ),
             (
                 triggers,

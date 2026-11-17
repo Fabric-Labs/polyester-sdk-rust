@@ -146,3 +146,39 @@ pub struct SubAccountActivityList {
     pub events: Vec<SubAccountActivityEvent>,
     pub next_page_token: String,
 }
+
+/// One event of the whole account's activity feed, from
+/// [`crate::services::SubAccountsService::list_account_activity`].
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AccountActivityEvent {
+    /// `<entity>:<action>` in lowercase, as [`SubAccountActivityEvent`]
+    /// names it, such as `"api_key:created"`.
+    pub event_type: String,
+    /// When the event occurred, in Unix milliseconds (UTC).
+    pub ts_ms: i64,
+    /// Client channel the event came from, such as `"web"`, `"mobile"` or
+    /// `"api"`; empty when unspecified.
+    pub source: String,
+    /// Sub-account the event belongs to, as a base58 ID; `None` for an event
+    /// of the main account itself.
+    pub subaccount_id: Option<String>,
+    /// Account that performed the action, as a base58 ID; `None` when the
+    /// server named none.
+    pub actor_account_id: Option<String>,
+    /// API key the actor used, as a base58 ID; `None` when it used a session.
+    pub actor_api_key_id: Option<String>,
+    /// Origin IP address, masked for callers other than the owner and admins.
+    pub ip: String,
+    /// User agent of the event, when available.
+    pub user_agent: String,
+    /// Structured event details as a JSON string, kept as sent.
+    pub payload_json: String,
+}
+
+/// One page of the whole account's activity feed, newest first.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AccountActivityList {
+    pub events: Vec<AccountActivityEvent>,
+    /// Cursor for the next page; empty when there is none.
+    pub next_page_token: String,
+}

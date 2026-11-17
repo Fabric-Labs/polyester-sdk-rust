@@ -26,6 +26,7 @@ procedure	access
 /alerts.v1.PriceAlertService/CreateAlert	signed
 /alerts.v1.PriceAlertService/ListAlerts	signed
 /alerts.v1.PriceAlertService/UpdateAlert	signed
+/auth.v1.AccountActivityService/ListAccountActivity	signed
 /auth.v1.AddressBookService/CopyAddressBookEntry	signed
 /auth.v1.AddressBookService/CreateAddressBookEntry	signed
 /auth.v1.AddressBookService/CreateAddressBookTag	signed
@@ -216,6 +217,8 @@ procedure	access
 /swap.quickswap.v1.QuickSwapBrokerService/SetMemberRole	signed
 /swap.quickswap.v1.QuickSwapBrokerService/SetVaultStatus	signed
 /swap.quickswap.v1.QuickSwapBrokerService/TransferOwnership	signed
+/swap.quickswap.v1.QuickSwapExplorerService/GetQuickSwapStats	public
+/swap.quickswap.v1.QuickSwapExplorerService/ListCompletedQuickSwaps	public
 /swap.quickswap.v1.QuickSwapReferralService/CheckReferralCode	signed
 /swap.quickswap.v1.QuickSwapReferralService/EnrollReferralPartner	signed
 /swap.quickswap.v1.QuickSwapReferralService/GetReferralPartner	signed

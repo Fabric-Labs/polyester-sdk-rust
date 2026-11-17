@@ -757,6 +757,46 @@ impl SubAccountsService {
         };
         Ok(subaccount_activity_list_from_proto(&resp))
     }
+
+    /// List the security and activity events of the main account and its
+    /// sub-accounts in one feed, newest first
+    /// (`auth.v1.AccountActivityService/ListAccountActivity`): sign-ins, API
+    /// key, MFA, policy, member, invite and saved-destination changes. Only
+    /// the main account's own session, or an API key with
+    /// `READ_ACCOUNT_ACTIVITY`, may call it; a key scoped to a sub-account
+    /// reads only that sub-account's events.
+    ///
+    /// Every filter of `req` narrows the feed and is sent as given:
+    /// `subaccount_ids` with `include_main_account` select the accounts
+    /// (neither: the main account and every sub-account the caller may
+    /// read), and `entity_kinds`, `event_actions`, `sources`, `api_key_id`,
+    /// `start_time` and `end_time` narrow the events. Follow
+    /// `next_page_token` with the same filters. A `limit` above 200 is
+    /// refused before sending; 0 takes the server's default of 50.
+    pub async fn list_account_activity(
+        &self,
+        req: crate::proto::auth::v1::ListAccountActivityRequest,
+    ) -> crate::errors::Result<crate::models::AccountActivityList> {
+        use crate::codecs::decode::account_activity_list_from_proto;
+        super::limits::check_limit(
+            "sub_accounts.list_account_activity",
+            req.limit,
+            super::limits::ACCOUNT_ACTIVITY_LIMIT_MAX,
+        )?;
+        let client = crate::connect::auth::v1::AccountActivityServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        );
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/auth.v1.AccountActivityService/ListAccountActivity",
+            req,
+            |req, opts| client.list_account_activity_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        Ok(account_activity_list_from_proto(&resp))
+    }
 }
 
 impl AddressBookService {
@@ -1742,7 +1782,11 @@ impl SocialVerificationService {
     /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED` carries `retryAfter`, the time
     /// from which a new one may succeed; a restarted X/Twitter or Discord
     /// verification keeps the linked account's `providerUserId` and
-    /// `verifiedAt` until it succeeds. Starting, confirming and
+    /// `verifiedAt` until it succeeds. A linked X/Twitter or Discord account
+    /// carries `changeAvailableAt` (UTC) while it is inside its one change or
+    /// unlink per 30 days: a change or unlink before then is refused with
+    /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED`, so offer it only from that time;
+    /// an API key's read leaves it out. Starting, confirming and
     /// unlinking a verification stay session-only; confirming a Telegram link
     /// also needs a fresh MFA step-up.
     pub async fn get(&self, provider: &str) -> crate::errors::Result<crate::models::ApiData> {

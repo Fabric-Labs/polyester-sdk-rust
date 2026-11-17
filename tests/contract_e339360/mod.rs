@@ -188,3 +188,49 @@ async fn get_wallet_balances_refuses_a_balance_without_amount() {
         "{err:?}"
     );
 }
+
+/// An asset whose balance could not be read is listed as unavailable, with
+/// its reason, and the read is incomplete: its balance is unknown, not zero.
+#[tokio::test]
+async fn get_wallet_balances_reports_unreadable_assets() {
+    use polyester::proto::chain::withdraw::v1::{
+        GetWalletBalancesResponse, UnavailableWalletAsset, WalletAssetUnavailableReason,
+    };
+
+    let server = MockHttpServer::spawn(|_| {
+        connect_proto_ok(&GetWalletBalancesResponse {
+            smart_account_address: "0x1111".into(),
+            unavailable_assets: vec![
+                UnavailableWalletAsset {
+                    zipped_asset_id: 12,
+                    unified_asset_id: 3,
+                    chain_id: 1,
+                    ztoken_address: "0x2222".into(),
+                    reason: WalletAssetUnavailableReason::READ_FAILED.into(),
+                    ..Default::default()
+                },
+                UnavailableWalletAsset {
+                    zipped_asset_id: 13,
+                    reason: buffa::EnumValue::from(9),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        })
+    })
+    .await;
+    let wallet = keyed_client(&server)
+        .withdraw
+        .get_wallet_balances(SubAccountScope::Default)
+        .await
+        .unwrap();
+    assert!(wallet.balances.is_empty());
+    assert!(!wallet.is_complete());
+    let reasons: Vec<_> = wallet
+        .unavailable_assets
+        .iter()
+        .map(|a| (a.zipped_asset_id, a.reason.as_str()))
+        .collect();
+    assert_eq!(reasons, [(12, "read_failed"), (13, "unknown(9)")]);
+    assert_eq!(wallet.unavailable_assets[0].ztoken_address, "0x2222");
+}

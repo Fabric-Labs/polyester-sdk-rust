@@ -56,6 +56,8 @@ alerts.v1.PriceAlert.symbol_id	not_required	reference to a market
 auth.v1.AccountScopeRef.root_account_id	not_required	reference to an account; 0 or empty where the contract allows
 auth.v1.AccountScopeRef.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 auth.v1.ActivityEvent.actor_account_id	not_required	reference to an account; 0 or empty where the contract allows
+auth.v1.ActivityEvent.actor_api_key_id	not_required	optional reference; 0 or empty means none
+auth.v1.ActivityEvent.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 auth.v1.AddressBookEntry.address_book_entry_id	required	
 auth.v1.AddressBookTag.tag_id	required	
 auth.v1.AddressBookTagSummary.tag_id	required	
@@ -135,6 +137,9 @@ chain.withdraw.v1.AutoWithdrawStep.destination_chain_id	not_required	reference t
 chain.withdraw.v1.AutoWithdrawStep.intent_id	not_required	reference to another object; 0 or empty when none
 chain.withdraw.v1.CreateTradingWithdrawResponse.intent_id	required	
 chain.withdraw.v1.CreateWalletTradingWithdrawResponse.intent_id	required	
+chain.withdraw.v1.UnavailableWalletAsset.chain_id	not_required	reference to a chain
+chain.withdraw.v1.UnavailableWalletAsset.unified_asset_id	not_required	reference to an asset
+chain.withdraw.v1.UnavailableWalletAsset.zipped_asset_id	not_required	reference to an asset
 chain.withdraw.v1.WalletBalance.chain_id	not_required	reference to a chain
 chain.withdraw.v1.WalletBalance.unified_asset_id	not_required	reference to an asset
 chain.withdraw.v1.WalletBalance.zipped_asset_id	not_required	reference to an asset
@@ -263,6 +268,10 @@ swap.quickswap.v1.ChargedFee.asset_id	not_required	reference to an asset
 swap.quickswap.v1.Deposit.flow_id	not_required	reference to another object; 0 or empty when none
 swap.quickswap.v1.Deposit.zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.DepositInstructions.zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ExplorerQuickSwap.destination_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ExplorerQuickSwap.source_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ExplorerQuickSwap.swap_id	required	
+swap.quickswap.v1.ExplorerRouteLeg.symbol_id	not_required	reference to a market
 swap.quickswap.v1.FeeSplit.asset_id	not_required	reference to an asset
 swap.quickswap.v1.FeeTotal.asset_id	not_required	reference to an asset
 swap.quickswap.v1.FeeTotal.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
@@ -279,6 +288,8 @@ swap.quickswap.v1.PayoutStep.destination_chain_id	not_required	reference to a ch
 swap.quickswap.v1.QuickSwap.refund_zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.QuickSwap.swap_id	required	
 swap.quickswap.v1.QuickSwapQuote.intermediate_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuickSwapRouteStats.destination_zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.QuickSwapRouteStats.source_zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.QuickSwapSummary.swap_id	required	
 swap.quickswap.v1.QuickSwapTerms.destination_zipped_asset_id	not_required	reference to an asset
 swap.quickswap.v1.QuickSwapTerms.source_zipped_asset_id	not_required	reference to an asset
@@ -314,6 +325,7 @@ swap.quickswap.v1.VaultLedgerPayoutRefund.run_id	not_required	reference to anoth
 swap.quickswap.v1.VaultPayoutRule.vault_account_id	not_required	reference to an account; 0 or empty where the contract allows
 swap.quickswap.v1.Withdrawal.flow_id	not_required	reference to another object; 0 or empty when none
 swap.quickswap.v1.Withdrawal.zipped_asset_id	not_required	reference to an asset
+swap.quickswap.v1.ZippedAssetVolume.zipped_asset_id	not_required	reference to an asset
 swap.v1.Swap.destination_asset_id	not_required	reference to an asset
 swap.v1.Swap.source_asset_id	not_required	reference to an asset
 swap.v1.Swap.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows

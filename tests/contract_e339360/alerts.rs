@@ -472,6 +472,8 @@ async fn alert_refusals_map_to_sdk_errors() {
             ErrorCode::ALERT_UPDATE_LIMIT_REACHED,
         ),
         (404, "not_found", ErrorCode::ALERT_NOT_FOUND),
+        (400, "failed_precondition", ErrorCode::TELEGRAM_NOT_LINKED),
+        (400, "failed_precondition", ErrorCode::TELEGRAM_UNAVAILABLE),
     ];
     for (status, code, detail) in cases {
         let server = MockHttpServer::spawn(move |_| connect_error(status, code, detail)).await;

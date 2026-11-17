@@ -5,8 +5,9 @@ use crate::codecs::scalars::{LEDGER_SCALE, format_ledger_u128, u128_to_str};
 use crate::errors::{Error, Result};
 use crate::models::{
     DepositAddress, DepositAddressesList, InternalTransferBatchLegResult,
-    InternalTransferBatchResult, InternalTransferResult, ResolvedDestination, WalletBalance,
-    WalletBalances, WithdrawDestinationValidation, WithdrawIntentResult,
+    InternalTransferBatchResult, InternalTransferResult, ResolvedDestination,
+    UnavailableWalletAsset, WalletBalance, WalletBalances, WithdrawDestinationValidation,
+    WithdrawIntentResult,
 };
 use crate::proto::chain::deposit::v1::{
     CreateDepositAddressResponse, DepositAddress as ProtoDepositAddress,
@@ -312,6 +313,17 @@ pub fn wallet_balances_from_proto(msg: &GetWalletBalancesResponse) -> Result<Wal
             .iter()
             .map(wallet_balance_from_proto)
             .collect::<Result<_>>()?,
+        unavailable_assets: msg
+            .unavailable_assets
+            .iter()
+            .map(|asset| UnavailableWalletAsset {
+                zipped_asset_id: asset.zipped_asset_id,
+                unified_asset_id: asset.unified_asset_id,
+                chain_id: asset.chain_id,
+                ztoken_address: asset.ztoken_address.clone(),
+                reason: super::changelog::changelog_enum_label(&asset.reason),
+            })
+            .collect(),
     })
 }
 

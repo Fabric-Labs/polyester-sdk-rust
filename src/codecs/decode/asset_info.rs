@@ -1,10 +1,42 @@
 //! Decode `marketdata.v1.ListAssetInfoResponse`.
 
-use crate::models::{AssetEditorialInfo, AssetInfo, AssetIssuePrice};
+use super::changelog_enum_label;
+use crate::models::{
+    AssetEditorialInfo, AssetInfo, AssetIssuePrice, AssetMarketFlag, AssetMarketStats,
+    AssetMarketValue,
+};
 use crate::proto::marketdata::v1::{
     AssetEditorialInfo as ProtoAssetEditorialInfo, AssetInfo as ProtoAssetInfo,
-    ListAssetInfoResponse,
+    AssetMarketFlag as ProtoAssetMarketFlag, AssetMarketStats as ProtoAssetMarketStats,
+    AssetMarketValue as ProtoAssetMarketValue, ListAssetInfoResponse,
 };
+
+fn market_value(value: &buffa::MessageField<ProtoAssetMarketValue>) -> Option<AssetMarketValue> {
+    value.as_option().map(|v| AssetMarketValue {
+        value: v.value.clone(),
+        source: changelog_enum_label(&v.source),
+        as_of: v.as_of.as_option().cloned(),
+    })
+}
+
+fn market_flag(flag: &buffa::MessageField<ProtoAssetMarketFlag>) -> Option<AssetMarketFlag> {
+    flag.as_option().map(|f| AssetMarketFlag {
+        source: changelog_enum_label(&f.source),
+        as_of: f.as_of.as_option().cloned(),
+    })
+}
+
+fn market_stats_from_proto(msg: &ProtoAssetMarketStats) -> AssetMarketStats {
+    AssetMarketStats {
+        circulating_supply: market_value(&msg.circulating_supply),
+        total_supply: market_value(&msg.total_supply),
+        max_supply: market_value(&msg.max_supply),
+        max_supply_unlimited: market_flag(&msg.max_supply_unlimited),
+        market_cap_usd: market_value(&msg.market_cap_usd),
+        fully_diluted_market_cap_usd: market_value(&msg.fully_diluted_market_cap_usd),
+        rank: market_value(&msg.rank),
+    }
+}
 
 fn asset_editorial_from_proto(msg: &ProtoAssetEditorialInfo) -> AssetEditorialInfo {
     AssetEditorialInfo {
@@ -33,6 +65,7 @@ pub fn asset_info_from_proto(msg: &ProtoAssetInfo) -> AssetInfo {
             .map(asset_editorial_from_proto)
             .unwrap_or_default(),
         editorial_updated_at: msg.editorial_updated_at.as_option().cloned(),
+        market_stats: msg.market_stats.as_option().map(market_stats_from_proto),
     }
 }
 
@@ -117,5 +150,69 @@ mod tests {
         assert_eq!(cleared.editorial, AssetEditorialInfo::default());
         assert_eq!(cleared.editorial.issue_price, None);
         assert_eq!(cleared.editorial_updated_at, None);
+        assert_eq!(cleared.market_stats, None);
+    }
+
+    /// Market datapoints keep their exact values, sources and times; an
+    /// absent value stays unknown, and an unlimited maximum supply is a flag
+    /// with no value. An asset with datapoints and no editorial is listed
+    /// with an empty editorial.
+    #[test]
+    fn asset_market_stats_keep_values_sources_and_times() {
+        use crate::proto::marketdata::v1::{
+            AssetDataSource, AssetMarketFlag as Flag, AssetMarketStats as Stats,
+            AssetMarketValue as Value,
+        };
+        let at = |seconds| Timestamp {
+            seconds,
+            ..Default::default()
+        };
+        let msg = ProtoAssetInfo {
+            asset_id: 3,
+            market_stats: Stats {
+                circulating_supply: Value {
+                    value: "19876543.12345678".into(),
+                    source: AssetDataSource::COINMARKETCAP.into(),
+                    as_of: at(1_794_700_000).into(),
+                    ..Default::default()
+                }
+                .into(),
+                max_supply_unlimited: Flag {
+                    source: AssetDataSource::POLYESTER.into(),
+                    as_of: at(1_794_600_000).into(),
+                    ..Default::default()
+                }
+                .into(),
+                rank: Value {
+                    value: "1".into(),
+                    source: buffa::EnumValue::from(7),
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let info = asset_info_from_proto(&msg);
+        assert_eq!(info.editorial, AssetEditorialInfo::default());
+        assert_eq!(info.editorial_updated_at, None);
+        let stats = info.market_stats.expect("market stats");
+        let circulating = stats.circulating_supply.expect("circulating supply");
+        assert_eq!(circulating.value, "19876543.12345678");
+        assert_eq!(circulating.source, "coinmarketcap");
+        assert_eq!(circulating.as_of.map(|t| t.seconds), Some(1_794_700_000));
+        assert_eq!(stats.max_supply, None);
+        let unlimited = stats.max_supply_unlimited.expect("unlimited flag");
+        assert_eq!(unlimited.source, "polyester");
+        let rank = stats.rank.expect("rank");
+        assert_eq!(
+            (rank.value.as_str(), rank.source.as_str()),
+            ("1", "unknown(7)")
+        );
+        assert_eq!(rank.as_of, None);
+        assert_eq!(stats.total_supply, None);
+        assert_eq!(stats.market_cap_usd, None);
+        assert_eq!(stats.fully_diluted_market_cap_usd, None);
     }
 }
