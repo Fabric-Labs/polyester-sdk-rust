@@ -1431,8 +1431,26 @@ impl Error {
     /// expired or canceled, by an earlier cancel or otherwise. A repeated
     /// cancel of an order it ended answers this too. Treat it as "already
     /// done" and read the order for how it ended.
+    ///
+    /// It matches that code only. An ended order can also answer
+    /// `ERROR_CODE_ORDER_UNKNOWN` ([`Self::is_order_unknown`]); for an order
+    /// the caller knows ended, that is done too.
     pub fn is_order_already_terminal(&self) -> bool {
         self.auth_error_code() == Some(order_codes::ORDER_ALREADY_TERMINAL)
+    }
+
+    /// True when a cancel or change named an order the exchange cannot
+    /// confirm (`ERROR_CODE_ORDER_UNKNOWN`, ConnectRPC `not_found`). It does
+    /// not prove the order never existed: an order that ended answers it by
+    /// client order ID once that ID's window (at least a minute after the
+    /// order ended) has passed, and by order ID after exchange maintenance,
+    /// such as a market listing or a recovery, that the order ended before.
+    /// An open order is never reported unknown under its own order ID and
+    /// market. For an order the caller placed and knows ended, treat it as
+    /// done; otherwise read the order: an ended status means nothing is left
+    /// to cancel or modify. Not retryable.
+    pub fn is_order_unknown(&self) -> bool {
+        self.auth_error_code() == Some(order_codes::ORDER_UNKNOWN)
     }
 
     /// Names the called procedure (`/package.Service/Method`) on an
@@ -3369,6 +3387,10 @@ mod tests {
         );
         assert!(!unknown.is_order_already_terminal());
         assert_eq!(unknown.auth_error_code(), Some(order_codes::ORDER_UNKNOWN));
+        // Each helper stays exact, and neither code is retryable: an ended
+        // order may answer either one.
+        assert!(unknown.is_order_unknown() && !ended.is_order_unknown());
+        assert!(!unknown.is_retryable() && !unknown.mutation_outcome_unknown());
     }
 
     #[test]

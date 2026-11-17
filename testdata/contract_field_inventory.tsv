@@ -83,6 +83,7 @@ orders.v1.ErrorDetail.cause_code	covered	Error::cause_code
 orders.v1.ErrorDetail.code	covered	Error::Api.code / Error::RateLimit.code
 orders.v1.ErrorDetail.existing_order_id	covered	Error::existing_order_id
 orders.v1.ErrorDetail.level_index	covered	Error::level_index
+orders.v1.ErrorDetail.price_band_limit_ticks	covered	OrderErrorDetail::price_band_limit (preview rejection)
 orders.v1.ErrorDetail.rate_limit	covered	Error::RateLimit.detail
 orders.v1.ErrorDetail.violations	covered	Error::violations
 transfer.v1.BatchCreateInternalTransfersRequest.idempotency_key	covered	BatchCreateInternalTransfersParams.idempotency_key

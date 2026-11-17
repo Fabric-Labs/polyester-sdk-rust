@@ -132,6 +132,31 @@ fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &
     }
 }
 
+/// An attached leg's value refused before sending, as [`Error::Api`] with the
+/// code the server answers for the same mistake and no violation: the same
+/// codes a standalone trigger's refusal carries.
+fn order_code_refusal(code: &str, message: impl Into<String>) -> Error {
+    Error::Api {
+        message: message.into(),
+        code: code.to_owned(),
+        metadata: Vec::new(),
+        violations: Vec::new(),
+        answer: None,
+    }
+}
+
+/// Codes of the attached-leg refusals ([`order_code_refusal`]).
+mod leg_codes {
+    pub const BAD_PRICE: &str = "ERROR_CODE_BAD_PRICE";
+    pub const MAX_SLIPPAGE_INVALID: &str = "ERROR_CODE_MAX_SLIPPAGE_INVALID";
+    pub const SLIPPAGE_BPS_INVALID: &str = "ERROR_CODE_SLIPPAGE_BPS_INVALID";
+    pub const SLIPPAGE_TICKS_INVALID: &str = "ERROR_CODE_SLIPPAGE_TICKS_INVALID";
+    pub const TRAILING_DISTANCE_INVALID: &str = "ERROR_CODE_TRAILING_DISTANCE_INVALID";
+    pub const TRIGGER_ACTIVATION_PRICE_INVALID: &str =
+        "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID";
+    pub const TRIGGER_PRICE_INVALID: &str = "ERROR_CODE_TRIGGER_PRICE_INVALID";
+}
+
 /// When a batch's status window ends, as a local instant: `window` after
 /// `accepted_ts_ns` (Unix nanoseconds), or `window` after `fallback` when the
 /// admission time is unknown.
@@ -909,10 +934,11 @@ impl OrdersService {
             }
             (CreateOrderType::Limit, Some(price)) => {
                 risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
-                    price_ticks: positive_constraint_price(
+                    price_ticks: coded_positive_price(
                         price,
                         symbol,
                         &format!("attached_risk {leg_name} limit_price"),
+                        leg_codes::BAD_PRICE,
                     )?,
                     ..Default::default()
                 }))
@@ -931,12 +957,13 @@ impl OrdersService {
 
     fn encode_take_profit(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
         let mut policy = TakeProfitPolicy {
-            trigger_price_ticks: positive_constraint_price(
+            trigger_price_ticks: coded_positive_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached take_profit requires trigger_price")
                 })?,
                 symbol,
                 "attached_risk take_profit trigger_price",
+                leg_codes::TRIGGER_PRICE_INVALID,
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
@@ -948,12 +975,13 @@ impl OrdersService {
 
     fn encode_stop_loss(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
         let mut policy = StopLossPolicy {
-            trigger_price_ticks: positive_constraint_price(
+            trigger_price_ticks: coded_positive_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached stop_loss requires trigger_price")
                 })?,
                 symbol,
                 "attached_risk stop_loss trigger_price",
+                leg_codes::TRIGGER_PRICE_INVALID,
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
@@ -984,11 +1012,12 @@ impl OrdersService {
         };
         if let Some(activation) = stop.activation_price.as_ref() {
             // 0 is no activation price on the wire: a zero one is refused
-            // rather than sent as none.
-            proto.activation_price_ticks = positive_constraint_price(
+            // rather than sent as none; leave it `None` for none.
+            proto.activation_price_ticks = coded_positive_price(
                 activation,
                 symbol,
                 "attached_risk trailing_stop activation_price",
+                leg_codes::TRIGGER_ACTIVATION_PRICE_INVALID,
             )?;
         }
         // The trailing stop of a sell order buys back and declares the most its
@@ -1039,21 +1068,30 @@ impl OrdersService {
             }
             proto.limit_price_ticks = ticks;
         }
+        // Refusals carry the codes a standalone trailing stop answers for
+        // the same mistake.
         proto.trailing_distance = Some(match stop.distance.ok_or_else(|| {
-            Error::validation(
+            order_code_refusal(
+                leg_codes::TRAILING_DISTANCE_INVALID,
                 "attached trailing_stop requires trailing_distance_ticks or trailing_distance_bps",
             )
         })? {
             TrailingDistance::Ticks(v) => {
                 if v <= 0 {
-                    return Err(Error::validation(
+                    return Err(order_code_refusal(
+                        leg_codes::TRAILING_DISTANCE_INVALID,
                         "trailing_distance_ticks must be positive",
                     ));
                 }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)
             }
             TrailingDistance::Bps(v) => {
-                validate_bps("trailing_distance_bps", v)?;
+                if !(1..=MAX_BPS).contains(&v) {
+                    return Err(order_code_refusal(
+                        leg_codes::TRAILING_DISTANCE_INVALID,
+                        format!("trailing_distance_bps must be between 1 and {MAX_BPS}"),
+                    ));
+                }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)
             }
         });
@@ -1061,14 +1099,32 @@ impl OrdersService {
             proto.max_slippage = Some(match slip {
                 MaxSlippage::Ticks(v) => {
                     if v <= 0 {
-                        return Err(Error::validation("max_slippage_ticks must be positive"));
+                        return Err(order_code_refusal(
+                            leg_codes::SLIPPAGE_TICKS_INVALID,
+                            "max_slippage_ticks must be positive",
+                        ));
                     }
                     trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)
                 }
                 MaxSlippage::Bps(v) => {
                     // The trailing stop's child can sell whichever side the
-                    // parent order is on.
-                    validate_bps_at_most("max_slippage_bps", v, MAX_SELLING_SLIPPAGE_BPS)?;
+                    // parent order is on, so a 100% cap is refused too.
+                    if v <= 0 {
+                        return Err(order_code_refusal(
+                            leg_codes::SLIPPAGE_BPS_INVALID,
+                            format!(
+                                "max_slippage_bps must be between 1 and {MAX_SELLING_SLIPPAGE_BPS}"
+                            ),
+                        ));
+                    }
+                    if v > MAX_SELLING_SLIPPAGE_BPS {
+                        return Err(order_code_refusal(
+                            leg_codes::MAX_SLIPPAGE_INVALID,
+                            format!(
+                                "max_slippage_bps must be between 1 and {MAX_SELLING_SLIPPAGE_BPS}"
+                            ),
+                        ));
+                    }
                     trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)
                 }
             });
@@ -1738,11 +1794,16 @@ impl OrdersService {
     /// `ERROR_CODE_ORDER_ALREADY_TERMINAL`
     /// ([`crate::Error::is_order_already_terminal`]): treat it as "already
     /// done" and read the order for how it ended. A repeat sent while the
-    /// first cancel is still in progress answers `accepted` again. Retry by
-    /// order ID once you have it: a client order ID names its order for at
-    /// least a minute after the order ends, then reads
-    /// `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
-    /// rate limit, repeats included.
+    /// first cancel is still in progress answers `accepted` again.
+    ///
+    /// An ended order can also answer `ERROR_CODE_ORDER_UNKNOWN`
+    /// ([`crate::Error::is_order_unknown`]): by client order ID once its
+    /// window of at least a minute after the order ended has passed, and by
+    /// order ID after exchange maintenance that the order ended before. For
+    /// an order you know ended, treat it as done; otherwise read the order
+    /// with [`Self::get`]: an ended status means nothing is left to cancel.
+    /// Do not retry by order ID to tell an ended order from an unknown one.
+    /// Every cancel counts against the cancel rate limit, repeats included.
     ///
     /// An unset `subaccount_id` takes the configured default sub-account, as
     /// the typed helpers do; a sub-account set on `req` is sent unchanged.
@@ -2207,14 +2268,20 @@ fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
     trade_sum == cum
 }
 
-/// A modify or batch replace price. The API reads a new price of 0 as no
-/// change, so 0 is refused: leave `new_price` `None` to keep the price.
 /// An attached leg's trigger, child limit or activation price: positive, as
-/// the contract's `gt: 0` rules take them. 0 would read as no price.
-fn positive_constraint_price(price: &Price, symbol: Option<&str>, field: &str) -> Result<i64> {
-    let ticks = resolve_price_ticks(price, symbol)?;
+/// the contract takes them; 0 would read as no price. One that is not
+/// positive is refused with `code`, the code the Orders API and the trading
+/// WebSocket answer for the same field.
+fn coded_positive_price(
+    price: &Price,
+    symbol: Option<&str>,
+    field: &str,
+    code: &str,
+) -> Result<i64> {
+    price.compatible_with(symbol)?;
+    let ticks = price.as_ticks();
     if ticks <= 0 {
-        return Err(Error::validation(format!("{field} must be positive")));
+        return Err(order_code_refusal(code, format!("{field} must be positive")));
     }
     Ok(ticks)
 }

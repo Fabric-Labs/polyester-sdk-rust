@@ -754,6 +754,20 @@ replace sends the maximum as given: it does not carry the order's side, so the
 server applies the side rule and answers `ERROR_CODE_BAD_PRICE` with no
 violation.
 
+The other attached-leg values the SDK refuses before sending carry the code
+the Orders API and the trading WebSocket answer for the same value, as an
+`Error::Api` with that code and no violation, on `create`, `preview`,
+`batch_create`, `modify` and `batch_replace` alike: a take-profit or stop-loss
+`trigger_price` that is not positive, `ERROR_CODE_TRIGGER_PRICE_INVALID`; its
+limit child's price, `ERROR_CODE_BAD_PRICE`; a trailing stop's distance that is
+missing, not positive or outside 1–10000 bps,
+`ERROR_CODE_TRAILING_DISTANCE_INVALID`; its `max_slippage` in ticks that is not
+positive, `ERROR_CODE_SLIPPAGE_TICKS_INVALID`; in bps, below 1
+`ERROR_CODE_SLIPPAGE_BPS_INVALID` and 10000 or more
+`ERROR_CODE_MAX_SLIPPAGE_INVALID`; its `activation_price` that is not
+positive, `ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID` (leave it `None` for
+no activation price).
+
 `ModifyOrderParams.new_attached_risk` and `BatchReplaceItem.new_attached_risk`
 replace the order's legs; `None` leaves them unchanged, and an empty
 `AttachedRisk` is refused. To remove the take-profit, stop-loss and trailing
@@ -1965,7 +1979,11 @@ Order permission refusals name which policy to change: `API_KEY_SPOT_TRADE_DENY`
 neither policy grants it), `API_KEY_POLICY_REQUIRED` (the key has no policy, so
 no permissions: attach one), `POLICY_SPOT_TRADE_DENY` (enable it on the
 sub-account's policy), `API_KEY_MARKET_DENY` (a main-account key whose own
-market list excludes the pair) and `POLICY_MARKET_DENY`.
+market list excludes the pair) and `POLICY_MARKET_DENY`. A trigger resume or
+modify by a key limited to some markets is judged on the trigger's own pair,
+whether or not the request names it: it needs no `symbol`, and
+`API_KEY_MARKET_DENY` there can mean the trigger's own pair is outside the
+key's markets.
 
 Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
 `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,
@@ -2021,12 +2039,28 @@ quantity or `order.limit_gtc.price_ticks` for an off-tick price. Branch on the
 code, then on `rule_id`.
 
 A cancel of an order that has already ended, a repeat of the cancel that ended
-it included, is refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
-`Error::is_order_already_terminal()` is true. Treat it as "already done" and
-read the order for how it ended. Retry a cancel by order ID once you have it: a
-client order ID names its order for at least a minute after the order ends,
-then reads `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
-rate limit, repeats included.
+it included, is refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`
+(`Error::is_order_already_terminal()`) while the exchange can still confirm the
+order: treat it as "already done" and read the order for how it ended. An
+ended order can also answer `ERROR_CODE_ORDER_UNKNOWN`
+(`Error::is_order_unknown()`, ConnectRPC `not_found`): by client order ID once
+its window of at least a minute after the order ended has passed, and by order
+ID after exchange maintenance, such as a market listing or a recovery, that
+the order ended before. So `ERROR_CODE_ORDER_UNKNOWN` on a cancel or modify of
+an order you placed does not prove the order never existed:
+
+- if you know the order ended (you saw its final update, or this retries a
+  cancel that timed out), treat the cancel as done: an open order is never
+  reported unknown under its own order ID and market;
+- otherwise read the order with `orders.get`: an ended status (filled,
+  canceled, expired or rejected) means nothing is left to cancel or modify.
+  A retry by client order ID within its window answers
+  `ERROR_CODE_ORDER_ALREADY_TERMINAL` for an ended order too.
+
+Do not retry a cancel by order ID to tell an ended order from an unknown one:
+the retry can itself answer `ERROR_CODE_ORDER_UNKNOWN`. Neither code is
+retryable. Every cancel counts against the cancel rate limit, repeats
+included.
 
 A sub-account member call that targets the sub-account's owner (inviting the owner, accepting
 an invite for the owner, changing the owner's role or removing the owner) is refused with

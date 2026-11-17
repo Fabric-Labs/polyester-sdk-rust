@@ -42,9 +42,11 @@ pub struct Order {
     /// risk leg, TWAP or trailing stop). A BUY fills at or below it and a SELL
     /// at or above it. It is the order's reference price moved by its maximum
     /// slippage (`market_max_slippage_bps` or `market_max_slippage`), or
-    /// by the pair's default market slippage for its side, on the pair's tick
-    /// grid; a triggered market order takes the price that fired it as its
-    /// reference. `None` when the server sent no price. Tell a market order
+    /// by the pair's default market slippage for its side, then put on the
+    /// pair's tick grid toward the reference (a BUY's rounded down, a SELL's
+    /// up), so it never allows more than the slippage and can be up to one
+    /// tick tighter; a triggered market order takes the price that fired it
+    /// as its reference. `None` when the server sent no price. Tell a market order
     /// from a limit order by `order_type`, never by its price.
     pub price: Option<Price>,
     /// Average execution price in 1e9 price ticks, rounded down. Prefer
@@ -66,15 +68,29 @@ pub struct Order {
     /// `base_quantity_scale` is at most 9. Above that it can exceed the
     /// settled quote by less than 1e-18 per fill.
     pub cum_notional: String,
-    /// Total fee of the fills, net of rebates, in `fee_asset`. Order history
-    /// reads and single-order reads with execution history (the default)
-    /// carry it; open-order reads, single-order reads without execution
-    /// history and private stream updates leave it `None`.
+    /// Total fee of the fills recorded so far, net of rebates, in
+    /// `fee_asset`. Order history reads and single-order reads with execution
+    /// history (the default) carry it; open-order reads, single-order reads
+    /// without execution history and private stream updates leave it `None`,
+    /// an ended order's update included. A fill's fee is recorded once the
+    /// fill settles, which can be seconds after the order ended: the total is
+    /// the order's whole fee once its quantity equals `cum_qty`. It is not
+    /// covered by `version`: two reads at one version can show different
+    /// totals.
     pub fee_total: Option<OrderFeeTotal>,
     pub created_ts_ns: String,
     /// When the order became terminal, in Unix nanoseconds (UTC) as a decimal
     /// string. Empty while the order is open.
     pub terminal_ts_ns: String,
+    /// The order's change counter, the same one its events carry on the
+    /// private and trading WebSockets: 0 while it is `PENDING`, 1 from its
+    /// first book state, and higher on every later change of its state (an
+    /// amend in place, a fill, a change of its attached risk, a cancel or a
+    /// replace). A replace that gives the order a new ID starts that order's
+    /// own counter. A read can lag behind events already applied: keep one
+    /// high-water mark per order ID across reads and both streams, and do
+    /// not let a read with a lower version undo a newer state. A read at the
+    /// version already applied can still carry a newer `fee_total`.
     pub version: u32,
     pub post_only: bool,
     /// Asset selected to pay fees: `quote`, `base`, or an
@@ -104,8 +120,9 @@ pub struct Order {
     /// Reference price a MARKET order's slippage protection was measured
     /// from; `None` when none was supplied.
     pub market_client_ref_price: Option<Price>,
-    /// A MARKET order's maximum slippage as an absolute price distance;
-    /// `None` when it has no cap of that form.
+    /// A MARKET order's maximum slippage as an absolute price distance, as
+    /// given (it need not be on the pair's tick); `None` when it has no cap of
+    /// that form.
     pub market_max_slippage: Option<Price>,
     /// A MARKET order's maximum slippage in basis points; 0 when it has no cap
     /// of that form.
@@ -616,7 +633,9 @@ pub enum TrailingDistance {
 /// Optional max slippage for a trailing stop's child.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaxSlippage {
-    /// Absolute Q9 price ticks (proto field is int64).
+    /// An absolute price distance in 1e-9 quote units (proto field is
+    /// int64), not a count of the pair's tick size: 1.5 USDT is
+    /// 1_500_000_000. It need not be a multiple of the pair's tick.
     Ticks(i64),
     Bps(i32),
 }
@@ -1444,6 +1463,12 @@ pub struct OrderErrorDetail {
     pub violations: Vec<OrderFieldViolation>,
     /// Structured quota rejection when `ErrorDetail.rate_limit` is present.
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// With `PRICE_BAND_VIOLATION` on a preview, the band limit the order's
+    /// limit price is past, as the market last published its band: the
+    /// highest admitted price for a buy, the lowest for a sell, both edges
+    /// admitted. `None` for every other rejection. A preview with no current
+    /// band skips the check, and `create` checks the band again.
+    pub price_band_limit: Option<crate::Price>,
 }
 
 /// Advisory admission result for [`crate::services::OrdersService::preview`].

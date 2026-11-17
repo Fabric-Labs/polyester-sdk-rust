@@ -388,6 +388,23 @@ pub struct TriggerLadderDetails {
     pub ladder_distribution: String,
     pub executed_levels: i32,
     pub executed_qty: Option<Quantity>,
+    /// Child orders the ladder requested, one per level.
+    pub requested_levels: i32,
+    /// Child orders placed on the book, open ones included.
+    pub placed_levels: i32,
+    /// Child orders rejected before they were placed.
+    pub rejected_levels: i32,
+    /// Placed child orders canceled or expired, partly filled or not; when
+    /// the ladder ends, its open child orders count here. A placed child
+    /// order rejected after a partial fill counts as neither rejected nor
+    /// canceled.
+    pub canceled_levels: i32,
+    /// How placement went once the ladder has ended: `all_admitted`,
+    /// `mixed_rejections` (some levels placed, the others rejected before
+    /// any fill) or `all_children_rejected` (the ladder placed nothing);
+    /// `UNKNOWN(<n>)` for an outcome this SDK does not name. `None` while the
+    /// ladder runs, and for a ladder refused at its creation.
+    pub outcome: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
