@@ -5,7 +5,9 @@
 //! [`connect`] opens a [`TradeSession`]. The upgrade request is signed with the
 //! API key's Ed25519 key and, unless [`Config::cancel_on_disconnect`] is
 //! `None`, opts into cancel-on-disconnect for the whole account
-//! (`X-Cancel-On-Disconnect: ACCOUNT`). The session subscribes to the
+//! (`X-Cancel-On-Disconnect: ACCOUNT`), on every reconnect too until
+//! [`TradeSender::disable_cancel_on_disconnect`] turns it off for every later
+//! upgrade. The session subscribes to the
 //! `executions`, `orders` and `marketResync` channels and sends no command
 //! before the server confirms that subscription ([`TradeSession::ready`]). It
 //! pings the server, and a ping or command left unanswered ends the

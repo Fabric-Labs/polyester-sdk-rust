@@ -2458,7 +2458,9 @@ good-till-cancelled limit orders.
   and opts into cancel-on-disconnect for the whole account
   (`X-Cancel-On-Disconnect: ACCOUNT`, 15 seconds by default,
   `Config::cancel_on_disconnect`). A server that accepts the upgrade without
-  echoing the opt-in is refused (`TradeError::NotProtected`).
+  echoing the opt-in is refused (`TradeError::NotProtected`). Every reconnect
+  opts in again, which renews the account's cancel-on-disconnect, until
+  `disable_cancel_on_disconnect` turns it off (see the kill sequence below).
 - **Ready.** The session subscribes to executions, orders and marketResync and
   sends no command until the server confirms it: wait for
   `TradeSession::ready` or `Event::Ready`. It pings the server; a ping or
@@ -2504,6 +2506,34 @@ good-till-cancelled limit orders.
   closes the session, so every command sent and unanswered becomes
   `TradeError::OutcomeUnknown` and later ones `NotSent::Closed`. Dropping every
   sender ends nothing. The unsplit `TradeSession` keeps every method.
+
+- **Kill sequence.** A reconnect that opts into cancel-on-disconnect renews
+  the account's cancel-on-disconnect when the server accepts its upgrade, so
+  during a shutdown it can postpone the cancel. Call
+  `TradeSender::disable_cancel_on_disconnect` (also on `TradeSession`) first:
+  it is shared by every clone, cannot be undone, and no upgrade that starts
+  after it returns sends `X-Cancel-On-Disconnect`, including the one that ends
+  a retry wait already pending. An upgrade already in flight keeps the opt-in
+  it started with, as does the connection open now; once the account's last
+  opted-in connection ends, its orders are cancelled after the grace period
+  unless another opted-in session is connected. Pair it with the dead-man
+  switch as the backstop: arm a short `cancel_all_after` (do not disarm it),
+  then cancel what must go and close. The timer cancels the account's orders
+  when it expires even if no connection ever drops.
+
+  ```rust,no_run
+  # async fn _kill(sender: polyester::tradews::TradeSender) -> polyester::Result<()> {
+  use std::time::Duration;
+  use polyester::tradews::{CancelAllOrders, Deadline};
+
+  sender.disable_cancel_on_disconnect();
+  let within = || Deadline::within(Duration::from_secs(1));
+  sender.cancel_all_after(Duration::from_secs(10), within()?).await?;
+  sender.cancel_all_orders(&CancelAllOrders::new(vec![7]), within()?).await?;
+  sender.close();
+  # Ok(())
+  # }
+  ```
 
 This example connects, splits the session, arms the dead-man switch and reads
 events; `quote` shows how an order is placed from any task and is not called.

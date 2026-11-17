@@ -109,7 +109,8 @@ pub struct Config {
     /// once no session of the account that opted in has been connected for
     /// this long, the account's open orders are cancelled with
     /// [`super::CancelReason::CancelOnDisconnect`]. `None` opts out. Default:
-    /// 15 seconds.
+    /// 15 seconds. Every upgrade, reconnects included, opts in until
+    /// [`TradeSender::disable_cancel_on_disconnect`] is called.
     pub cancel_on_disconnect: Option<Duration>,
     /// Holds back every order placement whose deadline is not inside the
     /// armed cancel-all-after timer ([`NotSent::NotArmed`]). `None` turns the
@@ -207,6 +208,9 @@ struct Shared {
     /// set, at admission and again right before its frame is written, so no
     /// command made or still queued after a close reaches the socket.
     closed: AtomicBool,
+    /// Set once by [`TradeSender::disable_cancel_on_disconnect`], never
+    /// cleared: every upgrade that reads it afterwards opts out.
+    cancel_on_disconnect_disabled: AtomicBool,
 }
 
 impl Shared {
@@ -218,6 +222,18 @@ impl Shared {
 
     fn is_closed(&self) -> bool {
         self.closed.load(Ordering::SeqCst)
+    }
+
+    /// The cancel-on-disconnect grace the next upgrade opts in with. Each
+    /// upgrade reads it once, before it builds its request, and keeps that
+    /// value for the request's headers and for checking the server's
+    /// confirmation.
+    fn cancel_on_disconnect(&self) -> Option<Duration> {
+        if self.cancel_on_disconnect_disabled.load(Ordering::SeqCst) {
+            None
+        } else {
+            self.cfg.cancel_on_disconnect
+        }
     }
 }
 
@@ -312,7 +328,7 @@ pub async fn connect(mut config: Config) -> Result<TradeSession> {
     if config.answer_timeout.is_zero() {
         config.answer_timeout = DEFAULT_ANSWER;
     }
-    let ws = dial(&config).await?;
+    let ws = dial(&config, config.cancel_on_disconnect).await?;
     let (events, rx) = mpsc::channel(config.queue_size);
     let (commands, cmd_rx) = mpsc::channel(COMMAND_QUEUE);
     let (link, _) = watch::channel(Link::default());
@@ -324,6 +340,7 @@ pub async fn connect(mut config: Config) -> Result<TradeSession> {
         stop,
         err: Mutex::new(None),
         closed: AtomicBool::new(false),
+        cancel_on_disconnect_disabled: AtomicBool::new(false),
     });
     let task = tokio::spawn(run(shared.clone(), ws, cmd_rx, events));
     Ok(TradeSession {
@@ -371,6 +388,11 @@ impl TradeSession {
     /// Closes the socket and stops the session; queued events stay readable.
     pub fn close(&self) {
         self.sender.close();
+    }
+
+    /// [`TradeSender::disable_cancel_on_disconnect`].
+    pub fn disable_cancel_on_disconnect(&self) {
+        self.sender.disable_cancel_on_disconnect();
     }
 
     /// [`TradeSender::create_order`].
@@ -497,6 +519,31 @@ impl TradeSender {
     /// Closes the socket and stops the session; queued events stay readable.
     pub fn close(&self) {
         self.shared.shutdown();
+    }
+
+    /// Stops opting into cancel-on-disconnect on every later upgrade of this
+    /// session, for every handle: no reconnect after this call returns sends
+    /// `X-Cancel-On-Disconnect`, so none renews the account's
+    /// cancel-on-disconnect, and none requires the server to confirm it. Use
+    /// it in a shutdown or kill sequence, where a reconnect would otherwise
+    /// postpone the cancel, with [`Self::cancel_all_after`] as the backstop.
+    ///
+    /// Each upgrade reads the switch once, before it builds its request. An
+    /// upgrade that read it before this call keeps its opt-in, and is still
+    /// refused unless the server confirms it; every upgrade that reads it
+    /// after this call returns, the one that ends a pending retry wait
+    /// included, opts out. The connection open now, and one such upgrade
+    /// still in flight, stay opted in until they end; once the last opted-in
+    /// connection of the account ends, its open orders are cancelled after
+    /// the grace period unless another opted-in session is connected.
+    ///
+    /// It cannot be undone, by a reconnect or otherwise: open a new session
+    /// to opt in again. Calling it again, or on a session configured without
+    /// cancel-on-disconnect, changes nothing.
+    pub fn disable_cancel_on_disconnect(&self) {
+        self.shared
+            .cancel_on_disconnect_disabled
+            .store(true, Ordering::SeqCst);
     }
 
     async fn call(
@@ -777,9 +824,9 @@ fn answer_correlation(answer: &Answer) -> u64 {
     }
 }
 
-/// Signs and opens one connection, and checks that the server confirmed the
-/// cancel-on-disconnect opt-in.
-async fn dial(cfg: &Config) -> Result<Ws> {
+/// Signs and opens one connection and, with a `cancel_on_disconnect` grace,
+/// opts into cancel-on-disconnect and checks that the server confirmed it.
+async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws> {
     let mut request = cfg
         .url
         .as_str()
@@ -796,7 +843,7 @@ async fn dial(cfg: &Config) -> Result<Ws> {
             .map_err(|e| Error::auth(format!("tradews signed header: {e}")))?;
         headers.insert(name, value);
     }
-    if let Some(grace) = cfg.cancel_on_disconnect {
+    if let Some(grace) = cancel_on_disconnect {
         headers.insert(HEADER_COD_SCOPE, HeaderValue::from_static("ACCOUNT"));
         headers.insert(HEADER_COD_GRACE, HeaderValue::from(grace.as_secs()));
     }
@@ -810,7 +857,7 @@ async fn dial(cfg: &Config) -> Result<Ws> {
     .await
     .map_err(|_| Error::realtime("tradews connect timed out"))?
     .map_err(upgrade_error)?;
-    if cfg.cancel_on_disconnect.is_some() && !protected(response.headers()) {
+    if cancel_on_disconnect.is_some() && !protected(response.headers()) {
         let _ = ws.close(None).await;
         return Err(Error::TradeSession(TradeError::NotProtected));
     }
@@ -1140,10 +1187,14 @@ async fn run(
                 break 'session None;
             }
             let mut stop = shared.stop.subscribe();
+            // The switch is read here, once, after the wait: a
+            // `disable_cancel_on_disconnect` that returned during the wait
+            // applies to this upgrade.
+            let cancel_on_disconnect = shared.cancel_on_disconnect();
             let dialed = tokio::select! {
                 biased;
                 () = stopped(&mut stop) => break 'session None,
-                dialed = dial(&shared.cfg) => dialed,
+                dialed = dial(&shared.cfg, cancel_on_disconnect) => dialed,
             };
             match dialed {
                 Ok(next) => break next,
@@ -1706,6 +1757,7 @@ mod write_tests {
             stop,
             err: Mutex::new(None),
             closed: AtomicBool::new(false),
+            cancel_on_disconnect_disabled: AtomicBool::new(false),
         });
         let mut stop = shared.stop.subscribe();
         let mut conn = Conn::new(1);

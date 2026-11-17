@@ -54,6 +54,9 @@ struct Script {
     refuse_retry_after: Option<&'static str>,
     /// Accept the connection and never answer its upgrade.
     hang: bool,
+    /// Once the whole upgrade request has arrived, signal it and answer it
+    /// only when released.
+    hold: Option<Arc<Hold>>,
     /// Refuse every command with this code instead of acknowledging it.
     reject: Option<reject_code::RejectCode>,
     /// Frames sent right after the SubscriptionAck.
@@ -82,6 +85,7 @@ fn serve() -> Script {
         refuse: None,
         refuse_retry_after: None,
         hang: false,
+        hold: None,
         reject: None,
         after_ready: Vec::new(),
         close_on: None,
@@ -103,6 +107,26 @@ struct Seen {
 }
 
 type Record = Arc<Mutex<Vec<Seen>>>;
+
+/// Holds one upgrade between its request and its answer.
+#[derive(Default)]
+struct Hold {
+    arrived: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+}
+
+/// Whether the client's whole upgrade request has reached `tcp`, read
+/// without taking it off the socket; false once the peer goes away.
+async fn upgrade_arrived(tcp: &tokio::net::TcpStream) -> bool {
+    let mut buf = vec![0u8; 16 * 1024];
+    loop {
+        match tcp.peek(&mut buf).await {
+            Ok(0) | Err(_) => return false,
+            Ok(n) if buf[..n].windows(4).any(|w| w == b"\r\n\r\n") => return true,
+            Ok(_) => tokio::time::sleep(Duration::from_millis(1)).await,
+        }
+    }
+}
 
 fn now_ns() -> u64 {
     SystemTime::now()
@@ -309,6 +333,13 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                     std::future::pending::<()>().await;
                 });
                 continue;
+            }
+            if let Some(hold) = &current.hold {
+                if !upgrade_arrived(&tcp).await {
+                    continue;
+                }
+                hold.arrived.notify_one();
+                hold.release.notified().await;
             }
             let captured: Arc<Mutex<Seen>> = Arc::default();
             let capture = Arc::clone(&captured);
@@ -1716,4 +1747,199 @@ async fn a_close_during_a_reconnect_upgrade_ends_it() {
     .await
     .expect("the close ends the upgrade in flight");
     assert_eq!(record.lock().unwrap().len(), 2, "nothing after the close");
+}
+
+/// Whether an upgrade opted into cancel-on-disconnect, and with which grace.
+fn opt_in(seen: &Seen) -> Option<(String, String)> {
+    let get = |name: &str| {
+        seen.headers
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(name))
+            .map(|(_, v)| v.clone())
+    };
+    match (
+        get("x-cancel-on-disconnect"),
+        get("x-cancel-on-disconnect-grace-sec"),
+    ) {
+        (None, None) => None,
+        (Some(scope), Some(grace)) => Some((scope, grace)),
+        partial => panic!("half an opt-in: {partial:?}"),
+    }
+}
+
+fn opt_ins(record: &Record) -> Vec<Option<(String, String)>> {
+    record.lock().unwrap().iter().map(opt_in).collect()
+}
+
+fn opted_in() -> Option<(String, String)> {
+    Some(("ACCOUNT".into(), "15".into()))
+}
+
+/// Arms the timer on connection `n`, whose script closes the socket after
+/// the answer, and waits for the loss.
+async fn lose(session: &mut TradeSession, n: u64) {
+    ready_on(session, n).await;
+    arm(session).await;
+    disconnected(session).await;
+}
+
+#[tokio::test]
+async fn disabling_cancel_on_disconnect_drops_the_opt_in_from_every_later_upgrade() {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![
+        close_after_arm.clone(),
+        close_after_arm.clone(),
+        close_after_arm,
+        serve(),
+    ])
+    .await;
+    let mut session = start(url).await;
+    // Before the switch, a reconnect opts in again.
+    lose(&mut session, 1).await;
+    ready_on(&mut session, 2).await;
+    assert_eq!(opt_ins(&record), [opted_in(), opted_in()]);
+
+    session.disable_cancel_on_disconnect();
+    // Idempotent: a second call changes nothing.
+    session.disable_cancel_on_disconnect();
+    arm(&session).await;
+    disconnected(&mut session).await;
+    // Two reconnects after the switch, both without the opt-in, and accepted
+    // although the server confirms none: none was asked for.
+    lose(&mut session, 3).await;
+    ready_on(&mut session, 4).await;
+    assert_eq!(opt_ins(&record), [opted_in(), opted_in(), None, None]);
+    assert!(session.err().is_none(), "{:?}", session.err());
+}
+
+#[tokio::test]
+async fn a_sender_clone_disables_cancel_on_disconnect_for_the_session() {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![close_after_arm.clone(), close_after_arm, serve()]).await;
+    let session = start(url).await;
+    let (sender, mut events) = session.split();
+    // From another task, through a clone: the switch is shared by the
+    // session, not by one handle.
+    let clone = sender.clone();
+    tokio::spawn(async move { clone.disable_cancel_on_disconnect() })
+        .await
+        .unwrap();
+    async fn ready_on(events: &mut crate::tradews::TradeEvents, n: u64) {
+        tokio::time::timeout(WAIT, async {
+            loop {
+                if let Event::Ready { connection } = events.recv().await.expect("an event")
+                    && connection == n
+                {
+                    return;
+                }
+            }
+        })
+        .await
+        .expect("ready in time");
+    }
+    for n in 1..=2 {
+        ready_on(&mut events, n).await;
+        sender
+            .cancel_all_after(Duration::from_secs(10), within(1_000))
+            .await
+            .expect("armed");
+    }
+    ready_on(&mut events, 3).await;
+    // The first upgrade was made before the switch existed.
+    assert_eq!(opt_ins(&record), [opted_in(), None, None]);
+}
+
+/// A switch made while the session waits out a refused upgrade's
+/// Retry-After applies to the upgrade that ends the wait, and to every one
+/// after it.
+#[tokio::test]
+async fn a_switch_during_the_retry_timer_applies_to_the_next_upgrade() {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let refused = Script {
+        refuse: Some((503, "UNAVAILABLE")),
+        refuse_retry_after: Some("1"),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![
+        close_after_arm.clone(),
+        refused,
+        close_after_arm,
+        serve(),
+    ])
+    .await;
+    let mut session = start(url).await;
+    lose(&mut session, 1).await;
+    let delay = wait(&mut session, |e| match e {
+        Event::Disconnected { delay, .. } => Some(*delay),
+        _ => None,
+    })
+    .await;
+    assert!(delay >= Duration::from_secs(1), "{delay:?}");
+    session.disable_cancel_on_disconnect();
+    // The call returned while the timer was pending: the refused upgrade
+    // arrived before the session learned of the refusal and started its wait.
+    let refused_at = record.lock().unwrap()[1].at.unwrap();
+    assert!(
+        refused_at.elapsed() < delay,
+        "the switch came {:?} after the refusal, past the {delay:?} wait",
+        refused_at.elapsed()
+    );
+    assert_eq!(
+        record.lock().unwrap().len(),
+        2,
+        "no upgrade during the wait"
+    );
+    lose(&mut session, 2).await;
+    ready_on(&mut session, 3).await;
+    assert_eq!(opt_ins(&record), [opted_in(), opted_in(), None, None]);
+}
+
+/// A switch made while an upgrade is in flight leaves that upgrade as it
+/// started: it opts in and must be confirmed. Every upgrade after it does
+/// not opt in.
+#[tokio::test]
+async fn a_switch_during_an_upgrade_in_flight_applies_from_the_next_upgrade() {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let hold = Arc::new(Hold::default());
+    let held = Script {
+        hold: Some(Arc::clone(&hold)),
+        ..close_after_arm.clone()
+    };
+    let (url, record) = stand_in(vec![
+        close_after_arm.clone(),
+        held,
+        close_after_arm,
+        serve(),
+    ])
+    .await;
+    let mut session = start(url).await;
+    lose(&mut session, 1).await;
+    tokio::time::timeout(WAIT, hold.arrived.notified())
+        .await
+        .expect("the reconnect's upgrade is in flight");
+    session.disable_cancel_on_disconnect();
+    hold.release.notify_one();
+    // Connection 2 is ready only if the server confirmed the opt-in its
+    // upgrade asked for.
+    lose(&mut session, 2).await;
+    lose(&mut session, 3).await;
+    ready_on(&mut session, 4).await;
+    assert_eq!(
+        opt_ins(&record),
+        [opted_in(), opted_in(), None, None],
+        "the upgrade in flight kept the opt-in; the two after it dropped it"
+    );
+    assert!(session.err().is_none(), "{:?}", session.err());
 }
