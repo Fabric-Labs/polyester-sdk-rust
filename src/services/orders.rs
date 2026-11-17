@@ -195,7 +195,7 @@ impl OrdersService {
 
     pub async fn list_open_with(&self, opts: ListOpenOrdersOpts) -> Result<OrdersList> {
         let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
+            Some(raw) if !raw.is_empty() => Some(id_to_u64(raw, "trigger_id")?),
             _ => None,
         };
         let limit = check_optional_limit("list_open_orders", opts.limit, ORDER_READ_LIMIT_MAX)?;
@@ -277,7 +277,7 @@ impl OrdersService {
             symbol_ids.push(resolved);
         }
         let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
+            Some(raw) if !raw.is_empty() => Some(id_to_u64(raw, "trigger_id")?),
             _ => None,
         };
         let req = GetOrderHistoryRequest {

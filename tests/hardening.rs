@@ -9991,9 +9991,10 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
 }
 
 // Reads take the public IDs other reads return: `sub_accounts.get` takes a
-// sub-account's public ID (base58, or decimal), and `triggers.list_events_by_id`
-// a trigger's, with the configured default sub-account as the typed helpers
-// apply it. An ID that does not parse, or names 0, is refused before sending.
+// sub-account's public ID (base58), and `triggers.list_events_by_id` a
+// trigger's, with the configured default sub-account as the typed helpers
+// apply it. An ID that is not bare base58 (decimal, or with whitespace), or
+// that names 0, is refused before sending.
 #[tokio::test]
 async fn subaccount_and_trigger_event_reads_take_public_ids() {
     use polyester::codecs::scalars::format_id;
@@ -10045,11 +10046,8 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     })
     .unwrap();
 
-    for id in [
-        format_id(SUB),
-        SUB.to_string(),
-        format!(" {} ", format_id(SUB)),
-    ] {
+    // A leading `1` is a base58 zero: both strings name SUB.
+    for id in [format_id(SUB), format!("1{}", format_id(SUB))] {
         let _ = client
             .sub_accounts
             .get(&id, GetSubaccountOpts::default())
@@ -10062,7 +10060,7 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     let _ = client
         .triggers
         .list_events_by_id(
-            &TRIGGER.to_string(),
+            &format_id(TRIGGER),
             ListTriggerEventsOpts {
                 subaccount_id: SubAccountScope::Id(44),
                 limit: Some(25),
@@ -10075,7 +10073,6 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     assert_eq!(
         std::mem::take(&mut *seen.lock().unwrap()),
         vec![
-            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             (
@@ -10101,6 +10098,24 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
         client
             .sub_accounts
             .get("1", GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .sub_accounts
+            .get(&SUB.to_string(), GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .sub_accounts
+            .get(
+                &format!(" {} ", format_id(SUB)),
+                GetSubaccountOpts::default(),
+            )
+            .await
+            .map(|_| ()),
+        client
+            .triggers
+            .list_events_by_id(&TRIGGER.to_string(), ListTriggerEventsOpts::default())
             .await
             .map(|_| ()),
         client
@@ -10503,7 +10518,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let cancel = |n: usize| {
         (0..n)
             .map(|i| BatchCancelItem {
-                key: OrderKey::OrderId((i + 2).to_string()),
+                key: OrderKey::OrderId(polyester::codecs::scalars::format_id(i as u64 + 2)),
                 symbol_id: None,
             })
             .collect::<Vec<_>>()
@@ -10511,7 +10526,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let replace = |n: usize| {
         (0..n)
             .map(|i| BatchReplaceItem {
-                key: OrderKey::OrderId((i + 2).to_string()),
+                key: OrderKey::OrderId(polyester::codecs::scalars::format_id(i as u64 + 2)),
                 new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,

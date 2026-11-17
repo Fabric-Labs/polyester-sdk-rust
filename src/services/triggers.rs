@@ -1612,7 +1612,7 @@ impl TriggersService {
     }
 
     /// List a trigger's events by the public trigger ID that create and list
-    /// calls return (base58, or decimal), with the filters of
+    /// calls return (base58), with the filters of
     /// [`ListTriggerEventsOpts`]. The configured default sub-account applies
     /// when `opts.subaccount_id` is `None`. An ID that does not parse, or an
     /// unknown event type, is refused with `Error::Validation` before sending.
@@ -1685,6 +1685,7 @@ impl TriggersService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codecs::scalars::format_id;
     use buffa::Message;
     use serde_json::json;
 
@@ -3895,7 +3896,7 @@ mod tests {
         let wire = client
             .triggers
             .encode_batch_cancel(
-                &[base58.clone(), "40".into()],
+                &[base58.clone(), format_id(40)],
                 SubAccountScope::Id(5),
                 Some(" retry-1 ".into()),
             )
@@ -3906,7 +3907,7 @@ mod tests {
 
         let generated = client
             .triggers
-            .encode_batch_cancel(&["43".into()], SubAccountScope::Default, None)
+            .encode_batch_cancel(&[format_id(43)], SubAccountScope::Default, None)
             .unwrap();
         assert!(
             generated.request_id.starts_with("batch-cancel-triggers-"),
@@ -3915,7 +3916,7 @@ mod tests {
         );
         assert_eq!(generated.subaccount_id, None);
 
-        let fifty: Vec<String> = (1..=50).map(|n| (n * 1000).to_string()).collect();
+        let fifty: Vec<String> = (1..=50).map(|n| format_id(n * 1000)).collect();
         assert_eq!(
             client
                 .triggers
@@ -3943,17 +3944,26 @@ mod tests {
             assert!(err.to_string().contains(want), "{want}: {err}");
         };
         refused(Vec::new(), None, "at least one trigger_id");
-        let fifty_one: Vec<String> = (1..=51).map(|n| (n * 1000).to_string()).collect();
+        let fifty_one: Vec<String> = (1..=51).map(|n| format_id(n * 1000)).collect();
         refused(fifty_one, None, "at most 50 trigger_ids; received 51");
-        // The same trigger, once in base58 and once in decimal (a `0` keeps
-        // a decimal ID from reading as base58).
+        // The same trigger written twice: a leading `1` is a base58 zero.
         let base58 = bs58::encode(40_u64.to_be_bytes()).into_string();
-        refused(vec![base58, "40".into()], None, "duplicate trigger_id");
-        refused(vec!["0".into()], None, "non-zero ID");
-        refused(vec!["not an id".into()], None, "trigger_id");
-        refused(vec!["42".into()], Some("has space"), "request_id");
         refused(
-            vec!["42".into()],
+            vec![base58, format!("1{}", format_id(40))],
+            None,
+            "duplicate trigger_id",
+        );
+        refused(vec!["1".into()], None, "non-zero ID");
+        // A decimal-looking ID is not base58.
+        refused(
+            vec!["40".into(), "0".into()],
+            None,
+            "trigger_id must be a base58 ID",
+        );
+        refused(vec!["not an id".into()], None, "trigger_id");
+        refused(vec![format_id(42)], Some("has space"), "request_id");
+        refused(
+            vec![format_id(42)],
             Some("r".repeat(65).as_str()),
             "request_id",
         );

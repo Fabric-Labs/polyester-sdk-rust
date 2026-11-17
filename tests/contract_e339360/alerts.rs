@@ -5,6 +5,7 @@ use super::super::hardening_support::{HttpScript, MockHttpServer, connect_proto_
 use base64::Engine as _;
 use buffa::Message as _;
 use futures_util::TryStreamExt;
+use polyester::codecs::scalars::format_id;
 use polyester::models::{
     AlertChannel, AlertDirection, AlertPriceSource, AlertStatus, CreateAlertParams,
     ListAlertsOptions, UpdateAlertParams,
@@ -238,10 +239,10 @@ async fn alert_inputs_are_validated_before_sending() {
         assert!(matches!(err, Error::Validation(_)), "{params:?}: {err:?}");
     }
     for params in [
-        UpdateAlertParams::new("1234", 0),
+        UpdateAlertParams::new(format_id(1234), 0),
         UpdateAlertParams::new("", 1),
-        UpdateAlertParams::new("1234", 1).with_price(price("0")),
-        UpdateAlertParams::new("1234", 1).with_channels(vec![]),
+        UpdateAlertParams::new(format_id(1234), 1).with_price(price("0")),
+        UpdateAlertParams::new(format_id(1234), 1).with_channels(vec![]),
     ] {
         let err = client.alerts.update(params.clone()).await.unwrap_err();
         assert!(matches!(err, Error::Validation(_)), "{params:?}: {err:?}");
@@ -293,13 +294,13 @@ async fn update_alert_builds_its_mask_from_the_fields_set() {
     );
     client
         .alerts
-        .update(UpdateAlertParams::new("1234", 4))
+        .update(UpdateAlertParams::new(format_id(1234), 4))
         .await
         .unwrap();
     client
         .alerts
         .update(
-            UpdateAlertParams::new("1234", 5)
+            UpdateAlertParams::new(format_id(1234), 5)
                 .with_direction(AlertDirection::Above)
                 .with_channels(vec![AlertChannel::Telegram]),
         )
@@ -381,7 +382,7 @@ async fn cancel_alert_and_read_a_triggered_alert() {
     })
     .await;
     let client = client(&server);
-    let cancelled = client.alerts.cancel("1234").await.unwrap();
+    let cancelled = client.alerts.cancel(&format_id(1234)).await.unwrap();
     assert_eq!(cancelled.status, "cancelled");
     assert_eq!(*seen.lock().unwrap(), [1234]);
 
@@ -476,7 +477,7 @@ async fn alert_refusals_map_to_sdk_errors() {
         let server = MockHttpServer::spawn(move |_| connect_error(status, code, detail)).await;
         let err = client(&server)
             .alerts
-            .update(UpdateAlertParams::new("1234", 1))
+            .update(UpdateAlertParams::new(format_id(1234), 1))
             .await
             .unwrap_err();
         match detail {
@@ -576,12 +577,12 @@ async fn alert_mutations_refuse_an_answer_without_the_alert() {
             *outcome.lock().unwrap() = value;
             let err = client
                 .alerts
-                .update(UpdateAlertParams::new("123", 1).with_price(price("1000000")))
+                .update(UpdateAlertParams::new(format_id(123), 1).with_price(price("1000000")))
                 .await
                 .unwrap_err();
             assert_response_contract(&err, "UpdateAlert");
         }
-        let err = client.alerts.cancel("123").await.unwrap_err();
+        let err = client.alerts.cancel(&format_id(123)).await.unwrap_err();
         assert_response_contract(&err, "CancelAlert");
         assert_eq!(server.requests.load(Ordering::SeqCst), 6, "{name}");
     }
@@ -612,7 +613,7 @@ async fn update_alert_reads_a_populated_alert_for_every_outcome() {
         *outcome.lock().unwrap() = value;
         let result = client
             .alerts
-            .update(UpdateAlertParams::new("1234", 1).with_price(price("1000000")))
+            .update(UpdateAlertParams::new(format_id(1234), 1).with_price(price("1000000")))
             .await
             .unwrap();
         assert_eq!(result.outcome, label);
@@ -805,7 +806,7 @@ async fn update_alert_refuses_a_market_bound_price() {
     ] {
         let err = client
             .alerts
-            .update(UpdateAlertParams::new("1234", 1).with_price(bound.clone()))
+            .update(UpdateAlertParams::new(format_id(1234), 1).with_price(bound.clone()))
             .await
             .unwrap_err();
         assert!(
@@ -820,7 +821,7 @@ async fn update_alert_refuses_a_market_bound_price() {
     ] {
         client
             .alerts
-            .update(UpdateAlertParams::new("1234", 1).with_price(unbound))
+            .update(UpdateAlertParams::new(format_id(1234), 1).with_price(unbound))
             .await
             .unwrap();
     }

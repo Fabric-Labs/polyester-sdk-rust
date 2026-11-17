@@ -573,7 +573,7 @@ impl SubAccountsService {
     /// `balances` is `None`.
     ///
     /// `subaccount_id` is the sub-account's public ID as `sub_accounts.list`
-    /// returns it (base58, or decimal). One that does not parse, or names 0,
+    /// returns it (base58). One that is not bare base58, or names 0,
     /// is refused with `Error::Validation` before sending.
     pub async fn get(
         &self,

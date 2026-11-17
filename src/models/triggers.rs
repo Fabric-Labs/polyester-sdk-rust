@@ -310,14 +310,14 @@ pub struct ListTriggersOpts {
     pub trigger_type: Option<CreateTriggerType>,
     /// Only the triggers attached to this order (the contract's
     /// `parent_order_id` filter), as order reads and
-    /// [`Trigger::parent_order_id`] spell it, in base58 or decimal. An ID
-    /// that does not parse, or names order 0, is refused before sending.
+    /// [`Trigger::parent_order_id`] spell it, in base58. An ID that is not
+    /// bare base58, or names order 0, is refused before sending.
     /// `None` lists standalone and attached triggers alike.
     pub parent_order_id: Option<String>,
     /// Only the take-profit and stop-loss of this OCO (the contract's
     /// `order_list_id` filter), as `CreateOcoResult::order_list_id` and
-    /// [`Trigger::order_list_id`] spell it, in base58 or decimal. An ID that
-    /// does not parse, or names 0, is refused before sending. `None` lists
+    /// [`Trigger::order_list_id`] spell it, in base58. An ID that is not bare
+    /// base58, or names 0, is refused before sending. `None` lists
     /// every trigger.
     pub order_list_id: Option<String>,
     /// Only the take-profit and stop-loss of the OCO created with this

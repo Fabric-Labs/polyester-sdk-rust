@@ -30,7 +30,7 @@ pub fn resolve_subaccount(
             let Some(s) = ctx.default_sub_account_id.as_deref() else {
                 return Ok(None);
             };
-            if s.trim().is_empty() {
+            if s.is_empty() {
                 return Ok(None);
             }
             // Configured defaults use the same canonical public base58
@@ -75,10 +75,11 @@ pub fn require_account_id(ctx: &ServiceContext) -> Result<String> {
 }
 
 /// Resolve the account ID from `explicit`, or else the configured default.
-/// One that decodes to 0, such as `"1"`, `"0"` or `"00"`, or doesn't decode,
-/// is refused: it would name the channel of account 0, or of no account.
+/// One that decodes to 0, such as `"1"`, or that is not bare base58 (a
+/// decimal-looking `"0"`, or whitespace, which is not trimmed) is refused: it
+/// would name the channel of account 0, or of no account.
 pub fn resolve_account_id(ctx: &ServiceContext, explicit: Option<&str>) -> Result<String> {
-    let account = match explicit.map(str::trim).filter(|s| !s.is_empty()) {
+    let account = match explicit.filter(|s| !s.is_empty()) {
         Some(value) => value.to_owned(),
         None => require_account_id(ctx)?,
     };

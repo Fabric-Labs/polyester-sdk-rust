@@ -361,14 +361,15 @@ async fn create_oco_refuses_invalid_params_before_sending() {
     }
 }
 
-/// `cancel_oco_by_id` sends the OCO's ID, in base58 or decimal, and returns
-/// it with both legs' status; an ID that is not one is refused before
-/// sending.
+/// `cancel_oco_by_id` sends the OCO's base58 ID and returns it with both
+/// legs' status; an ID that is not bare base58 (decimal, or with whitespace)
+/// is refused before sending.
 #[tokio::test]
 async fn cancel_oco_sends_the_oco_id() {
     for wire in WIRES {
         let s = server(wire).await;
-        for raw in [id(70), "70".into()] {
+        // A leading `1` is a base58 zero: both strings name OCO 70.
+        for raw in [id(70), format!("1{}", id(70))] {
             let canceled = s
                 .client
                 .triggers
@@ -382,7 +383,7 @@ async fn cancel_oco_sends_the_oco_id() {
             assert_eq!(sent.subaccount_id, Some(3), "{wire:?} {raw}");
         }
         let sent = s.sent();
-        for bad in ["", "0", "not an id"] {
+        for bad in ["", "0", "70", " 2 ", "not an id"] {
             let err = s
                 .client
                 .triggers
@@ -411,8 +412,7 @@ async fn cancel_oco_sends_the_oco_id() {
 async fn batch_cancel_returns_each_triggers_result() {
     for wire in WIRES {
         let s = server(wire).await;
-        // A `0` keeps a decimal ID from reading as base58.
-        let ids = vec![id(42), "40".to_string()];
+        let ids = vec![id(42), id(40)];
         let result = s
             .client
             .triggers
@@ -465,11 +465,13 @@ async fn batch_cancel_returns_each_triggers_result() {
 async fn batch_cancel_refuses_invalid_batches_before_sending() {
     for wire in WIRES {
         let s = server(wire).await;
-        let fifty_one: Vec<String> = (1..=51).map(|n: u64| (n * 1000).to_string()).collect();
+        let fifty_one: Vec<String> = (1..=51).map(|n: u64| id(n * 1000)).collect();
         for (ids, want) in [
             (Vec::new(), "at least one trigger_id"),
             (fifty_one, "at most 50"),
-            (vec![id(40), "40".into()], "duplicate trigger_id"),
+            // The same trigger written twice: a leading `1` is a base58 zero.
+            (vec![id(40), format!("1{}", id(40))], "duplicate trigger_id"),
+            (vec!["40".into()], "trigger_id must be a base58 ID"),
         ] {
             let err = s
                 .client
@@ -602,8 +604,8 @@ async fn list_sends_the_oco_filters() {
         assert_eq!(unfiltered.order_list_id, None, "{wire:?}");
         assert_eq!(unfiltered.client_list_id, None, "{wire:?}");
 
-        // A `0` keeps the decimal ID from reading as base58.
-        for raw in [id(70), "70".into()] {
+        // A leading `1` is a base58 zero: both strings name OCO 70.
+        for raw in [id(70), format!("1{}", id(70))] {
             s.client
                 .triggers
                 .list_with(ListTriggersOpts {
@@ -634,7 +636,7 @@ async fn list_sends_the_oco_filters() {
         assert_eq!(sent.order_list_id, None, "{wire:?}");
 
         let sent_before = s.sent();
-        for bad in ["", "0", "not an id"] {
+        for bad in ["", "0", "70", " 2 ", "not an id"] {
             let err = s
                 .client
                 .triggers

@@ -210,7 +210,10 @@ async fn read_all(client: &Client) -> Vec<(String, Option<u32>)> {
     seen.extend(trade_scales("trades.list", &trades.trades));
     let one = client
         .triggers
-        .get_by_id("11", SubAccountScope::Default)
+        .get_by_id(
+            &polyester::codecs::scalars::format_id(11),
+            SubAccountScope::Default,
+        )
         .await
         .expect("trigger get")
         .expect("trigger");
