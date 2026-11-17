@@ -1133,7 +1133,19 @@ async fn run(
             if !wait(&shared, &mut cmds, delay).await {
                 break 'session None;
             }
-            match dial(&shared.cfg).await {
+            // The shutdown fence again, right before the upgrade, and the
+            // upgrade itself ends when the session closes: no upgrade starts
+            // or completes after a close.
+            if shared.is_closed() {
+                break 'session None;
+            }
+            let mut stop = shared.stop.subscribe();
+            let dialed = tokio::select! {
+                biased;
+                () = stopped(&mut stop) => break 'session None,
+                dialed = dial(&shared.cfg) => dialed,
+            };
+            match dialed {
                 Ok(next) => break next,
                 Err(e) if fatal(&e) => break 'session Some(e),
                 Err(e) => error = e,

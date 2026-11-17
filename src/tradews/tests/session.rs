@@ -52,6 +52,8 @@ struct Script {
     refuse: Option<(u16, &'static str)>,
     /// The refusal's Retry-After header.
     refuse_retry_after: Option<&'static str>,
+    /// Accept the connection and never answer its upgrade.
+    hang: bool,
     /// Refuse every command with this code instead of acknowledging it.
     reject: Option<reject_code::RejectCode>,
     /// Frames sent right after the SubscriptionAck.
@@ -79,6 +81,7 @@ fn serve() -> Script {
         echo_cod: true,
         refuse: None,
         refuse_retry_after: None,
+        hang: false,
         reject: None,
         after_ready: Vec::new(),
         close_on: None,
@@ -298,6 +301,15 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
         let mut script = scripts.next();
         while let Some(current) = script.clone() {
             let (tcp, _) = listener.accept().await.unwrap();
+            if current.hang {
+                seen.lock().unwrap().push(Seen::default());
+                script = scripts.next();
+                tokio::spawn(async move {
+                    let _held = tcp;
+                    std::future::pending::<()>().await;
+                });
+                continue;
+            }
             let captured: Arc<Mutex<Seen>> = Arc::default();
             let capture = Arc::clone(&captured);
             let plan = current.clone();
@@ -1649,4 +1661,39 @@ async fn a_503_upgrade_waits_its_retry_after_of_400_milliseconds() {
         gap >= Duration::from_millis(400),
         "reconnected {gap:?} after a 0.4 s Retry-After"
     );
+}
+
+/// Closing while a reconnect's upgrade is in flight ends it at once, not at
+/// the connect timeout, and starts nothing after.
+#[tokio::test]
+async fn a_close_during_a_reconnect_upgrade_ends_it() {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let hang = Script {
+        hang: true,
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![close_after_arm, hang, serve()]).await;
+    let mut session = start(url).await;
+    ready_on(&mut session, 1).await;
+    arm(&session).await;
+    disconnected(&mut session).await;
+    tokio::time::timeout(WAIT, async {
+        while record.lock().unwrap().len() < 2 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the reconnect's upgrade is in flight");
+    session.close();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while session.is_alive() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the close ends the upgrade in flight");
+    assert_eq!(record.lock().unwrap().len(), 2, "nothing after the close");
 }
