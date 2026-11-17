@@ -82,10 +82,6 @@ const MAX_BPS: i32 = 10_000;
 /// stop: a 100% cap would leave a sell no positive price to sell at.
 const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
 
-fn validate_bps(field: &str, value: i32) -> Result<()> {
-    validate_bps_at_most(field, value, MAX_BPS)
-}
-
 fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
     if !(1..=max).contains(&value) {
         return Err(Error::validation(format!(
@@ -2281,7 +2277,10 @@ fn coded_positive_price(
     price.compatible_with(symbol)?;
     let ticks = price.as_ticks();
     if ticks <= 0 {
-        return Err(order_code_refusal(code, format!("{field} must be positive")));
+        return Err(order_code_refusal(
+            code,
+            format!("{field} must be positive"),
+        ));
     }
     Ok(ticks)
 }
@@ -2720,10 +2719,30 @@ mod tests {
                     .orders
                     .encode_create_params(&params)
                     .expect_err(&format!("{label} {form}"));
-                assert!(
-                    matches!(err, Error::Validation(_)),
-                    "{label} {form}: {err:?}"
-                );
+                // An attached leg's price carries the code the Orders API
+                // answers for it; the order's own prices stay validation
+                // errors.
+                let code = match label {
+                    "take_profit trigger" | "stop_loss trigger" => {
+                        Some("ERROR_CODE_TRIGGER_PRICE_INVALID")
+                    }
+                    "take_profit child limit" | "stop_loss child limit" => {
+                        Some("ERROR_CODE_BAD_PRICE")
+                    }
+                    "trailing activation" => Some("ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID"),
+                    _ => None,
+                };
+                match code {
+                    Some(code) => assert!(
+                        matches!(&err, Error::Api { code: got, violations, .. }
+                            if got == code && violations.is_empty()),
+                        "{label} {form}: {err:?}"
+                    ),
+                    None => assert!(
+                        matches!(err, Error::Validation(_)),
+                        "{label} {form}: {err:?}"
+                    ),
+                }
                 assert!(err.to_string().contains(want), "{label} {form}: {err}");
             }
         }
@@ -3401,6 +3420,103 @@ mod tests {
                 result.unwrap();
             }
         }
+    }
+
+    /// An attached trailing stop's refused value carries the code a
+    /// standalone trailing stop answers for it, on create and modify alike,
+    /// so a pre-checked request and a server refusal read the same.
+    #[test]
+    fn attached_trailing_stop_refusals_carry_the_standalone_codes() {
+        use crate::models::{AttachedRisk, MaxSlippage, TrailingDistance, TrailingStop};
+
+        let client = client();
+        let create = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        let stop = |distance, max_slippage| TrailingStop {
+            distance,
+            max_slippage,
+            ..TrailingStop::new(TrailingDistance::Bps(100))
+        };
+        let cases = [
+            (stop(None, None), "ERROR_CODE_TRAILING_DISTANCE_INVALID"),
+            (
+                stop(Some(TrailingDistance::Ticks(-1)), None),
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                stop(Some(TrailingDistance::Bps(10_001)), None),
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Ticks(0)),
+                ),
+                "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+            ),
+            (
+                stop(Some(TrailingDistance::Bps(100)), Some(MaxSlippage::Bps(0))),
+                "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Bps(10_000)),
+                ),
+                "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Bps(10_001)),
+                ),
+                "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+            ),
+            (
+                TrailingStop::new(TrailingDistance::Bps(100))
+                    .with_activation_price(Price::from_ticks(0, Some("BTC-USDT".into())).unwrap()),
+                "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID",
+            ),
+        ];
+        for (trailing, want) in cases {
+            let risk = AttachedRisk {
+                trailing_stop: Some(trailing.clone()),
+                ..Default::default()
+            };
+            let mut params = create.clone();
+            params.attached_risk = Some(risk.clone());
+            let mut modify = modify_params(None, None);
+            modify.new_attached_risk = Some(risk);
+            for err in [
+                client.orders.encode_create_params(&params).unwrap_err(),
+                client.orders.encode_modify_params(modify).unwrap_err(),
+            ] {
+                assert!(
+                    matches!(&err, Error::Api { code, violations, .. }
+                        if code == want && violations.is_empty()),
+                    "{trailing:?}: {err:?}"
+                );
+            }
+        }
+        // The edges stay accepted.
+        let mut params = create.clone();
+        params.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(stop(
+                Some(TrailingDistance::Bps(10_000)),
+                Some(MaxSlippage::Bps(9_999)),
+            )),
+            ..Default::default()
+        });
+        client.orders.encode_create_params(&params).unwrap();
     }
 
     #[test]

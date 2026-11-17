@@ -576,7 +576,8 @@ pub mod withdraw_codes {
     pub const ROUTE_SUSPENDED: &str = "ERROR_CODE_ROUTE_SUSPENDED";
 }
 
-/// `transfer.v1.ErrorCode` names of dust conversion refusals.
+/// `transfer.v1.ErrorCode` names of dust conversion and batch transfer
+/// refusals.
 pub mod transfer_codes {
     /// The quote is older than 30 seconds, unknown, or another account's:
     /// quote again. Final.
@@ -602,6 +603,10 @@ pub mod transfer_codes {
     pub const DUST_BALANCE_CHANGED: &str = "ERROR_CODE_DUST_BALANCE_CHANGED";
     /// The conversion could not complete; nothing moved: quote again. Final.
     pub const DUST_CONVERSION_FAILED: &str = "ERROR_CODE_DUST_CONVERSION_FAILED";
+    /// A batch of internal transfers debits more than 10 distinct source
+    /// accounts (`invalid_argument`, HTTP 400). Final: send fewer source
+    /// accounts per batch.
+    pub const BATCH_TOO_MANY_SOURCES: &str = "ERROR_CODE_BATCH_TOO_MANY_SOURCES";
 }
 
 /// `ledger.read.v1.ErrorCode` names of statement export refusals.
@@ -618,6 +623,11 @@ pub mod ledger_codes {
     pub const STATEMENT_EXPORT_EXPIRED: &str = "ERROR_CODE_STATEMENT_EXPORT_EXPIRED";
     /// The export failed and has no file.
     pub const STATEMENT_EXPORT_FAILED: &str = "ERROR_CODE_STATEMENT_EXPORT_FAILED";
+    /// The export already finished (`ready`, `failed` or `expired`) and
+    /// cannot be canceled (REST 409). Final.
+    pub const STATEMENT_EXPORT_NOT_CANCELABLE: &str = "ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE";
+    /// The export was canceled and has no file (REST 409). Final.
+    pub const STATEMENT_EXPORT_CANCELED: &str = "ERROR_CODE_STATEMENT_EXPORT_CANCELED";
 }
 
 pub mod order_codes {

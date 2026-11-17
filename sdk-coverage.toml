@@ -80,7 +80,7 @@ reason = "Root portfolio equity history requires an interactive root-account ses
 
 [[allowlist]]
 procedure = "/ledger.read.v1.LedgerReadService/GetPortfolioEquitySnapshot"
-reason = "Root portfolio equity snapshot requires an interactive root-account session; API keys and subaccount-scoped sessions are not supported."
+reason = "Root portfolio equity snapshot accepts a root-account session, and on devnet a root-scoped API key with READ_BALANCES (testnet keeps session-only access until its next update); subaccount-scoped keys and sessions are refused. Not wrapped in this SDK yet."
 
 [[allowlist]]
 procedure = "/auth.v1.AuthService/AcceptTerms"

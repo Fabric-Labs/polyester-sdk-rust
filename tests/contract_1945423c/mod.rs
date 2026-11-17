@@ -15,19 +15,19 @@ use polyester::proto::chain::lifecycle::v1::{
 };
 use polyester::proto::ledger::read::v1::{
     BalanceSeries, CreateStatementExportRequest, CreateStatementExportResponse,
-    ExportStatementResponse, GetBalanceHistoryRequest, GetBalanceHistoryResponse,
-    ListStatementExportsRequest, ListStatementExportsResponse, StatementExport,
-    StatementExportStatus,
+    GetBalanceHistoryRequest, GetBalanceHistoryResponse, ListStatementExportsRequest,
+    ListStatementExportsResponse, StatementExport, StatementExportStatus,
 };
 use polyester::proto::polyester::r#type::v1::U128;
 use polyester::proto::transfer::v1::{
     BatchCreateInternalTransfersRequest, BatchCreateInternalTransfersResponse,
     CreateDustConversionRequest, CreateDustConversionResponse, DustConversion, DustConversionState,
+    GetInternalTransferBatchRequest, GetInternalTransferBatchResponse,
     InternalTransferBatchLegResult, InternalTransferBatchLegStatus, InternalTransferBatchStatus,
     ListDustConversionsRequest, ListDustConversionsResponse, QuoteDustConversionRequest,
     QuoteDustConversionResponse, internal_transfer_batch_leg,
 };
-use polyester::services::{CreateStatementExportOptions, ExportStatementOptions};
+use polyester::services::CreateStatementExportOptions;
 use polyester::{AssetAmount, Client, Config, Error, QuantityDomain};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
@@ -261,35 +261,51 @@ fn leg(asset_id: u32, amount: &str) -> InternalTransferBatchLeg {
     }
 }
 
+const BATCH_ID: &str = "92640625967207661803151833376978068587";
+
 /// A batch sends every leg exactly, in order, with the source sub-account of
-/// each leg and one idempotency key; the reply reads leg by leg.
+/// each leg and one idempotency key; the reply reads leg by leg, and the
+/// batch reads back by its request ID.
 #[tokio::test]
 async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
-    let (client, seen) = server(|_| {
-        connect_proto_ok(&BatchCreateInternalTransfersResponse {
-            request_id: "batch-1".into(),
-            status: InternalTransferBatchStatus::BATCH_SUBMITTED.into(),
+    let leg_result = |index: u32, status: InternalTransferBatchLegStatus, flow: &str| {
+        InternalTransferBatchLegResult {
+            leg_index: index,
+            status: status.into(),
+            transfer_id: format!("9264062596720766180315183337697806858{index}"),
+            flow_id: flow.into(),
+            asset_id: 1,
+            amount_e18: u128(500_000_000_000_000_000).into(),
+            ..Default::default()
+        }
+    };
+    let (client, seen) = server(move |path| match path {
+        "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers" => {
+            connect_proto_ok(&BatchCreateInternalTransfersResponse {
+                request_id: BATCH_ID.into(),
+                status: InternalTransferBatchStatus::BATCH_PROCESSING.into(),
+                legs: vec![
+                    leg_result(0, InternalTransferBatchLegStatus::LEG_PROCESSING, ""),
+                    leg_result(1, InternalTransferBatchLegStatus::LEG_PROCESSING, ""),
+                ],
+                ..Default::default()
+            })
+        }
+        _ => connect_proto_ok(&GetInternalTransferBatchResponse {
+            request_id: BATCH_ID.into(),
+            status: InternalTransferBatchStatus::BATCH_ACCEPTED.into(),
             legs: vec![
                 InternalTransferBatchLegResult {
-                    leg_index: 0,
-                    status: InternalTransferBatchLegStatus::LEG_ACCEPTED.into(),
-                    request_id: "r0".into(),
-                    transfer_id: "t0".into(),
-                    flow_id: "flow_t0".into(),
-                    asset_id: 1,
-                    amount_e18: u128(500_000_000_000_000_000).into(),
-                    ..Default::default()
+                    credited_at_ts_ns: 1_763_330_000_000_000_000,
+                    ..leg_result(0, InternalTransferBatchLegStatus::LEG_CREDITED, "flow_t0")
                 },
                 InternalTransferBatchLegResult {
-                    leg_index: 1,
-                    status: InternalTransferBatchLegStatus::LEG_PENDING.into(),
-                    request_id: "r1".into(),
-                    asset_id: 3,
-                    ..Default::default()
+                    credited_at_ts_ns: 1_763_330_000_000_000_001,
+                    ..leg_result(1, InternalTransferBatchLegStatus::LEG_CREDITED, "flow_t1")
                 },
             ],
             ..Default::default()
-        })
+        }),
     })
     .await;
     let mut second = leg(3, "0.000000000000000001");
@@ -304,16 +320,38 @@ async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
         })
         .await
         .unwrap();
-    assert_eq!(result.status, "submitted");
-    assert_eq!(result.legs[0].status, "accepted");
-    assert_eq!(result.legs[1].status, "pending");
+    assert_eq!(
+        (result.request_id.as_str(), result.status.as_str()),
+        (BATCH_ID, "processing")
+    );
+    assert_eq!(result.legs[0].status, "processing");
+    assert_eq!(result.legs[1].flow_id, "");
     assert_eq!(
         result.legs[0].quantity.as_ref().map(AssetAmount::as_scaled),
         Some(500_000_000_000_000_000)
     );
 
+    let read = client
+        .internal_transfers
+        .get_batch(&result.request_id)
+        .await
+        .unwrap();
+    assert_eq!(read.status, "accepted");
+    let legs: Vec<_> = read
+        .legs
+        .iter()
+        .map(|l| (l.status.as_str(), l.flow_id.as_str(), l.credited_at_ts_ns))
+        .collect();
+    assert_eq!(
+        legs,
+        [
+            ("credited", "flow_t0", 1_763_330_000_000_000_000),
+            ("credited", "flow_t1", 1_763_330_000_000_000_001)
+        ]
+    );
+
     let sent = requests(&seen);
-    assert_eq!(sent.len(), 1);
+    assert_eq!(sent.len(), 2);
     let (path, signed, body) = &sent[0];
     assert_eq!(
         path,
@@ -335,11 +373,20 @@ async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
         req.legs[1].destination,
         Some(internal_transfer_batch_leg::Destination::DestinationSubaccountId(id)) if id == default_sub()
     ));
+    let (path, signed, body) = &sent[1];
+    assert_eq!(
+        path,
+        "/transfer.v1.InternalTransferService/GetInternalTransferBatch"
+    );
+    assert!(signed);
+    let req = GetInternalTransferBatchRequest::decode_from_slice(body).unwrap();
+    assert_eq!(req.request_id, BATCH_ID);
 }
 
 /// A batch the contract refuses is refused before sending: no legs, more than
-/// ten, a bad idempotency key, a leg without an asset or with other than one
-/// destination, and an amount finer than 18 decimals.
+/// 500, a bad idempotency key, a leg without an asset or with other than one
+/// destination, and an amount finer than 18 decimals. A batch read refuses a
+/// request ID that breaks the contract's `^[1-9][0-9]*$` (1 to 39 digits).
 #[tokio::test]
 async fn batch_transfer_refuses_out_of_contract_input_before_sending() {
     let (client, seen) = server(|_| HttpScript::NotFound).await;
@@ -359,7 +406,7 @@ async fn batch_transfer_refuses_out_of_contract_input_before_sending() {
         AssetAmount::from_scaled(1, Some(19), QuantityDomain::LedgerE18, Some(1)).unwrap();
     let cases = vec![
         ("no legs", params(vec![], "k")),
-        ("eleven legs", params(vec![leg(1, "1"); 11], "k")),
+        ("501 legs", params(vec![leg(1, "1"); 501], "k")),
         ("empty key", params(vec![leg(1, "1")], "")),
         ("long key", params(vec![leg(1, "1")], &"k".repeat(129))),
         ("no asset", params(vec![no_asset], "k")),
@@ -375,10 +422,42 @@ async fn batch_transfer_refuses_out_of_contract_input_before_sending() {
             .unwrap_err();
         assert!(matches!(err, Error::Validation(_)), "{label}: {err:?}");
     }
-    let ten = params(vec![leg(1, "1"); 10], &"k".repeat(128));
-    // Ten legs and a 128-character key reach the wire (the server 404s).
-    assert!(client.internal_transfers.batch_create(ten).await.is_err());
-    assert_eq!(requests(&seen).len(), 1);
+    let forty_digits = "1".repeat(40);
+    for request_id in [
+        "",
+        "0",
+        "01",
+        " 1",
+        "1 ",
+        "12a",
+        "-1",
+        "١",
+        forty_digits.as_str(),
+    ] {
+        let err = client
+            .internal_transfers
+            .get_batch(request_id)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Validation(_)),
+            "{request_id:?}: {err:?}"
+        );
+    }
+    assert!(requests(&seen).is_empty(), "refused calls were sent");
+
+    // 500 legs and a 128-character key reach the wire (the server 404s), and
+    // so does a 39-digit request ID.
+    let most = params(vec![leg(1, "1"); 500], &"k".repeat(128));
+    assert!(client.internal_transfers.batch_create(most).await.is_err());
+    assert!(
+        client
+            .internal_transfers
+            .get_batch(&"9".repeat(39))
+            .await
+            .is_err()
+    );
+    assert_eq!(requests(&seen).len(), 2);
 }
 
 /// Quote, convert and list dust: signed, scoped, and refused before sending
@@ -531,6 +610,8 @@ async fn statement_export_files_are_created_and_listed() {
         }
         _ => connect_proto_ok(&ListStatementExportsResponse {
             exports: vec![export(7)],
+            in_progress_exports: 1,
+            max_in_progress_exports: 5,
             ..Default::default()
         }),
     })
@@ -558,6 +639,10 @@ async fn statement_export_files_are_created_and_listed() {
         .await
         .unwrap();
     assert_eq!(list.exports.len(), 1);
+    assert_eq!(
+        (list.in_progress_exports, list.max_in_progress_exports),
+        (1, 5)
+    );
     let sent = requests(&seen);
     assert_eq!(sent.len(), 2);
     assert!(sent.iter().all(|(_, signed, _)| *signed));
@@ -603,62 +688,6 @@ async fn statement_export_files_are_created_and_listed() {
         assert!(matches!(err, Err(Error::Validation(_))), "{err:?}");
     }
     assert!(requests(&seen).is_empty(), "refused calls were sent");
-}
-
-/// A statement carries `complete_through`; pages that disagree on it are a
-/// response-contract error.
-#[tokio::test]
-async fn statement_carries_complete_through_and_pages_must_agree() {
-    use polyester::proto::ledger::read::v1::ExportStatementRequest;
-    for (second_seconds, ok) in [(1_790_900_000, true), (1_790_900_001, false)] {
-        let http = MockHttpServer::spawn(move |request| {
-            let req = ExportStatementRequest::decode_from_slice(&request.body).unwrap();
-            let first = req.page_token.is_empty();
-            connect_proto_ok(&ExportStatementResponse {
-                csv: if first {
-                    "h\r\n".into()
-                } else {
-                    "r\r\n".into()
-                },
-                next_page_token: if first { "p2".into() } else { String::new() },
-                complete_through: buffa_types::google::protobuf::Timestamp {
-                    seconds: if first { 1_790_900_000 } else { second_seconds },
-                    nanos: 5,
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
-            })
-        })
-        .await;
-        let client = Client::new(Config {
-            api_url: http.base_url(),
-            api_key_id: Some("ak_test".into()),
-            api_private_key: Some(TEST_KEY.into()),
-            hydrate_catalogs: false,
-            ..Default::default()
-        })
-        .unwrap();
-        let result = client
-            .statements
-            .export(ExportStatementOptions {
-                start_time: Some(UNIX_EPOCH + Duration::from_secs(1_790_812_800)),
-                end_time: Some(UNIX_EPOCH + Duration::from_secs(1_793_491_200)),
-                ..Default::default()
-            })
-            .await;
-        if ok {
-            let statement = result.unwrap();
-            let through = statement.complete_through.expect("complete_through");
-            assert_eq!((through.seconds, through.nanos), (1_790_900_000, 5));
-            assert_eq!(statement.csv, "h\r\nr\r\n");
-        } else {
-            assert!(
-                matches!(result, Err(Error::ResponseContract { .. })),
-                "{result:?}"
-            );
-        }
-    }
 }
 
 /// Balance history reads each point's exact 18-decimal balance, and a server

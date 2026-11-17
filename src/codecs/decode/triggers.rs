@@ -16,12 +16,12 @@ use crate::proto::orders::v1::{
 };
 use crate::proto::triggers::v1::{
     BatchCancelTriggersResponse, CancelOcoResponse, CancelTriggerResponse, ConditionalTrigger,
-    CreateOcoResponse, CreateTriggerResponse, GetTriggerResponse, LadderDistribution, LadderOutcome,
-    ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse, PauseTriggerResponse,
-    ResumeTriggerResponse, Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent,
-    TriggerEventType, TriggerStatus, TriggerType, batch_cancel_triggers_result_item,
-    conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
-    twap_market_ioc, twap_trigger,
+    CreateOcoResponse, CreateTriggerResponse, GetTriggerResponse, LadderDistribution,
+    LadderOutcome, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
+    PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
+    TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
+    batch_cancel_triggers_result_item, conditional_child_execution, trailing_stop_trigger, trigger,
+    trigger_event, trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -1338,7 +1338,10 @@ mod tests {
             (4, 3, 1, 1)
         );
         assert_eq!(ladder.outcome.as_deref(), Some("mixed_rejections"));
-        assert_eq!(ladder_outcome_label(LadderOutcome::LADDER_OUTCOME_UNSPECIFIED.into()), None);
+        assert_eq!(
+            ladder_outcome_label(LadderOutcome::LADDER_OUTCOME_UNSPECIFIED.into()),
+            None
+        );
         assert_eq!(
             ladder_outcome_label(buffa::EnumValue::from(9)).as_deref(),
             Some("UNKNOWN(9)")

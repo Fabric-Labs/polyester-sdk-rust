@@ -66,6 +66,38 @@ async fn get_version_reads_the_build_without_credentials() {
     assert_eq!(release.release(), "0.10.0");
 }
 
+/// `get_time` (contract 0.93.5) needs no API key, is never signed, keeps the
+/// server time exact, and refuses a reply without it.
+#[tokio::test]
+async fn get_time_reads_the_server_clock_unsigned() {
+    use polyester::proto::system::v1::GetTimeResponse;
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path != "/system.v1.SystemService/GetTime" {
+            return HttpScript::NotFound;
+        }
+        let mut log = log.lock().unwrap();
+        log.push(request.has_header("X-API-KEY-ID"));
+        connect_proto_ok(&GetTimeResponse {
+            server_time_ms: if log.len() < 3 { 1_763_337_600_123 } else { 0 },
+            ..Default::default()
+        })
+    })
+    .await;
+    for client in [public_client(&server), keyed_client(&server)] {
+        let time = client.get_time().await.unwrap();
+        assert_eq!(time.server_time_ms, 1_763_337_600_123);
+    }
+    let err = public_client(&server).get_time().await.unwrap_err();
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err:?}"
+    );
+    assert_eq!(*seen.lock().unwrap(), [false, false, false]);
+}
+
 /// Wallet balances are signed reads of the account's smart account wallet:
 /// the root account by default, or the named sub-account. Amounts keep all
 /// 18 decimals.

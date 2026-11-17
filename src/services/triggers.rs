@@ -67,7 +67,6 @@ const CLIENT_TRIGGER_ID_MAX_BYTES: usize = 36;
 mod refusal_codes {
     pub const BAD_PRICE: &str = "ERROR_CODE_BAD_PRICE";
     pub const BAD_QTY: &str = "ERROR_CODE_BAD_QTY";
-    pub const CLIENT_LIST_ID_INVALID: &str = super::correlation_id::CLIENT_LIST_ID_INVALID;
     pub const CLIENT_TRIGGER_ID_INVALID: &str = "ERROR_CODE_CLIENT_TRIGGER_ID_INVALID";
     pub const FEE_ASSET_NOT_ALLOWED: &str = "ERROR_CODE_FEE_ASSET_NOT_ALLOWED";
     pub const LADDER_LEVELS_INVALID: &str = "ERROR_CODE_LADDER_LEVELS_INVALID";
@@ -3849,13 +3848,25 @@ mod tests {
 
         let mut p = sell_oco();
         p.client_list_id = String::new();
-        coded(p, codes::CLIENT_LIST_ID_INVALID, "client_list_id must be 1 to 36 characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id must be 1 to 36 characters",
+        );
         let mut p = sell_oco();
         p.client_list_id = "x".repeat(37);
-        coded(p, codes::CLIENT_LIST_ID_INVALID, "client_list_id must be 1 to 36 characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id must be 1 to 36 characters",
+        );
         let mut p = sell_oco();
         p.client_list_id = "\u{30b9}".repeat(12);
-        coded(p, codes::CLIENT_LIST_ID_INVALID, "client_list_id contains invalid characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id contains invalid characters",
+        );
 
         let mut p = sell_oco();
         p.take_profit.limit_price = None;

@@ -1,5 +1,6 @@
-//! Account statements (`ledger.read.v1.LedgerReadService/ExportStatement`)
-//! and whole-period statement files (`ledger.read.v1.StatementExportService`).
+//! Account statements (`ledger.read.v1.StatementExportService`): a
+//! whole-period statement of one account, produced in the background as one
+//! CSV file.
 
 use super::changelog::timestamp_field;
 use super::limits::{
@@ -9,34 +10,39 @@ use super::limits::{
 };
 use super::{ServiceContext, scope, unary};
 use crate::codecs::decode::{
+    statement_export_download_url_from_proto, statement_export_from_cancel_response,
     statement_export_from_create_response, statement_export_from_get_response,
     statement_exports_list_from_proto,
 };
 use crate::codecs::scalars::parse_account_id;
-use crate::connect::ledger::read::v1::{LedgerReadServiceClient, StatementExportServiceClient};
+use crate::connect::ledger::read::v1::StatementExportServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::SubAccountScope;
-use crate::models::{Statement, StatementExport, StatementExportsList, StatementPage};
+use crate::models::{StatementExport, StatementExportDownloadUrl, StatementExportsList};
 use crate::proto::ledger::read::v1::{
-    CreateStatementExportRequest, ExportStatementRequest, GetStatementExportRequest,
-    ListStatementExportsRequest,
+    CancelStatementExportRequest, CreateStatementExportRequest,
+    GetStatementExportDownloadUrlRequest, GetStatementExportRequest, ListStatementExportsRequest,
 };
 use crate::transport::SharedTransport;
-use std::collections::HashSet;
 use std::time::SystemTime;
 
-const EXPORT_STATEMENT: &str = "/ledger.read.v1.LedgerReadService/ExportStatement";
 const CREATE_STATEMENT_EXPORT: &str =
     "/ledger.read.v1.StatementExportService/CreateStatementExport";
 const GET_STATEMENT_EXPORT: &str = "/ledger.read.v1.StatementExportService/GetStatementExport";
+const GET_STATEMENT_EXPORT_DOWNLOAD_URL: &str =
+    "/ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl";
+const CANCEL_STATEMENT_EXPORT: &str =
+    "/ledger.read.v1.StatementExportService/CancelStatementExport";
 const LIST_STATEMENT_EXPORTS: &str = "/ledger.read.v1.StatementExportService/ListStatementExports";
 
 /// What [`StatementsService::create_export`] asks for: a whole-period
 /// statement file of one account, optionally one asset.
 #[derive(Debug, Clone, Default)]
 pub struct CreateStatementExportOptions {
-    /// The account (see [`SubAccountScope`]), chosen as for
-    /// [`ExportStatementOptions::subaccount_id`].
+    /// The account the statement covers (see [`SubAccountScope`]). With
+    /// [`SubAccountScope::Default`] and no default configured, a key scoped
+    /// to a sub-account reads that sub-account and other callers their main
+    /// account. [`SubAccountScope::Id`] 0 is refused.
     pub subaccount_id: SubAccountScope,
     /// Start of the period (UTC), inclusive. Required.
     pub start_time: Option<SystemTime>,
@@ -53,31 +59,6 @@ pub struct CreateStatementExportOptions {
     pub idempotency_key: String,
 }
 
-/// What [`StatementsService::export_page`] and [`StatementsService::export`]
-/// read: one account, optionally one asset, over a period of at most 366
-/// days. The statement is CSV; there is no other format.
-#[derive(Debug, Clone, Default)]
-pub struct ExportStatementOptions {
-    /// The account to export (see [`SubAccountScope`]). With
-    /// [`SubAccountScope::Default`] and no default configured, a key scoped to a
-    /// sub-account reads that sub-account and other callers their main
-    /// account. [`SubAccountScope::Id`] 0 is refused.
-    pub subaccount_id: SubAccountScope,
-    /// Start of the period (UTC), inclusive. Required.
-    pub start_time: Option<SystemTime>,
-    /// End of the period (UTC), exclusive. Required. The statement covers
-    /// the period up to its `complete_through`, which is at most `end_time`.
-    pub end_time: Option<SystemTime>,
-    /// Numeric asset ID (the spot config's `ledger_id`); `None` or `Some(0)`
-    /// covers every asset.
-    pub asset_id: Option<u32>,
-    /// Continue from a previous page's `next_page_token`. It is bound to the
-    /// account, sub-account, asset, period and `complete_through`: reuse it
-    /// only with the same fields. A token issued before the statement carried
-    /// `complete_through` is refused as invalid: restart from the first page.
-    pub page_token: Option<String>,
-}
-
 #[derive(Clone)]
 pub struct StatementsService {
     ctx: ServiceContext,
@@ -88,13 +69,6 @@ impl StatementsService {
         Self { ctx }
     }
 
-    fn client(&self) -> LedgerReadServiceClient<SharedTransport> {
-        LedgerReadServiceClient::new(
-            self.ctx.factory.transport(),
-            self.ctx.factory.connect_config(),
-        )
-    }
-
     fn export_client(&self) -> StatementExportServiceClient<SharedTransport> {
         StatementExportServiceClient::new(
             self.ctx.factory.transport(),
@@ -102,95 +76,14 @@ impl StatementsService {
         )
     }
 
-    fn request(&self, opts: ExportStatementOptions) -> Result<ExportStatementRequest> {
-        let required = |time: Option<SystemTime>, field: &str| {
-            time.map(Some)
-                .ok_or_else(|| Error::validation(format!("export_statement {field} is required")))
-        };
-        Ok(ExportStatementRequest {
-            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
-            start_time: timestamp_field(required(opts.start_time, "start_time")?),
-            end_time: timestamp_field(required(opts.end_time, "end_time")?),
-            asset_id: opts.asset_id.unwrap_or(0),
-            page_token: opts.page_token.unwrap_or_default(),
-            ..Default::default()
-        })
-    }
-
-    /// One page of an account statement as CSV text. A page holds at most
-    /// 2000 ledger movements and never splits an entry; only the first page
-    /// starts with the header row. Signed: an API key needs
-    /// `READ_STATEMENTS` on its policy (`READ_BALANCES` does not grant it).
-    pub async fn export_page(&self, opts: ExportStatementOptions) -> Result<StatementPage> {
-        let req = self.request(opts)?;
-        let client = self.client();
-        let resp = unary::await_auth(&self.ctx.factory, EXPORT_STATEMENT, req, |req, opts| {
-            client.export_statement_with_options(req, opts)
-        })
-        .await?
-        .into_owned();
-        Ok(StatementPage {
-            csv: resp.csv,
-            next_page_token: resp.next_page_token,
-            complete_through: resp.complete_through.as_option().cloned(),
-        })
-    }
-
-    /// The whole statement: every page from `opts.page_token` on, requested
-    /// with the same fields and concatenated in order, so that from the first
-    /// page the result starts with the header row. Read its rows with
-    /// [`Statement::rows`]; its `complete_through` says how far it is
-    /// complete. A next page token that repeats one this call already sent,
-    /// or pages that disagree on `complete_through`, fail with a
-    /// response-contract error.
-    pub async fn export(&self, opts: ExportStatementOptions) -> Result<Statement> {
-        let mut csv = String::new();
-        let mut complete_through = None;
-        let mut first = true;
-        let mut requested = HashSet::new();
-        let mut token = opts.page_token.clone().unwrap_or_default();
-        loop {
-            if !token.is_empty() {
-                requested.insert(token.clone());
-            }
-            let page = self
-                .export_page(ExportStatementOptions {
-                    page_token: Some(token),
-                    ..opts.clone()
-                })
-                .await?;
-            if first {
-                complete_through = page.complete_through;
-                first = false;
-            } else if page.complete_through != complete_through {
-                return Err(Error::response_contract(
-                    "statement pagination",
-                    "pages of one statement disagree on complete_through",
-                ));
-            }
-            csv.push_str(&page.csv);
-            if page.next_page_token.is_empty() {
-                return Ok(Statement {
-                    csv,
-                    complete_through,
-                });
-            }
-            if requested.contains(&page.next_page_token) {
-                return Err(Error::response_contract(
-                    "statement pagination",
-                    "next_page_token repeats an earlier page_token",
-                ));
-            }
-            token = page.next_page_token;
-        }
-    }
-
     /// Create a whole-period statement file of one account, produced in the
     /// background, or return the export already created under the same
-    /// idempotency key. Poll [`Self::get_export`] until its status is `ready`
-    /// (or `failed`); download the file over REST (see [`StatementExport`]).
+    /// idempotency key. Poll [`Self::get_export`] until its status is
+    /// `ready`, or ends `failed`, `expired` or `canceled`; then download the
+    /// file (see [`StatementExport`] and [`Self::get_export_download_url`]).
     ///
-    /// Signed like [`Self::export_page`]: an API key needs `READ_STATEMENTS`.
+    /// Signed: an API key needs `READ_STATEMENTS` on its policy
+    /// (`READ_BALANCES` does not grant it).
     /// A main account has at most 5 exports `queued` or `processing`;
     /// another create is refused with `ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`
     /// (not retryable: wait for one to finish). Refused before sending: a
@@ -277,10 +170,67 @@ impl StatementsService {
         statement_export_from_get_response(&resp)
     }
 
-    /// One page of an account's statement exports, newest first. `limit` 0
-    /// asks for the server's default (20); above 100 is refused. Pass the
-    /// previous page's `next_page_token` to continue; it is bound to the
-    /// account.
+    /// A URL that downloads a `ready` export's file without credentials, for
+    /// a browser to save it as `filename` (`statement-<export_id>.csv`). It
+    /// works until `expires_at`, at most 60 seconds after the call; each call
+    /// returns a new URL. Anyone holding it can download the file until
+    /// then: never log, store or share it (the result's `Debug` redacts it).
+    ///
+    /// Refused by the API with `failed_precondition` and an
+    /// [`crate::errors::ledger_codes`] code: `STATEMENT_EXPORT_NOT_READY`
+    /// before the file is ready, `STATEMENT_EXPORT_FAILED` and
+    /// `STATEMENT_EXPORT_CANCELED` for an export without a file, and
+    /// `STATEMENT_EXPORT_EXPIRED` once the file expired or has less than 5
+    /// seconds left. A reply without a URL is an
+    /// [`Error::ResponseContract`].
+    pub async fn get_export_download_url(
+        &self,
+        export_id: &str,
+    ) -> Result<StatementExportDownloadUrl> {
+        let req = GetStatementExportDownloadUrlRequest {
+            export_id: parse_account_id(export_id, "export_id")?,
+            ..Default::default()
+        };
+        let client = self.export_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            GET_STATEMENT_EXPORT_DOWNLOAD_URL,
+            req,
+            |req, opts| client.get_statement_export_download_url_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        statement_export_download_url_from_proto(&resp)
+    }
+
+    /// Cancel a `queued` or `processing` export and return it, `canceled`.
+    /// It stops at once: it no longer counts toward the main account's 5
+    /// exports in progress, the account's next export can start, and any
+    /// partial file is deleted. Canceling a `canceled` export returns it as
+    /// it is; a finished one (`ready`, `failed` or `expired`) is refused with
+    /// `failed_precondition` and
+    /// [`crate::errors::ledger_codes::STATEMENT_EXPORT_NOT_CANCELABLE`].
+    pub async fn cancel_export(&self, export_id: &str) -> Result<StatementExport> {
+        let req = CancelStatementExportRequest {
+            export_id: parse_account_id(export_id, "export_id")?,
+            ..Default::default()
+        };
+        let client = self.export_client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            CANCEL_STATEMENT_EXPORT,
+            req,
+            |req, opts| client.cancel_statement_export_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        statement_export_from_cancel_response(&resp)
+    }
+
+    /// One page of an account's statement exports, newest first, with the
+    /// main account's exports in progress and its limit. `limit` 0 asks for
+    /// the server's default (20); above 100 is refused. Pass the previous
+    /// page's `next_page_token` to continue; it is bound to the account.
     pub async fn list_exports(
         &self,
         subaccount_id: SubAccountScope,

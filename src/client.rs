@@ -613,6 +613,19 @@ impl Client {
         crate::services::system::get_version(&self.factory).await
     }
 
+    /// The server time in milliseconds since the Unix epoch
+    /// (`system.v1.SystemService/GetTime`): the clock that checks the
+    /// timestamp of requests signed with an API key. Needs no API key, is
+    /// never signed and never cached. A signed request is accepted only
+    /// while its timestamp is at most 1000 ms ahead of this clock and at
+    /// most its receive window behind it; estimate the local clock's offset
+    /// as `server_time_ms - (sent + received) / 2`, with `sent` and
+    /// `received` the local times around the call. A reply without the time
+    /// is an [`Error::ResponseContract`].
+    pub async fn get_time(&self) -> Result<crate::models::ServerTime> {
+        crate::services::system::get_time(&self.factory).await
+    }
+
     /// One page of the environment's scheduled maintenance and incidents,
     /// latest start first (`system.v1.SystemService/ListStatusEvents`).
     /// Needs no API key and is never signed; answers can be up to 10 seconds

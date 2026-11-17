@@ -1,4 +1,5 @@
-//! Server build version and status events (`system.v1.SystemService`).
+//! Server build version, server time and status events
+//! (`system.v1.SystemService`).
 //!
 //! Status event enum values are lowercase labels: `""` when unset and
 //! `unknown(<n>)` for a value newer than this SDK.
@@ -31,6 +32,16 @@ impl ServerVersion {
             .split_once('-')
             .map_or(self.version.as_str(), |(release, _)| release)
     }
+}
+
+/// The server clock, from [`crate::Client::get_time`]: the clock that checks
+/// the timestamp of requests signed with an API key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ServerTime {
+    /// Server time when the request was answered, in milliseconds since the
+    /// Unix epoch (UTC), exact as sent.
+    pub server_time_ms: i64,
 }
 
 /// Status event kind labels.

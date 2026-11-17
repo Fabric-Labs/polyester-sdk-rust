@@ -96,8 +96,9 @@ for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
 `sub_accounts.get`, which leaves out an expansion the key may not read rather
 than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
 `READ_BALANCES` for `withdraw.get_wallet_balances` and `dust.list_balances`,
-`READ_STATEMENTS` for `statements.export_page`, `statements.export` and the
-statement export files (`READ_BALANCES` does not grant it), `CONVERT_DUST` for
+`READ_STATEMENTS` for the statement exports (`statements.create_export`,
+`get_export`, `list_exports`, `cancel_export` and `get_export_download_url`;
+`READ_BALANCES` does not grant it), `CONVERT_DUST` for
 `dust.quote`, `dust.convert`, `dust.get_conversion` and `dust.list_conversions`,
 and `READ_FUNDING_FLOWS` for `lifecycle.list_account_flows` and
 `lifecycle.get_account_flow`. A key scoped to the main
@@ -1235,6 +1236,16 @@ reads `"0.10.0"`; a build made after one reads `"0.10.0-12-g4e21a2f09670"`,
 which is not a semantic version, so compare `release()` (the part before the
 first `-`) rather than parsing it.
 
+## Server time
+
+`client.get_time().await?` returns the server clock that checks the timestamp
+of requests signed with an API key (`system.v1.SystemService/GetTime`), as
+`server_time_ms`, milliseconds since the Unix epoch, exact as sent. It needs no
+API key and is never cached. A signed request is accepted while its timestamp
+is at most 1000 ms ahead of this clock and at most its receive window behind
+it: estimate the local clock's offset as
+`server_time_ms - (sent + received) / 2`.
+
 ## Maintenance and incident status
 
 `client.list_status_events(opts)` returns one page of the environment's
@@ -1588,13 +1599,19 @@ SDK notes:
   (`client.lifecycle.get_account_flow`). Looking a transfer up by its request or
   transfer ID is session-only and not wrapped.
 - **Several Trading → trading transfers at once:**
-  `client.internal_transfers.batch_create(...)` sends 1 to 10 legs under one
-  idempotency key and one MFA check (an API key needs none). Every leg is
-  checked before any leg runs: if one fails, the batch is `refused` and nothing
-  moves. Otherwise legs run in order and are not atomic, so a leg can be
-  `refused` after earlier legs were `accepted`. A `pending` leg's outcome is not
-  known yet: retry the batch with the same key and legs to learn it. Each leg
-  counts as one internal transfer against the rate limit.
+  `client.internal_transfers.batch_create(...)` moves 1 to 500 legs together
+  under one idempotency key and one MFA check (an API key needs none): every
+  leg is credited, or none moves. The batch is `accepted` (every leg
+  `credited`, with its `transfer_id` and `flow_id`), `refused` (nothing moved,
+  and nothing will under this key: the legs that caused it carry `error_code`)
+  or `processing` (it completes on its own: follow it with
+  `client.internal_transfers.get_batch(&batch.request_id)`, or retry with the
+  same key and legs). A batch debits at most 10 distinct source accounts
+  (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
+  asset pairs. It counts once against the internal transfer rate limit, with a
+  weight of `max(ceil(legs / 50), distinct source accounts)`: a
+  `RATE_LIMIT_EXCEEDED` without `Retry-After` means the batch outweighs the
+  burst, so split it rather than retry.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1797,62 +1814,27 @@ order it arrives rather than by revision.
 
 ## Account statements
 
-`client.statements` exports an account's balance movements for a period as
-CSV (`ledger.read.v1.LedgerReadService/ExportStatement`), for reconciliation
-and tax reporting: one account (the main account or one sub-account),
-optionally one asset, for a period of at most 366 days. It is signed like the
-other ledger reads: `subaccount_id` is a `SubAccountScope`, and
-`SubAccountScope::Default` takes the configured default sub-account. `start_time` (inclusive) and `end_time` (exclusive) are required.
+`client.statements` produces an account's balance movements for a period as
+one CSV file in the background (`ledger.read.v1.StatementExportService`), for
+reconciliation and tax reporting: one account (the main account or one
+sub-account), optionally one asset, for a period of at most 366 days. It is
+signed like the other ledger reads: `subaccount_id` is a `SubAccountScope`, and
+`SubAccountScope::Default` takes the configured default sub-account.
+`start_time` (inclusive) and `end_time` (exclusive) are required.
 
-```rust,no_run
-# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
-use polyester::services::ExportStatementOptions;
-use std::time::{Duration, UNIX_EPOCH};
-
-let statement = client
-    .statements
-    .export(ExportStatementOptions {
-        start_time: Some(UNIX_EPOCH + Duration::from_secs(1_790_812_800)),
-        end_time: Some(UNIX_EPOCH + Duration::from_secs(1_793_491_200)),
-        ..Default::default()
-    })
-    .await?;
-std::fs::write("statement.csv", &statement.csv)?;
-for row in statement.rows()? {
-    println!("{} {} {} {} fee {}", row.kind, row.account, row.asset, row.amount, row.fee);
-}
-# Ok(())
-# }
-```
-
-`export` follows `next_page_token` with the same fields and concatenates the
-pages; `export_page` reads one page (at most 2000 ledger movements, an entry
-never split, the header row on the first page only). The CSV is kept as sent:
-RFC 4180, UTF-8, CRLF line endings. `rows()` and
-`codecs::decode::parse_statement_csv` read its columns by header name, so
-columns a later release appends are ignored, and keep every amount an exact
-decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
-`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
-`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
-internal transfer (empty for other entries).
-
-Each page and the whole statement carry `complete_through`: the statement covers
-movements from `start_time` up to it, exclusive, and it is the same on every
-page. When it is before `end_time`, request the rest, from `complete_through` to
-`end_time`, later. Pages that disagree on it fail with `Error::ResponseContract`.
-
-### Statement export files
-
-For a long period, `create_export` asks the server to produce the whole
-statement as one CSV file in the background (up to 366 days, idempotent per
-`idempotency_key`); `get_export` and `list_exports` report its status
-(`queued`, `processing`, `ready`, `failed` or `expired`), progress and expiry. A
-`ready` file is byte for byte the statement up to `complete_through` and is
-downloaded for 7 days over REST only, with an authenticated
-`GET /v1/statements/exports/{export_id}/file`; this SDK does not download it. A
-main account has at most 5 exports queued or processing
-(`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, not retryable), and a period with
-more than 4,000,000 movements fails with `failure_reason` `too_large`.
+`create_export` is idempotent per `idempotency_key`; `get_export` and
+`list_exports` report its status (`queued`, `processing`, `ready`, `failed`,
+`expired` or `canceled`), progress and expiry, and `cancel_export` cancels a
+`queued` or `processing` one (`ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE`
+otherwise). A `ready` file is byte for byte the statement up to
+`complete_through` and can be downloaded for 7 days. `get_export_download_url`
+returns a URL that downloads it without credentials, valid for at most 60
+seconds, with its `expires_at` and `filename`: anyone holding it can download
+the file, so never log or store it (its `Debug` redacts it). A main account
+has at most 5 exports queued or processing (`list_exports` reports
+`in_progress_exports` of `max_in_progress_exports`;
+`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED` is not retryable), and a period
+with more than 4,000,000 movements fails with `failure_reason` `too_large`.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1870,9 +1852,23 @@ let export = client
     .await?;
 let current = client.statements.get_export(&export.export_id).await?;
 println!("{} {} {} movements", current.export_id, current.status, current.movements);
+if current.status == "ready" {
+    let download = client.statements.get_export_download_url(&export.export_id).await?;
+    println!("save as {} before {:?}", download.filename, download.expires_at);
+}
 # Ok(())
 # }
 ```
+
+The file is RFC 4180 CSV, UTF-8, with CRLF line endings.
+`codecs::decode::parse_statement_csv` reads its columns by header name, so
+columns a later release appends are ignored, and keeps every amount an exact
+decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
+`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
+`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
+internal transfer (empty for other entries). The statement covers movements
+from `start_time` up to `complete_through`, exclusive; when that is before
+`end_time`, request the rest later.
 
 ## Errors, retries, and withdrawal identity
 

@@ -813,17 +813,21 @@ pub struct InternalTransferBatchLeg {
     pub destination_smart_account_address: Option<String>,
 }
 
-/// Typed batch internal-transfer params: 1 to 10 Trading to Trading
-/// transfers under one idempotency key and one MFA check.
+/// Typed batch internal-transfer params: 1 to 500 Trading to Trading
+/// transfers that move together or not at all, under one idempotency key and
+/// one MFA check.
 #[derive(Debug, Clone)]
 pub struct BatchCreateInternalTransfersParams {
-    /// The transfers, run in order: 1 to 10 legs.
+    /// The transfers, in order: 1 to 500 legs, debiting at most 50 distinct
+    /// source account and asset pairs from at most 10 distinct source
+    /// accounts. A source, destination and asset combination appears at most
+    /// once; legs may otherwise repeat an asset, a source or a destination.
     pub legs: Vec<InternalTransferBatchLeg>,
     /// Stable key for the whole batch, 1 to 128 characters, scoped to the
-    /// caller. Persist it and retry with the same key and the same legs in
-    /// the same order: accepted legs answer the same transfers and legs not
-    /// yet accepted run again. Different legs under the key are refused with
-    /// `ERROR_CODE_IDEMPOTENCY_CONFLICT`.
+    /// caller. Persist it: a retry with the same key and the same legs in
+    /// the same order returns the batch's current state. Different legs
+    /// under the key are refused with `ERROR_CODE_IDEMPOTENCY_CONFLICT`. A
+    /// `refused` batch is final for its key: submit again under a new key.
     pub idempotency_key: String,
 }
 
@@ -1585,20 +1589,25 @@ pub struct InternalTransferResult {
 }
 
 /// The outcome of a batch of internal transfers, from
-/// [`crate::services::InternalTransfersService::batch_create`].
+/// [`crate::services::InternalTransfersService::batch_create`] or
+/// [`crate::services::InternalTransfersService::get_batch`].
 ///
-/// Legs are not atomic. When `status` is `refused`, at least one leg failed
-/// its checks (`refused`, with `error_code`), every other leg is
-/// `not_submitted`, and nothing moved. When it is `submitted`, legs ran in
-/// order, each on its own: a leg can be `refused` (for example
-/// `insufficient_funds`) after earlier legs were `accepted`.
+/// A batch is all or nothing: every leg is credited, or no leg moves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferBatchResult {
-    /// Stable ID of the batch request; empty when the batch was refused.
+    /// Stable ID of the batch, for
+    /// [`crate::services::InternalTransfersService::get_batch`]: a decimal
+    /// string. Never empty for an `accepted` or `processing` batch, nor on a
+    /// read; empty when the batch was refused before it was accepted for
+    /// processing.
     pub request_id: String,
-    /// `submitted` or `refused`.
+    /// `accepted` (every leg is `credited`), `processing` (the outcome is
+    /// not known yet: the batch completes on its own, ending `accepted` or
+    /// `refused`; follow it with `get_batch` or retry it with the same key
+    /// and legs) or `refused` (nothing moved, and nothing will under this
+    /// idempotency key; the legs that caused it carry `error_code`).
     pub status: String,
-    /// One result per requested leg, in request order.
+    /// One result per leg, in request order.
     pub legs: Vec<InternalTransferBatchLegResult>,
 }
 
@@ -1615,45 +1624,43 @@ pub struct ResolvedDestination {
     pub smart_account_address: String,
 }
 
-/// The outcome of one leg of a batch.
+/// The state of one leg of a batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferBatchLegResult {
     /// Zero-based position of the leg in the request.
     pub leg_index: u32,
-    /// `accepted` (the transfer has a durable `transfer_id`; it has not
-    /// necessarily settled), `pending` (the outcome is not known yet: it
-    /// completes without the caller; retry the batch with the same
-    /// idempotency key to learn it, since reading one transfer needs an
-    /// interactive session), `refused` (no funds moved; `error_code` says
-    /// why) or `not_submitted` (the leg did not run; a retry with the same
-    /// key runs it). `UNKNOWN(<n>)` for a status this SDK does not know:
-    /// treat it as not known yet.
+    /// `credited` (the leg is credited to its destination; its batch is
+    /// `accepted`), `processing` (the leg's outcome is its batch's, not known
+    /// yet) or `not_moved` (the leg moved nothing: its batch was refused;
+    /// `error_code` is set on the legs that caused the refusal).
+    /// `UNKNOWN(<n>)` for a status this SDK does not know: treat it as not
+    /// known yet.
     pub status: String,
-    /// Stable request ID of the leg's transfer; empty while the leg has not
-    /// been submitted.
-    pub request_id: String,
-    /// Transfer ID, set once the leg is accepted.
+    /// Stable transfer ID of the leg, a decimal string. Never empty for a
+    /// `credited` or `processing` leg; it names the leg in the transfer
+    /// history.
     pub transfer_id: String,
-    /// Lifecycle flow ID, set once the leg is accepted.
+    /// Lifecycle flow ID of the leg, readable by its sender and its
+    /// recipient with `LifecycleService::get_account_flow`. Never empty for
+    /// a `credited` leg; empty otherwise.
     pub flow_id: String,
-    /// Acceptance time in nanoseconds since the Unix epoch (server time),
-    /// set once the leg is accepted; 0 otherwise.
-    pub accepted_at_ts_ns: u64,
+    /// Credit time in nanoseconds since the Unix epoch (server time), set
+    /// once the leg is credited; 0 otherwise.
+    pub credited_at_ts_ns: u64,
     /// The leg's asset, echoed.
     pub asset_id: u32,
-    /// Resolved asset code, set once the leg is submitted.
+    /// Resolved asset code, set once the leg passed its checks.
     pub asset_code: String,
     /// The leg's amount, echoed, exact at 18 decimals; `None` when the
     /// server sent none.
     pub quantity: Option<AssetAmount>,
-    /// The destination the server resolved for the leg, set once the leg is
-    /// submitted; `None` when the server sent none.
+    /// The destination the server resolved for the leg, set once the leg
+    /// passed its checks; `None` when the server sent none.
     pub destination: Option<ResolvedDestination>,
-    /// Why the leg was refused, or why its outcome is not known yet: the
-    /// `transfer.v1.ErrorCode` as a lowercase label without its
-    /// `ERROR_CODE_` prefix, such as `insufficient_funds`;
-    /// `UNKNOWN_ERROR_CODE(<n>)` for a code this SDK does not know. `None`
-    /// for an accepted or not-submitted leg.
+    /// Why the leg caused its batch's refusal: the `transfer.v1.ErrorCode`
+    /// as a lowercase label without its `ERROR_CODE_` prefix, such as
+    /// `insufficient_funds`; `UNKNOWN_ERROR_CODE(<n>)` for a code this SDK
+    /// does not know. `None` for every other leg.
     pub error_code: Option<String>,
     /// Human-readable description of `error_code`.
     pub error_message: String,

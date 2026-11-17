@@ -327,7 +327,7 @@ swap.v1.SwapTerms.source_asset_id	not_required	reference to an asset
 swap.v1.SwapTerms.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 system.v1.StatusEvent.id	required	
 system.v1.StatusEventUpdate.id	required	
-transfer.v1.BatchCreateInternalTransfersResponse.request_id	not_required	empty when the batch was refused; a submitted batch requires it
+transfer.v1.BatchCreateInternalTransfersResponse.request_id	not_required	empty when the batch was refused before processing; an accepted or processing batch requires it
 transfer.v1.CreateInternalTransferResponse.asset_id	not_required	reference to an asset
 transfer.v1.CreateInternalTransferResponse.flow_id	not_required	an older server sends none; the receipt decodes with an empty flow ID
 transfer.v1.CreateInternalTransferResponse.request_id	required	
@@ -339,13 +339,13 @@ transfer.v1.DustConversion.conversion_id	required
 transfer.v1.DustConversion.quote_id	not_required	reference to the quote the conversion converted
 transfer.v1.DustConversion.target_asset_id	not_required	reference to an asset
 transfer.v1.DustSource.asset_id	not_required	reference to an asset
+transfer.v1.GetInternalTransferBatchResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.flow_id	not_required	an older server sends none, as for CreateInternalTransfer
 transfer.v1.GetInternalTransferResponse.request_id	required	
 transfer.v1.GetInternalTransferResponse.transfer_id	required	
 transfer.v1.InternalTransferBatchLegResult.asset_id	not_required	reference to an asset
-transfer.v1.InternalTransferBatchLegResult.flow_id	not_required	set once the leg is accepted; empty otherwise
-transfer.v1.InternalTransferBatchLegResult.request_id	not_required	empty while the leg has not been submitted; an accepted or pending leg requires it
-transfer.v1.InternalTransferBatchLegResult.transfer_id	not_required	set once the leg is accepted; an accepted leg requires it
+transfer.v1.InternalTransferBatchLegResult.flow_id	not_required	set once the leg is credited; a credited leg requires it
+transfer.v1.InternalTransferBatchLegResult.transfer_id	not_required	set once the batch is accepted for processing; a credited or processing leg requires it
 transfer.v1.ListDustBalancesResponse.target_asset_id	not_required	reference to an asset
 transfer.v1.QuoteDustConversionResponse.quote_id	not_required	empty when no balance converts
 transfer.v1.QuoteDustConversionResponse.target_asset_id	not_required	reference to an asset
