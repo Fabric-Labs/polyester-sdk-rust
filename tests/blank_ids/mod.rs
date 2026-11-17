@@ -319,3 +319,35 @@ async fn id_lookups_refuse_a_blank_id() {
     }
     assert_eq!(http.requests.load(Ordering::SeqCst), 0, "nothing was sent");
 }
+
+/// `lifecycle.subscribe_flow_detail` reads its flow ID by the contract's
+/// rule, as the flow reads do: a blank or padded one is refused and never
+/// subscribes.
+#[tokio::test]
+async fn flow_detail_subscription_refuses_a_blank_or_padded_flow_id() {
+    let http = server().await;
+    let ws = ws_server().await;
+    let c = client(
+        &http,
+        Config {
+            ws_url: ws.ws_url(),
+            ..Default::default()
+        },
+    );
+    for id in BLANK
+        .into_iter()
+        .chain([" flow_2j", "flow_2j ", "flow_2 j"])
+    {
+        assert_refused(
+            &format!("subscribe_flow_detail({id:?})"),
+            c.lifecycle.subscribe_flow_detail(id),
+        )
+        .await;
+    }
+    assert_eq!(ws.connects.load(Ordering::SeqCst), 0, "nothing connected");
+    assert_not_refused(
+        "subscribe_flow_detail(\"flow_2j\")",
+        c.lifecycle.subscribe_flow_detail("flow_2j"),
+    )
+    .await;
+}
