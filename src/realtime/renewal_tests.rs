@@ -1,5 +1,10 @@
-//! Token renewal on private Centrifugo connections, against a real local
-//! Centrifugo-shaped socket and token API that issue short-lived tokens.
+//! Token renewal on private Centrifugo connections, against an in-process
+//! Centrifugo-shaped server and token API that issue short-lived tokens.
+//!
+//! Each socket is a real WebSocket over an in-process duplex pipe, and time is
+//! paused: Tokio advances the clock only once every task waits, so renewal
+//! deadlines hold however slowly the test runs. A real socket would not do:
+//! the paused clock jumps ahead while a task waits for the kernel.
 
 use super::*;
 use crate::codecs::decode::ledger_transfer_batch_from_bytes;
@@ -7,7 +12,7 @@ use crate::codecs::scalars::format_id;
 use crate::models::LedgerTransfer;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::DuplexStream;
 use tokio::time::Instant;
 use tokio_tungstenite::tungstenite::protocol::{CloseFrame, frame::coding::CloseCode};
 
@@ -76,6 +81,7 @@ struct ServerState {
     command_hook: Mutex<Option<CommandHook>>,
     /// Open connections, by accept order; sending closes one.
     conns: Mutex<HashMap<usize, mpsc::UnboundedSender<()>>>,
+    dials: AtomicUsize,
 }
 
 /// A Centrifugo-shaped socket with its token API. It issues connection and
@@ -84,18 +90,7 @@ struct ServerState {
 /// subscription with 2501 or closes the connection with 3005. Every token it
 /// mints is single use.
 pub(super) struct RenewalServer {
-    pub ws_url: String,
-    pub api_url: String,
     state: Arc<ServerState>,
-    tasks: Vec<tokio::task::JoinHandle<()>>,
-}
-
-impl Drop for RenewalServer {
-    fn drop(&mut self) {
-        for task in &self.tasks {
-            task.abort();
-        }
-    }
 }
 
 impl RenewalServer {
@@ -110,31 +105,9 @@ impl RenewalServer {
             token_hook: Mutex::default(),
             command_hook: Mutex::default(),
             conns: Mutex::default(),
+            dials: AtomicUsize::new(0),
         });
-        let api = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let ws = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let api_url = format!("http://{}", api.local_addr().unwrap());
-        let ws_url = format!("ws://{}", ws.local_addr().unwrap());
-        let api_state = state.clone();
-        let api_task = tokio::spawn(async move {
-            while let Ok((stream, _)) = api.accept().await {
-                tokio::spawn(serve_token(api_state.clone(), stream));
-            }
-        });
-        let ws_state = state.clone();
-        let ws_task = tokio::spawn(async move {
-            let mut next = 0;
-            while let Ok((stream, _)) = ws.accept().await {
-                next += 1;
-                tokio::spawn(serve_socket(ws_state.clone(), stream, next));
-            }
-        });
-        Self {
-            ws_url,
-            api_url,
-            state,
-            tasks: vec![api_task, ws_task],
-        }
+        Self { state }
     }
 
     pub fn counters(&self) -> &Counters {
@@ -169,13 +142,48 @@ impl RenewalServer {
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         )
         .unwrap();
-        Client::new(
-            self.ws_url.clone(),
-            self.api_url.clone(),
+        let mut client = Client::new(
+            "ws://renewal.test",
+            "http://renewal.test",
             Some(credentials),
             Some(1000),
-        )
-        .allow_insecure_http(true)
+        );
+        client.transport = Some(Arc::new(InProcess(self.state.clone())));
+        client
+    }
+}
+
+/// The client's tokens and sockets, served by the [`RenewalServer`].
+struct InProcess(Arc<ServerState>);
+
+impl Transport for InProcess {
+    fn connect_token(&self) -> BoxFuture<Result<String>> {
+        Box::pin(mint(self.0.clone(), "conn"))
+    }
+
+    fn subscribe_token(&self, _channel: String) -> BoxFuture<Result<String>> {
+        Box::pin(mint(self.0.clone(), "sub"))
+    }
+
+    fn open(&self) -> BoxFuture<Result<(WsSink, WsStream)>> {
+        let state = self.0.clone();
+        Box::pin(async move {
+            let (client_io, server_io) = tokio::io::duplex(1 << 20);
+            let n = state.dials.fetch_add(1, Ordering::SeqCst) + 1;
+            tokio::spawn(serve_socket(state, server_io, n));
+            let mut request = "ws://renewal.test/connection/websocket"
+                .into_client_request()
+                .unwrap();
+            request.headers_mut().insert(
+                SEC_WEBSOCKET_PROTOCOL,
+                HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
+            );
+            let (ws, _) = tokio_tungstenite::client_async(request, client_io)
+                .await
+                .map_err(|e| Error::realtime(format!("ws connect: {e}")))?;
+            let (sink, stream) = ws.split();
+            Ok((Box::pin(sink) as WsSink, Box::pin(stream) as WsStream))
+        })
     }
 }
 
@@ -201,22 +209,8 @@ fn token_serial(token: &str) -> usize {
         .unwrap_or(0)
 }
 
-async fn serve_token(state: Arc<ServerState>, mut stream: tokio::net::TcpStream) {
-    let mut buf = vec![0u8; 16 * 1024];
-    let n = stream.read(&mut buf).await.unwrap_or(0);
-    let raw = String::from_utf8_lossy(&buf[..n]);
-    let target = raw.split_whitespace().nth(1).unwrap_or("/");
-    let path = target.split('?').next().unwrap_or(target);
-    let kind = match path {
-        "/v1/rt/token" => "conn",
-        "/v1/rt/subscribe" => "sub",
-        _ => {
-            let _ = stream
-                .write_all(b"HTTP/1.1 404 X\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
-                .await;
-            return;
-        }
-    };
+/// The token API: mints a `kind` token, or refuses it as a 403 would.
+async fn mint(state: Arc<ServerState>, kind: &'static str) -> Result<String> {
     let serial = if kind == "conn" {
         &state.counters.conn_tokens
     } else {
@@ -227,18 +221,12 @@ async fn serve_token(state: Arc<ServerState>, mut stream: tokio::net::TcpStream)
     let hook = lock_unpoisoned(&state.token_hook).clone();
     let (delay, status) = hook.map_or((Duration::ZERO, 200), |hook| hook(kind));
     tokio::time::sleep(delay).await;
-    let body = if status == 200 {
-        let token = format!("{kind}-{serial}");
-        lock_unpoisoned(&state.minted).insert(token.clone(), false);
-        format!(r#"{{"token":"{token}"}}"#)
-    } else {
-        r#"{"code":"permission_denied","message":"token refused"}"#.to_owned()
-    };
-    let response = format!(
-        "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
-    );
-    let _ = stream.write_all(response.as_bytes()).await;
+    if status != 200 {
+        return Err(Error::auth(format!("realtime {kind} token: HTTP {status}")));
+    }
+    let token = format!("{kind}-{serial}");
+    lock_unpoisoned(&state.minted).insert(token.clone(), false);
+    Ok(token)
 }
 
 #[derive(Debug, Default)]
@@ -411,7 +399,7 @@ async fn until(at: Option<Instant>) {
     }
 }
 
-async fn serve_socket(state: Arc<ServerState>, stream: tokio::net::TcpStream, n: usize) {
+async fn serve_socket(state: Arc<ServerState>, stream: DuplexStream, n: usize) {
     let accepted = tokio_tungstenite::accept_hdr_async(
         stream,
         |_: &_, mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
@@ -569,7 +557,7 @@ pub(super) fn record_errors(sub: &TypedSubscription<LedgerTransfer>) -> Arc<Mute
 /// A transfer subscription whose subscription token lives one second stays on
 /// its first connection and subscription across three token lifetimes: the
 /// client renews the token before the server ends the subscription.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(start_paused = true)]
 async fn transfer_subscription_renews_short_lived_token_without_reconnect() {
     let srv = RenewalServer::spawn(RenewalServerConfig {
         unit: Duration::from_secs(1),
@@ -636,7 +624,7 @@ async fn transfer_subscription_renews_short_lived_token_without_reconnect() {
 }
 
 /// A connection token that lives one second is renewed on the same connection.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(start_paused = true)]
 async fn private_connection_renews_short_lived_token_without_reconnect() {
     let srv = RenewalServer::spawn(RenewalServerConfig {
         unit: Duration::from_secs(1),
@@ -689,7 +677,7 @@ fn subscription_refusal(err: &Error) -> bool {
 /// A renewal the token API or the server refuses is reported. The server then
 /// ends the subscription at expiry, the client resubscribes with a fresh token,
 /// says so through `resubscribes`, and renews on the new connection.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(start_paused = true)]
 async fn transfer_renewal_refused_reports_then_resubscribes() {
     let unit = Duration::from_millis(100);
     type Refusal = fn(&Error) -> bool;
@@ -757,7 +745,7 @@ async fn transfer_renewal_refused_reports_then_resubscribes() {
 /// The connection token's lifetime runs from the connect reply, not from the
 /// end of setup: a slow subscription token must not push the first connection
 /// renewal past the server's expiry.
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(start_paused = true)]
 async fn connection_renewal_counts_from_connect_reply() {
     let unit = Duration::from_millis(200);
     let srv = RenewalServer::spawn(RenewalServerConfig {
@@ -807,7 +795,7 @@ async fn connection_renewal_counts_from_connect_reply() {
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(start_paused = true)]
 async fn transfer_renewal_continues_after_disconnect() {
     let unit = Duration::from_millis(100);
     let srv = RenewalServer::spawn(RenewalServerConfig {
@@ -872,23 +860,26 @@ impl SplitMix {
 /// lands before, during or after a renewal. Whatever the order, a healthy
 /// client never lets a token expire, never sends a token twice or on a
 /// connection it was not fetched for, reconnects only for the drops, and stops
-/// renewing once closed. `RENEWAL_SEED` replays a run.
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+/// renewing once closed. A failure names its `RENEWAL_SEED`, which replays
+/// that one interleaving; `RENEWAL_SEEDS` sets how many random ones run (64).
+#[tokio::test(start_paused = true)]
 async fn token_renewal_interleaves_with_reconnects() {
-    let seed = std::env::var("RENEWAL_SEED")
-        .ok()
-        .map(|seed| seed.parse::<u64>().expect("RENEWAL_SEED is a u64"))
-        .unwrap_or_else(|| OsRng.next_u64());
-    eprintln!("RENEWAL_SEED={seed}");
-    let mut seeds = SplitMix(seed);
-    for iteration in 0..8 {
-        let iteration_seed = seeds.next();
-        eprintln!("iteration {iteration} seed {iteration_seed}");
-        run_renewal_interleaving(iteration_seed).await;
+    let seeds: Vec<u64> = match std::env::var("RENEWAL_SEED") {
+        Ok(seed) => vec![seed.parse().expect("RENEWAL_SEED is a u64")],
+        Err(_) => {
+            let count = std::env::var("RENEWAL_SEEDS")
+                .map_or(64, |count| count.parse().expect("RENEWAL_SEEDS is a count"));
+            let mut seeds = SplitMix(OsRng.next_u64());
+            (0..count).map(|_| seeds.next()).collect()
+        }
+    };
+    for seed in seeds {
+        run_renewal_interleaving(seed).await;
     }
 }
 
 async fn run_renewal_interleaving(seed: u64) {
+    eprintln!("RENEWAL_SEED={seed}");
     let unit = Duration::from_millis(40);
     let mut rng = SplitMix(seed);
     let cfg = RenewalServerConfig {
@@ -919,7 +910,7 @@ async fn run_renewal_interleaving(seed: u64) {
     let drops = 1 + rng.below(2) as usize;
     for drop in 0..drops {
         tokio::time::sleep(rng.duration(unit * 4)).await;
-        assert_eq!(srv.drop_all(), 1, "seed {seed}: drop {drop}");
+        assert_eq!(srv.drop_all(), 1, "RENEWAL_SEED={seed}: drop {drop}");
         wait_for(
             "resubscribe",
             || Counters::get(&c.subscribes) == drop + 2,
@@ -941,7 +932,7 @@ async fn run_renewal_interleaving(seed: u64) {
     .await;
 
     let context = format!(
-        "seed {seed}, conn_ttl {}, sub_ttl {}",
+        "RENEWAL_SEED={seed}, conn_ttl {}, sub_ttl {}",
         cfg.conn_ttl, cfg.sub_ttl
     );
     assert_eq!(

@@ -14,9 +14,11 @@ pub use snapshot_then_stream::{SnapshotErrorFn, SnapshotThenStream, SnapshotThen
 
 use crate::auth::Credentials;
 use crate::errors::{Error, Result, SubscriptionEndReason};
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use rand_core::{OsRng, RngCore};
 use std::collections::VecDeque;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{
     Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
     atomic::{AtomicBool, Ordering},
@@ -26,7 +28,7 @@ use tokio::time::{Duration, timeout};
 use tokio_tungstenite::{
     connect_async_with_config,
     tungstenite::{
-        Message,
+        self, Message,
         client::IntoClientRequest,
         http::{HeaderValue, header::SEC_WEBSOCKET_PROTOCOL},
         protocol::WebSocketConfig,
@@ -44,6 +46,96 @@ const CENTRIFUGO_PROTOBUF_SUBPROTOCOL: &str = "centrifuge-protobuf";
 const CENTRIFUGO_SETUP_DEADLINE: Duration = Duration::from_secs(30);
 
 type ErrorCallback = Arc<dyn Fn(Error) + Send + Sync>;
+
+type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+pub(crate) type WsSink = Pin<Box<dyn Sink<Message, Error = tungstenite::Error> + Send>>;
+pub(crate) type WsStream =
+    Pin<Box<dyn Stream<Item = std::result::Result<Message, tungstenite::Error>> + Send>>;
+
+/// Tokens and sockets for a realtime connection: the live API in production,
+/// an in-process fake server in tests.
+pub(crate) trait Transport: Send + Sync + 'static {
+    fn connect_token(&self) -> BoxFuture<Result<String>>;
+    fn subscribe_token(&self, channel: String) -> BoxFuture<Result<String>>;
+    fn open(&self) -> BoxFuture<Result<(WsSink, WsStream)>>;
+}
+
+/// Centrifugo's WebSocket, with tokens from the API's realtime token endpoints.
+struct CentrifugoTransport {
+    /// The configured WebSocket URL, and the endpoint it names.
+    ws_url: String,
+    url: String,
+    api_url: String,
+    credentials: Option<Credentials>,
+    timeout: Duration,
+    allow_insecure_http: bool,
+}
+
+impl CentrifugoTransport {
+    fn credentials(&self) -> Result<Credentials> {
+        self.credentials
+            .clone()
+            .ok_or_else(|| Error::auth("private channel requires credentials"))
+    }
+}
+
+impl Transport for CentrifugoTransport {
+    fn connect_token(&self) -> BoxFuture<Result<String>> {
+        let credentials = self.credentials();
+        let api_url = self.api_url.clone();
+        let (timeout, insecure) = (self.timeout, self.allow_insecure_http);
+        Box::pin(async move {
+            auth::fetch_connection_token(&credentials?, &api_url, timeout, insecure).await
+        })
+    }
+
+    fn subscribe_token(&self, channel: String) -> BoxFuture<Result<String>> {
+        let credentials = self.credentials();
+        let api_url = self.api_url.clone();
+        let (timeout, insecure) = (self.timeout, self.allow_insecure_http);
+        Box::pin(async move {
+            auth::fetch_subscription_token(&credentials?, &api_url, &channel, timeout, insecure)
+                .await
+        })
+    }
+
+    fn open(&self) -> BoxFuture<Result<(WsSink, WsStream)>> {
+        let (ws_url, url) = (self.ws_url.clone(), self.url.clone());
+        let insecure = self.allow_insecure_http;
+        Box::pin(async move {
+            crate::transport::validate_ws_url(&ws_url, insecure)?;
+            let mut request = url
+                .into_client_request()
+                .map_err(|e| Error::realtime(format!("ws request: {e}")))?;
+            request.headers_mut().insert(
+                SEC_WEBSOCKET_PROTOCOL,
+                HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
+            );
+            let websocket_config = WebSocketConfig::default()
+                .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
+                .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
+            let (ws, response) = timeout(
+                CENTRIFUGO_READ_TIMEOUT,
+                connect_async_with_config(request, Some(websocket_config), false),
+            )
+            .await
+            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
+            .map_err(|e| upgrade_error(format!("ws connect: {e}"), &e))?;
+            if response
+                .headers()
+                .get(SEC_WEBSOCKET_PROTOCOL)
+                .and_then(|value| value.to_str().ok())
+                != Some(CENTRIFUGO_PROTOBUF_SUBPROTOCOL)
+            {
+                return Err(Error::realtime(
+                    "server did not negotiate centrifuge-protobuf websocket subprotocol".to_owned(),
+                ));
+            }
+            let (sink, stream) = ws.split();
+            Ok((Box::pin(sink) as WsSink, Box::pin(stream) as WsStream))
+        })
+    }
+}
 
 pub(crate) fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex
@@ -209,6 +301,8 @@ pub struct Client {
     setup_deadline: Duration,
     /// The unit of a Centrifugo token TTL: a second; tests shorten it.
     renewal_unit: Duration,
+    /// Replaces the live endpoints; tests set an in-process server.
+    transport: Option<Arc<dyn Transport>>,
 }
 
 impl Client {
@@ -254,6 +348,7 @@ impl Client {
                 resubscribe::ResubscribeTiming::default(),
             )),
             renewal_unit: Duration::from_secs(1),
+            transport: None,
         }
     }
 
@@ -265,6 +360,20 @@ impl Client {
 
     pub(crate) fn request_timeout(&self) -> Duration {
         self.timeout
+    }
+
+    /// Tokens and the socket of a Centrifugo connection.
+    fn transport(&self) -> Arc<dyn Transport> {
+        self.transport.clone().unwrap_or_else(|| {
+            Arc::new(CentrifugoTransport {
+                ws_url: self.ws_url.clone(),
+                url: self.ws_endpoint(),
+                api_url: self.api_url.clone(),
+                credentials: self.credentials.clone(),
+                timeout: self.timeout,
+                allow_insecure_http: self.allow_insecure_http,
+            })
+        })
     }
 
     fn ws_endpoint(&self) -> String {
@@ -572,6 +681,7 @@ impl Client {
 
     async fn handshake_channel<W, R>(
         &self,
+        transport: &dyn Transport,
         write: &mut W,
         read: &mut R,
         channel: &str,
@@ -584,29 +694,15 @@ impl Client {
             + Unpin,
     {
         if is_private_channel(channel) {
-            let creds = self
-                .credentials
-                .as_ref()
-                .ok_or_else(|| Error::auth("private channel requires credentials"))?;
-            let connection_token = auth::fetch_connection_token(
-                creds,
-                &self.api_url,
-                self.timeout,
-                self.allow_insecure_http,
-            )
-            .await?;
+            if self.credentials.is_none() {
+                return Err(Error::auth("private channel requires credentials"));
+            }
+            let connection_token = transport.connect_token().await?;
             let connection_ttl =
                 centrifugo_connect(write, read, Some(&connection_token), pending).await?;
             // The connection token's TTL runs from its reply, through the rest of setup.
             let connection_expiry = (tokio::time::Instant::now(), connection_ttl);
-            let subscription_token = auth::fetch_subscription_token(
-                creds,
-                &self.api_url,
-                channel,
-                self.timeout,
-                self.allow_insecure_http,
-            )
-            .await?;
+            let subscription_token = transport.subscribe_token(channel.to_owned()).await?;
             let subscription_ttl =
                 centrifugo_subscribe(write, read, channel, Some(&subscription_token), pending)
                     .await?;
@@ -630,40 +726,12 @@ impl Client {
     where
         F: Fn(&[u8]) -> Result<Publication<T>>,
     {
+        let transport = self.transport();
         let (mut write, mut read, mut pending, expiries) = timeout(self.setup_deadline, async {
-            crate::transport::validate_ws_url(&self.ws_url, self.allow_insecure_http)?;
-            let url = self.ws_endpoint();
-            let mut request = url
-                .into_client_request()
-                .map_err(|e| Error::realtime(format!("ws request: {e}")))?;
-            request.headers_mut().insert(
-                SEC_WEBSOCKET_PROTOCOL,
-                HeaderValue::from_static(CENTRIFUGO_PROTOBUF_SUBPROTOCOL),
-            );
-            let websocket_config = WebSocketConfig::default()
-                .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
-                .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
-            let (ws, response) = timeout(
-                CENTRIFUGO_READ_TIMEOUT,
-                connect_async_with_config(request, Some(websocket_config), false),
-            )
-            .await
-            .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?
-            .map_err(|e| upgrade_error(format!("ws connect: {e}"), &e))?;
-            if response
-                .headers()
-                .get(SEC_WEBSOCKET_PROTOCOL)
-                .and_then(|value| value.to_str().ok())
-                != Some(CENTRIFUGO_PROTOBUF_SUBPROTOCOL)
-            {
-                return Err(Error::realtime(
-                    "server did not negotiate centrifuge-protobuf websocket subprotocol".to_owned(),
-                ));
-            }
-            let (mut write, mut read) = ws.split();
+            let (mut write, mut read) = transport.open().await?;
             let mut pending = VecDeque::new();
             let expiries = self
-                .handshake_channel(&mut write, &mut read, channel, &mut pending)
+                .handshake_channel(&*transport, &mut write, &mut read, channel, &mut pending)
                 .await?;
             Ok::<_, Error>((write, read, pending, expiries))
         })
@@ -686,11 +754,8 @@ impl Client {
         // Renewal belongs to this connection and ends with it.
         let (mut renewer, mut fetched) = renewal::TokenRenewer::new(
             renewal::TokenSource {
-                credentials: self.credentials.clone(),
-                api_url: self.api_url.clone(),
+                transport,
                 channel: channel.to_owned(),
-                timeout: self.timeout,
-                allow_insecure_http: self.allow_insecure_http,
             },
             self.renewal_unit,
             3,

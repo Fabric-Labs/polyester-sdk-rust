@@ -5,11 +5,11 @@
 //! private order stream handles one: it is reported, and the server ending the
 //! subscription or the connection then drives the usual resubscribe.
 
-use super::auth;
+use super::Transport;
 use super::protocol;
-use crate::auth::Credentials;
 use crate::errors::{Error, Result};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant};
 
@@ -31,39 +31,15 @@ impl RenewalKind {
 /// Where a renewal takes its fresh token.
 #[derive(Clone)]
 pub(super) struct TokenSource {
-    pub credentials: Option<Credentials>,
-    pub api_url: String,
+    pub transport: Arc<dyn Transport>,
     pub channel: String,
-    pub timeout: Duration,
-    pub allow_insecure_http: bool,
 }
 
 impl TokenSource {
     async fn fetch(self, kind: RenewalKind) -> Result<String> {
-        let creds = self
-            .credentials
-            .as_ref()
-            .ok_or_else(|| Error::auth("private channel requires credentials"))?;
         match kind {
-            RenewalKind::Connection => {
-                auth::fetch_connection_token(
-                    creds,
-                    &self.api_url,
-                    self.timeout,
-                    self.allow_insecure_http,
-                )
-                .await
-            }
-            RenewalKind::Subscription => {
-                auth::fetch_subscription_token(
-                    creds,
-                    &self.api_url,
-                    &self.channel,
-                    self.timeout,
-                    self.allow_insecure_http,
-                )
-                .await
-            }
+            RenewalKind::Connection => self.transport.connect_token().await,
+            RenewalKind::Subscription => self.transport.subscribe_token(self.channel).await,
         }
     }
 }
