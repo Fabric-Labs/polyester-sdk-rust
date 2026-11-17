@@ -138,6 +138,9 @@ pub struct Config {
     /// Permit a `ws://` URL on a host that is not loopback.
     pub allow_insecure_http: bool,
     pub(crate) pacing: Pacing,
+    /// Holds the stream's task between polls, to schedule races in tests.
+    #[cfg(test)]
+    pub(crate) gate: Option<Arc<SchedGate>>,
 }
 
 impl Config {
@@ -152,6 +155,8 @@ impl Config {
             pong_timeout: Duration::ZERO,
             allow_insecure_http: false,
             pacing: Pacing::default(),
+            #[cfg(test)]
+            gate: None,
         }
     }
 }
@@ -380,8 +385,62 @@ pub async fn connect(mut config: Config) -> Result<MarketStream> {
     // Subscribe may run as soon as connect returns: the connection is the
     // client's before then.
     let out_rx = shared.attach(false).ok_or_else(closed)?;
+    #[cfg(test)]
+    let task = match shared.cfg.gate.clone() {
+        Some(gate) => tokio::spawn(Gated {
+            gate,
+            inner: Box::pin(run(shared.clone(), ws, out_rx)),
+        }),
+        None => tokio::spawn(run(shared.clone(), ws, out_rx)),
+    };
+    #[cfg(not(test))]
     let task = tokio::spawn(run(shared.clone(), ws, out_rx));
     Ok(MarketStream { rx, shared, task })
+}
+
+/// Lets a test stop polling the stream's task, so timers become ready while
+/// it waits, and resume it.
+#[cfg(test)]
+#[derive(Default)]
+pub(crate) struct SchedGate {
+    held: AtomicBool,
+    waker: Mutex<Option<std::task::Waker>>,
+}
+
+#[cfg(test)]
+impl SchedGate {
+    pub(crate) fn hold(&self) {
+        self.held.store(true, Ordering::SeqCst);
+    }
+
+    pub(crate) fn release(&self) {
+        self.held.store(false, Ordering::SeqCst);
+        if let Some(waker) = lock_unpoisoned(&self.waker).take() {
+            waker.wake();
+        }
+    }
+}
+
+#[cfg(test)]
+struct Gated<F> {
+    gate: Arc<SchedGate>,
+    inner: std::pin::Pin<Box<F>>,
+}
+
+#[cfg(test)]
+impl<F: std::future::Future<Output = ()>> std::future::Future for Gated<F> {
+    type Output = ();
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<()> {
+        if self.gate.held.load(Ordering::SeqCst) {
+            *lock_unpoisoned(&self.gate.waker) = Some(cx.waker().clone());
+            return std::task::Poll::Pending;
+        }
+        self.inner.as_mut().poll(cx)
+    }
 }
 
 fn closed() -> Error {
@@ -582,7 +641,21 @@ impl Shared {
         )
         .await
         .map_err(|_| Error::realtime("market stream connect timed out"))?
-        .map_err(|e| Error::realtime(format!("market stream connect: {e}")))?;
+        .map_err(|e| match e {
+            // A refused upgrade's answer: its status and the delay it asks
+            // for, which the next connection waits at least.
+            tokio_tungstenite::tungstenite::Error::Http(response) => Error::Realtime {
+                message: format!(
+                    "market stream connect: the upgrade was refused (HTTP {})",
+                    response.status().as_u16()
+                ),
+                answer: Some(Box::new(crate::errors::answer_from_headers(
+                    response.status().as_u16(),
+                    response.headers(),
+                ))),
+            },
+            other => Error::realtime(format!("market stream connect: {other}")),
+        })?;
         Ok(ws)
     }
 
@@ -989,16 +1062,29 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
         }
         let mut err = err;
         let next = loop {
-            let delay = backoff.next_delay();
+            let delay = crate::realtime::reconnect_wait(backoff.next_delay(), &err);
             if !shared.emit(Event::Disconnected { error: err, delay }) {
                 return finish(&shared);
             }
+            // The stop signal is the shutdown fence: it wins over a wait that
+            // is due at the same moment, is checked again right before every
+            // upgrade, and cancels an upgrade in flight, so no upgrade starts
+            // after the stream is closed.
             let mut stop = shared.stop.subscribe();
             tokio::select! {
-                _ = tokio::time::sleep(delay) => {}
-                _ = stop.wait_for(|s| *s) => return finish(&shared),
+                biased;
+                () = stopped(&mut stop) => return finish(&shared),
+                () = tokio::time::sleep(delay) => {}
             }
-            match shared.dial().await {
+            if shared.stopped() {
+                return finish(&shared);
+            }
+            let dialed = tokio::select! {
+                biased;
+                () = stopped(&mut stop) => return finish(&shared),
+                dialed = shared.dial() => dialed,
+            };
+            match dialed {
                 Ok(next) => break next,
                 Err(e) => err = e,
             }
@@ -1014,6 +1100,12 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
         reconnect = true;
     }
     finish(&shared);
+}
+
+/// Resolves once the stream is stopped. The guard `wait_for` returns is not
+/// `Send`, so it is dropped here.
+async fn stopped(stop: &mut watch::Receiver<bool>) {
+    let _ = stop.wait_for(|s| *s).await;
 }
 
 /// Ends delivery: the event channel closes once every event is read.

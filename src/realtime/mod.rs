@@ -95,6 +95,18 @@ fn clear_subscription_error(state: &Arc<Mutex<SubscriptionErrorState>>) {
     lock_unpoisoned(state).last = None;
 }
 
+/// How long a stream waits before its next connection: the backoff's delay,
+/// or longer when the answer behind `err`, such as a refused WebSocket
+/// upgrade, asked for more with `Retry-After` ([`crate::Error::retry_after`]).
+/// A server's `Retry-After` is never shortened; the backoff's ceiling applies
+/// to the backoff alone.
+pub(crate) fn reconnect_wait(backoff: Duration, err: &crate::Error) -> Duration {
+    match err.retry_after() {
+        Some(seconds) => backoff.max(Duration::try_from_secs_f64(seconds).unwrap_or(Duration::MAX)),
+        None => backoff,
+    }
+}
+
 pub(crate) struct ReconnectBackoff {
     failures: u32,
     jitter_state: u64,
@@ -1496,5 +1508,65 @@ mod tests {
 
         first.reset();
         assert!(first.next_delay() <= RECONNECT_INITIAL_CAP);
+    }
+
+    #[test]
+    fn reconnect_wait_is_the_longer_of_backoff_and_retry_after() {
+        let refused = |seconds: f64| crate::Error::Realtime {
+            message: "refused".into(),
+            answer: Some(Box::new(crate::errors::AnswerMeta {
+                status: 503,
+                retry_after: Some(seconds),
+            })),
+        };
+        let ms = Duration::from_millis;
+        let cases = [
+            (
+                "no answer",
+                ms(300),
+                crate::Error::realtime("reset"),
+                ms(300),
+            ),
+            (
+                "an answer without Retry-After",
+                ms(300),
+                crate::Error::Realtime {
+                    message: "refused".into(),
+                    answer: Some(Box::new(crate::errors::AnswerMeta {
+                        status: 503,
+                        retry_after: None,
+                    })),
+                },
+                ms(300),
+            ),
+            (
+                "0.4 s over a shorter backoff",
+                ms(300),
+                refused(0.4),
+                ms(400),
+            ),
+            (
+                "the backoff over a shorter Retry-After",
+                ms(800),
+                refused(0.4),
+                ms(800),
+            ),
+            ("30 s", ms(900), refused(30.0), Duration::from_secs(30)),
+            (
+                "past the backoff's ceiling",
+                Duration::from_secs(30),
+                refused(45.0),
+                Duration::from_secs(45),
+            ),
+            (
+                "an absurd Retry-After",
+                ms(300),
+                refused(1e300),
+                Duration::MAX,
+            ),
+        ];
+        for (name, backoff, err, want) in cases {
+            assert_eq!(reconnect_wait(backoff, &err), want, "{name}");
+        }
     }
 }

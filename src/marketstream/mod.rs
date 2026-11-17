@@ -375,7 +375,13 @@ pub enum Event {
     Connected {
         reconnect: bool,
     },
-    /// A lost connection; the client reconnects after `delay`.
+    /// A lost connection, or a failed reconnect; the client connects again
+    /// after `delay`. When `error` comes from an answer, such as a refused
+    /// upgrade, [`crate::Error::answer`] holds its status and the delay it
+    /// asked for with `Retry-After`, and `delay` is at least that delay: a
+    /// server's `Retry-After` is never shortened, and the backoff's 30-second
+    /// ceiling applies to the backoff alone. A caller that will not wait that
+    /// long can close the stream.
     Disconnected {
         error: crate::Error,
         delay: std::time::Duration,

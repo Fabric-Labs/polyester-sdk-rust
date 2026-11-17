@@ -8,6 +8,8 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+use tokio_tungstenite::tungstenite::http::{HeaderValue, StatusCode};
 
 use super::frames::*;
 use super::units::{FakeHistory, span};
@@ -126,6 +128,15 @@ pub(super) struct FakeServer {
     pub(super) url: String,
     conns: mpsc::UnboundedReceiver<ServerConn>,
     pub(super) count: Arc<AtomicUsize>,
+    /// Retry-After values: each upgrade takes the next, if any, and is
+    /// refused with 503 and it.
+    pub(super) refuse: Arc<std::sync::Mutex<std::collections::VecDeque<&'static str>>>,
+    /// When each upgrade request arrived, refused ones included.
+    pub(super) upgrades: Arc<std::sync::Mutex<Vec<std::time::Instant>>>,
+    /// When set, the next connection is held open and never answered.
+    pub(super) hang: Arc<std::sync::atomic::AtomicBool>,
+    /// Connections held unanswered.
+    pub(super) hung: Arc<AtomicUsize>,
 }
 
 impl FakeServer {
@@ -135,10 +146,41 @@ impl FakeServer {
         let (conn_tx, conns) = mpsc::unbounded_channel();
         let count = Arc::new(AtomicUsize::new(0));
         let counter = count.clone();
+        let refuse: Arc<std::sync::Mutex<std::collections::VecDeque<&'static str>>> =
+            Arc::default();
+        let upgrades: Arc<std::sync::Mutex<Vec<std::time::Instant>>> = Arc::default();
+        let (refusals, seen) = (refuse.clone(), upgrades.clone());
+        let hang = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let hung = Arc::new(AtomicUsize::new(0));
+        let (hanging, holding) = (hang.clone(), hung.clone());
         tokio::spawn(async move {
             while let Ok((tcp, _)) = listener.accept().await {
+                if hanging.swap(false, Ordering::SeqCst) {
+                    holding.fetch_add(1, Ordering::SeqCst);
+                    tokio::spawn(async move {
+                        let _held = tcp;
+                        std::future::pending::<()>().await;
+                    });
+                    continue;
+                }
+                let (refusals, seen) = (refusals.clone(), seen.clone());
+                #[allow(clippy::result_large_err)]
+                let callback = move |_: &Request, response: Response| {
+                    seen.lock().unwrap().push(std::time::Instant::now());
+                    match refusals.lock().unwrap().pop_front() {
+                        Some(retry_after) => {
+                            let mut refusal = ErrorResponse::new(Some("UNAVAILABLE".into()));
+                            *refusal.status_mut() = StatusCode::SERVICE_UNAVAILABLE;
+                            refusal
+                                .headers_mut()
+                                .insert("retry-after", HeaderValue::from_static(retry_after));
+                            Err(refusal)
+                        }
+                        None => Ok(response),
+                    }
+                };
                 // Anything but a WebSocket upgrade (a port probe) is dropped.
-                let Ok(ws) = tokio_tungstenite::accept_async(tcp).await else {
+                let Ok(ws) = tokio_tungstenite::accept_hdr_async(tcp, callback).await else {
                     continue;
                 };
                 counter.fetch_add(1, Ordering::SeqCst);
@@ -172,7 +214,15 @@ impl FakeServer {
                 }
             }
         });
-        Self { url, conns, count }
+        Self {
+            url,
+            conns,
+            count,
+            refuse,
+            upgrades,
+            hang,
+            hung,
+        }
     }
 
     pub(super) async fn accept(&mut self) -> ServerConn {
@@ -1665,4 +1715,143 @@ async fn unsubscribe_during_a_recovery_ends_the_stream() {
         stream.order_book(7, Stream::Depth, 0).is_none(),
         "book kept after the caller's Unsubscribe"
     );
+}
+
+/// The connection is lost; the next upgrade is refused with 503 and
+/// `retry_after`. Returns the refusal's error and wait.
+async fn ms_refused_after_loss(
+    retry_after: &'static str,
+) -> (FakeServer, MarketStream, Error, Duration) {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let conn = server.accept().await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::Connected { .. }).then_some(())
+    })
+    .await;
+    server.refuse.lock().unwrap().push_back(retry_after);
+    conn.close();
+    let lost = expect(&mut stream, |e| match e {
+        Event::Disconnected { error, .. } => Some(error),
+        _ => None,
+    })
+    .await;
+    assert!(lost.answer().is_none(), "a lost connection has no answer");
+    let (error, delay) = expect(&mut stream, |e| match e {
+        Event::Disconnected { error, delay } => Some((error, delay)),
+        _ => None,
+    })
+    .await;
+    (server, stream, error, delay)
+}
+
+#[tokio::test]
+async fn a_503_upgrade_waits_its_retry_after_of_30_seconds() {
+    let (server, stream, error, delay) = ms_refused_after_loss("30").await;
+    let answer = error.answer().expect("the refusal's answer");
+    assert_eq!((answer.status, answer.retry_after), (503, Some(30.0)));
+    assert_eq!(delay, Duration::from_secs(30));
+    let before = server.upgrades.lock().unwrap().len();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(server.upgrades.lock().unwrap().len(), before);
+    stream.close();
+}
+
+#[tokio::test]
+async fn a_503_upgrade_waits_its_retry_after_of_400_milliseconds() {
+    let (mut server, mut stream, error, delay) = ms_refused_after_loss("0.4").await;
+    assert_eq!(error.retry_after(), Some(0.4));
+    assert!(delay >= Duration::from_millis(400), "{delay:?}");
+    let _conn = server.accept().await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::Connected { reconnect: true }).then_some(())
+    })
+    .await;
+    let upgrades = server.upgrades.lock().unwrap().clone();
+    let gap = upgrades[2] - upgrades[1];
+    assert!(
+        gap >= Duration::from_millis(400),
+        "reconnected {gap:?} after a 0.4 s Retry-After"
+    );
+}
+
+/// Loses the connection and has the next upgrade refused with 503 and a
+/// short Retry-After; returns the refusal's wait.
+async fn lost_then_refused(server: &mut FakeServer, stream: &mut MarketStream) -> Duration {
+    let conn = server.accept().await;
+    expect(stream, |e| {
+        matches!(e, Event::Connected { .. }).then_some(())
+    })
+    .await;
+    server.refuse.lock().unwrap().push_back("0.2");
+    conn.close();
+    expect(stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    expect(stream, |e| match e {
+        Event::Disconnected { delay, .. } => Some(delay),
+        _ => None,
+    })
+    .await
+}
+
+/// Closing while the reconnect timer is already due starts no upgrade: the
+/// stream is held between polls until the timer has elapsed, then closed and
+/// resumed with both the timer and the close ready, over and over.
+#[tokio::test(flavor = "current_thread")]
+async fn a_close_with_the_retry_timer_already_due_starts_no_upgrade() {
+    for round in 0..16 {
+        let mut server = FakeServer::start().await;
+        let gate = Arc::new(crate::marketstream::client::SchedGate::default());
+        let held = gate.clone();
+        let mut stream = dial(&server, |c| c.gate = Some(held)).await;
+        let delay = lost_then_refused(&mut server, &mut stream).await;
+        gate.hold();
+        tokio::time::sleep(delay + Duration::from_millis(100)).await;
+        stream.close();
+        let upgrades = server.upgrades.lock().unwrap().len();
+        gate.release();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert_eq!(
+            server.upgrades.lock().unwrap().len(),
+            upgrades,
+            "round {round}: an upgrade after close"
+        );
+        assert_eq!(server.count.load(Ordering::SeqCst), 1, "round {round}");
+    }
+}
+
+/// Closing while an upgrade is in flight ends it at once, not at the connect
+/// timeout.
+#[tokio::test]
+async fn a_close_during_an_upgrade_ends_it() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |_| {}).await;
+    let conn = server.accept().await;
+    expect(&mut stream, |e| {
+        matches!(e, Event::Connected { .. }).then_some(())
+    })
+    .await;
+    server.hang.store(true, Ordering::SeqCst);
+    conn.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while server.hung.load(Ordering::SeqCst) == 0 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the reconnect's upgrade is in flight");
+    stream.close();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while stream.is_alive() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("the close ends the upgrade in flight");
 }

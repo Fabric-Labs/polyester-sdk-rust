@@ -672,10 +672,15 @@ pub enum Event {
         connection: u64,
     },
     /// The connection ended, or a reconnect failed with `error`; the session
-    /// tries again after `delay`. `connection` is the last connection's
-    /// number. `unanswered` holds the correlation ID of every command sent on it
-    /// without an answer: each outcome is unknown, and each caller got
-    /// [`TradeError::OutcomeUnknown`].
+    /// tries again after `delay`. When `error` comes from an answer, such as
+    /// a refused upgrade ([`TradeError::Upgrade`]), [`crate::Error::answer`]
+    /// holds its status and the delay it asked for with `Retry-After`, and
+    /// `delay` is at least that delay: a server's `Retry-After` is never
+    /// shortened, and the backoff's 30-second ceiling applies to the backoff
+    /// alone. A caller that will not wait that long can close the session.
+    /// `connection` is the last connection's number. `unanswered` holds the
+    /// correlation ID of every command sent on it without an answer: each
+    /// outcome is unknown, and each caller got [`TradeError::OutcomeUnknown`].
     Disconnected {
         connection: u64,
         error: Error,
@@ -915,7 +920,7 @@ impl fmt::Display for Reject {
 }
 
 /// A trading WebSocket failure.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum TradeError {
     /// Refused locally; nothing reached the server.
     #[error("tradews {command} was not sent: {reason}")]
@@ -935,7 +940,14 @@ pub enum TradeError {
     /// cancel-on-disconnect opt-in may have armed the account's timer: the
     /// session reconnects with the same opt-in.
     #[error("tradews upgrade refused (HTTP {status}, code {code})")]
-    Upgrade { status: u16, code: String },
+    Upgrade {
+        status: u16,
+        code: String,
+        /// The refused upgrade's answer: its status and the delay it asked
+        /// for with `Retry-After`, which the next connection waits at least.
+        /// See [`crate::Error::answer`] and [`crate::Error::retry_after`].
+        answer: Option<Box<crate::errors::AnswerMeta>>,
+    },
     /// The server accepted the upgrade without echoing the cancel-on-disconnect
     /// opt-in, so the session would not be protected; it is closed.
     #[error("tradews accepted the connection without confirming cancel-on-disconnect")]
@@ -979,9 +991,14 @@ impl TradeError {
                 correlation_id,
                 reason: text(reason),
             },
-            TradeError::Upgrade { status, code } => TradeError::Upgrade {
+            TradeError::Upgrade {
+                status,
+                code,
+                answer,
+            } => TradeError::Upgrade {
                 status,
                 code: text(code),
+                answer,
             },
             TradeError::Frame {
                 template_id,
@@ -998,7 +1015,7 @@ impl TradeError {
         match self {
             TradeError::OutcomeUnknown { .. } => true,
             TradeError::Rejected(reject) => reject.outcome_unknown(),
-            TradeError::Upgrade { status, code } => {
+            TradeError::Upgrade { status, code, .. } => {
                 *status == 504 && code == "ORDER_CANCEL_OUTCOME_UNKNOWN"
             }
             _ => false,
