@@ -267,7 +267,10 @@ async fn order_reads_keep_batch_request_id() {
             .await;
             let got = client
                 .orders
-                .get(OrderKey::OrderId("901".into()), SubAccountScope::Default)
+                .get(
+                    OrderKey::OrderId(polyester::codecs::scalars::format_id(901)),
+                    SubAccountScope::Default,
+                )
                 .await
                 .expect("get")
                 .order

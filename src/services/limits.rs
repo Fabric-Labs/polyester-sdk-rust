@@ -1,5 +1,6 @@
-//! Request limits the published contract defines for the account-flow,
-//! batch-transfer, dust-conversion and statement-export calls.
+//! Request limits the published contract defines: page sizes of the list
+//! calls, and the account-flow, batch-transfer, dust-conversion and
+//! statement-export limits.
 //!
 //! Each value is a `buf.validate` rule of the contract. Where the generated
 //! field docs state it, a test pins the constant to that text, so a contract
@@ -53,6 +54,56 @@ pub(crate) const LIST_STATEMENT_EXPORTS_LIMIT_MAX: u32 = 100;
 /// `ListStatementExportsRequest.page_token`.
 pub(crate) const STATEMENT_EXPORT_PAGE_TOKEN_MAX_LEN: usize = 512;
 
+/// Largest page of the order reads: the `uint32 {gte: 1, lte: 1000}` rule on
+/// the optional `limit` of `GetOpenOrdersRequest`, `GetOrderHistoryRequest`,
+/// `GetUserTradesRequest` and `GetOrderRequest` (its executions).
+pub(crate) const ORDER_READ_LIMIT_MAX: u32 = 1_000;
+/// Largest `GetTrades` page: the `uint32.lte` rule on `GetTradesRequest.limit`.
+pub(crate) const MARKET_TRADES_LIMIT_MAX: u32 = 1_000;
+/// Most candles one `GetCandles` or `GetCandlesColumns` page returns: the
+/// `uint32.lte` rule on their `limit`.
+pub(crate) const CANDLES_LIMIT_MAX: u32 = 10_000;
+/// Most delta buckets one heatmap page returns: the `uint32 {gte: 1, lte:
+/// 20000}` rule on `GetOrderbookHeatmapRequest.limit`.
+pub(crate) const HEATMAP_LIMIT_MAX: u32 = 20_000;
+/// Fewest delta buckets one heatmap page asks for: the `gte: 1` of the same
+/// rule. The field has no presence, so 0 is on the wire and refused there.
+pub(crate) const HEATMAP_LIMIT_MIN: u32 = 1;
+/// Largest `ListTransfers` page: the `uint32.lte` rule on
+/// `ListTransfersRequest.limit`.
+pub(crate) const LIST_TRANSFERS_LIMIT_MAX: u32 = 1_000;
+/// Largest `ListMarketOverview` page: the `uint32.lte` rule on
+/// `ListMarketOverviewRequest.limit`.
+pub(crate) const MARKET_OVERVIEW_LIMIT_MAX: u32 = 2_000;
+/// Largest sub-account activity page: the `uint32.lte` rule on
+/// `ListSubaccountEventsRequest.limit`.
+pub(crate) const SUBACCOUNT_EVENTS_LIMIT_MAX: u32 = 200;
+/// Largest `ListTriggers` and `ListTriggerEvents` page: the `uint32.lte` rule
+/// on their `limit`.
+pub(crate) const TRIGGER_LIST_LIMIT_MAX: u32 = 1_000;
+/// Largest address-book entries, transfer destinations and internal-transfer
+/// whitelist page: the `uint32.lte` rule on the `limit` of
+/// `ListAddressBookEntriesRequest`, `ListTransferDestinationsRequest` and
+/// `ListInternalTransferWhitelistEntriesRequest`.
+pub(crate) const ADDRESS_BOOK_PAGE_LIMIT_MAX: u32 = 500;
+/// Most counterparties `ListTransferCounterparties` returns, and most recent
+/// destinations `GetAddressBookView` returns: the `uint32.lte` rule on
+/// `ListTransferCounterpartiesRequest.limit` and
+/// `GetAddressBookViewRequest.limit`.
+pub(crate) const ADDRESS_BOOK_RECENT_LIMIT_MAX: u32 = 200;
+/// Largest `ListFlows` and `ListFlowsByTx` page: the `uint32.lte` rule on
+/// their `limit`.
+pub(crate) const LIST_FLOWS_LIMIT_MAX: u32 = 500;
+/// Largest `ListStatusEvents` page: the `uint32.lte` rule on
+/// `ListStatusEventsRequest.limit`.
+pub(crate) const STATUS_EVENTS_LIMIT_MAX: u32 = 200;
+/// Largest changelog `ListPosts` and `ListDeploymentGroups` page: the
+/// `uint32.lte` rule on their `limit`.
+pub(crate) const CHANGELOG_PAGE_LIMIT_MAX: u32 = 100;
+/// Largest changelog `ListChanges` page: the `uint32.lte` rule on
+/// `ListChangesRequest.limit`.
+pub(crate) const CHANGELOG_CHANGES_LIMIT_MAX: u32 = 500;
+
 /// Refuse an ID filter that breaks its `repeated` rule: more than `max`
 /// IDs, an ID of 0, or an ID listed twice.
 pub(crate) fn check_id_filter(field: &str, ids: &[u32], max: usize) -> Result<()> {
@@ -81,6 +132,34 @@ pub(crate) fn check_limit(operation: &str, limit: u32, max: u32) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// Refuse a page size outside `min..=max`, the contract's `gte: min, lte:
+/// max` rule on a plain `uint32` `limit`, which is on the wire even at 0.
+pub(crate) fn check_limit_range(operation: &str, limit: u32, min: u32, max: u32) -> Result<()> {
+    if limit < min {
+        return Err(Error::validation(format!(
+            "{operation} limit {limit} is below the minimum {min}"
+        )));
+    }
+    check_limit(operation, limit, max)
+}
+
+/// Refuse an explicit page size outside `1..=max`, the contract's
+/// `gte: 1, lte: max` rule on an optional `limit`. `None` is left out, and
+/// the server applies its default; `Some(0)` is never sent.
+pub(crate) fn check_optional_limit(
+    operation: &str,
+    limit: Option<u32>,
+    max: u32,
+) -> Result<Option<u32>> {
+    match limit {
+        Some(0) => Err(Error::validation(format!(
+            "{operation} limit must be positive when explicitly supplied"
+        ))),
+        Some(limit) => check_limit(operation, limit, max).map(|()| Some(limit)),
+        None => Ok(None),
+    }
 }
 
 /// Refuse an empty string, or one longer than `max` characters.
@@ -169,6 +248,157 @@ mod tests {
         );
     }
 
+    /// The doc comment of `message`'s `limit` field in the generated
+    /// `source`, one line.
+    fn limit_doc(source: &str, message: &str) -> String {
+        let start = source
+            .find(&format!("pub struct {message} {{\n"))
+            .unwrap_or_else(|| panic!("{message} is not generated"));
+        let body = &source[start..];
+        let field = body
+            .find("    pub limit:")
+            .unwrap_or_else(|| panic!("{message} has no limit"));
+        let mut doc = Vec::new();
+        for line in body[..field].lines().rev() {
+            let line = line.trim();
+            if let Some(text) = line.strip_prefix("///") {
+                doc.push(text.trim());
+            } else if line.starts_with("pub ") {
+                break;
+            }
+        }
+        doc.reverse();
+        doc.retain(|line| !line.is_empty());
+        doc.join(" ")
+    }
+
+    /// Every list call's page-size maximum is the one its request's
+    /// generated field docs state, so a contract change that regenerates
+    /// them breaks the build.
+    #[test]
+    fn page_size_limits_match_the_generated_contract_docs() {
+        let orders = include_str!("../gen/buffa/orders.v1.rs");
+        let marketdata = include_str!("../gen/buffa/marketdata.v1.rs");
+        let ledger = include_str!("../gen/buffa/ledger.read.v1.rs");
+        let overview = include_str!("../gen/buffa/marketoverview.v1.rs");
+        let auth = include_str!("../gen/buffa/auth.v1.rs");
+        let triggers = include_str!("../gen/buffa/triggers.v1.rs");
+        let lifecycle = include_str!("../gen/buffa/chain.lifecycle.v1.rs");
+        let system = include_str!("../gen/buffa/system.v1.rs");
+        let changelog = include_str!("../gen/buffa/changelog.v1.rs");
+        let order_read = format!("(1-{ORDER_READ_LIMIT_MAX}, default 100)");
+        let maximum_is = |max: u32| format!("maximum is {max}.");
+        for (source, message, text) in [
+            (orders, "GetOpenOrdersRequest", order_read.clone()),
+            (orders, "GetOrderHistoryRequest", order_read.clone()),
+            (orders, "GetUserTradesRequest", order_read.clone()),
+            (orders, "GetOrderRequest", order_read),
+            (
+                marketdata,
+                "GetTradesRequest",
+                format!("max {MARKET_TRADES_LIMIT_MAX}."),
+            ),
+            (
+                marketdata,
+                "GetCandlesRequest",
+                format!("max {CANDLES_LIMIT_MAX}."),
+            ),
+            (
+                marketdata,
+                "GetCandlesColumnsRequest",
+                format!("max {CANDLES_LIMIT_MAX}."),
+            ),
+            (
+                marketdata,
+                "GetOrderbookHeatmapRequest",
+                format!("(min {HEATMAP_LIMIT_MIN}, max {HEATMAP_LIMIT_MAX})"),
+            ),
+            (
+                ledger,
+                "ListTransfersRequest",
+                maximum_is(LIST_TRANSFERS_LIMIT_MAX),
+            ),
+            (
+                overview,
+                "ListMarketOverviewRequest",
+                maximum_is(MARKET_OVERVIEW_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListSubaccountEventsRequest",
+                maximum_is(SUBACCOUNT_EVENTS_LIMIT_MAX),
+            ),
+            (
+                triggers,
+                "ListTriggersRequest",
+                maximum_is(TRIGGER_LIST_LIMIT_MAX),
+            ),
+            (
+                triggers,
+                "ListTriggerEventsRequest",
+                maximum_is(TRIGGER_LIST_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListAddressBookEntriesRequest",
+                maximum_is(ADDRESS_BOOK_PAGE_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListTransferDestinationsRequest",
+                maximum_is(ADDRESS_BOOK_PAGE_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListInternalTransferWhitelistEntriesRequest",
+                maximum_is(ADDRESS_BOOK_PAGE_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "ListTransferCounterpartiesRequest",
+                maximum_is(ADDRESS_BOOK_RECENT_LIMIT_MAX),
+            ),
+            (
+                auth,
+                "GetAddressBookViewRequest",
+                maximum_is(ADDRESS_BOOK_RECENT_LIMIT_MAX),
+            ),
+            (
+                lifecycle,
+                "ListFlowsRequest",
+                maximum_is(LIST_FLOWS_LIMIT_MAX),
+            ),
+            (
+                lifecycle,
+                "ListFlowsByTxRequest",
+                maximum_is(LIST_FLOWS_LIMIT_MAX),
+            ),
+            (
+                system,
+                "ListStatusEventsRequest",
+                format!("maximum {STATUS_EVENTS_LIMIT_MAX}."),
+            ),
+            (
+                changelog,
+                "ListPostsRequest",
+                format!("maximum {CHANGELOG_PAGE_LIMIT_MAX}."),
+            ),
+            (
+                changelog,
+                "ListDeploymentGroupsRequest",
+                format!("maximum {CHANGELOG_PAGE_LIMIT_MAX}."),
+            ),
+            (
+                changelog,
+                "ListChangesRequest",
+                format!("maximum {CHANGELOG_CHANGES_LIMIT_MAX}."),
+            ),
+        ] {
+            let doc = limit_doc(source, message);
+            assert!(doc.contains(&text), "{message}: {doc:?} lacks {text:?}");
+        }
+    }
+
     /// The generated docs do not state these rules, so their values are
     /// pinned here: legs `min_items: 1`; idempotency keys `max_len: 128`;
     /// `quote_id` `max_len: 64`; `conversion_id` `max_len: 39`; page tokens
@@ -187,6 +417,18 @@ mod tests {
 
     #[test]
     fn checks_refuse_only_outside_the_rule() {
+        assert_eq!(check_optional_limit("op", None, 1000).unwrap(), None);
+        assert_eq!(check_optional_limit("op", Some(1), 1000).unwrap(), Some(1));
+        assert_eq!(
+            check_optional_limit("op", Some(1000), 1000).unwrap(),
+            Some(1000)
+        );
+        for limit in [0, 1001, u32::MAX] {
+            assert!(matches!(
+                check_optional_limit("op", Some(limit), 1000),
+                Err(Error::Validation(_))
+            ));
+        }
         assert!(check_limit("op", 0, 100).is_ok());
         assert!(check_limit("op", 100, 100).is_ok());
         assert!(matches!(

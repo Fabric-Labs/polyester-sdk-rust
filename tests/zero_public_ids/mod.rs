@@ -1,6 +1,7 @@
 //! A public ID that decodes to 0 names nothing: `"1"` is the base58 form of
-//! 0, `"0"` and `"00"` the decimal. Every call that takes one refuses it with
-//! `Error::Validation` and sends no request.
+//! 0, and leading `1`s add nothing. Every call that takes one refuses it with
+//! `Error::Validation` and sends no request. (`"0"` is no base58 ID at all;
+//! see `public_id_strings`.)
 
 use super::hardening_support::{HttpScript, MockHttpServer};
 use polyester::models::{
@@ -11,7 +12,7 @@ use polyester::{Client, Config, Error};
 use std::sync::atomic::Ordering;
 
 const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-const ZERO_IDS: [&str; 3] = ["1", "0", "00"];
+const ZERO_IDS: [&str; 3] = ["1", "11", "111"];
 
 fn assert_refused<T: std::fmt::Debug>(call: &str, id: &str, result: polyester::Result<T>) {
     match result {

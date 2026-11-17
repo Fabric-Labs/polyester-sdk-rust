@@ -225,7 +225,7 @@ impl CreateAlertParams {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UpdateAlertParams {
-    /// Public alert ID (base58, or decimal).
+    /// Public alert ID, in base58 as alert reads return it.
     pub alert_id: String,
     /// The alert's current `revision`; a stale one is refused with
     /// `REVISION_CONFLICT`: read the alert again.

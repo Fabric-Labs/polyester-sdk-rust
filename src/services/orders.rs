@@ -2,6 +2,7 @@ use super::ServiceContext;
 use super::correlation_id::{
     optional_client_order_id, optional_request_id, require_client_style_id,
 };
+use super::limits::{ORDER_READ_LIMIT_MAX, check_optional_limit};
 use super::scope;
 use super::unary;
 use crate::catalogs::Manager as CatalogManager;
@@ -193,11 +194,13 @@ impl OrdersService {
     }
 
     pub async fn list_open_with(&self, opts: ListOpenOrdersOpts) -> Result<OrdersList> {
-        let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
-            _ => None,
-        };
-        let limit = super::positive_limit(opts.limit, "list_open_orders")?;
+        // Only None means no trigger filter: a supplied ID is parsed.
+        let trigger_id = opts
+            .trigger_id
+            .as_deref()
+            .map(|raw| id_to_u64(raw, "trigger_id"))
+            .transpose()?;
+        let limit = check_optional_limit("list_open_orders", opts.limit, ORDER_READ_LIMIT_MAX)?;
         let req = GetOpenOrdersRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             page_token: opts.page_token.unwrap_or_default(),
@@ -238,6 +241,7 @@ impl OrdersService {
 
     pub async fn list_history_with(&self, opts: ListOrderHistoryOpts) -> Result<OrdersList> {
         validate_time_range("orders.list_history", opts.start_ts_ns, opts.end_ts_ns)?;
+        let limit = check_optional_limit("orders.list_history", opts.limit, ORDER_READ_LIMIT_MAX)?;
         // A market name is resolved, or checked against the ID given with it,
         // through the catalog.
         if opts
@@ -274,16 +278,18 @@ impl OrdersService {
                 })?;
             symbol_ids.push(resolved);
         }
-        let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.trim().is_empty() => Some(id_to_u64(raw, "trigger_id")?),
-            _ => None,
-        };
+        // Only None means no trigger filter: a supplied ID is parsed.
+        let trigger_id = opts
+            .trigger_id
+            .as_deref()
+            .map(|raw| id_to_u64(raw, "trigger_id"))
+            .transpose()?;
         let req = GetOrderHistoryRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,
             page_token: opts.page_token.unwrap_or_default(),
-            // Option wire field: None omits; Some(0) means server default.
-            limit: opts.limit,
+            // None omits the limit for the server's default.
+            limit,
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             trigger_id,
@@ -334,6 +340,7 @@ impl OrdersService {
                 "orders.get limit and page_token require include_execution_history",
             ));
         }
+        let limit = check_optional_limit("orders.get", opts.limit, ORDER_READ_LIMIT_MAX)?;
         let key = Some(Self::encode_get_order_key(&opts.key)?);
         let req = GetOrderRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
@@ -341,7 +348,7 @@ impl OrdersService {
             include_attached_risk: Some(opts.include_attached_risk),
             include_attached_risk_state: Some(opts.include_attached_risk_state),
             include_execution_history: opts.include_execution_history,
-            limit: opts.limit,
+            limit,
             page_token: opts.page_token.unwrap_or_default(),
             ..Default::default()
         };
@@ -379,7 +386,10 @@ impl OrdersService {
     /// order, read it with [`Self::get`] and compare its trades to `cum_qty`.
     ///
     /// Each poll reads every execution page; the result holds the last poll's
-    /// order, trades and transfers with that read's `executions_complete`.
+    /// order, trades and transfers with that read's `executions_complete`. A
+    /// settlement leg a later page repeats (the same `tx_id`, as the contract
+    /// repeats a match's legs on each page holding one of its fills) is kept
+    /// once, where it first appeared.
     /// `timeout` (15 s when zero) bounds the whole wait, page reads included;
     /// a read that finishes after it is no success.
     /// A `next_page_token` that repeats a page token of the same poll returns
@@ -399,7 +409,13 @@ impl OrdersService {
         let mut page_token = None;
         let mut requested = std::collections::HashSet::new();
         let mut trades = Vec::new();
-        let mut transfers = Vec::new();
+        let mut transfers: Vec<crate::models::OrderTransfer> = Vec::new();
+        // The `tx_id`s of the legs earlier pages carried. The contract repeats
+        // a match's settlement legs on every page that holds one of its fills
+        // and identifies a leg by `tx_id`: a leg an earlier page carried is
+        // the same leg and is kept once, where it first appeared. Legs within
+        // one page are all kept, and a leg without a `tx_id` is never merged.
+        let mut earlier_tx_ids = std::collections::HashSet::new();
         let mut order = None;
         loop {
             let page = self
@@ -420,7 +436,18 @@ impl OrdersService {
                 order = page.order;
             }
             trades.extend(page.trades);
-            transfers.extend(page.transfers);
+            let first_new = transfers.len();
+            transfers.extend(
+                page.transfers
+                    .into_iter()
+                    .filter(|leg| leg.tx_id.is_empty() || !earlier_tx_ids.contains(&leg.tx_id)),
+            );
+            earlier_tx_ids.extend(
+                transfers[first_new..]
+                    .iter()
+                    .filter(|leg| !leg.tx_id.is_empty())
+                    .map(|leg| leg.tx_id.clone()),
+            );
             if page.next_page_token.is_empty() {
                 return Ok(GetOrderResult {
                     order,
@@ -725,7 +752,13 @@ impl OrdersService {
                         "price is required for limit orders (use Price::from_decimal or Price::from_ticks)",
                     )
                 })?;
+                // The contract's limit prices are positive: 0 is no price.
                 let price_ticks = resolve_price_ticks(price, Some(symbol))?;
+                if price_ticks <= 0 {
+                    return Err(Error::validation(
+                        "price must be positive for a limit order",
+                    ));
+                }
                 match params.time_in_force {
                     Some(CreateTimeInForce::Ioc) => {
                         if post_only {
@@ -854,7 +887,12 @@ impl OrdersService {
 
     /// Map the flat public [`RiskLeg`] (`order_type`/`limit_price`) onto a child
     /// [`RiskExecution`] variant.
-    fn encode_risk_child(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<RiskExecution> {
+    fn encode_risk_child(
+        &self,
+        leg: &RiskLeg,
+        symbol: Option<&str>,
+        leg_name: &str,
+    ) -> Result<RiskExecution> {
         let child_ty = leg.order_type.unwrap_or(CreateOrderType::Market);
         let execution = match (child_ty, leg.limit_price.as_ref()) {
             (CreateOrderType::Market, None) => risk_execution::Execution::MarketIoc(Box::default()),
@@ -865,7 +903,11 @@ impl OrdersService {
             }
             (CreateOrderType::Limit, Some(price)) => {
                 risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
-                    price_ticks: self.resolve_constraint_price(price, symbol)?,
+                    price_ticks: positive_constraint_price(
+                        price,
+                        symbol,
+                        &format!("attached_risk {leg_name} limit_price"),
+                    )?,
                     ..Default::default()
                 }))
             }
@@ -883,31 +925,34 @@ impl OrdersService {
 
     fn encode_take_profit(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
         let mut policy = TakeProfitPolicy {
-            trigger_price_ticks: self.resolve_constraint_price(
+            trigger_price_ticks: positive_constraint_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached take_profit requires trigger_price")
                 })?,
                 symbol,
+                "attached_risk take_profit trigger_price",
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
         };
-        *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
+        *policy.child.get_or_insert_default() =
+            self.encode_risk_child(leg, symbol, "take_profit")?;
         Ok(policy)
     }
 
     fn encode_stop_loss(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
         let mut policy = StopLossPolicy {
-            trigger_price_ticks: self.resolve_constraint_price(
+            trigger_price_ticks: positive_constraint_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached stop_loss requires trigger_price")
                 })?,
                 symbol,
+                "attached_risk stop_loss trigger_price",
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
         };
-        *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol)?;
+        *policy.child.get_or_insert_default() = self.encode_risk_child(leg, symbol, "stop_loss")?;
         Ok(policy)
     }
 
@@ -932,7 +977,13 @@ impl OrdersService {
             ..Default::default()
         };
         if let Some(activation) = stop.activation_price.as_ref() {
-            proto.activation_price_ticks = self.resolve_constraint_price(activation, symbol)?;
+            // 0 is no activation price on the wire: a zero one is refused
+            // rather than sent as none.
+            proto.activation_price_ticks = positive_constraint_price(
+                activation,
+                symbol,
+                "attached_risk trailing_stop activation_price",
+            )?;
         }
         // The trailing stop of a sell order buys back and declares the most its
         // exit pays; the trailing stop of a buy order sells and declares none.
@@ -1930,6 +1981,7 @@ impl TradesService {
 
     pub async fn list_with(&self, opts: ListUserTradesOpts) -> Result<UserTradesList> {
         validate_time_range("trades.list", opts.start_ts_ns, opts.end_ts_ns)?;
+        let limit = check_optional_limit("trades.list", opts.limit, ORDER_READ_LIMIT_MAX)?;
         if opts.order_id.is_some() && opts.lineage_id.is_some() {
             return Err(Error::validation(
                 "trades.list order_id and lineage_id are mutually exclusive",
@@ -1977,8 +2029,8 @@ impl TradesService {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id,
             after_match_id: opts.after_match_id,
-            // Option wire field: None omits; Some(0) means server default.
-            limit: opts.limit,
+            // None omits the limit for the server's default.
+            limit,
             page_token: opts.page_token.unwrap_or_default(),
             through_generation: opts.through_generation,
             include_transfers: opts.include_transfers,
@@ -2151,6 +2203,16 @@ fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
 
 /// A modify or batch replace price. The API reads a new price of 0 as no
 /// change, so 0 is refused: leave `new_price` `None` to keep the price.
+/// An attached leg's trigger, child limit or activation price: positive, as
+/// the contract's `gt: 0` rules take them. 0 would read as no price.
+fn positive_constraint_price(price: &Price, symbol: Option<&str>, field: &str) -> Result<i64> {
+    let ticks = resolve_price_ticks(price, symbol)?;
+    if ticks <= 0 {
+        return Err(Error::validation(format!("{field} must be positive")));
+    }
+    Ok(ticks)
+}
+
 fn resolve_new_price_ticks(price: &Price, symbol: &str) -> Result<i64> {
     let ticks = resolve_price_ticks(price, Some(symbol))?;
     if ticks <= 0 {
@@ -2469,6 +2531,128 @@ mod tests {
         match policy.stop_leg.as_ref().expect("stop leg") {
             risk_policy::StopLeg::StopLoss(leg) => leg.trigger_price_source,
             risk_policy::StopLeg::TrailingStop(leg) => leg.trigger_price_source,
+        }
+    }
+
+    /// A limit order's price and an attached leg's trigger, child limit and
+    /// activation prices are positive (`gt: 0`, and an activation price is
+    /// no price at 0): a zero one on create is refused before sending in
+    /// every input form, naming the price, rather than encoded as an empty
+    /// price or no activation.
+    #[test]
+    fn create_refuses_a_zero_price_in_every_form() {
+        use crate::models::{AttachedRisk, RiskLeg, TrailingDistance, TrailingStop};
+
+        let client = client();
+        let qty = || {
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap()
+        };
+        let btc = |ticks: i64| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap();
+        let zeros = [
+            (
+                "decimal 0",
+                Price::from_decimal_str("0", Some("BTC-USDT".into())).unwrap(),
+            ),
+            (
+                "decimal 0.00",
+                Price::from_decimal_str("0.00", Some("BTC-USDT".into())).unwrap(),
+            ),
+            ("0 ticks", btc(0)),
+        ];
+        let leg = |trigger: Price, order_type, limit: Option<Price>| RiskLeg {
+            trigger_price: Some(trigger),
+            trigger_price_source: None,
+            order_type: Some(order_type),
+            limit_price: limit,
+            state: None,
+        };
+        for (form, zero) in zeros {
+            let mut cases: Vec<(&str, CreateOrderParams, &str)> = Vec::new();
+            for tif in [
+                None,
+                Some(CreateTimeInForce::Gtc),
+                Some(CreateTimeInForce::Ioc),
+                Some(CreateTimeInForce::Fok),
+            ] {
+                let mut p = create_params(qty(), zero.clone());
+                p.post_only = None;
+                p.time_in_force = tif;
+                cases.push(("limit price", p, "price must be positive"));
+            }
+            let risk = |risk: AttachedRisk| {
+                let mut p = create_params(qty(), btc(50_000_000_000_000));
+                p.attached_risk = Some(risk);
+                p
+            };
+            cases.push((
+                "take_profit trigger",
+                risk(AttachedRisk {
+                    take_profit: Some(leg(zero.clone(), CreateOrderType::Market, None)),
+                    ..Default::default()
+                }),
+                "take_profit trigger_price must be positive",
+            ));
+            cases.push((
+                "stop_loss trigger",
+                risk(AttachedRisk {
+                    stop_loss: Some(leg(zero.clone(), CreateOrderType::Market, None)),
+                    ..Default::default()
+                }),
+                "stop_loss trigger_price must be positive",
+            ));
+            cases.push((
+                "take_profit child limit",
+                risk(AttachedRisk {
+                    take_profit: Some(leg(
+                        btc(51_000_000_000_000),
+                        CreateOrderType::Limit,
+                        Some(zero.clone()),
+                    )),
+                    ..Default::default()
+                }),
+                "take_profit limit_price must be positive",
+            ));
+            cases.push((
+                "stop_loss child limit",
+                risk(AttachedRisk {
+                    stop_loss: Some(leg(
+                        btc(49_000_000_000_000),
+                        CreateOrderType::Limit,
+                        Some(zero.clone()),
+                    )),
+                    ..Default::default()
+                }),
+                "stop_loss limit_price must be positive",
+            ));
+            cases.push((
+                "trailing activation",
+                risk(AttachedRisk {
+                    trailing_stop: Some(
+                        TrailingStop::new(TrailingDistance::Bps(100))
+                            .with_activation_price(zero.clone()),
+                    ),
+                    ..Default::default()
+                }),
+                "trailing_stop activation_price must be positive",
+            ));
+            for (label, params, want) in cases {
+                let err = client
+                    .orders
+                    .encode_create_params(&params)
+                    .expect_err(&format!("{label} {form}"));
+                assert!(
+                    matches!(err, Error::Validation(_)),
+                    "{label} {form}: {err:?}"
+                );
+                assert!(err.to_string().contains(want), "{label} {form}: {err}");
+            }
         }
     }
 

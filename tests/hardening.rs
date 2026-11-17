@@ -7,6 +7,8 @@
 mod api_key_display;
 #[path = "batch_replace_status_errors/mod.rs"]
 mod batch_replace_status_errors;
+#[path = "blank_ids/mod.rs"]
+mod blank_ids;
 #[path = "catalog_hydration_wait/mod.rs"]
 mod catalog_hydration_wait;
 #[path = "catalog_startup_recovery/mod.rs"]
@@ -28,6 +30,8 @@ mod contract_74af7f3;
 mod contract_e339360;
 #[path = "contract_ebbbeac/mod.rs"]
 mod contract_ebbbeac;
+#[path = "contract_page_limits/mod.rs"]
+mod contract_page_limits;
 #[path = "error_chain_redaction/mod.rs"]
 mod error_chain_redaction;
 mod hardening_support;
@@ -59,6 +63,8 @@ mod orderbook_depths;
 mod orderbook_symbol_id_only;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
+#[path = "public_id_strings/mod.rs"]
+mod public_id_strings;
 #[path = "public_reads_keyless/mod.rs"]
 mod public_reads_keyless;
 #[path = "read_model_retention/mod.rs"]
@@ -3203,7 +3209,7 @@ async fn l2_lifecycle_get_rejects_missing_required_flow_through_public_service()
 
     let err = client
         .lifecycle
-        .get_flow("flow-1")
+        .get_flow("flow_1")
         .await
         .expect_err("service must reject a missing required flow");
     assert!(err.to_string().contains("missing flow"), "{err}");
@@ -9987,9 +9993,10 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
 }
 
 // Reads take the public IDs other reads return: `sub_accounts.get` takes a
-// sub-account's public ID (base58, or decimal), and `triggers.list_events_by_id`
-// a trigger's, with the configured default sub-account as the typed helpers
-// apply it. An ID that does not parse, or names 0, is refused before sending.
+// sub-account's public ID (base58), and `triggers.list_events_by_id` a
+// trigger's, with the configured default sub-account as the typed helpers
+// apply it. An ID that is not bare base58 (decimal, or with whitespace), or
+// that names 0, is refused before sending.
 #[tokio::test]
 async fn subaccount_and_trigger_event_reads_take_public_ids() {
     use polyester::codecs::scalars::format_id;
@@ -10041,11 +10048,8 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     })
     .unwrap();
 
-    for id in [
-        format_id(SUB),
-        SUB.to_string(),
-        format!(" {} ", format_id(SUB)),
-    ] {
+    // A leading `1` is a base58 zero: both strings name SUB.
+    for id in [format_id(SUB), format!("1{}", format_id(SUB))] {
         let _ = client
             .sub_accounts
             .get(&id, GetSubaccountOpts::default())
@@ -10058,7 +10062,7 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     let _ = client
         .triggers
         .list_events_by_id(
-            &TRIGGER.to_string(),
+            &format_id(TRIGGER),
             ListTriggerEventsOpts {
                 subaccount_id: SubAccountScope::Id(44),
                 limit: Some(25),
@@ -10071,7 +10075,6 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     assert_eq!(
         std::mem::take(&mut *seen.lock().unwrap()),
         vec![
-            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             (
@@ -10097,6 +10100,24 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
         client
             .sub_accounts
             .get("1", GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .sub_accounts
+            .get(&SUB.to_string(), GetSubaccountOpts::default())
+            .await
+            .map(|_| ()),
+        client
+            .sub_accounts
+            .get(
+                &format!(" {} ", format_id(SUB)),
+                GetSubaccountOpts::default(),
+            )
+            .await
+            .map(|_| ()),
+        client
+            .triggers
+            .list_events_by_id(&TRIGGER.to_string(), ListTriggerEventsOpts::default())
             .await
             .map(|_| ()),
         client
@@ -10499,7 +10520,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let cancel = |n: usize| {
         (0..n)
             .map(|i| BatchCancelItem {
-                key: OrderKey::OrderId((i + 2).to_string()),
+                key: OrderKey::OrderId(polyester::codecs::scalars::format_id(i as u64 + 2)),
                 symbol_id: None,
             })
             .collect::<Vec<_>>()
@@ -10507,7 +10528,7 @@ async fn l2_batch_cancel_and_replace_send_up_to_fifty_items() {
     let replace = |n: usize| {
         (0..n)
             .map(|i| BatchReplaceItem {
-                key: OrderKey::OrderId((i + 2).to_string()),
+                key: OrderKey::OrderId(polyester::codecs::scalars::format_id(i as u64 + 2)),
                 new_price: Some(Price::from_ticks(1_000_000_000, None).expect("price")),
                 new_qty: None,
                 new_attached_risk: None,
@@ -11076,7 +11097,7 @@ async fn zero_default_subaccount_is_refused_before_sending() {
 
 #[tokio::test]
 async fn omitted_and_non_zero_default_subaccounts_still_send() {
-    for default in [None, Some(""), Some("j")] {
+    for default in [None, Some("j")] {
         let (client, server) = zero_id_client(default, None).await;
         let result = client.orders.list_open(SubAccountScope::Default).await;
         assert!(
@@ -11085,6 +11106,11 @@ async fn omitted_and_non_zero_default_subaccounts_still_send() {
         );
         assert_eq!(server.requests.load(Ordering::SeqCst), 1, "{default:?}");
     }
+    // Only an unset default is none: an empty one is refused, not omitted.
+    let (client, server) = zero_id_client(Some(""), None).await;
+    let result = client.orders.list_open(SubAccountScope::Default).await;
+    assert!(matches!(result, Err(Error::Validation(_))), "{result:?}");
+    assert_eq!(server.requests.load(Ordering::SeqCst), 0);
 }
 
 macro_rules! zero_account_subscribes {

@@ -312,27 +312,21 @@ fn format_scaled(value: i128, scale: u32) -> Result<String> {
     Ok(if neg { format!("-{raw}") } else { raw })
 }
 
-fn base58_to_u64(value: &str, label: &str) -> Result<u64> {
-    let bytes = bs58::decode(value)
-        .into_vec()
-        .map_err(|_| Error::validation(format!("{label} must be base58 or decimal uint64")))?;
-    if bytes.len() > 8 {
-        return Err(Error::validation(format!("{label} exceeds uint64 range")));
-    }
-    let mut buf = [0u8; 8];
-    buf[8 - bytes.len()..].copy_from_slice(&bytes);
-    Ok(u64::from_be_bytes(buf))
-}
+/// The base58 alphabet of public IDs: no `0`, `O`, `I` or `l`.
+const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-/// Parse a public id that may be base58 or decimal, refusing one that decodes
-/// to 0.
+/// Parse a string public ID, refusing one that decodes to 0.
 ///
-/// On the wire 0 is unset and names nothing, so `"1"` (`format_id(0)`), `"0"`
-/// or `"00"` would send a request for an ID the caller did not mean.
+/// A string public ID is base58 and only base58, read byte by byte as the
+/// server reads it. A digit-only string is base58 too: `"23"` and `"123"`
+/// are both 60 (a leading `1` is a base58 zero), and an ID with a `0`, such
+/// as `"100"`, is refused, never read as decimal. Nothing is trimmed: an ID
+/// with whitespace anywhere, or with any character outside the alphabet, is
+/// refused with [`Error::Validation`] naming `label`. Build string IDs with
+/// [`format_id`], or pass the `u64` where the API takes one.
 ///
-/// All-digit strings are ambiguous: `format_id(4)` is `"5"`, which is also a
-/// valid decimal. Prefer the canonical base58 decode when `format_id(b) == input`;
-/// otherwise treat the value as decimal.
+/// On the wire 0 is unset and names nothing, so `"1"` (`format_id(0)`) or
+/// `"11"` would send a request for an ID the caller did not mean.
 pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
     let id = parse_id(value, label)?;
     if id == 0 {
@@ -344,24 +338,30 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
 }
 
 fn parse_id(value: &str, label: &str) -> Result<u64> {
-    let value = value.trim();
     if value.is_empty() {
+        return Err(Error::validation(format!("{label} must be a base58 ID")));
+    }
+    if value.chars().any(char::is_whitespace) {
         return Err(Error::validation(format!(
-            "{label} must be base58 or decimal uint64"
+            "{label} must be a base58 ID without whitespace"
         )));
     }
-    if value.chars().all(|c| c.is_ascii_digit()) {
-        let decimal = value
-            .parse::<u64>()
-            .map_err(|_| Error::validation(format!("{label} exceeds uint64 range")))?;
-        if let Ok(canonical) = base58_to_u64(value, label)
-            && format_id(canonical) == value
-        {
-            return Ok(canonical);
-        }
-        return Ok(decimal);
+    let mut id: u64 = 0;
+    for byte in value.bytes() {
+        let digit = BASE58_ALPHABET
+            .iter()
+            .position(|&c| c == byte)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "{label} must be a base58 ID: a character is outside the base58 alphabet"
+                ))
+            })?;
+        id = id
+            .checked_mul(58)
+            .and_then(|id| id.checked_add(digit as u64))
+            .ok_or_else(|| Error::validation(format!("{label} exceeds uint64 range")))?;
     }
-    base58_to_u64(value, label)
+    Ok(id)
 }
 
 /// Parse an account or sub-account ID as [`id_to_u64`] does, which refuses 0.
@@ -538,8 +538,8 @@ mod tests {
     }
 
     #[test]
-    fn id_round_trip_prefers_canonical_base58_for_all_digit_encodings() {
-        // format_id(4) == "5"; decimal parse would wrongly yield 5.
+    fn id_round_trip_reads_digit_only_ids_as_base58() {
+        // format_id(4) == "5"; a decimal read would wrongly yield 5.
         assert_eq!(format_id(4), "5");
         assert_eq!(id_to_u64("5", "order_id").unwrap(), 4);
         // Zero has its own canonical base58 encoding and must not alias id 1.
@@ -564,25 +564,117 @@ mod tests {
     }
 
     #[test]
-    fn id_to_u64_still_accepts_non_canonical_decimal() {
-        // "10" is not the canonical encoding of any small id via format_id.
+    fn id_to_u64_refuses_decimal_ids() {
+        // "10" and "100" are no base58 ID: `0` is outside the alphabet. They
+        // are refused, never read as the decimal 10 or 100.
         assert_ne!(format_id(10), "10");
-        assert_eq!(id_to_u64("10", "order_id").unwrap(), 10);
-        assert_eq!(id_to_u64("100", "order_id").unwrap(), 100);
+        for raw in ["10", "100"] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(
+                err.to_string().contains("order_id must be a base58 ID"),
+                "{raw:?}: {err}"
+            );
+        }
+        assert_eq!(id_to_u64(&format_id(10), "order_id").unwrap(), 10);
+        assert_eq!(id_to_u64(&format_id(100), "order_id").unwrap(), 100);
     }
 
     #[test]
     fn id_to_u64_refuses_ids_that_decode_to_zero() {
-        for raw in ["1", "0", "00", " 1 "] {
+        // "1" is the base58 zero, and leading ones add nothing.
+        for raw in ["1", "11", "111"] {
             let err = id_to_u64(raw, "trigger_id").unwrap_err();
             assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
             assert!(err.to_string().contains("trigger_id must be a non-zero ID"));
+        }
+        // A decimal zero is no base58 ID, and a padded one is not trimmed.
+        for raw in ["0", "00", " 1 "] {
+            let err = id_to_u64(raw, "trigger_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(
+                err.to_string().contains("trigger_id must be a base58 ID"),
+                "{raw:?}: {err}"
+            );
         }
         assert_eq!(id_to_u64("2", "trigger_id").unwrap(), 1);
         assert_eq!(
             id_to_u64(&format_id(1 << 63), "trigger_id").unwrap(),
             1 << 63
         );
+    }
+
+    /// Public IDs are ASCII base58. A digit of another script, or any other
+    /// non-ASCII character, is refused, never read as the ASCII ID it looks
+    /// like; Unicode spaces are refused, not trimmed.
+    #[test]
+    fn id_to_u64_refuses_non_ascii_input() {
+        for raw in [
+            "\u{0662}\u{0663}", // Arabic-Indic 23
+            "\u{FF12}\u{FF13}", // full-width 23
+            "\u{0E52}\u{0E53}", // Thai 23
+            "\u{0665}",         // Arabic-Indic 5
+            "\u{FF15}",         // full-width 5
+            "2\u{0663}",
+            "\u{00A0}23", // no-break space
+            "23\u{3000}", // ideographic space
+            "\u{2003}23\u{2003}",
+            "\u{FEFF}23", // byte order mark
+            "2\u{200B}3", // zero-width space
+            "\u{0410}B",  // Cyrillic A
+        ] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(err.to_string().contains("order_id"), "{raw:?}: {err}");
+            assert!(parse_account_id(raw, "sub_account_id").is_err(), "{raw:?}");
+        }
+        assert_eq!(id_to_u64("23", "order_id").unwrap(), 60);
+        assert!(id_to_u64(" 23\t", "order_id").is_err());
+        assert_eq!(id_to_u64(&format_id(100), "order_id").unwrap(), 100);
+        assert_eq!(id_to_u64(&format_id(1 << 40), "order_id").unwrap(), 1 << 40);
+    }
+
+    /// A string public ID is base58 and only base58, read byte by byte as
+    /// the server reads it: a digit-only string is base58 too, so `"123"`
+    /// and `"23"` are 60, and a `0` (outside the alphabet) is refused, never
+    /// read as decimal. Nothing is trimmed: whitespace anywhere is refused,
+    /// naming the field.
+    #[test]
+    fn id_strings_are_base58_only_and_never_trimmed() {
+        for (raw, want) in [("123", 60), ("23", 60), ("2", 1), ("12", 1), ("z", 57)] {
+            assert_eq!(id_to_u64(raw, "order_id").unwrap(), want, "{raw:?}");
+        }
+        // Leading base58 zeros ("1") add nothing, as on the server.
+        assert_eq!(id_to_u64("111111111112", "order_id").unwrap(), 1);
+        assert_eq!(
+            id_to_u64(&format_id(u64::MAX), "order_id").unwrap(),
+            u64::MAX
+        );
+        for raw in [
+            "100", "00023", "0", "10", "1000000", "2O", "2I", "2l", "+2", "-2", "2.0",
+        ] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(err.to_string().contains("order_id"), "{raw:?}: {err}");
+            assert!(err.to_string().contains("base58"), "{raw:?}: {err}");
+        }
+        for raw in [" 23", "23 ", "\t23", "23\n", "2 3", " ", "\r\n23"] {
+            let err = id_to_u64(raw, "trigger_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            let text = err.to_string();
+            assert!(
+                text.contains("trigger_id") && text.contains("whitespace"),
+                "{raw:?}: {text}"
+            );
+            assert!(parse_account_id(raw, "subaccount_id").is_err(), "{raw:?}");
+        }
+        // One past u64::MAX in base58 overflows.
+        let err = id_to_u64("jpXCZedGfVR", "order_id").unwrap_err();
+        assert!(err.to_string().contains("uint64"), "{err}");
+        // The formatter's output always parses back.
+        for id in [23, 60, 100, 1 << 40] {
+            assert_eq!(id_to_u64(&format_id(id), "order_id").unwrap(), id);
+        }
     }
 
     #[test]

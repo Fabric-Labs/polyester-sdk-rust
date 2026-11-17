@@ -3,6 +3,7 @@
 //! No credentials are needed: every call works on a client without an API
 //! key. The API host decides which environment's changelog is returned.
 
+use super::limits::{CHANGELOG_CHANGES_LIMIT_MAX, CHANGELOG_PAGE_LIMIT_MAX, check_limit};
 use super::{ServiceContext, unary};
 use crate::codecs::decode::{
     changelog_changes_page_from_proto, changelog_deployment_group_from_proto,
@@ -102,8 +103,10 @@ impl ChangelogService {
 
     /// One page of post summaries, newest first.
     pub async fn list_posts(&self, opts: ListChangelogPostsOptions) -> Result<ChangelogPostsPage> {
+        let limit = opts.limit.unwrap_or(0);
+        check_limit("changelog.list_posts", limit, CHANGELOG_PAGE_LIMIT_MAX)?;
         let req = ListPostsRequest {
-            limit: opts.limit.unwrap_or(0),
+            limit,
             page_token: opts.page_token.unwrap_or_default(),
             ..Default::default()
         };
@@ -136,8 +139,14 @@ impl ChangelogService {
         &self,
         opts: ListChangelogDeploymentGroupsOptions,
     ) -> Result<ChangelogDeploymentGroupsPage> {
+        let limit = opts.limit.unwrap_or(0);
+        check_limit(
+            "changelog.list_deployment_groups",
+            limit,
+            CHANGELOG_PAGE_LIMIT_MAX,
+        )?;
         let req = ListDeploymentGroupsRequest {
-            limit: opts.limit.unwrap_or(0),
+            limit,
             page_token: opts.page_token.unwrap_or_default(),
             ..Default::default()
         };
@@ -372,6 +381,8 @@ fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChanges
             opts.surfaces.len()
         )));
     }
+    let limit = opts.limit.unwrap_or(0);
+    check_limit("changelog.list_changes", limit, CHANGELOG_CHANGES_LIMIT_MAX)?;
     Ok(ListChangesRequest {
         categories: labels_to_enums::<ChangeCategory>(&opts.categories, "categories")?,
         action_required: opts.action_required,
@@ -381,7 +392,7 @@ fn list_changes_request(opts: ListChangelogChangesOptions) -> Result<ListChanges
         end_time: timestamp_field(opts.end_time),
         post_slug: opts.post_slug.unwrap_or_default(),
         sort: sort_direction(opts.sort.as_deref())?.into(),
-        limit: opts.limit.unwrap_or(0),
+        limit,
         page_token: opts.page_token.unwrap_or_default(),
         ..Default::default()
     })

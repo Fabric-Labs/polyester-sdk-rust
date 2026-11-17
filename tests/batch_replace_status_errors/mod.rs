@@ -5,6 +5,7 @@
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use base64::Engine as _;
 use buffa::Message as _;
+use polyester::codecs::scalars::format_id;
 use polyester::models::SubAccountScope;
 use polyester::proto::orders::v1::{
     BatchReplaceAdmissionStatus, ErrorCode, ErrorDetail, GetBatchReplaceStatusRequest,
@@ -56,7 +57,7 @@ async fn get_batch_replace_status_errors_and_exact_batch_id() {
     let http = MockHttpServer::spawn(move |_| connect_error(503, unavailable.clone())).await;
     let err = api_key_client(&http)
         .orders
-        .get_batch_replace_status("18446744073709551615", SubAccountScope::Default)
+        .get_batch_replace_status(&format_id(u64::MAX), SubAccountScope::Default)
         .await
         .expect_err("unavailable");
     assert!(err.is_retryable(), "{err:?}");
@@ -71,7 +72,7 @@ async fn get_batch_replace_status_errors_and_exact_batch_id() {
     .await;
     let err = api_key_client(&http)
         .orders
-        .get_batch_replace_status("18446744073709551615", SubAccountScope::Default)
+        .get_batch_replace_status(&format_id(u64::MAX), SubAccountScope::Default)
         .await
         .expect_err("not found");
     assert!(
@@ -94,7 +95,7 @@ async fn get_batch_replace_status_errors_and_exact_batch_id() {
     .await;
     let status = api_key_client(&http)
         .orders
-        .get_batch_replace_status("18446744073709551615", SubAccountScope::Default)
+        .get_batch_replace_status(&format_id(u64::MAX), SubAccountScope::Default)
         .await
         .unwrap();
     assert_eq!(*seen.lock().unwrap(), [u64::MAX]);

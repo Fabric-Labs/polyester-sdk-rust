@@ -344,7 +344,7 @@ field of its params:
 
 | `SubAccountScope` | Account the call acts on |
 | --- | --- |
-| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when none is set |
+| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when it is `None`; a set default that is no base58 ID, empty or blank included, is refused with `Error::Validation` |
 | `SubAccountScope::Main` | always the main account, whatever default is set |
 | `SubAccountScope::Id(id)`, or `id.into()` | that sub-account; 0 is refused with `Error::Validation` before sending |
 
@@ -1265,9 +1265,9 @@ state change caused only by time passing does not move `updated_at`.
 `triggers.list_with(ListTriggersOpts)` with `status` filters by lifecycle
 status. `trigger_type: Some(CreateTriggerType::Ladder)` lists only one trigger
 type, and `parent_order_id: Some(order_id)` only the triggers attached to that
-order (base58 or decimal, as order reads spell it; an ID that does not parse
-or names order 0 fails locally with `Error::Validation`). Leave the other
-fields with `..Default::default()`:
+order (base58, as order reads spell it; an ID that is not bare base58, with
+whitespace or a decimal-looking `0`, or that names order 0, fails locally with
+`Error::Validation`). Leave the other fields with `..Default::default()`:
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {

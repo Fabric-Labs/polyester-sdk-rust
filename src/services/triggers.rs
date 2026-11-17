@@ -1,5 +1,6 @@
 use super::ServiceContext;
 use super::correlation_id::require_client_list_id;
+use super::limits::{TRIGGER_LIST_LIMIT_MAX, check_limit};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -343,6 +344,7 @@ impl TriggersService {
     /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
     /// account.
     async fn list_scoped(&self, req: ListTriggersRequest) -> Result<TriggersList> {
+        check_limit("triggers.list", req.limit, TRIGGER_LIST_LIMIT_MAX)?;
         // Triggers are labelled with their symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -659,7 +661,7 @@ impl TriggersService {
                         price,
                         Some(&params.symbol),
                         "activation_price",
-                        true,
+                        false,
                         codes::TRIGGER_ACTIVATION_PRICE_INVALID,
                     )?;
                 }
@@ -786,7 +788,7 @@ impl TriggersService {
                                 price,
                                 Some(&params.symbol),
                                 "limit_price",
-                                true,
+                                false,
                                 codes::BAD_PRICE,
                             )?,
                             ..Default::default()
@@ -815,7 +817,7 @@ impl TriggersService {
                         price,
                         Some(&params.symbol),
                         field,
-                        true,
+                        false,
                         codes::TRIGGER_PRICE_INVALID,
                     )
                 };
@@ -921,7 +923,7 @@ impl TriggersService {
                     price,
                     Some(&params.symbol),
                     "limit_price",
-                    true,
+                    false,
                     codes::BAD_PRICE,
                 )?;
                 match params.time_in_force {
@@ -1033,7 +1035,7 @@ impl TriggersService {
                         price,
                         Some(symbol),
                         &format!("{field} limit_price"),
-                        true,
+                        false,
                         codes::BAD_PRICE,
                     )?,
                     ..Default::default()
@@ -1164,7 +1166,7 @@ impl TriggersService {
                 price,
                 market.as_deref(),
                 "trigger_price",
-                true,
+                false,
                 codes::TRIGGER_PRICE_INVALID,
             )?);
         }
@@ -1595,6 +1597,7 @@ impl TriggersService {
     /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
     /// account.
     async fn list_events_scoped(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
+        check_limit("triggers.list_events", req.limit, TRIGGER_LIST_LIMIT_MAX)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,
@@ -1609,7 +1612,7 @@ impl TriggersService {
     }
 
     /// List a trigger's events by the public trigger ID that create and list
-    /// calls return (base58, or decimal), with the filters of
+    /// calls return (base58), with the filters of
     /// [`ListTriggerEventsOpts`]. The configured default sub-account applies
     /// when `opts.subaccount_id` is `None`. An ID that does not parse, or an
     /// unknown event type, is refused with `Error::Validation` before sending.
@@ -1682,6 +1685,7 @@ impl TriggersService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codecs::scalars::format_id;
     use buffa::Message;
     use serde_json::json;
 
@@ -3204,6 +3208,184 @@ mod tests {
         client.triggers.encode_modify_params(&cleared).unwrap();
     }
 
+    /// Every way of writing a zero price: decimal `"0"` and `"0.00"`, and 0
+    /// ticks.
+    fn zero_prices() -> Vec<(&'static str, crate::Price)> {
+        vec![
+            ("decimal 0", btc_price("0")),
+            ("decimal 0.00", btc_price("0.00")),
+            (
+                "0 ticks",
+                crate::Price::from_ticks(0, Some("BTC-USDT".into())).unwrap(),
+            ),
+        ]
+    }
+
+    /// The contract's trigger, child limit, activation and ladder prices are
+    /// positive (`gt: 0`): a zero one on create is refused before sending
+    /// with the field's server code and a message naming it, in every input
+    /// form. It was encoded as an unset price (a trailing stop with no
+    /// activation, a limit child with no price).
+    #[test]
+    fn create_refuses_a_zero_price_in_every_form() {
+        let client = client();
+        for (form, zero) in zero_prices() {
+            let mut cases: Vec<(&str, CreateTriggerParams, &str, &str)> = Vec::new();
+            for tif in [
+                None,
+                Some(CreateTimeInForce::Gtc),
+                Some(CreateTimeInForce::Ioc),
+                Some(CreateTimeInForce::Fok),
+            ] {
+                let mut p = create_params(
+                    crate::Quantity::from_decimal_str("0.1", 8, Some("BTC-USDT".into()), Some(7))
+                        .unwrap(),
+                    btc_price("49000"),
+                    zero.clone(),
+                );
+                p.time_in_force = tif;
+                cases.push(("stop limit child", p, "ERROR_CODE_BAD_PRICE", "limit_price"));
+            }
+            let mut p = market_stop(CreateSide::Sell);
+            p.trigger_price = Some(zero.clone());
+            cases.push((
+                "stop trigger",
+                p,
+                "ERROR_CODE_TRIGGER_PRICE_INVALID",
+                "trigger_price",
+            ));
+            let mut p = market_stop(CreateSide::Sell);
+            p.trigger_type = CreateTriggerType::TakeProfit;
+            p.trigger_price = Some(zero.clone());
+            cases.push((
+                "take-profit trigger",
+                p,
+                "ERROR_CODE_TRIGGER_PRICE_INVALID",
+                "trigger_price",
+            ));
+            let mut p = twap_create(CreateOrderType::Limit);
+            p.limit_price = Some(zero.clone());
+            cases.push(("twap limit", p, "ERROR_CODE_BAD_PRICE", "limit_price"));
+            let mut p = trailing_create(None);
+            p.activation_price = Some(zero.clone());
+            cases.push((
+                "trailing activation",
+                p,
+                "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID",
+                "activation_price",
+            ));
+            let mut p = trailing_create(None);
+            p.side = CreateSide::Buy;
+            p.limit_price = Some(zero.clone());
+            cases.push((
+                "buy trailing maximum",
+                p,
+                "ERROR_CODE_BAD_PRICE",
+                "limit_price",
+            ));
+            let mut p = ladder_create();
+            p.ladder_price_min = Some(zero.clone());
+            cases.push((
+                "ladder min",
+                p,
+                "ERROR_CODE_TRIGGER_PRICE_INVALID",
+                "ladder_price_min",
+            ));
+            let mut p = ladder_create();
+            p.ladder_price_max = Some(zero.clone());
+            cases.push((
+                "ladder max",
+                p,
+                "ERROR_CODE_TRIGGER_PRICE_INVALID",
+                "ladder_price_max",
+            ));
+            for (label, params, code, field) in cases {
+                expect_refusal(&client, &params, code, field, &format!("{label} {form}"));
+            }
+
+            for (leg, mut p) in [("take_profit", sell_oco()), ("stop_loss", sell_oco())] {
+                if leg == "take_profit" {
+                    p.take_profit.limit_price = Some(zero.clone());
+                } else {
+                    p.stop_loss = OcoLegParams::limit(btc_price("49000"), zero.clone());
+                }
+                match client.triggers.encode_create_oco_params(&p) {
+                    Err(Error::Api { code, message, .. }) => {
+                        assert_eq!(code, "ERROR_CODE_BAD_PRICE", "{leg} {form}: {message}");
+                        assert!(
+                            message.contains(&format!("{leg} limit_price must be positive")),
+                            "{leg} {form}: {message}"
+                        );
+                    }
+                    other => panic!("OCO {leg} limit {form}: expected a refusal, got {other:?}"),
+                }
+            }
+        }
+        // A positive price still encodes.
+        let mut p = trailing_create(None);
+        p.activation_price = Some(btc_price("50000"));
+        let wire = client.triggers.encode_create_params(&p).unwrap();
+        match wire.trigger.as_option().unwrap().strategy.as_ref() {
+            Some(trigger_intent::Strategy::TrailingStop(t)) => {
+                assert_eq!(t.activation_price_ticks, 50_000_000_000_000)
+            }
+            other => panic!("expected a trailing stop, got {other:?}"),
+        }
+    }
+
+    /// A modify's trigger price is positive (`gt: 0`) and its trailing
+    /// distance in ticks too, as at create; its activation price takes 0,
+    /// which clears it.
+    #[test]
+    fn modify_refuses_a_zero_trigger_price_and_distance_but_clears_activation_with_zero() {
+        let client = client();
+        for (form, zero) in zero_prices() {
+            let params = ModifyTriggerParams {
+                trigger_price: Some(zero.clone()),
+                ..modify_params(None, None)
+            };
+            match client.triggers.encode_modify_params(&params) {
+                Err(Error::Api { code, message, .. }) => {
+                    assert_eq!(code, "ERROR_CODE_TRIGGER_PRICE_INVALID", "{form}");
+                    assert!(message.contains("trigger_price"), "{form}: {message}");
+                }
+                other => panic!("modify trigger_price {form}: expected a refusal, got {other:?}"),
+            }
+            let cleared = client
+                .triggers
+                .encode_modify_params(&modify_params(None, Some(zero.clone())))
+                .unwrap_or_else(|err| panic!("activation {form}: {err}"));
+            assert_eq!(cleared.activation_price_ticks, Some(0), "{form}");
+        }
+        for ticks in [0, -5, i64::MIN] {
+            let params = ModifyTriggerParams {
+                trailing_distance_ticks: Some(ticks),
+                ..modify_params(None, None)
+            };
+            match client.triggers.encode_modify_params(&params) {
+                Err(Error::Api { code, .. }) => {
+                    assert_eq!(code, "ERROR_CODE_TRAILING_DISTANCE_INVALID", "{ticks}")
+                }
+                other => {
+                    panic!("trailing_distance_ticks {ticks}: expected a refusal, got {other:?}")
+                }
+            }
+        }
+        let sent = client
+            .triggers
+            .encode_modify_params(&ModifyTriggerParams {
+                trailing_distance_ticks: Some(1),
+                trigger_price: Some(btc_price("48000")),
+                ..modify_params(None, None)
+            })
+            .unwrap();
+        assert_eq!(
+            sent.trailing_distance,
+            Some(modify_trigger_request::TrailingDistance::TrailingDistanceTicks(1))
+        );
+        assert_eq!(sent.trigger_price_ticks, Some(48_000_000_000_000));
+    }
+
     /// Ladder levels the contract refuses (outside 2..=100) are refused
     /// before sending.
     #[test]
@@ -3714,7 +3896,7 @@ mod tests {
         let wire = client
             .triggers
             .encode_batch_cancel(
-                &[base58.clone(), "40".into()],
+                &[base58.clone(), format_id(40)],
                 SubAccountScope::Id(5),
                 Some(" retry-1 ".into()),
             )
@@ -3725,7 +3907,7 @@ mod tests {
 
         let generated = client
             .triggers
-            .encode_batch_cancel(&["43".into()], SubAccountScope::Default, None)
+            .encode_batch_cancel(&[format_id(43)], SubAccountScope::Default, None)
             .unwrap();
         assert!(
             generated.request_id.starts_with("batch-cancel-triggers-"),
@@ -3734,7 +3916,7 @@ mod tests {
         );
         assert_eq!(generated.subaccount_id, None);
 
-        let fifty: Vec<String> = (1..=50).map(|n| (n * 1000).to_string()).collect();
+        let fifty: Vec<String> = (1..=50).map(|n| format_id(n * 1000)).collect();
         assert_eq!(
             client
                 .triggers
@@ -3762,17 +3944,26 @@ mod tests {
             assert!(err.to_string().contains(want), "{want}: {err}");
         };
         refused(Vec::new(), None, "at least one trigger_id");
-        let fifty_one: Vec<String> = (1..=51).map(|n| (n * 1000).to_string()).collect();
+        let fifty_one: Vec<String> = (1..=51).map(|n| format_id(n * 1000)).collect();
         refused(fifty_one, None, "at most 50 trigger_ids; received 51");
-        // The same trigger, once in base58 and once in decimal (a `0` keeps
-        // a decimal ID from reading as base58).
+        // The same trigger written twice: a leading `1` is a base58 zero.
         let base58 = bs58::encode(40_u64.to_be_bytes()).into_string();
-        refused(vec![base58, "40".into()], None, "duplicate trigger_id");
-        refused(vec!["0".into()], None, "non-zero ID");
-        refused(vec!["not an id".into()], None, "trigger_id");
-        refused(vec!["42".into()], Some("has space"), "request_id");
         refused(
-            vec!["42".into()],
+            vec![base58, format!("1{}", format_id(40))],
+            None,
+            "duplicate trigger_id",
+        );
+        refused(vec!["1".into()], None, "non-zero ID");
+        // A decimal-looking ID is not base58.
+        refused(
+            vec!["40".into(), "0".into()],
+            None,
+            "trigger_id must be a base58 ID",
+        );
+        refused(vec!["not an id".into()], None, "trigger_id");
+        refused(vec![format_id(42)], Some("has space"), "request_id");
+        refused(
+            vec![format_id(42)],
             Some("r".repeat(65).as_str()),
             "request_id",
         );
