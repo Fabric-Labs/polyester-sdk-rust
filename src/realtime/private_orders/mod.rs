@@ -19,16 +19,14 @@ use crate::proto::privatews::v1::{
 };
 use crate::services::scale_order;
 use buffa::{Enumeration, Message as _};
-use futures_util::{Sink, SinkExt, Stream, StreamExt};
+use futures_util::{SinkExt, StreamExt};
 use rand_core::{OsRng, RngCore};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 use tokio::time::{Duration, Instant};
 use tokio_tungstenite::tungstenite::{
-    self, Message,
+    Message,
     client::IntoClientRequest,
     http::{HeaderValue, header::SEC_WEBSOCKET_PROTOCOL},
     protocol::{CloseFrame, WebSocketConfig, frame::coding::CloseCode},
@@ -54,18 +52,7 @@ const TERMINAL_CLOSE_CODES: [u16; 2] = [4400, 4403];
 const HEARTBEAT_CLOSE_CODE: u16 = 4000;
 const ABNORMAL_CLOSE_CODE: u16 = 1006;
 
-type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
-pub(crate) type WsSink = Pin<Box<dyn Sink<Message, Error = tungstenite::Error> + Send>>;
-pub(crate) type WsStream =
-    Pin<Box<dyn Stream<Item = std::result::Result<Message, tungstenite::Error>> + Send>>;
-
-/// Tokens and sockets for the stream: the live API in production, a local
-/// fake server in tests.
-pub(crate) trait Transport: Send + Sync + 'static {
-    fn connect_token(&self) -> BoxFuture<Result<String>>;
-    fn subscribe_token(&self, channel: String) -> BoxFuture<Result<String>>;
-    fn open(&self) -> BoxFuture<Result<(WsSink, WsStream)>>;
-}
+use super::{BoxFuture, Transport, WsSink, WsStream};
 
 /// The private WebSocket of an API host, authenticated with signed realtime tokens.
 pub(crate) struct LiveTransport {

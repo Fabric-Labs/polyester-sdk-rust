@@ -14,9 +14,12 @@ use crate::proto::privatews::v1::{
     SnapshotPage, SubscribeExpiring, SubscribeRefreshed, Subscribed, TokenExpiring, Unavailable,
     UnavailableReason, Unit, UnitEvent, order_event, resync_required, server_message::Frame,
 };
+use futures_util::Sink;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::io::DuplexStream;
 use tokio_tungstenite::WebSocketStream;
+use tokio_tungstenite::tungstenite;
 
 const ACCOUNT: u64 = 42;
 const WAIT: Duration = Duration::from_secs(60);
