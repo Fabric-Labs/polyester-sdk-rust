@@ -373,6 +373,23 @@ async fn page_sizes_the_contract_refuses_are_never_sent() {
     );
 }
 
+/// A heatmap's `limit` is a plain `uint32` the contract takes from 1 to
+/// 20000: 0 is on the wire as 0 and refused there, so it is refused before
+/// anything is sent.
+#[tokio::test]
+async fn a_zero_heatmap_limit_is_never_sent() {
+    let (c, http, _) = server().await;
+    assert_refused(
+        "heatmap.get",
+        c.heatmap.get("BTC-USDT", "1s", 50, 0, "close").await,
+    );
+    assert_eq!(
+        http.requests.load(Ordering::SeqCst),
+        0,
+        "a refused page size must send nothing"
+    );
+}
+
 /// 1 and the contract maximum are sent unchanged; an unset page size is left
 /// out (the order reads) or sent as 0 (the plain `uint32` limits), and the
 /// server applies its default.
