@@ -9,7 +9,7 @@ use super::hardening_support::{GET_ORDER_PATH, HttpScript, MockHttpServer};
 use buffa::Message as _;
 use polyester::models::{GetOrderResult, OrderKey};
 use polyester::proto::orders::v1::{
-    GetOrderRequest, GetOrderResponse, Order, OrderStatus, UserTrade,
+    GetOrderRequest, GetOrderResponse, Order, OrderStatus, OrderTransfer, UserTrade,
 };
 use polyester::{Client, Config, Error};
 use std::sync::{Arc, Mutex};
@@ -24,6 +24,8 @@ const TIMEOUT_MESSAGE: &str = "timed out waiting for order trades";
 #[derive(Clone, Debug, Default)]
 struct Page {
     trades: Vec<i64>,
+    /// The page's settlement legs by `tx_id`, each one a leg of match 77.
+    transfers: Vec<&'static str>,
     next: String,
     complete: bool,
     delay: Duration,
@@ -120,6 +122,19 @@ impl TradesServer {
                         order_id: 1,
                         match_id: (1000 * index + i + 1) as u64,
                         qty_scaled: *qty,
+                        ..Default::default()
+                    })
+                    .collect(),
+                transfers: page
+                    .transfers
+                    .iter()
+                    .enumerate()
+                    .map(|(i, tx_id)| OrderTransfer {
+                        match_id: 77,
+                        symbol_id: 1,
+                        asset_id: i as u32 + 1,
+                        is_debit: i % 2 == 1,
+                        tx_id: (*tx_id).into(),
                         ..Default::default()
                     })
                     .collect(),
@@ -311,6 +326,72 @@ async fn l2_wait_follows_fast_pages() {
         .await
         .expect("wait");
     assert_eq!(trade_qtys(&result), vec![10, 20, 30, 40]);
+}
+
+fn transfer_tx_ids(result: &GetOrderResult) -> Vec<&str> {
+    result
+        .transfers
+        .iter()
+        .map(|leg| leg.tx_id.as_str())
+        .collect()
+}
+
+fn legs(trades: &[i64], transfers: &[&'static str], next: &str, complete: bool) -> Page {
+    Page {
+        transfers: transfers.to_vec(),
+        ..page(trades, next, complete)
+    }
+}
+
+/// The contract repeats a match's settlement legs on every execution page
+/// that holds one of its fills: a leg whose `tx_id` an earlier page carried is
+/// the same leg, kept once where it first appeared. Legs within one page, legs
+/// with distinct `tx_id`s and legs without one are all kept.
+#[tokio::test]
+async fn l2_wait_keeps_each_settlement_leg_once_across_pages() {
+    let cases: Vec<(&str, Vec<Page>, Vec<&str>)> = vec![
+        (
+            "one match on two pages",
+            vec![
+                legs(&[60], &["tx-77-base", "tx-77-quote"], "t1", true),
+                legs(&[40], &["tx-77-base", "tx-77-quote"], "", true),
+            ],
+            vec!["tx-77-base", "tx-77-quote"],
+        ),
+        (
+            "distinct legs on each page",
+            vec![
+                legs(&[60], &["tx-1-base", "tx-1-quote"], "t1", true),
+                legs(&[40], &["tx-2-base", "tx-2-quote"], "", true),
+            ],
+            vec!["tx-1-base", "tx-1-quote", "tx-2-base", "tx-2-quote"],
+        ),
+        (
+            "a repeat after a new leg keeps the first position",
+            vec![
+                legs(&[50], &["tx-a"], "t1", true),
+                legs(&[30], &["tx-b", "tx-a"], "t2", true),
+                legs(&[20], &["tx-a", "tx-b", "tx-c"], "", true),
+            ],
+            vec!["tx-a", "tx-b", "tx-c"],
+        ),
+        (
+            "legs without a tx_id are never merged",
+            vec![
+                legs(&[60], &["", "tx-x"], "t1", true),
+                legs(&[40], &["", "tx-x"], "", true),
+            ],
+            vec!["", "tx-x", ""],
+        ),
+    ];
+    for (name, pages, want) in cases {
+        let server = TradesServer::spawn(100, vec![pages]).await;
+        let result = wait_trades(&server.client(), Duration::from_secs(2))
+            .await
+            .unwrap_or_else(|err| panic!("{name}: {err}"));
+        assert_eq!(transfer_tx_ids(&result), want, "{name}");
+        assert_eq!(trade_qtys(&result).iter().sum::<i64>(), 100, "{name}");
+    }
 }
 
 /// Four 35 ms pages need about 140 ms; a 50 ms wait must time out.

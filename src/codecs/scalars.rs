@@ -585,6 +585,37 @@ mod tests {
         );
     }
 
+    /// Public IDs are ASCII: decimal digits or the base58 alphabet. A digit
+    /// of another script, or any other non-ASCII character, is refused, never
+    /// read as the ASCII ID it looks like; Unicode spaces are refused, not
+    /// trimmed. ASCII whitespace around an ID is still trimmed.
+    #[test]
+    fn id_to_u64_refuses_non_ascii_input() {
+        for raw in [
+            "\u{0662}\u{0663}", // Arabic-Indic 23
+            "\u{FF12}\u{FF13}", // full-width 23
+            "\u{0E52}\u{0E53}", // Thai 23
+            "\u{0665}",         // Arabic-Indic 5
+            "\u{FF15}",         // full-width 5
+            "2\u{0663}",
+            "\u{00A0}23", // no-break space
+            "23\u{3000}", // ideographic space
+            "\u{2003}23\u{2003}",
+            "\u{FEFF}23", // byte order mark
+            "2\u{200B}3", // zero-width space
+            "\u{0410}B",  // Cyrillic A
+        ] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(err.to_string().contains("order_id"), "{raw:?}: {err}");
+            assert!(parse_account_id(raw, "sub_account_id").is_err(), "{raw:?}");
+        }
+        assert_eq!(id_to_u64("23", "order_id").unwrap(), 60);
+        assert_eq!(id_to_u64(" 23\t", "order_id").unwrap(), 60);
+        assert_eq!(id_to_u64("100", "order_id").unwrap(), 100);
+        assert_eq!(id_to_u64(&format_id(1 << 40), "order_id").unwrap(), 1 << 40);
+    }
+
     #[test]
     fn id_to_u64_rejects_invalid() {
         assert!(id_to_u64("", "id").is_err());

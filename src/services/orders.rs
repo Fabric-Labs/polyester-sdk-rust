@@ -2472,6 +2472,128 @@ mod tests {
         }
     }
 
+    /// A limit order's price and an attached leg's trigger, child limit and
+    /// activation prices are positive (`gt: 0`, and an activation price is
+    /// no price at 0): a zero one on create is refused before sending in
+    /// every input form, naming the price, rather than encoded as an empty
+    /// price or no activation.
+    #[test]
+    fn create_refuses_a_zero_price_in_every_form() {
+        use crate::models::{AttachedRisk, RiskLeg, TrailingDistance, TrailingStop};
+
+        let client = client();
+        let qty = || {
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap()
+        };
+        let btc = |ticks: i64| Price::from_ticks(ticks, Some("BTC-USDT".into())).unwrap();
+        let zeros = [
+            (
+                "decimal 0",
+                Price::from_decimal_str("0", Some("BTC-USDT".into())).unwrap(),
+            ),
+            (
+                "decimal 0.00",
+                Price::from_decimal_str("0.00", Some("BTC-USDT".into())).unwrap(),
+            ),
+            ("0 ticks", btc(0)),
+        ];
+        let leg = |trigger: Price, order_type, limit: Option<Price>| RiskLeg {
+            trigger_price: Some(trigger),
+            trigger_price_source: None,
+            order_type: Some(order_type),
+            limit_price: limit,
+            state: None,
+        };
+        for (form, zero) in zeros {
+            let mut cases: Vec<(&str, CreateOrderParams, &str)> = Vec::new();
+            for tif in [
+                None,
+                Some(CreateTimeInForce::Gtc),
+                Some(CreateTimeInForce::Ioc),
+                Some(CreateTimeInForce::Fok),
+            ] {
+                let mut p = create_params(qty(), zero.clone());
+                p.post_only = None;
+                p.time_in_force = tif;
+                cases.push(("limit price", p, "price must be positive"));
+            }
+            let risk = |risk: AttachedRisk| {
+                let mut p = create_params(qty(), btc(50_000_000_000_000));
+                p.attached_risk = Some(risk);
+                p
+            };
+            cases.push((
+                "take_profit trigger",
+                risk(AttachedRisk {
+                    take_profit: Some(leg(zero.clone(), CreateOrderType::Market, None)),
+                    ..Default::default()
+                }),
+                "take_profit trigger_price must be positive",
+            ));
+            cases.push((
+                "stop_loss trigger",
+                risk(AttachedRisk {
+                    stop_loss: Some(leg(zero.clone(), CreateOrderType::Market, None)),
+                    ..Default::default()
+                }),
+                "stop_loss trigger_price must be positive",
+            ));
+            cases.push((
+                "take_profit child limit",
+                risk(AttachedRisk {
+                    take_profit: Some(leg(
+                        btc(51_000_000_000_000),
+                        CreateOrderType::Limit,
+                        Some(zero.clone()),
+                    )),
+                    ..Default::default()
+                }),
+                "take_profit limit_price must be positive",
+            ));
+            cases.push((
+                "stop_loss child limit",
+                risk(AttachedRisk {
+                    stop_loss: Some(leg(
+                        btc(49_000_000_000_000),
+                        CreateOrderType::Limit,
+                        Some(zero.clone()),
+                    )),
+                    ..Default::default()
+                }),
+                "stop_loss limit_price must be positive",
+            ));
+            cases.push((
+                "trailing activation",
+                risk(AttachedRisk {
+                    trailing_stop: Some(
+                        TrailingStop::new(TrailingDistance::Bps(100))
+                            .with_activation_price(zero.clone()),
+                    ),
+                    ..Default::default()
+                }),
+                "trailing_stop activation_price must be positive",
+            ));
+            for (label, params, want) in cases {
+                let err = client
+                    .orders
+                    .encode_create_params(&params)
+                    .expect_err(&format!("{label} {form}"));
+                assert!(
+                    matches!(err, Error::Validation(_)),
+                    "{label} {form}: {err:?}"
+                );
+                assert!(err.to_string().contains(want), "{label} {form}: {err}");
+            }
+        }
+    }
+
     #[test]
     fn attached_risk_encodes_on_create_and_modify() {
         use crate::models::{AttachedRisk, RiskLeg, TriggerPriceSourceKind};

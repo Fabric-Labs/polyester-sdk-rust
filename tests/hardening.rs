@@ -28,6 +28,8 @@ mod contract_74af7f3;
 mod contract_e339360;
 #[path = "contract_ebbbeac/mod.rs"]
 mod contract_ebbbeac;
+#[path = "contract_page_limits/mod.rs"]
+mod contract_page_limits;
 #[path = "error_chain_redaction/mod.rs"]
 mod error_chain_redaction;
 mod hardening_support;
