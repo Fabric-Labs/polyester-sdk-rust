@@ -625,6 +625,49 @@ mod tests {
         assert_eq!(id_to_u64(&format_id(1 << 40), "order_id").unwrap(), 1 << 40);
     }
 
+    /// A string public ID is base58 and only base58, read byte by byte as
+    /// the server reads it: a digit-only string is base58 too, so `"123"`
+    /// and `"23"` are 60, and a `0` (outside the alphabet) is refused, never
+    /// read as decimal. Nothing is trimmed: whitespace anywhere is refused,
+    /// naming the field.
+    #[test]
+    fn id_strings_are_base58_only_and_never_trimmed() {
+        for (raw, want) in [("123", 60), ("23", 60), ("2", 1), ("12", 1), ("z", 57)] {
+            assert_eq!(id_to_u64(raw, "order_id").unwrap(), want, "{raw:?}");
+        }
+        // Leading base58 zeros ("1") add nothing, as on the server.
+        assert_eq!(id_to_u64("111111111112", "order_id").unwrap(), 1);
+        assert_eq!(
+            id_to_u64(&format_id(u64::MAX), "order_id").unwrap(),
+            u64::MAX
+        );
+        for raw in [
+            "100", "00023", "0", "10", "1000000", "2O", "2I", "2l", "+2", "-2", "2.0",
+        ] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            assert!(err.to_string().contains("order_id"), "{raw:?}: {err}");
+            assert!(err.to_string().contains("base58"), "{raw:?}: {err}");
+        }
+        for raw in [" 23", "23 ", "\t23", "23\n", "2 3", " ", "\r\n23"] {
+            let err = id_to_u64(raw, "trigger_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            let text = err.to_string();
+            assert!(
+                text.contains("trigger_id") && text.contains("whitespace"),
+                "{raw:?}: {text}"
+            );
+            assert!(parse_account_id(raw, "subaccount_id").is_err(), "{raw:?}");
+        }
+        // One past u64::MAX in base58 overflows.
+        let err = id_to_u64("jpXCZedGfVR", "order_id").unwrap_err();
+        assert!(err.to_string().contains("uint64"), "{err}");
+        // The formatter's output always parses back.
+        for id in [23, 60, 100, 1 << 40] {
+            assert_eq!(id_to_u64(&format_id(id), "order_id").unwrap(), id);
+        }
+    }
+
     #[test]
     fn id_to_u64_rejects_invalid() {
         assert!(id_to_u64("", "id").is_err());

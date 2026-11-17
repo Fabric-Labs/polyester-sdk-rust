@@ -61,6 +61,8 @@ mod orderbook_depths;
 mod orderbook_symbol_id_only;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
+#[path = "public_id_strings/mod.rs"]
+mod public_id_strings;
 #[path = "public_reads_keyless/mod.rs"]
 mod public_reads_keyless;
 #[path = "read_model_retention/mod.rs"]
