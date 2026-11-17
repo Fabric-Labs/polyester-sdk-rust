@@ -1,4 +1,5 @@
 use super::ServiceContext;
+use super::limits::{LIST_TRANSFERS_LIMIT_MAX, check_limit};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -81,6 +82,11 @@ impl BalancesService {
         &self,
         mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> Result<TransfersList> {
+        check_limit(
+            "balances.list_transfers",
+            req.limit,
+            LIST_TRANSFERS_LIMIT_MAX,
+        )?;
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(

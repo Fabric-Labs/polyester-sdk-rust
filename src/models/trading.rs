@@ -1003,6 +1003,8 @@ pub struct DeadManSwitchScope {
 pub struct ListOpenOrdersOpts {
     pub subaccount_id: SubAccountScope,
     pub page_token: Option<String>,
+    /// Page size, 1 to 1000; `None` uses the server default of 100. `Some(0)`
+    /// is refused.
     pub limit: Option<u32>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
@@ -1017,6 +1019,8 @@ pub struct ListOrderHistoryOpts {
     pub symbol: Option<String>,
     pub symbol_id: Option<u32>,
     pub page_token: Option<String>,
+    /// Page size, 1 to 1000; `None` uses the server default of 100. `Some(0)`
+    /// is refused.
     pub limit: Option<u32>,
     pub include_attached_risk: bool,
     pub include_attached_risk_state: bool,
@@ -1047,6 +1051,8 @@ pub struct ListUserTradesOpts {
     pub lineage_id: Option<String>,
     pub through_generation: Option<u32>,
     pub include_transfers: bool,
+    /// Page size, 1 to 1000; `None` uses the server default of 100. `Some(0)`
+    /// is refused.
     pub limit: Option<u32>,
     pub page_token: Option<String>,
     /// Inclusive start of the time range, in nanoseconds since the Unix epoch
@@ -1068,6 +1074,8 @@ pub struct GetOrderOpts {
     pub include_attached_risk_state: bool,
     /// `None` omits the field so the server default (enabled) applies.
     pub include_execution_history: Option<bool>,
+    /// Executions per page, 1 to 1000; `None` uses the server default of
+    /// 100. `Some(0)` is refused.
     pub limit: Option<u32>,
     pub page_token: Option<String>,
 }

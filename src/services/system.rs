@@ -2,6 +2,7 @@
 //! public, no credentials, never signed.
 
 use super::changelog::{filter_labels_to_enums, paginate};
+use super::limits::{STATUS_EVENTS_LIMIT_MAX, check_limit};
 use super::unary;
 use crate::codecs::decode::{server_version_from_proto, status_events_page_from_proto};
 use crate::connect::system::v1::SystemServiceClient;
@@ -45,6 +46,8 @@ pub(crate) async fn get_version(factory: &Factory) -> Result<ServerVersion> {
 }
 
 fn list_status_events_request(opts: ListStatusEventsOptions) -> Result<ListStatusEventsRequest> {
+    let limit = opts.limit.unwrap_or(0);
+    check_limit("list_status_events", limit, STATUS_EVENTS_LIMIT_MAX)?;
     Ok(ListStatusEventsRequest {
         states: filter_labels_to_enums::<StatusEventState>(
             "list_status_events",
@@ -56,7 +59,7 @@ fn list_status_events_request(opts: ListStatusEventsOptions) -> Result<ListStatu
             &opts.kinds,
             "kinds",
         )?,
-        limit: opts.limit.unwrap_or(0),
+        limit,
         page_token: opts.page_token.unwrap_or_default(),
         ..Default::default()
     })

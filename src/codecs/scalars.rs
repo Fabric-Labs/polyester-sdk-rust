@@ -325,7 +325,7 @@ fn base58_to_u64(value: &str, label: &str) -> Result<u64> {
 }
 
 /// Parse a public id that may be base58 or decimal, refusing one that decodes
-/// to 0.
+/// to 0 and one with a non-ASCII character.
 ///
 /// On the wire 0 is unset and names nothing, so `"1"` (`format_id(0)`), `"0"`
 /// or `"00"` would send a request for an ID the caller did not mean.
@@ -344,6 +344,15 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
 }
 
 fn parse_id(value: &str, label: &str) -> Result<u64> {
+    // A public ID is ASCII: decimal digits or the base58 alphabet. Any other
+    // character, a digit of another script or a Unicode space among them, is
+    // refused before trimming, so it is never read as the ASCII ID it looks
+    // like. Only ASCII whitespace around the ID is trimmed.
+    if !value.is_ascii() {
+        return Err(Error::validation(format!(
+            "{label} must be ASCII base58 or decimal uint64"
+        )));
+    }
     let value = value.trim();
     if value.is_empty() {
         return Err(Error::validation(format!(

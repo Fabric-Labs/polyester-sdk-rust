@@ -1,4 +1,7 @@
 use super::ServiceContext;
+use super::limits::{
+    CANDLES_LIMIT_MAX, MARKET_OVERVIEW_LIMIT_MAX, MARKET_TRADES_LIMIT_MAX, check_limit,
+};
 use super::unary;
 use crate::codecs::decode::{
     asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
@@ -174,6 +177,8 @@ impl MarketDataService {
     }
 
     pub async fn get_trades_with(&self, opts: GetTradesOpts) -> Result<MarketTradesResult> {
+        let limit = opts.limit.unwrap_or(0);
+        check_limit("get_trades", limit, MARKET_TRADES_LIMIT_MAX)?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let symbol_id =
@@ -189,7 +194,7 @@ impl MarketDataService {
         }
         let req = GetTradesRequest {
             symbol_id,
-            limit: opts.limit.unwrap_or(0),
+            limit,
             start_time: Self::timestamp_field(opts.start),
             end_time: Self::timestamp_field(opts.end),
             page_token,
@@ -222,6 +227,7 @@ impl MarketDataService {
     }
 
     pub async fn get_candles_with(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
+        check_limit("get_candles", opts.limit.unwrap_or(0), CANDLES_LIMIT_MAX)?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (req, volume_scale) = self.build_candles_request(&opts)?;
@@ -258,6 +264,11 @@ impl MarketDataService {
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
+        check_limit(
+            "get_candles_columns",
+            opts.limit.unwrap_or(0),
+            CANDLES_LIMIT_MAX,
+        )?;
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (base, volume_scale) = self.build_candles_request(&opts)?;
@@ -526,6 +537,11 @@ impl MarketOverviewService {
         opts: impl Into<ListMarketOverviewOptions>,
     ) -> Result<MarketOverviewList> {
         let opts = opts.into();
+        check_limit(
+            "market_overview.list",
+            opts.limit.unwrap_or_default(),
+            MARKET_OVERVIEW_LIMIT_MAX,
+        )?;
         self.ctx.wait_for_catalogs().await?;
         let req = ListMarketOverviewRequest {
             symbol_id: self

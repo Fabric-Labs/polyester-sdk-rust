@@ -147,6 +147,7 @@ impl HeatmapService {
         use buffa_types::google::protobuf::Timestamp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
+        super::limits::check_limit("heatmap.get", limit, super::limits::HEATMAP_LIMIT_MAX)?;
         self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
@@ -671,6 +672,11 @@ impl SubAccountsService {
         mut req: crate::proto::auth::v1::ListSubaccountEventsRequest,
     ) -> crate::errors::Result<crate::models::SubAccountActivityList> {
         use crate::codecs::decode::subaccount_activity_list_from_proto;
+        super::limits::check_limit(
+            "sub_accounts.list_activity",
+            req.limit,
+            super::limits::SUBACCOUNT_EVENTS_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = crate::connect::auth::v1::SubaccountViewServiceClient::new(
             self.ctx.factory.transport(),
@@ -755,6 +761,11 @@ impl AddressBookService {
         mut req: crate::proto::auth::v1::ListAddressBookEntriesRequest,
     ) -> crate::errors::Result<crate::models::AddressBookEntriesList> {
         use crate::codecs::decode::list_entries_from_proto;
+        super::limits::check_limit(
+            "address_book.list_entries",
+            req.limit,
+            super::limits::ADDRESS_BOOK_PAGE_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -776,6 +787,11 @@ impl AddressBookService {
         mut req: crate::proto::auth::v1::ListTransferCounterpartiesRequest,
     ) -> crate::errors::Result<crate::models::TransferCounterpartiesList> {
         use crate::codecs::decode::list_counterparties_from_proto;
+        super::limits::check_limit(
+            "address_book.list_transfer_counterparties",
+            req.limit,
+            super::limits::ADDRESS_BOOK_RECENT_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -797,6 +813,11 @@ impl AddressBookService {
         mut req: crate::proto::auth::v1::ListTransferDestinationsRequest,
     ) -> crate::errors::Result<crate::models::AddressBookTransferDestinationsList> {
         use crate::codecs::decode::list_destinations_from_proto;
+        super::limits::check_limit(
+            "address_book.list_transfer_destinations",
+            req.limit,
+            super::limits::ADDRESS_BOOK_PAGE_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -818,6 +839,11 @@ impl AddressBookService {
         mut req: crate::proto::auth::v1::ListInternalTransferWhitelistEntriesRequest,
     ) -> crate::errors::Result<crate::models::InternalTransferWhitelistEntriesList> {
         use crate::codecs::decode::list_internal_whitelist_from_proto;
+        super::limits::check_limit(
+            "address_book.list_internal_transfer_whitelist_entries",
+            req.limit,
+            super::limits::ADDRESS_BOOK_PAGE_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -865,6 +891,11 @@ impl AddressBookService {
         mut req: crate::proto::auth::v1::GetAddressBookViewRequest,
     ) -> crate::errors::Result<crate::models::AddressBookView> {
         use crate::codecs::decode::address_book_view_from_proto;
+        super::limits::check_limit(
+            "address_book.get_view",
+            req.limit,
+            super::limits::ADDRESS_BOOK_RECENT_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -1065,6 +1096,11 @@ impl TransfersService {
         mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
     ) -> crate::errors::Result<crate::models::TransfersList> {
         use crate::codecs::decode::transfers_list_from_proto;
+        super::limits::check_limit(
+            "transfers.list",
+            req.limit,
+            super::limits::LIST_TRANSFERS_LIMIT_MAX,
+        )?;
         req.subaccount_id = super::scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -1203,6 +1239,11 @@ impl LifecycleService {
         req: crate::proto::chain::lifecycle::v1::ListFlowsRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flows_list_from_proto;
+        super::limits::check_limit(
+            "lifecycle.list_flows",
+            req.limit,
+            super::limits::LIST_FLOWS_LIMIT_MAX,
+        )?;
         let client = self.connect_client();
         // "/chain.lifecycle.v1.LifecycleReadService/ListFlows"
         let resp = super::unary::await_public(client.list_flows(req))
@@ -1329,6 +1370,11 @@ impl LifecycleService {
         mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flows_by_tx_list_from_proto;
+        super::limits::check_limit(
+            "lifecycle.list_flows_by_tx",
+            req.limit,
+            super::limits::LIST_FLOWS_LIMIT_MAX,
+        )?;
         if req.limit == 0 {
             req.limit = 50;
         }
@@ -1350,6 +1396,11 @@ impl LifecycleService {
         mut req: crate::proto::chain::lifecycle::v1::ListFlowsByTxRequest,
     ) -> crate::errors::Result<crate::models::LifecycleFlowsList> {
         use crate::codecs::decode::flow_from_get_by_tx_response;
+        super::limits::check_limit(
+            "lifecycle.get_flow_by_tx",
+            req.limit,
+            super::limits::LIST_FLOWS_LIMIT_MAX,
+        )?;
         if req.limit == 0 {
             req.limit = 50;
         }

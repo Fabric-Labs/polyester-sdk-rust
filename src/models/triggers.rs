@@ -301,7 +301,7 @@ pub struct ListTriggersOpts {
     pub symbol_id: Option<u32>,
     /// Status filter labels (`created`, `armed`, …). Unknown values are rejected.
     pub status: Vec<String>,
-    /// Omitted or `Some(0)` uses the server default.
+    /// Omitted or `Some(0)` uses the server default; at most 1000.
     pub limit: Option<u32>,
     pub page_token: Option<String>,
     pub subaccount_id: SubAccountScope,
@@ -335,7 +335,7 @@ pub struct ListTriggersOpts {
 pub struct ListTriggerEventsOpts {
     /// The sub-account the trigger belongs to (see [`crate::models::SubAccountScope`]).
     pub subaccount_id: SubAccountScope,
-    /// Omitted or `Some(0)` uses the server default.
+    /// Omitted or `Some(0)` uses the server default; at most 1000.
     pub limit: Option<u32>,
     /// Only events of this type: `fired`, `canceled`, `updated`, `failed`,
     /// `activated`, `armed` or `fire_refused`. Another label is refused with

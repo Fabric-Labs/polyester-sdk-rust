@@ -1,5 +1,6 @@
 use super::ServiceContext;
 use super::correlation_id::require_client_list_id;
+use super::limits::{TRIGGER_LIST_LIMIT_MAX, check_limit};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -343,6 +344,7 @@ impl TriggersService {
     /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
     /// account.
     async fn list_scoped(&self, req: ListTriggersRequest) -> Result<TriggersList> {
+        check_limit("triggers.list", req.limit, TRIGGER_LIST_LIMIT_MAX)?;
         // Triggers are labelled with their symbol from the catalogs.
         self.ctx.settle_catalogs().await;
         let client = self.client();
@@ -659,7 +661,7 @@ impl TriggersService {
                         price,
                         Some(&params.symbol),
                         "activation_price",
-                        true,
+                        false,
                         codes::TRIGGER_ACTIVATION_PRICE_INVALID,
                     )?;
                 }
@@ -786,7 +788,7 @@ impl TriggersService {
                                 price,
                                 Some(&params.symbol),
                                 "limit_price",
-                                true,
+                                false,
                                 codes::BAD_PRICE,
                             )?,
                             ..Default::default()
@@ -815,7 +817,7 @@ impl TriggersService {
                         price,
                         Some(&params.symbol),
                         field,
-                        true,
+                        false,
                         codes::TRIGGER_PRICE_INVALID,
                     )
                 };
@@ -921,7 +923,7 @@ impl TriggersService {
                     price,
                     Some(&params.symbol),
                     "limit_price",
-                    true,
+                    false,
                     codes::BAD_PRICE,
                 )?;
                 match params.time_in_force {
@@ -1033,7 +1035,7 @@ impl TriggersService {
                         price,
                         Some(symbol),
                         &format!("{field} limit_price"),
-                        true,
+                        false,
                         codes::BAD_PRICE,
                     )?,
                     ..Default::default()
@@ -1164,7 +1166,7 @@ impl TriggersService {
                 price,
                 market.as_deref(),
                 "trigger_price",
-                true,
+                false,
                 codes::TRIGGER_PRICE_INVALID,
             )?);
         }
@@ -1595,6 +1597,7 @@ impl TriggersService {
     /// it from a [`SubAccountScope`] first, so [`SubAccountScope::Main`] stays the main
     /// account.
     async fn list_events_scoped(&self, req: ListTriggerEventsRequest) -> Result<TriggerEventsList> {
+        check_limit("triggers.list_events", req.limit, TRIGGER_LIST_LIMIT_MAX)?;
         let client = self.client();
         let resp = unary::await_auth_retrying_unavailable(
             &self.ctx.factory,

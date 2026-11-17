@@ -53,19 +53,6 @@ use tokio::sync::OnceCell;
 
 use crate::realtime::Client as RealtimeClient;
 
-/// Reject an explicit zero on optional ListOpen-style limits (`Option` wire
-/// fields where omission means server default and `Some(0)` is invalid).
-///
-/// Plain `u32` / zero-means-default endpoints should pass `0` through instead.
-fn positive_limit(limit: Option<u32>, endpoint: &str) -> Result<Option<u32>> {
-    match limit {
-        Some(0) => Err(Error::validation(format!(
-            "{endpoint} limit must be positive when explicitly supplied"
-        ))),
-        other => Ok(other),
-    }
-}
-
 /// Shared dependencies for service constructors.
 #[derive(Clone)]
 pub struct ServiceContext {
@@ -150,22 +137,5 @@ impl ServiceContext {
                 "catalogs are not ready; await client.wait_for_catalogs() before placing orders",
             ))
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn positive_limits_preserve_omission_and_reject_explicit_zero() {
-        assert_eq!(positive_limit(None, "list_open_orders").unwrap(), None);
-        assert_eq!(
-            positive_limit(Some(1), "list_open_orders").unwrap(),
-            Some(1)
-        );
-        let err = positive_limit(Some(0), "list_open_orders").unwrap_err();
-        assert!(matches!(err, Error::Validation(_)));
-        assert!(err.to_string().contains("positive"));
     }
 }
