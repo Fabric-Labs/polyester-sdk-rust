@@ -198,6 +198,7 @@ pub enum RejectCode {
     PEG_REFERENCE_UNAVAILABLE = 0x139_u16,
     INVALID_PEG = 0x13a_u16,
     TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE = 0x13b_u16,
+    CLIENT_LIST_ID_INVALID = 0x13e_u16,
     #[default]
     NullVal = 0xffff_u16,
 }
@@ -402,6 +403,7 @@ impl From<u16> for RejectCode {
             0x139_u16 => Self::PEG_REFERENCE_UNAVAILABLE,
             0x13a_u16 => Self::INVALID_PEG,
             0x13b_u16 => Self::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
+            0x13e_u16 => Self::CLIENT_LIST_ID_INVALID,
             _ => Self::NullVal,
         }
     }
@@ -607,6 +609,7 @@ impl From<RejectCode> for u16 {
             RejectCode::PEG_REFERENCE_UNAVAILABLE => 0x139_u16,
             RejectCode::INVALID_PEG => 0x13a_u16,
             RejectCode::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE => 0x13b_u16,
+            RejectCode::CLIENT_LIST_ID_INVALID => 0x13e_u16,
             RejectCode::NullVal => 0xffff_u16,
         }
     }
@@ -822,6 +825,7 @@ impl core::str::FromStr for RejectCode {
             "TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE" => {
                 Ok(Self::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE)
             }
+            "CLIENT_LIST_ID_INVALID" => Ok(Self::CLIENT_LIST_ID_INVALID),
             _ => Ok(Self::NullVal),
         }
     }
@@ -1051,6 +1055,7 @@ impl core::fmt::Display for RejectCode {
             Self::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE => {
                 write!(f, "TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE")
             }
+            Self::CLIENT_LIST_ID_INVALID => write!(f, "CLIENT_LIST_ID_INVALID"),
             Self::NullVal => write!(f, "NullVal"),
         }
     }
