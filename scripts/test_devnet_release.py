@@ -586,6 +586,18 @@ class ReleaseTest(unittest.TestCase):
         self.assertEqual([w[2] for w in gh.writes].count("create"), 1)
         self.assertFalse(any("--cleanup-tag" in w for w in gh.writes))
 
+    def test_version_in_the_registry_without_its_release_gets_one(self) -> None:
+        # A publish whose release step failed: the registry has the version,
+        # GitHub has no pre-release of the target. The next run creates it.
+        for ecosystem in dr.ECOSYSTEMS:
+            with self.subTest(ecosystem=ecosystem):
+                p = snapshot(ecosystem, "0.33.0", "20261116231807")
+                gh = FakeGh([{"tagName": "v0.32.0", "name": "v0.32.0"}])
+                dr.sync_release(ecosystem, p, self.notes, {"v0.32.0"}, gh, dry_run=False)
+                (create,) = gh.calls
+                self.assertEqual(create[:4], ["gh", "release", "create", p.tag])
+                self.assertEqual(create[create.index("--title") + 1], p.title)
+
     def test_dry_run_only_lists(self) -> None:
         gh = FakeGh([{"tagName": "v0.35.0-devnet", "name": "v0.35.0-devnet.20261117080000"}])
         log = dr.sync_release(
@@ -598,6 +610,92 @@ class ReleaseTest(unittest.TestCase):
         )
         self.assertEqual(gh.calls, [])
         self.assertTrue(any(line.startswith("would run: gh release create") for line in log))
+
+
+# --------------------------------------------------------------------------- registry
+
+# `cargo add --dry-run polyester-sdk` on a runner that exports
+# CARGO_TERM_COLOR=always (dtolnay/rust-toolchain does), byte for byte.
+CARGO_ADD_COLORED = (
+    "\x1b[1m\x1b[32m    Updating\x1b[0m crates.io index\n"
+    "\x1b[1m\x1b[32m      Adding\x1b[0m polyester-sdk v0.32.0 to dependencies\n"
+    "             Features:\n"
+    "             \x1b[1m\x1b[31m-\x1b[0m chain\n"
+    "             \x1b[1m\x1b[31m-\x1b[0m realtime\n"
+    "\x1b[1m\x1b[33mwarning\x1b[0m\x1b[1m:\x1b[0m aborting add due to dry run\n"
+)
+CARGO_ADD_PLAIN = (
+    "    Updating crates.io index\n"
+    "      Adding polyester-sdk v0.32.0 to dependencies\n"
+    "             Features:\n"
+    "             - chain\n"
+    "             - realtime\n"
+    "warning: aborting add due to dry run\n"
+)
+
+
+class FakeTools:
+    """subprocess.run for devnet_release: records each call, answers like cargo."""
+
+    def __init__(self, cargo_add_stderr: str) -> None:
+        self.cargo_add_stderr = cargo_add_stderr
+        self.calls: list[tuple[list[str], dict[str, str]]] = []
+
+    def __call__(self, args: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        env = kwargs.get("env")
+        self.calls.append((list(args), dict(os.environ if env is None else env)))  # type: ignore[arg-type]
+        stderr = self.cargo_add_stderr if list(args[:2]) == ["cargo", "add"] else ""
+        return subprocess.CompletedProcess(list(args), 0, "", stderr)
+
+
+class RegistryOutputTest(unittest.TestCase):
+    def test_cargo_add_version_from_plain_and_colored_output(self) -> None:
+        for output in (CARGO_ADD_PLAIN, CARGO_ADD_COLORED):
+            with self.subTest(colored="\x1b" in output):
+                self.assertEqual(dr.cargo_added_version("polyester-sdk", output), "0.32.0")
+
+    def test_cargo_add_without_the_crate_is_an_error(self) -> None:
+        with self.assertRaisesRegex(dr.ReleaseError, "no version") as caught:
+            dr.cargo_added_version("polyester-sdk", "\x1b[1m\x1b[31merror\x1b[0m: no network\n")
+        self.assertNotIn("\x1b", str(caught.exception))
+
+    def test_strip_ansi(self) -> None:
+        self.assertEqual(dr.strip_ansi(CARGO_ADD_COLORED), CARGO_ADD_PLAIN)
+        link = "\x1b]8;;https://example.com/\x1b\\docs\x1b]8;;\x1b\\ and \x1b[38;5;208mmore\x1b[m"
+        self.assertEqual(dr.strip_ansi(link), "docs and more")
+
+    def test_every_tool_runs_with_color_off(self) -> None:
+        loud = {"CARGO_TERM_COLOR": "always", "FORCE_COLOR": "1", "PATH": os.environ["PATH"]}
+        for env in (None, {"GOPROXY": "direct", "CARGO_TERM_COLOR": "always"}):
+            with self.subTest(caller_env=env), mock.patch.dict(os.environ, loud, clear=True):
+                fake = FakeTools("")
+                with mock.patch.object(dr.subprocess, "run", fake):
+                    dr.run(["go", "list", "-m", "-json", "example.com/m@latest"], env=env)
+                ((_, used),) = fake.calls
+                self.assertEqual(used["CARGO_TERM_COLOR"], "never")
+                self.assertEqual(used["NO_COLOR"], "1")
+                self.assertEqual(used["PIP_NO_COLOR"], "1")
+                self.assertNotIn("FORCE_COLOR", used)
+                if env is not None:
+                    self.assertEqual(used["GOPROXY"], "direct")
+
+    def test_rust_default_resolution_on_a_color_forcing_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Cargo.toml").write_text(
+                '[package]\nname = "polyester-sdk"\nversion = "0.32.0"\n', encoding="utf-8"
+            )
+            for stderr in (CARGO_ADD_COLORED, CARGO_ADD_PLAIN):
+                with (
+                    self.subTest(colored="\x1b" in stderr),
+                    mock.patch.dict(os.environ, {"CARGO_TERM_COLOR": "always"}),
+                ):
+                    fake = FakeTools(stderr)
+                    with mock.patch.object(dr.subprocess, "run", fake):
+                        self.assertEqual(dr.default_resolution(root, "rust"), "0.32.0")
+                    add = next(args for args, _ in fake.calls if args[:2] == ["cargo", "add"])
+                    self.assertIn("--color", add)
+                    self.assertEqual(add[add.index("--color") + 1], "never")
 
 
 # --------------------------------------------------------------------------- workflow

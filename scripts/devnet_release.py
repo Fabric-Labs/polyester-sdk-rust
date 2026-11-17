@@ -74,6 +74,14 @@ RELEASE_TAG = {
 USER_AGENT = "polyester-sdk-release-check"
 GO_MODULE_LINE = re.compile(r"^module\s+(\S+)\s*$", re.MULTILINE)
 
+# The checks parse what cargo, pip and go print, so every tool runs with color
+# off whatever the runner exports (dtolnay/rust-toolchain sets
+# CARGO_TERM_COLOR=always), and parsed text has escape sequences stripped.
+NO_COLOR_ENV = {"NO_COLOR": "1", "CARGO_TERM_COLOR": "never", "PIP_NO_COLOR": "1"}
+FORCE_COLOR_ENV = ("FORCE_COLOR", "CLICOLOR_FORCE")
+# CSI sequences (colors, cursor) and OSC sequences (hyperlinks).
+ANSI_ESCAPE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\))")
+
 
 class ReleaseError(Exception):
     """A release step cannot continue; the message says why."""
@@ -384,7 +392,11 @@ def run(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(list(args), cwd=cwd, env=env, capture_output=True, text=True)
+    quiet = dict(os.environ if env is None else env)
+    for key in FORCE_COLOR_ENV:
+        quiet.pop(key, None)
+    quiet.update(NO_COLOR_ENV)
+    result = subprocess.run(list(args), cwd=cwd, env=quiet, capture_output=True, text=True)
     if result.returncode != 0:
         raise ReleaseError(
             f"{' '.join(args)} failed ({result.returncode}):\n{result.stdout}{result.stderr}"
@@ -625,6 +637,19 @@ def is_prerelease(version: str) -> bool:
     return bool(re.search(r"(-|\.dev|a\d|b\d|rc\d)", version))
 
 
+def strip_ansi(text: str) -> str:
+    return ANSI_ESCAPE.sub("", text)
+
+
+def cargo_added_version(name: str, output: str) -> str:
+    """The version ``cargo add --dry-run <name>`` picked, from what it printed."""
+    text = strip_ansi(output)
+    match = re.search(rf"(?m)^\s*Adding\s+{re.escape(name)}\s+v(\S+)", text)
+    if not match:
+        raise ReleaseError(f"cargo add printed no version for {name}:\n{text}")
+    return match[1]
+
+
 def default_resolution(root: Path, ecosystem: str) -> str:
     """The version a plain install picks from the public registry today."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -653,11 +678,8 @@ def default_resolution(root: Path, ecosystem: str) -> str:
         if ecosystem == "rust":
             name = crate_name(root)
             run(["cargo", "new", "--lib", "--quiet", "--name", "probe", str(home / "probe")])
-            added = run(["cargo", "add", "--dry-run", name], cwd=home / "probe")
-            match = re.search(rf"Adding {re.escape(name)} v(\S+)", added.stderr + added.stdout)
-            if not match:
-                raise ReleaseError(f"cargo add printed no version:\n{added.stderr}")
-            return match[1]
+            added = run(["cargo", "add", "--dry-run", "--color", "never", name], cwd=home / "probe")
+            return cargo_added_version(name, added.stderr + added.stdout)
         env = go_env(home, {"GOPROXY": "https://proxy.golang.org"})
         return go_query(home, env, f"{go_module(root)}@latest")
 
