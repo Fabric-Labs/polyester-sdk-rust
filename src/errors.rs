@@ -1308,6 +1308,9 @@ impl Error {
             | Self::ApiKeyRejected { answer, .. }
             | Self::SessionRequired { answer, .. }
             | Self::Realtime { answer, .. } => answer.as_deref(),
+            Self::TradeSession(crate::tradews::TradeError::Upgrade { answer, .. }) => {
+                answer.as_deref()
+            }
             _ => None,
         }
     }
@@ -1323,6 +1326,9 @@ impl Error {
                 retry_after: Some(seconds),
                 ..
             } => Some(*seconds),
+            Self::TradeSession(crate::tradews::TradeError::Upgrade { answer, .. }) => {
+                answer.as_deref().and_then(|answer| answer.retry_after)
+            }
             Self::TradeSession(trade) => trade.retry_after().map(|d| d.as_secs_f64()),
             _ => self.answer().and_then(|answer| answer.retry_after),
         }

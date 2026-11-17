@@ -582,7 +582,21 @@ impl Shared {
         )
         .await
         .map_err(|_| Error::realtime("market stream connect timed out"))?
-        .map_err(|e| Error::realtime(format!("market stream connect: {e}")))?;
+        .map_err(|e| match e {
+            // A refused upgrade's answer: its status and the delay it asks
+            // for, which the next connection waits at least.
+            tokio_tungstenite::tungstenite::Error::Http(response) => Error::Realtime {
+                message: format!(
+                    "market stream connect: the upgrade was refused (HTTP {})",
+                    response.status().as_u16()
+                ),
+                answer: Some(Box::new(crate::errors::answer_from_headers(
+                    response.status().as_u16(),
+                    response.headers(),
+                ))),
+            },
+            other => Error::realtime(format!("market stream connect: {other}")),
+        })?;
         Ok(ws)
     }
 
@@ -989,7 +1003,7 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
         }
         let mut err = err;
         let next = loop {
-            let delay = backoff.next_delay();
+            let delay = crate::realtime::reconnect_wait(backoff.next_delay(), &err);
             if !shared.emit(Event::Disconnected { error: err, delay }) {
                 return finish(&shared);
             }

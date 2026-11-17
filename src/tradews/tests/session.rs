@@ -50,6 +50,8 @@ struct Script {
     echo_cod: bool,
     /// Refuse the upgrade with this status and body.
     refuse: Option<(u16, &'static str)>,
+    /// The refusal's Retry-After header.
+    refuse_retry_after: Option<&'static str>,
     /// Refuse every command with this code instead of acknowledging it.
     reject: Option<reject_code::RejectCode>,
     /// Frames sent right after the SubscriptionAck.
@@ -76,6 +78,7 @@ fn serve() -> Script {
         close_after: None,
         echo_cod: true,
         refuse: None,
+        refuse_retry_after: None,
         reject: None,
         after_ready: Vec::new(),
         close_on: None,
@@ -92,6 +95,8 @@ struct Seen {
     headers: Vec<(String, String)>,
     path: String,
     frames: Vec<(u16, u64, u64)>,
+    /// When the upgrade request arrived.
+    at: Option<std::time::Instant>,
 }
 
 type Record = Arc<Mutex<Vec<Seen>>>;
@@ -299,6 +304,7 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
             let callback = move |request: &Request, mut response: Response| {
                 let mut c = capture.lock().unwrap();
                 c.path = request.uri().path().to_string();
+                c.at = Some(std::time::Instant::now());
                 c.headers = request
                     .headers()
                     .iter()
@@ -307,6 +313,11 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                 if let Some((status, body)) = plan.refuse {
                     let mut refusal = ErrorResponse::new(Some(body.to_string()));
                     *refusal.status_mut() = StatusCode::from_u16(status).unwrap();
+                    if let Some(retry_after) = plan.refuse_retry_after {
+                        refusal
+                            .headers_mut()
+                            .insert("retry-after", HeaderValue::from_static(retry_after));
+                    }
                     return Err(refusal);
                 }
                 if plan.echo_cod
@@ -596,7 +607,7 @@ async fn a_refused_upgrade_reports_its_status_and_code() {
     .await;
     let err = connect(config(url)).await.err().expect("refused");
     match &err {
-        Error::TradeSession(TradeError::Upgrade { status, code }) => {
+        Error::TradeSession(TradeError::Upgrade { status, code, .. }) => {
             assert_eq!(
                 (*status, code.as_str()),
                 (504, "ORDER_CANCEL_OUTCOME_UNKNOWN")
@@ -1575,5 +1586,67 @@ async fn queued_commands_at_close_are_refused_or_unknown_never_written_after() {
     assert!(
         closed.iter().all(|i| !written.contains(i)),
         "a command refused as closed reached the server"
+    );
+}
+
+/// The first connection is lost after the timer's answer; the next upgrade
+/// is refused with 503 and `retry_after`. Returns the refusal's error and
+/// wait.
+async fn refused_after_loss(retry_after: &'static str) -> (Record, TradeSession, Error, Duration) {
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let refused = Script {
+        refuse: Some((503, "UNAVAILABLE")),
+        refuse_retry_after: Some(retry_after),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![close_after_arm, refused, serve()]).await;
+    let mut session = start(url).await;
+    ready_on(&mut session, 1).await;
+    arm(&session).await;
+    let (lost, _) = disconnected(&mut session).await;
+    assert!(!lost.is_empty());
+    let (error, delay) = wait(&mut session, |e| match e {
+        Event::Disconnected { error, delay, .. } => Some((error.clone(), *delay)),
+        _ => None,
+    })
+    .await;
+    (record, session, error, delay)
+}
+
+#[tokio::test]
+async fn a_503_upgrade_waits_its_retry_after_of_30_seconds() {
+    let (record, session, error, delay) = refused_after_loss("30").await;
+    let answer = error.answer().expect("the refusal's answer");
+    assert_eq!((answer.status, answer.retry_after), (503, Some(30.0)));
+    assert_eq!(error.retry_after(), Some(30.0));
+    assert!(matches!(
+        error,
+        Error::TradeSession(TradeError::Upgrade { status: 503, .. })
+    ));
+    // Never shortened: not to the backoff, nor to its 30-second ceiling.
+    assert_eq!(delay, Duration::from_secs(30));
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    assert_eq!(
+        record.lock().unwrap().len(),
+        2,
+        "no upgrade within a second of a 30-second Retry-After"
+    );
+    session.close();
+}
+
+#[tokio::test]
+async fn a_503_upgrade_waits_its_retry_after_of_400_milliseconds() {
+    let (record, mut session, error, delay) = refused_after_loss("0.4").await;
+    assert_eq!(error.retry_after(), Some(0.4));
+    assert!(delay >= Duration::from_millis(400), "{delay:?}");
+    ready_on(&mut session, 2).await;
+    let all = record.lock().unwrap().clone();
+    let gap = all[2].at.unwrap() - all[1].at.unwrap();
+    assert!(
+        gap >= Duration::from_millis(400),
+        "reconnected {gap:?} after a 0.4 s Retry-After"
     );
 }

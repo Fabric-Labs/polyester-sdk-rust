@@ -865,10 +865,15 @@ fn upgrade_error(e: tungstenite::Error) -> Error {
                 .as_deref()
                 .map(body_code)
                 .unwrap_or_default();
+            let answer = crate::errors::answer_from_headers(status, response.headers());
             if status == 401 || status == 403 {
-                return crate::errors::gateway_rejection_error(status, &code);
+                return crate::errors::gateway_rejection_error(status, &code).with_answer(answer);
             }
-            Error::TradeSession(TradeError::Upgrade { status, code })
+            Error::TradeSession(TradeError::Upgrade {
+                status,
+                code,
+                answer: Some(Box::new(answer)),
+            })
         }
         other => Error::realtime(format!("tradews connect: {other}")),
     }
@@ -1113,7 +1118,7 @@ async fn run(
             backoff.reset();
         }
         ws = loop {
-            let delay = backoff.next_delay();
+            let delay = crate::realtime::reconnect_wait(backoff.next_delay(), &error);
             let event = Event::Disconnected {
                 connection,
                 error,
