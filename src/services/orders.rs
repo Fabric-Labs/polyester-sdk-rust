@@ -194,10 +194,12 @@ impl OrdersService {
     }
 
     pub async fn list_open_with(&self, opts: ListOpenOrdersOpts) -> Result<OrdersList> {
-        let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.is_empty() => Some(id_to_u64(raw, "trigger_id")?),
-            _ => None,
-        };
+        // Only None means no trigger filter: a supplied ID is parsed.
+        let trigger_id = opts
+            .trigger_id
+            .as_deref()
+            .map(|raw| id_to_u64(raw, "trigger_id"))
+            .transpose()?;
         let limit = check_optional_limit("list_open_orders", opts.limit, ORDER_READ_LIMIT_MAX)?;
         let req = GetOpenOrdersRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
@@ -276,10 +278,12 @@ impl OrdersService {
                 })?;
             symbol_ids.push(resolved);
         }
-        let trigger_id = match opts.trigger_id.as_deref() {
-            Some(raw) if !raw.is_empty() => Some(id_to_u64(raw, "trigger_id")?),
-            _ => None,
-        };
+        // Only None means no trigger filter: a supplied ID is parsed.
+        let trigger_id = opts
+            .trigger_id
+            .as_deref()
+            .map(|raw| id_to_u64(raw, "trigger_id"))
+            .transpose()?;
         let req = GetOrderHistoryRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             symbol_id: symbol_ids,

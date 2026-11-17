@@ -34,7 +34,7 @@ const GET_FLOW: &str = "/chain.lifecycle.v1.LifecycleReadService/GetFlowById";
 const LIST_FLOWS_BY_TX: &str = "/chain.lifecycle.v1.LifecycleReadService/ListFlowsByTx";
 const LIST_ACCOUNT_FLOWS: &str = "/chain.lifecycle.v1.LifecycleReadService/ListAccountFlows";
 const GET_ACCOUNT_FLOW: &str = "/chain.lifecycle.v1.LifecycleReadService/GetAccountFlow";
-const FLOW_ID: &str = "flow_keyless";
+const FLOW_ID: &str = "flow_keyfree";
 const TX_HASH: &str = "0xabc";
 
 /// One request the fake server received: its path and whether it carried any

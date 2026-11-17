@@ -27,16 +27,12 @@ pub fn resolve_subaccount(
         SubAccountScope::Main => Ok(None),
         SubAccountScope::Id(id) => explicit_subaccount(id).map(Some),
         SubAccountScope::Default => {
+            // Only an unset default means none: a configured one, even empty
+            // or blank, is parsed and refused when it is no base58 ID. One
+            // that decodes to 0, such as "1", is refused like an explicit 0.
             let Some(s) = ctx.default_sub_account_id.as_deref() else {
                 return Ok(None);
             };
-            if s.is_empty() {
-                return Ok(None);
-            }
-            // Configured defaults use the same canonical public base58
-            // representation returned by subaccount APIs. Digit-only base58
-            // IDs are valid and must not be interpreted as decimal first. One
-            // that decodes to 0, such as "1", is refused like an explicit 0.
             Ok(Some(parse_account_id(s, "subaccount_id")?))
         }
     }
@@ -70,16 +66,16 @@ pub fn plain_subaccount(ctx: &ServiceContext, id: u64) -> Result<u64> {
 pub fn require_account_id(ctx: &ServiceContext) -> Result<String> {
     ctx.default_account_id
         .clone()
-        .filter(|s| !s.is_empty())
         .ok_or_else(|| Error::validation("default_account_id is required for this call"))
 }
 
-/// Resolve the account ID from `explicit`, or else the configured default.
-/// One that decodes to 0, such as `"1"`, or that is not bare base58 (a
-/// decimal-looking `"0"`, or whitespace, which is not trimmed) is refused: it
-/// would name the channel of account 0, or of no account.
+/// Resolve the account ID from `explicit`, or else, only when it is `None`,
+/// the configured default. One that decodes to 0, such as `"1"`, or that is
+/// not bare base58 (empty, blank, a decimal-looking `"0"`, or with
+/// whitespace, which is not trimmed) is refused: it would name the channel of
+/// account 0, or of no account.
 pub fn resolve_account_id(ctx: &ServiceContext, explicit: Option<&str>) -> Result<String> {
-    let account = match explicit.filter(|s| !s.is_empty()) {
+    let account = match explicit {
         Some(value) => value.to_owned(),
         None => require_account_id(ctx)?,
     };

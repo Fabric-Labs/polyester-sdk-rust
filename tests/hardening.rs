@@ -3209,7 +3209,7 @@ async fn l2_lifecycle_get_rejects_missing_required_flow_through_public_service()
 
     let err = client
         .lifecycle
-        .get_flow("flow-1")
+        .get_flow("flow_1")
         .await
         .expect_err("service must reject a missing required flow");
     assert!(err.to_string().contains("missing flow"), "{err}");
@@ -11097,7 +11097,7 @@ async fn zero_default_subaccount_is_refused_before_sending() {
 
 #[tokio::test]
 async fn omitted_and_non_zero_default_subaccounts_still_send() {
-    for default in [None, Some(""), Some("j")] {
+    for default in [None, Some("j")] {
         let (client, server) = zero_id_client(default, None).await;
         let result = client.orders.list_open(SubAccountScope::Default).await;
         assert!(
@@ -11106,6 +11106,11 @@ async fn omitted_and_non_zero_default_subaccounts_still_send() {
         );
         assert_eq!(server.requests.load(Ordering::SeqCst), 1, "{default:?}");
     }
+    // Only an unset default is none: an empty one is refused, not omitted.
+    let (client, server) = zero_id_client(Some(""), None).await;
+    let result = client.orders.list_open(SubAccountScope::Default).await;
+    assert!(matches!(result, Err(Error::Validation(_))), "{result:?}");
+    assert_eq!(server.requests.load(Ordering::SeqCst), 0);
 }
 
 macro_rules! zero_account_subscribes {

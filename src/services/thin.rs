@@ -272,14 +272,10 @@ impl InternalTransfersService {
             CreateInternalTransferRequest, create_internal_transfer_request::Destination,
         };
 
-        let has_account = params
-            .destination_account_id
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty());
-        let has_sub = params
-            .destination_subaccount_id
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty());
+        // A supplied account or sub-account ID is that destination, even an
+        // empty or blank one, which is then refused as no ID.
+        let has_account = params.destination_account_id.is_some();
+        let has_sub = params.destination_subaccount_id.is_some();
         let has_smart = params
             .destination_smart_account_address
             .as_ref()
@@ -408,12 +404,14 @@ impl InternalTransfersService {
                     "{OP} legs[{index}].asset_id is required"
                 )));
             }
-            let present =
+            // A supplied account or sub-account ID is that destination, even
+            // an empty or blank one, which is then refused as no ID.
+            let present_address =
                 |value: &Option<String>| value.as_ref().is_some_and(|s| !s.trim().is_empty());
             let destination = match (
-                present(&leg.destination_account_id),
-                present(&leg.destination_subaccount_id),
-                present(&leg.destination_smart_account_address),
+                leg.destination_account_id.is_some(),
+                leg.destination_subaccount_id.is_some(),
+                present_address(&leg.destination_smart_account_address),
             ) {
                 (true, false, false) => Destination::DestinationAccountId(parse_account_id(
                     leg.destination_account_id.as_deref().unwrap_or_default(),
@@ -1226,6 +1224,23 @@ impl ChainAnalyticsService {
     }
 }
 
+/// Refuse a flow ID that breaks the contract's rule on `flow_id`: 6 to 64
+/// characters, `flow_` and then base58 (`^flow_[1-9A-HJ-NP-Za-km-z]+$`). An
+/// empty, blank or padded one is refused, never trimmed.
+fn check_flow_id(operation: &str, flow_id: &str) -> crate::errors::Result<()> {
+    const BASE58: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    let valid = (6..=64).contains(&flow_id.len())
+        && flow_id
+            .strip_prefix("flow_")
+            .is_some_and(|tail| tail.bytes().all(|b| BASE58.contains(&b)));
+    if !valid {
+        return Err(crate::errors::Error::validation(format!(
+            "{operation} flow_id must be `flow_` and base58, 6 to 64 characters"
+        )));
+    }
+    Ok(())
+}
+
 impl LifecycleService {
     /// List lifecycle flows a chain transaction started (those with a
     /// `source_tx_hash`); a flow settled without one, such as a transfer
@@ -1267,11 +1282,8 @@ impl LifecycleService {
         flow_id: &str,
     ) -> crate::errors::Result<crate::models::LifecycleFlowSummary> {
         use crate::codecs::decode::flow_from_get_response;
-        use crate::errors::Error;
         use crate::proto::chain::lifecycle::v1::GetFlowByIdRequest;
-        if flow_id.trim().is_empty() {
-            return Err(Error::validation("flow_id or intent_id is required"));
-        }
+        check_flow_id("get_flow", flow_id)?;
         let req = GetFlowByIdRequest {
             flow_id: flow_id.to_owned(),
             ..Default::default()
@@ -1345,11 +1357,8 @@ impl LifecycleService {
         subaccount_id: SubAccountScope,
     ) -> crate::errors::Result<crate::models::LifecycleFlowSummary> {
         use crate::codecs::decode::account_flow_from_get_response;
-        use crate::errors::Error;
         use crate::proto::chain::lifecycle::v1::GetAccountFlowRequest;
-        if flow_id.trim().is_empty() {
-            return Err(Error::validation("get_account_flow flow_id is required"));
-        }
+        check_flow_id("get_account_flow", flow_id)?;
         let req = GetAccountFlowRequest {
             subaccount_id: super::scope::resolve_subaccount(&self.ctx, subaccount_id)?,
             flow_id: flow_id.to_owned(),
@@ -1419,15 +1428,16 @@ impl LifecycleService {
 
     /// Subscribe to open lifecycle flow summaries.
     ///
-    /// When `account_id` is `Some`, uses the private account channel; otherwise
-    /// the public open-flows channel (Go `SubscribeOpenFlows` parity).
+    /// When `account_id` is `Some`, uses that account's private channel, and
+    /// an ID that is not one (empty or blank included) is refused; only `None`
+    /// subscribes to the public open-flows channel.
     pub async fn subscribe_open_flows(
         &self,
         account_id: Option<&str>,
     ) -> crate::errors::Result<
         crate::realtime::TypedSubscription<crate::models::LifecycleFlowSummary>,
     > {
-        if let Some(account) = account_id.filter(|s| !s.trim().is_empty()) {
+        if let Some(account) = account_id {
             let account = super::scope::resolve_account_id(&self.ctx, Some(account))?;
             let channel = format!("private:chain:lifecycle:flows:{account}:proto");
             self.ctx
@@ -1452,6 +1462,7 @@ impl LifecycleService {
     ) -> crate::errors::Result<
         crate::realtime::TypedSubscription<crate::models::LifecycleFlowSummary>,
     > {
+        check_flow_id("subscribe_flow_detail", flow_id)?;
         let channel = format!("public:chain:lifecycle:flow:{flow_id}:proto");
         self.ctx
             .realtime

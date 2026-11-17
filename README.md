@@ -344,7 +344,7 @@ field of its params:
 
 | `SubAccountScope` | Account the call acts on |
 | --- | --- |
-| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when none is set |
+| `SubAccountScope::Default` (also `SubAccountScope::default()`) | `Config::default_sub_account_id`, or the main account when it is `None`; a set default that is no base58 ID, empty or blank included, is refused with `Error::Validation` |
 | `SubAccountScope::Main` | always the main account, whatever default is set |
 | `SubAccountScope::Id(id)`, or `id.into()` | that sub-account; 0 is refused with `Error::Validation` before sending |
 
