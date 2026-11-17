@@ -7,4 +7,5 @@ mod frames;
 mod golden;
 mod interleave;
 mod pin;
+mod reconnect_limit;
 mod units;

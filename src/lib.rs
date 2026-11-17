@@ -55,6 +55,9 @@ pub mod marketoverview;
 pub mod marketstream;
 pub mod models;
 pub mod orderbook;
+pub mod reconnect;
+#[cfg(test)]
+mod reconnect_test_server;
 #[cfg(test)]
 mod reply_id_inventory_tests;
 #[cfg(test)]
@@ -83,6 +86,7 @@ pub use errors::{
     AnswerMeta, CatalogLoadFailure, Error, Result, SubscriptionEndReason, auth_codes, order_codes,
     problem_codes,
 };
+pub use reconnect::ReconnectLimiter;
 pub use services::{
     PreparedTradingWithdraw, new_trading_withdraw_idempotency_key, new_trading_withdraw_nonce,
 };

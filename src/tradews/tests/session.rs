@@ -135,7 +135,7 @@ fn now_ns() -> u64 {
         .as_nanos() as u64
 }
 
-fn subscription_ack(seq: u64) -> Vec<u8> {
+pub(super) fn subscription_ack(seq: u64) -> Vec<u8> {
     let mut buf = vec![0u8; HEADER + subscription_ack_codec::SBE_BLOCK_LENGTH as usize];
     let mut e = subscription_ack_codec::SubscriptionAckEncoder::default()
         .wrap(WriteBuf::new(&mut buf), HEADER)
@@ -147,7 +147,7 @@ fn subscription_ack(seq: u64) -> Vec<u8> {
     buf
 }
 
-fn pong(seq: u64) -> Vec<u8> {
+pub(super) fn pong(seq: u64) -> Vec<u8> {
     let mut buf = vec![0u8; HEADER + pong_codec::SBE_BLOCK_LENGTH as usize + 4];
     let mut e = pong_codec::PongEncoder::default()
         .wrap(WriteBuf::new(&mut buf), HEADER)
@@ -451,7 +451,7 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
     (url, record)
 }
 
-fn credentials() -> Credentials {
+pub(super) fn credentials() -> Credentials {
     Credentials::new("42", SEED_HEX).unwrap()
 }
 

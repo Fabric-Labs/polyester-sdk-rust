@@ -27,6 +27,7 @@ use super::{
 };
 use crate::errors::{Error, Result};
 use crate::realtime::{ReconnectBackoff, lock_unpoisoned, read_unpoisoned, write_unpoisoned};
+use crate::reconnect::{ReconnectLimiter, upgrade_slot};
 use crate::types::{Price, Quantity, QuantityDomain};
 
 type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
@@ -137,7 +138,16 @@ pub struct Config {
     pub pong_timeout: Duration,
     /// Permit a `ws://` URL on a host that is not loopback.
     pub allow_insecure_http: bool,
+    /// Shares a cap on concurrent upgrades with every other stream and
+    /// session given the same limiter ([`ReconnectLimiter`]): each upgrade,
+    /// the first included, waits for a slot once its backoff and any
+    /// `Retry-After` have run out, and holds it only until the upgrade ends.
+    /// `None`, the default, connects as soon as the stream's own wait ends.
+    pub reconnect_limiter: Option<ReconnectLimiter>,
     pub(crate) pacing: Pacing,
+    /// How long an upgrade may take before it fails and is retried.
+    #[cfg(test)]
+    pub(crate) connect_timeout: Duration,
     /// Holds the stream's task between polls, to schedule races in tests.
     #[cfg(test)]
     pub(crate) gate: Option<Arc<SchedGate>>,
@@ -154,10 +164,24 @@ impl Config {
             ping_interval: Duration::ZERO,
             pong_timeout: Duration::ZERO,
             allow_insecure_http: false,
+            reconnect_limiter: None,
             pacing: Pacing::default(),
+            #[cfg(test)]
+            connect_timeout: CONNECT_TIMEOUT,
             #[cfg(test)]
             gate: None,
         }
+    }
+
+    /// How long an upgrade may take before it fails.
+    #[cfg(not(test))]
+    fn connect_timeout(&self) -> Duration {
+        CONNECT_TIMEOUT
+    }
+
+    #[cfg(test)]
+    fn connect_timeout(&self) -> Duration {
+        self.connect_timeout
     }
 }
 
@@ -169,6 +193,7 @@ impl std::fmt::Debug for Config {
             .field("queue_size", &self.queue_size)
             .field("ping_interval", &self.ping_interval)
             .field("pong_timeout", &self.pong_timeout)
+            .field("reconnect_limiter", &self.reconnect_limiter)
             .finish_non_exhaustive()
     }
 }
@@ -375,7 +400,12 @@ pub async fn connect(mut config: Config) -> Result<MarketStream> {
         }),
         state: RwLock::new(State::default()),
     });
-    let ws = shared.dial().await?;
+    // The first upgrade takes a slot of a shared limiter too, so the cap
+    // holds for streams started together as for streams dropped together.
+    let slot = upgrade_slot(shared.cfg.reconnect_limiter.as_ref()).await;
+    let ws = shared.dial().await;
+    drop(slot);
+    let ws = ws?;
     // The first connection's pairs are read before connect returns, so a
     // subscribe right after it uses them.
     if let Some(source) = &shared.cfg.reload {
@@ -636,7 +666,7 @@ impl Shared {
             .max_message_size(Some(MAX_MESSAGE_BYTES))
             .max_frame_size(Some(MAX_MESSAGE_BYTES));
         let (ws, _) = tokio::time::timeout(
-            CONNECT_TIMEOUT,
+            self.cfg.connect_timeout(),
             connect_async_with_config(request, Some(config), false),
         )
         .await
@@ -1076,6 +1106,14 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
                 () = stopped(&mut stop) => return finish(&shared),
                 () = tokio::time::sleep(delay) => {}
             }
+            // Only now, with the whole wait over, does the upgrade queue for
+            // a slot of a shared limiter: the queue adds to the wait and
+            // never shortens it. A close ends the queueing.
+            let slot = tokio::select! {
+                biased;
+                () = stopped(&mut stop) => return finish(&shared),
+                slot = upgrade_slot(shared.cfg.reconnect_limiter.as_ref()) => slot,
+            };
             if shared.stopped() {
                 return finish(&shared);
             }
@@ -1084,6 +1122,9 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
                 () = stopped(&mut stop) => return finish(&shared),
                 dialed = shared.dial() => dialed,
             };
+            // The upgrade has ended, accepted, refused or timed out: its
+            // slot goes back before anything else.
+            drop(slot);
             match dialed {
                 Ok(next) => break next,
                 Err(e) => err = e,
