@@ -451,7 +451,14 @@ client.wait_for_catalogs().await?;
 
 The hydrated zipper config also seeds each variant's supply, read with
 `catalogs.supply_for_zipped_asset_id`; `zipper.subscribe_zipped_asset_supply(true)`
-keeps it current.
+keeps it current. Each variant carries `supply_status` (`"available"`,
+`"stale"` or `"missing"`) and `supply_observed_at`; `supply` is `Some` only
+while the status is available or stale, and `None` never means zero: a
+missing supply is not known. `catalogs.zipped_asset_supply` returns the
+status, supply and observation time together. Size a withdrawal against the
+supply only while `supply_is_current()` (available): a withdrawal on a route
+whose supply is stale or missing is refused with
+`ERROR_CODE_SUPPLY_UNAVAILABLE`, and nothing is reserved for it.
 
 Each variant of `zipper.get_deposit_withdraw_config` says whether its route
 accepts new deposits and new withdrawals: `deposit_status` and

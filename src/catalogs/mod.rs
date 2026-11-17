@@ -1,13 +1,17 @@
 //! Spot / zipper catalog cache for scale lookups.
 //!
-//! Zipper supply is read through [`Manager::supply_for_zipped_asset_id`]
-//! (keyed by `zipped_asset_id`), seeded from the hydrated zipper config. Full
-//! enriched zipper config rows are not mutated; use
-//! [`Manager::patch_zipper_supply`] from `subscribe_zipped_asset_supply(true)`.
+//! Zipper supply is read through [`Manager::zipped_asset_supply`] and
+//! [`Manager::supply_for_zipped_asset_id`] (keyed by `zipped_asset_id`),
+//! seeded from the hydrated zipper config. Full enriched zipper config rows
+//! are not mutated; use [`Manager::patch_zipper_supply`] from
+//! `subscribe_zipped_asset_supply(true)`.
 
 use crate::codecs::scalars::{MAX_PROTOCOL_SCALE, validate_protocol_scale};
 use crate::errors::{Error, Result};
-use crate::models::{DepositWithdrawConfig, PairOrderLimits, PriceBand, ZippedAssetSupplyUpdate};
+use crate::models::{
+    DepositWithdrawConfig, PairOrderLimits, PriceBand, ZippedAssetSupplyUpdate,
+    supply_status_carries_supply,
+};
 use crate::realtime::{read_unpoisoned, write_unpoisoned};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -173,8 +177,8 @@ struct Inner {
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
-    /// Live supply strings by `zipped_asset_id` (updated via [`Manager::patch_zipper_supply`]).
-    zipped_id_to_supply: HashMap<u32, String>,
+    /// Live supply state by `zipped_asset_id` (updated via [`Manager::patch_zipper_supply`]).
+    zipped_id_to_supply: HashMap<u32, ZippedAssetSupplyUpdate>,
     orderbook_buckets: HashMap<String, Vec<String>>,
     spot_config: Option<Value>,
     zipper_config: Option<Value>,
@@ -201,8 +205,9 @@ struct ZipperSnapshot {
     asset_to_ledger_id: HashMap<String, u32>,
     asset_to_qty_scale: HashMap<String, u32>,
     zipped_id_to_scale: HashMap<u32, u32>,
-    /// Each variant's supply as the config reports it.
-    zipped_id_to_supply: HashMap<u32, String>,
+    /// Each variant's supply state as the config reports it, one entry per
+    /// variant, a missing supply included.
+    zipped_id_to_supply: HashMap<u32, ZippedAssetSupplyUpdate>,
     zipper_config: Value,
 }
 
@@ -429,14 +434,8 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
                     )));
                 }
                 zipped_id_to_asset.insert(zipped_id, sym.to_owned());
-                if let Some(supply) = variant
-                    .get("supply")
-                    .and_then(Value::as_str)
-                    .filter(|supply| !supply.is_empty())
-                {
-                    snap.zipped_id_to_supply
-                        .insert(zipped_id, supply.to_owned());
-                }
+                snap.zipped_id_to_supply
+                    .insert(zipped_id, variant_supply(zipped_id, variant));
             }
         }
     }
@@ -446,6 +445,42 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
         ));
     }
     Ok(snap)
+}
+
+/// A config variant's supply state. The supply and its observation time are
+/// kept only while the status is available or stale (`supply_status` or
+/// `supplyStatus`, in any case); a variant without such a status has no known
+/// supply, whatever `supply` holds.
+fn variant_supply(zipped_asset_id: u32, variant: &Value) -> ZippedAssetSupplyUpdate {
+    let status = variant
+        .get("supply_status")
+        .or_else(|| variant.get("supplyStatus"))
+        .and_then(Value::as_str)
+        .map(|status| status.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    if !supply_status_carries_supply(&status) {
+        return ZippedAssetSupplyUpdate {
+            zipped_asset_id,
+            status,
+            ..Default::default()
+        };
+    }
+    let supply = variant
+        .get("supply")
+        .and_then(Value::as_str)
+        .filter(|supply| !supply.is_empty())
+        .map(str::to_owned);
+    let observed_at = variant
+        .get("supply_observed_at")
+        .or_else(|| variant.get("supplyObservedAt"))
+        .filter(|observed_at| !observed_at.is_null())
+        .and_then(|observed_at| serde_json::from_value(observed_at.clone()).ok());
+    ZippedAssetSupplyUpdate {
+        zipped_asset_id,
+        observed_at: supply.as_ref().and(observed_at),
+        supply,
+        status,
+    }
 }
 
 impl Manager {
@@ -864,9 +899,25 @@ impl Manager {
             .copied()
     }
 
-    /// Latest supply string for a zipped asset id: from the hydrated zipper
-    /// config, or from a later realtime update.
+    /// Latest supply string for a zipped asset id, from the hydrated zipper
+    /// config or a later realtime update: `Some` only while the route's
+    /// supply status is available or stale. `None` when the supply is not
+    /// known (missing, unspecified, a status this SDK version does not know,
+    /// or a route the config does not name); it never means zero. Read
+    /// [`Self::zipped_asset_supply`] for the status and observation time:
+    /// size a withdrawal against the supply only while it is available.
     pub fn supply_for_zipped_asset_id(&self, id: u32) -> Option<String> {
+        read_unpoisoned(&self.inner)
+            .zipped_id_to_supply
+            .get(&id)
+            .and_then(|state| state.supply.clone())
+    }
+
+    /// The supply state of a zipped asset id, from the hydrated zipper config
+    /// or a later realtime update: its supply status, its supply (`Some`
+    /// only while available or stale) and when that supply was observed.
+    /// `None` for a route neither names.
+    pub fn zipped_asset_supply(&self, id: u32) -> Option<ZippedAssetSupplyUpdate> {
         read_unpoisoned(&self.inner)
             .zipped_id_to_supply
             .get(&id)
@@ -875,10 +926,11 @@ impl Manager {
 
     /// Apply supply updates to the in-memory `zipped_asset_id -> supply` map.
     ///
-    /// Returns `true` when at least one entry changed. Unlike Go/Python, Rust
-    /// catalogs do not store full enriched zipper chain rows with a `supply`
-    /// field; this map, seeded from the hydrated config, is the live-supply
-    /// source of truth.
+    /// Returns `true` when at least one entry changed: its supply, status or
+    /// observation time, so the one stale update that repeats a route's last
+    /// value counts as a change. Unlike Go/Python, Rust catalogs do not store
+    /// full enriched zipper chain rows with a `supply` field; this map, seeded
+    /// from the hydrated config, is the live-supply source of truth.
     pub fn patch_zipper_supply(&self, updates: &[ZippedAssetSupplyUpdate]) -> bool {
         if updates.is_empty() {
             return false;
@@ -886,11 +938,10 @@ impl Manager {
         let mut inner = write_unpoisoned(&self.inner);
         let mut changed = false;
         for update in updates {
-            let prev = inner.zipped_id_to_supply.get(&update.zipped_asset_id);
-            if prev.map(String::as_str) != Some(update.supply.as_str()) {
+            if inner.zipped_id_to_supply.get(&update.zipped_asset_id) != Some(update) {
                 inner
                     .zipped_id_to_supply
-                    .insert(update.zipped_asset_id, update.supply.clone());
+                    .insert(update.zipped_asset_id, update.clone());
                 changed = true;
             }
         }
@@ -932,8 +983,9 @@ fn apply_zipper(inner: &mut Inner, snap: ZipperSnapshot) {
     inner.asset_to_qty_scale = snap.asset_to_qty_scale;
     inner.zipped_id_to_scale = snap.zipped_id_to_scale;
     inner.zipper_config = Some(snap.zipper_config);
-    // The config's supplies replace those of the variants it names; live
-    // supply patches of other variants are kept across replacement.
+    // The config's supply states replace those of the variants it names, a
+    // missing supply included; live supply patches of other variants are
+    // kept across replacement.
     inner.zipped_id_to_supply.extend(snap.zipped_id_to_supply);
 }
 
@@ -1406,9 +1458,19 @@ mod tests {
         assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), Some(6));
     }
 
-    /// The hydrated config seeds each variant's supply; a later config
-    /// replaces the supplies of the variants it names and keeps live patches
-    /// of the others.
+    fn supply(id: u32, status: &str, supply: Option<&str>) -> ZippedAssetSupplyUpdate {
+        ZippedAssetSupplyUpdate {
+            zipped_asset_id: id,
+            supply: supply.map(str::to_owned),
+            status: status.to_owned(),
+            observed_at: None,
+        }
+    }
+
+    /// The hydrated config seeds each variant's supply state; a later config
+    /// replaces the states of the variants it names, a missing supply
+    /// included, and keeps live patches of the others. A supply is read only
+    /// with an available or stale status.
     #[test]
     fn zipper_config_seeds_variant_supply() {
         let mgr = Manager::new();
@@ -1418,9 +1480,12 @@ mod tests {
                 "ledger_id": 1,
                 "quantity_scale": 8,
                 "variants": [
-                    {"zipped_asset_id": 7, "supply": "97.08173223"},
-                    {"zipped_asset_id": 8, "supply": "0"},
-                    {"zipped_asset_id": 9}
+                    {"zipped_asset_id": 7, "supply": "97.08173223", "supply_status": "available",
+                     "supply_observed_at": "2026-11-15T12:00:00.500Z"},
+                    {"zipped_asset_id": 8, "supply": "0", "supplyStatus": "AVAILABLE"},
+                    {"zipped_asset_id": 9, "supply_status": "missing"},
+                    {"zipped_asset_id": 10, "supply": "5"},
+                    {"zipped_asset_id": 11, "supply": "6", "supply_status": "stale"}
                 ]
             }]
         }))
@@ -1429,42 +1494,112 @@ mod tests {
             mgr.supply_for_zipped_asset_id(7).as_deref(),
             Some("97.08173223")
         );
+        let seven = mgr.zipped_asset_supply(7).unwrap();
+        assert!(seven.supply_is_current());
+        assert_eq!(
+            seven.observed_at.map(|t| (t.seconds, t.nanos)),
+            Some((1_794_744_000, 500_000_000))
+        );
         assert_eq!(mgr.supply_for_zipped_asset_id(8).as_deref(), Some("0"));
         assert_eq!(mgr.supply_for_zipped_asset_id(9), None);
+        assert_eq!(mgr.zipped_asset_supply(9), Some(supply(9, "missing", None)));
+        // A supply without a status is not known.
+        assert_eq!(mgr.supply_for_zipped_asset_id(10), None);
+        assert_eq!(mgr.supply_for_zipped_asset_id(11).as_deref(), Some("6"));
+        assert!(!mgr.zipped_asset_supply(11).unwrap().supply_is_current());
+        assert_eq!(mgr.zipped_asset_supply(12), None);
 
-        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 9,
-            supply: "1.5".to_owned(),
-        }]));
+        assert!(mgr.patch_zipper_supply(&[
+            supply(9, "available", Some("1.5")),
+            supply(12, "available", Some("2")),
+        ]));
         mgr.hydrate_zipper_config_json(json!({
             "assets": [{
                 "asset": "BTC",
                 "ledger_id": 1,
                 "quantity_scale": 8,
-                "variants": [{"zipped_asset_id": 7, "supply": "98"}]
+                "variants": [
+                    {"zipped_asset_id": 7, "supply_status": "missing"},
+                    {"zipped_asset_id": 9, "supply": "98", "supply_status": "available"}
+                ]
             }]
         }))
         .expect("replace");
-        assert_eq!(mgr.supply_for_zipped_asset_id(7).as_deref(), Some("98"));
-        assert_eq!(mgr.supply_for_zipped_asset_id(9).as_deref(), Some("1.5"));
+        // The config names 7 as missing: its earlier supply is gone.
+        assert_eq!(mgr.supply_for_zipped_asset_id(7), None);
+        assert_eq!(mgr.supply_for_zipped_asset_id(9).as_deref(), Some("98"));
+        assert_eq!(mgr.supply_for_zipped_asset_id(12).as_deref(), Some("2"));
+    }
+
+    /// A typed config seeds the same state as its JSON.
+    #[test]
+    fn typed_zipper_config_seeds_supply_status_and_time() {
+        use crate::models::{
+            DepositWithdrawConfig, ZipperAssetChainVariant, ZipperAssetConfig, ZipperTokenConfig,
+        };
+        use buffa_types::google::protobuf::Timestamp;
+
+        let token = || ZipperTokenConfig {
+            address: String::new(),
+            decimals: 18,
+        };
+        let variant = |id, supply: Option<&str>, status: &str| ZipperAssetChainVariant {
+            zipped_asset_id: id,
+            chain_id: 1,
+            is_native_asset: false,
+            network_fee: String::new(),
+            deposit_min_amount: String::new(),
+            withdraw_min_amount: String::new(),
+            supply: supply.map(str::to_owned),
+            supply_status: status.to_owned(),
+            supply_observed_at: supply.map(|_| Timestamp {
+                seconds: 1_763_208_000,
+                ..Default::default()
+            }),
+            source_token: token(),
+            z_token: token(),
+            deposit_status: String::new(),
+            withdrawal_status: String::new(),
+        };
+        let mgr = Manager::new();
+        mgr.hydrate_zipper_config(&DepositWithdrawConfig {
+            chains: Vec::new(),
+            assets: vec![ZipperAssetConfig {
+                asset: "USDT".into(),
+                ledger_id: 2,
+                name: String::new(),
+                icon: String::new(),
+                quantity_scale: 6,
+                quantity_display_decimals: 2,
+                u_asset_id: String::new(),
+                variants: vec![
+                    variant(3, Some("1250000.5"), "stale"),
+                    variant(5, None, "missing"),
+                ],
+            }],
+            contracts: Vec::new(),
+            ts_ms: 0,
+        })
+        .expect("hydrate");
+        let stale = mgr.zipped_asset_supply(3).unwrap();
+        assert_eq!(
+            (stale.supply.as_deref(), stale.status.as_str()),
+            (Some("1250000.5"), "stale")
+        );
+        assert_eq!(stale.observed_at.map(|t| t.seconds), Some(1_763_208_000));
+        assert_eq!(mgr.zipped_asset_supply(5), Some(supply(5, "missing", None)));
     }
 
     #[test]
     fn patch_zipper_supply_updates_map() {
         let mgr = Manager::new();
-        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 42,
-            supply: "100.5".to_owned(),
-        }]));
+        assert!(mgr.patch_zipper_supply(&[supply(42, "available", Some("100.5"))]));
         assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("100.5"));
-        assert!(!mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 42,
-            supply: "100.5".to_owned(),
-        }]));
-        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 42,
-            supply: "200".to_owned(),
-        }]));
+        assert!(!mgr.patch_zipper_supply(&[supply(42, "available", Some("100.5"))]));
+        // The one stale update repeats the last value: the status changes.
+        assert!(mgr.patch_zipper_supply(&[supply(42, "stale", Some("100.5"))]));
+        assert!(!mgr.zipped_asset_supply(42).unwrap().supply_is_current());
+        assert!(mgr.patch_zipper_supply(&[supply(42, "available", Some("200"))]));
         assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
     }
 
@@ -1564,10 +1699,7 @@ mod tests {
             }),
         )
         .expect("hydrate");
-        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 42,
-            supply: "100.5".to_owned(),
-        }]));
+        assert!(mgr.patch_zipper_supply(&[supply(42, "available", Some("100.5"))]));
     }
 
     #[test]
@@ -1609,10 +1741,7 @@ mod tests {
         assert_eq!(mgr.base_quantity_scale_for_symbol("ETH-USDT"), Some(6));
         assert_eq!(mgr.base_quantity_scale_for_symbol("BTC-USDT"), None);
 
-        assert!(mgr.patch_zipper_supply(&[ZippedAssetSupplyUpdate {
-            zipped_asset_id: 42,
-            supply: "200".to_owned(),
-        }]));
+        assert!(mgr.patch_zipper_supply(&[supply(42, "available", Some("200"))]));
         assert_eq!(mgr.supply_for_zipped_asset_id(42).as_deref(), Some("200"));
 
         mgr.hydrate_zipper_config_json(json!({

@@ -10168,7 +10168,8 @@ fn zero_scale_zipped_supply_reads_whole_units() {
     };
     use polyester::codecs::format_ledger_u64;
     use polyester::proto::chain::zipper::v1::{
-        GetDepositWithdrawConfigResponse, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
+        GetDepositWithdrawConfigResponse, SupplyStatus, ZippedAssetSupplyBatch,
+        ZippedAssetSupplyUpdate,
     };
 
     let config: GetDepositWithdrawConfigResponse = serde_json::from_value(json!({
@@ -10204,6 +10205,7 @@ fn zero_scale_zipped_supply_reads_whole_units() {
             .map(|(id, q, _)| ZippedAssetSupplyUpdate {
                 zipped_asset_id: *id,
                 supply_q: *q,
+                status: SupplyStatus::AVAILABLE.into(),
                 ..Default::default()
             })
             .collect(),
@@ -10213,14 +10215,14 @@ fn zero_scale_zipped_supply_reads_whole_units() {
         catalogs.quantity_scale_for_zipped_asset_id(id)
     })
     .unwrap();
-    let got: Vec<(u32, String)> = decoded
+    let got: Vec<(u32, Option<String>)> = decoded
         .updates
         .into_iter()
         .map(|u| (u.zipped_asset_id, u.supply))
         .collect();
-    let want: Vec<(u32, String)> = updates
+    let want: Vec<(u32, Option<String>)> = updates
         .iter()
-        .map(|(id, _, s)| (*id, (*s).to_owned()))
+        .map(|(id, _, s)| (*id, Some((*s).to_owned())))
         .collect();
     assert_eq!(got, want);
 
@@ -10228,6 +10230,7 @@ fn zero_scale_zipped_supply_reads_whole_units() {
         updates: vec![ZippedAssetSupplyUpdate {
             zipped_asset_id: 999,
             supply_q: 3_582_802,
+            status: SupplyStatus::AVAILABLE.into(),
             ..Default::default()
         }],
         ..Default::default()

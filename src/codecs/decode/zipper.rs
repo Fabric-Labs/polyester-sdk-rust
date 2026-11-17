@@ -6,13 +6,32 @@ use crate::errors::{Error, Result};
 use crate::models::{
     DepositWithdrawConfig, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
     ZipperAssetChainVariant, ZipperAssetConfig, ZipperChainConfig, ZipperChainContractConfig,
-    ZipperTokenConfig,
+    ZipperTokenConfig, supply_status_carries_supply,
 };
 use crate::proto::chain::zipper::v1::{
-    GetDepositWithdrawConfigResponse, MemoRequirement,
+    GetDepositWithdrawConfigResponse, MemoRequirement, SupplyStatus,
     ZippedAssetSupplyBatch as ProtoZippedAssetSupplyBatch,
     ZippedAssetSupplyUpdate as ProtoZippedAssetSupplyUpdate,
 };
+use buffa_types::google::protobuf::Timestamp;
+
+/// A route's supply status label, and its observation time when the status
+/// carries a supply (available or stale). Missing, unspecified and unknown
+/// statuses carry neither, whatever else the message holds: a missing supply
+/// is never read as zero.
+fn supply_state(
+    status: &buffa::EnumValue<SupplyStatus>,
+    observed_at: &buffa::MessageField<Timestamp>,
+) -> (String, bool, Option<Timestamp>) {
+    let label = changelog_enum_label(status);
+    let carries = supply_status_carries_supply(&label);
+    let observed_at = if carries {
+        observed_at.as_option().cloned()
+    } else {
+        None
+    };
+    (label, carries, observed_at)
+}
 
 /// Memo rule label: `required`, `optional` or `not_supported`, empty when
 /// unspecified, and `UNKNOWN(n)` for a rule newer than this SDK.
@@ -66,25 +85,34 @@ pub fn deposit_withdraw_config_from_proto(
                 variants: a
                     .variants
                     .iter()
-                    .map(|v| ZipperAssetChainVariant {
-                        zipped_asset_id: v.zipped_asset_id,
-                        chain_id: v.chain_id,
-                        is_native_asset: v.is_native_asset,
-                        network_fee: v.network_fee.clone(),
-                        deposit_min_amount: v.deposit_min_amount.clone(),
-                        withdraw_min_amount: v.withdraw_min_amount.clone(),
-                        // supply_q is scaled by the parent asset's quantity_scale.
-                        supply: format_ledger_u64(v.supply_q, a.quantity_scale).unwrap_or_default(),
-                        source_token: ZipperTokenConfig {
-                            address: v.source_address.clone(),
-                            decimals: v.source_decimals,
-                        },
-                        z_token: ZipperTokenConfig {
-                            address: v.ztoken_address.clone(),
-                            decimals: v.ztoken_decimals,
-                        },
-                        deposit_status: changelog_enum_label(&v.deposit_status),
-                        withdrawal_status: changelog_enum_label(&v.withdrawal_status),
+                    .map(|v| {
+                        let (supply_status, carries, supply_observed_at) =
+                            supply_state(&v.supply_status, &v.supply_observed_at);
+                        ZipperAssetChainVariant {
+                            zipped_asset_id: v.zipped_asset_id,
+                            chain_id: v.chain_id,
+                            is_native_asset: v.is_native_asset,
+                            network_fee: v.network_fee.clone(),
+                            deposit_min_amount: v.deposit_min_amount.clone(),
+                            withdraw_min_amount: v.withdraw_min_amount.clone(),
+                            // supply_q is scaled by the parent asset's quantity_scale,
+                            // and means something only while the status carries it.
+                            supply: carries
+                                .then(|| format_ledger_u64(v.supply_q, a.quantity_scale).ok())
+                                .flatten(),
+                            supply_status,
+                            supply_observed_at,
+                            source_token: ZipperTokenConfig {
+                                address: v.source_address.clone(),
+                                decimals: v.source_decimals,
+                            },
+                            z_token: ZipperTokenConfig {
+                                address: v.ztoken_address.clone(),
+                                decimals: v.ztoken_decimals,
+                            },
+                            deposit_status: changelog_enum_label(&v.deposit_status),
+                            withdrawal_status: changelog_enum_label(&v.withdrawal_status),
+                        }
                     })
                     .collect(),
             })
@@ -103,24 +131,37 @@ pub fn deposit_withdraw_config_from_proto(
     }
 }
 
+/// Decode one supply stream update. The supply and its observation time are
+/// read only when the status is available or stale; another status leaves
+/// both `None`. An update that carries a supply needs the route's quantity
+/// scale from the catalogs, and is refused with [`Error::Validation`] without
+/// one.
 pub fn zipped_asset_supply_update_from_proto(
     msg: &ProtoZippedAssetSupplyUpdate,
     scale_fn: impl Fn(u32) -> Option<u32>,
 ) -> Result<ZippedAssetSupplyUpdate> {
-    let scale = scale_fn(msg.zipped_asset_id).ok_or_else(|| {
-        Error::validation(format!(
-            "unknown quantity scale for zipped_asset_id {}; hydrate catalogs first",
-            msg.zipped_asset_id
-        ))
-    })?;
-    Ok(ZippedAssetSupplyUpdate {
-        zipped_asset_id: msg.zipped_asset_id,
-        supply: format_ledger_u64(msg.supply_q, scale).map_err(|e| {
+    let (status, carries, observed_at) = supply_state(&msg.status, &msg.observed_at);
+    let supply = if carries {
+        let scale = scale_fn(msg.zipped_asset_id).ok_or_else(|| {
+            Error::validation(format!(
+                "unknown quantity scale for zipped_asset_id {}; hydrate catalogs first",
+                msg.zipped_asset_id
+            ))
+        })?;
+        Some(format_ledger_u64(msg.supply_q, scale).map_err(|e| {
             Error::validation(format!(
                 "zipped asset {} supply scale invalid: {e}",
                 msg.zipped_asset_id
             ))
-        })?,
+        })?)
+    } else {
+        None
+    };
+    Ok(ZippedAssetSupplyUpdate {
+        zipped_asset_id: msg.zipped_asset_id,
+        supply,
+        status,
+        observed_at,
     })
 }
 
@@ -170,6 +211,7 @@ mod tests {
         let msg = ProtoZippedAssetSupplyUpdate {
             zipped_asset_id: 1,
             supply_q: 1_000,
+            status: SupplyStatus::AVAILABLE.into(),
             ..Default::default()
         };
         let err = zipped_asset_supply_update_from_proto(&msg, |_| Some(65535))
@@ -182,10 +224,128 @@ mod tests {
         let msg = ProtoZippedAssetSupplyUpdate {
             zipped_asset_id: 99,
             supply_q: 1_000,
+            status: SupplyStatus::AVAILABLE.into(),
             ..Default::default()
         };
         let err = zipped_asset_supply_update_from_proto(&msg, |_| None).unwrap_err();
         assert!(err.to_string().contains("zipped_asset_id 99"));
+    }
+
+    fn observed(seconds: i64) -> buffa::MessageField<Timestamp> {
+        Timestamp {
+            seconds,
+            nanos: 500_000_000,
+            ..Default::default()
+        }
+        .into()
+    }
+
+    /// A variant carries its supply and observation time only while its
+    /// supply status is available or stale. A missing route reads no supply,
+    /// never `"0"`, and an available route's 0 is a real supply of zero.
+    #[test]
+    fn variant_supply_is_read_only_with_its_status() {
+        use crate::proto::chain::zipper::v1::AssetChainVariant;
+
+        let variant = |status: buffa::EnumValue<SupplyStatus>, supply_q: u64| {
+            let msg = GetDepositWithdrawConfigResponse {
+                assets: vec![AssetConfig {
+                    asset: "USDT".into(),
+                    quantity_scale: 6,
+                    variants: vec![AssetChainVariant {
+                        zipped_asset_id: 3,
+                        supply_q,
+                        supply_status: status,
+                        supply_observed_at: observed(1_763_208_000),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            deposit_withdraw_config_from_proto(&msg).assets[0].variants[0].clone()
+        };
+
+        let available = variant(SupplyStatus::AVAILABLE.into(), 1_250_000_500_000);
+        assert_eq!(available.supply.as_deref(), Some("1250000.5"));
+        assert_eq!(available.supply_status, "available");
+        assert_eq!(
+            available.supply_observed_at.as_ref().map(|t| t.seconds),
+            Some(1_763_208_000)
+        );
+        assert!(available.supply_is_current());
+
+        let zero = variant(SupplyStatus::AVAILABLE.into(), 0);
+        assert_eq!(zero.supply.as_deref(), Some("0"));
+
+        let stale = variant(SupplyStatus::STALE.into(), 97_000_000);
+        assert_eq!(stale.supply.as_deref(), Some("97"));
+        assert_eq!(stale.supply_status, "stale");
+        assert!(stale.supply_observed_at.is_some());
+        assert!(!stale.supply_is_current());
+
+        for (status, label) in [
+            (SupplyStatus::MISSING.into(), "missing"),
+            (SupplyStatus::SUPPLY_UNSPECIFIED.into(), ""),
+            (buffa::EnumValue::Unknown(9), "unknown(9)"),
+        ] {
+            let unknown = variant(status, 0);
+            assert_eq!(unknown.supply, None, "{label}");
+            assert_eq!(unknown.supply_status, label);
+            assert_eq!(unknown.supply_observed_at, None, "{label}");
+            assert!(!unknown.supply_is_current());
+        }
+
+        // A server older than this contract sends no status: no supply is
+        // read, whatever supply_q holds.
+        let json: GetDepositWithdrawConfigResponse = serde_json::from_str(
+            r#"{"assets":[{"asset":"USDT","quantityScale":6,"variants":[{"zippedAssetId":3,"supplyQ":"5000000"}]}]}"#,
+        )
+        .unwrap();
+        let legacy = &deposit_withdraw_config_from_proto(&json).assets[0].variants[0];
+        assert_eq!(
+            (legacy.supply.as_deref(), legacy.supply_status.as_str()),
+            (None, "")
+        );
+    }
+
+    /// Stream updates carry the status and observation time; a stale update
+    /// keeps its value, and an update without a supply status needs no
+    /// catalog scale and reads no supply.
+    #[test]
+    fn zipped_supply_update_keeps_status_and_observation_time() {
+        let update = |status: buffa::EnumValue<SupplyStatus>| ProtoZippedAssetSupplyUpdate {
+            zipped_asset_id: 3,
+            supply_q: 1_250_000_500_000,
+            status,
+            observed_at: observed(1_763_208_000),
+            ..Default::default()
+        };
+        let stale =
+            zipped_asset_supply_update_from_proto(&update(SupplyStatus::STALE.into()), |_| Some(6))
+                .unwrap();
+        assert_eq!(stale.supply.as_deref(), Some("1250000.5"));
+        assert_eq!(stale.status, "stale");
+        assert_eq!(
+            stale.observed_at.as_ref().map(|t| t.nanos),
+            Some(500_000_000)
+        );
+        assert!(!stale.supply_is_current());
+
+        let available =
+            zipped_asset_supply_update_from_proto(&update(SupplyStatus::AVAILABLE.into()), |_| {
+                Some(6)
+            })
+            .unwrap();
+        assert!(available.supply_is_current());
+
+        let missing =
+            zipped_asset_supply_update_from_proto(&update(SupplyStatus::MISSING.into()), |_| None)
+                .unwrap();
+        assert_eq!(
+            (missing.supply, missing.status.as_str(), missing.observed_at),
+            (None, "missing", None)
+        );
     }
 
     /// POLY-9102: a network's memo rule, label and format hint reach the
