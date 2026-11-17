@@ -66,6 +66,9 @@ pub(crate) const CANDLES_LIMIT_MAX: u32 = 10_000;
 /// Most delta buckets one heatmap page returns: the `uint32 {gte: 1, lte:
 /// 20000}` rule on `GetOrderbookHeatmapRequest.limit`.
 pub(crate) const HEATMAP_LIMIT_MAX: u32 = 20_000;
+/// Fewest delta buckets one heatmap page asks for: the `gte: 1` of the same
+/// rule. The field has no presence, so 0 is on the wire and refused there.
+pub(crate) const HEATMAP_LIMIT_MIN: u32 = 1;
 /// Largest `ListTransfers` page: the `uint32.lte` rule on
 /// `ListTransfersRequest.limit`.
 pub(crate) const LIST_TRANSFERS_LIMIT_MAX: u32 = 1_000;
@@ -129,6 +132,17 @@ pub(crate) fn check_limit(operation: &str, limit: u32, max: u32) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+/// Refuse a page size outside `min..=max`, the contract's `gte: min, lte:
+/// max` rule on a plain `uint32` `limit`, which is on the wire even at 0.
+pub(crate) fn check_limit_range(operation: &str, limit: u32, min: u32, max: u32) -> Result<()> {
+    if limit < min {
+        return Err(Error::validation(format!(
+            "{operation} limit {limit} is below the minimum {min}"
+        )));
+    }
+    check_limit(operation, limit, max)
 }
 
 /// Refuse an explicit page size outside `1..=max`, the contract's
@@ -297,7 +311,7 @@ mod tests {
             (
                 marketdata,
                 "GetOrderbookHeatmapRequest",
-                format!("(min 1, max {HEATMAP_LIMIT_MAX})"),
+                format!("(min {HEATMAP_LIMIT_MIN}, max {HEATMAP_LIMIT_MAX})"),
             ),
             (
                 ledger,

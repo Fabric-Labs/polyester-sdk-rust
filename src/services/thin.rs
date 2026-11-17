@@ -147,7 +147,12 @@ impl HeatmapService {
         use buffa_types::google::protobuf::Timestamp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
-        super::limits::check_limit("heatmap.get", limit, super::limits::HEATMAP_LIMIT_MAX)?;
+        super::limits::check_limit_range(
+            "heatmap.get",
+            limit,
+            super::limits::HEATMAP_LIMIT_MIN,
+            super::limits::HEATMAP_LIMIT_MAX,
+        )?;
         self.ctx.wait_for_catalogs().await?;
         let symbol_id = self
             .ctx
