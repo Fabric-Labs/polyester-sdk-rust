@@ -160,6 +160,45 @@ pub fn internal_transfer_from_proto(
     })
 }
 
+/// A credited leg's resolved destination: its root account as a canonical
+/// base58 public ID, its sub-account, when it names one, the same way, and
+/// its smart-account address as `0x` and 40 hex digits.
+fn credited_destination(
+    op: &str,
+    index: usize,
+    destination: &crate::proto::transfer::v1::ResolvedDestination,
+) -> Result<()> {
+    let refuse = |what: String| {
+        Error::response_contract(op, format!("credited leg {index} destination {what}"))
+    };
+    let public_id = |field: &str, value: &str| {
+        crate::codecs::scalars::id_to_u64(value, field)
+            .map(drop)
+            .map_err(|_| refuse(format!("has an invalid {field} {value:?}")))
+    };
+    if destination.root_account_public_id.is_empty() {
+        return Err(refuse("has no root_account_public_id".into()));
+    }
+    public_id(
+        "root_account_public_id",
+        &destination.root_account_public_id,
+    )?;
+    if !destination.subaccount_public_id.is_empty() {
+        public_id("subaccount_public_id", &destination.subaccount_public_id)?;
+    }
+    let address = &destination.smart_account_address;
+    if address.is_empty() {
+        return Err(refuse("has no smart_account_address".into()));
+    }
+    let hex = address.strip_prefix("0x").unwrap_or_default();
+    if hex.len() != 40 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(refuse(format!(
+            "has an invalid smart_account_address {address:?}"
+        )));
+    }
+    Ok(())
+}
+
 /// Decode a batch of internal transfers sent with `requested_legs` legs.
 ///
 /// Refused with [`Error::ResponseContract`], as [`internal_transfer_batch`]
@@ -264,6 +303,9 @@ fn internal_transfer_batch(
                             op,
                             format!("credited leg {index} has no {field}"),
                         ));
+                    }
+                    if let Some(destination) = leg.destination.as_option() {
+                        credited_destination(op, index, destination)?;
                     }
                     "credited".to_owned()
                 }
@@ -570,6 +612,17 @@ mod tests {
         }
     }
 
+    /// A credited leg whose destination `edit` changes.
+    fn credited_to(
+        edit: impl FnOnce(&mut crate::proto::transfer::v1::ResolvedDestination),
+    ) -> ProtoInternalTransferBatchLegResult {
+        let mut leg = credited(0);
+        let mut destination = leg.destination.as_option().cloned().unwrap();
+        edit(&mut destination);
+        leg.destination = destination.into();
+        leg
+    }
+
     fn credited(index: u32) -> ProtoInternalTransferBatchLegResult {
         let mut leg = batch_leg(
             index,
@@ -812,6 +865,53 @@ mod tests {
                         asset_code: String::new(),
                         ..credited(0)
                     }],
+                ),
+                1,
+            ),
+            (
+                "credited destination without root ID",
+                reply(
+                    4,
+                    "7",
+                    vec![credited_to(|d| d.root_account_public_id.clear())],
+                ),
+                1,
+            ),
+            (
+                "credited destination with a non-base58 root ID",
+                reply(
+                    4,
+                    "7",
+                    vec![credited_to(|d| d.root_account_public_id = "0OIl".into())],
+                ),
+                1,
+            ),
+            (
+                "credited destination without address",
+                reply(
+                    4,
+                    "7",
+                    vec![credited_to(|d| d.smart_account_address.clear())],
+                ),
+                1,
+            ),
+            (
+                "credited destination with a malformed address",
+                reply(
+                    4,
+                    "7",
+                    vec![credited_to(|d| d.smart_account_address = "0x22".into())],
+                ),
+                1,
+            ),
+            (
+                "credited destination with a non-base58 sub-account ID",
+                reply(
+                    4,
+                    "7",
+                    vec![credited_to(|d| {
+                        d.subaccount_public_id = "not base58!".into()
+                    })],
                 ),
                 1,
             ),

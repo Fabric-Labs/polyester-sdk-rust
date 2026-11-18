@@ -299,6 +299,7 @@ async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
                     credited_at_ts_ns: 1_763_330_000_000_000_000,
                     asset_code: "BTC".into(),
                     destination: ResolvedDestination {
+                        root_account_public_id: "AAo8yKqygTg".into(),
                         smart_account_address: "0x2222222222222222222222222222222222222222".into(),
                         ..Default::default()
                     }
@@ -309,6 +310,7 @@ async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
                     credited_at_ts_ns: 1_763_330_000_000_000_001,
                     asset_code: "BTC".into(),
                     destination: ResolvedDestination {
+                        root_account_public_id: "AAo8yKqygTg".into(),
                         smart_account_address: "0x2222222222222222222222222222222222222222".into(),
                         ..Default::default()
                     }
