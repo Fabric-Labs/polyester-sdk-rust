@@ -115,57 +115,161 @@ struct Hold {
     release: tokio::sync::Notify,
 }
 
+/// Largest request head the stand-in reads before it holds an upgrade; a
+/// longer one is not the client's upgrade.
+const MAX_HEAD: usize = 16 * 1024;
+
+/// What the bytes on a socket are so far.
+#[derive(Debug, PartialEq)]
+enum Head {
+    /// The start of a request head, not yet complete.
+    Partial,
+    /// A whole request head that upgrades the trading path to a WebSocket.
+    Upgrade,
+    /// Anything else: not HTTP, another request, or a malformed upgrade.
+    Other,
+}
+
+/// Parses `bytes`, the start of what a peer sent, as an HTTP/1.1 request
+/// head. Other processes probe local ports on a shared machine (with a
+/// `HEAD /`, for example), and a probe must not take the script: only a
+/// valid WebSocket upgrade of [`PATH`] is an [`Head::Upgrade`], with the
+/// headers RFC 6455 requires of one (`Host`, `Upgrade: websocket`,
+/// `Connection: Upgrade`, version 13 and a 16-byte `Sec-WebSocket-Key`).
+fn parse_head(bytes: &[u8]) -> Head {
+    use base64::Engine as _;
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut request = httparse::Request::new(&mut headers);
+    match request.parse(bytes) {
+        Ok(httparse::Status::Complete(_)) => {}
+        Ok(httparse::Status::Partial) => return Head::Partial,
+        Err(_) => return Head::Other,
+    }
+    // Every value of the header `name`, comma-separated tokens included.
+    let tokens = |name: &str| -> Vec<String> {
+        request
+            .headers
+            .iter()
+            .filter(|h| h.name.eq_ignore_ascii_case(name))
+            .flat_map(|h| h.value.split(|&b| b == b','))
+            .map(|t| String::from_utf8_lossy(t).trim().to_owned())
+            .collect()
+    };
+    // Exactly one key, of 16 bytes in base64.
+    let key_is_valid = match tokens("sec-websocket-key").as_slice() {
+        [key] => base64::engine::general_purpose::STANDARD
+            .decode(key)
+            .is_ok_and(|key| key.len() == 16),
+        _ => false,
+    };
+    let upgrade = request.method == Some("GET")
+        && request.path == Some(PATH)
+        && request.version == Some(1)
+        && !tokens("host").is_empty()
+        && tokens("upgrade")
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case("websocket"))
+        && tokens("connection")
+            .iter()
+            .any(|t| t.eq_ignore_ascii_case("upgrade"))
+        && tokens("sec-websocket-version") == ["13"]
+        && key_is_valid;
+    if upgrade { Head::Upgrade } else { Head::Other }
+}
+
 /// Whether the client's whole upgrade request has reached `tcp`, read
-/// without taking it off the socket: a `GET` of the trading path that asks
-/// to upgrade to a WebSocket. False once the peer goes away, and for any
-/// other request: other processes probe local ports on a shared machine
-/// (with a `HEAD /`, for example), and a probe must not take the script.
+/// without taking it off the socket. False for any other request, and for
+/// a head that cannot complete: one longer than [`MAX_HEAD`], or one the
+/// peer stopped sending (it closed or shut down its side).
 async fn upgrade_arrived(tcp: &tokio::net::TcpStream) -> bool {
-    let mut buf = vec![0u8; 16 * 1024];
+    let mut buf = vec![0u8; MAX_HEAD];
     loop {
-        match tcp.peek(&mut buf).await {
+        // Readiness before the peek: a close seen here leaves nothing more
+        // to come after the bytes the peek returns.
+        let Ok(ready) = tcp.ready(tokio::io::Interest::READABLE).await else {
+            return false;
+        };
+        let n = match tcp.peek(&mut buf).await {
             Ok(0) | Err(_) => return false,
-            Ok(n) if buf[..n].windows(4).any(|w| w == b"\r\n\r\n") => {
-                return is_trading_upgrade(&buf[..n]);
+            Ok(n) => n,
+        };
+        match parse_head(&buf[..n]) {
+            Head::Upgrade => return true,
+            Head::Partial if n < MAX_HEAD && !ready.is_read_closed() => {
+                tokio::time::sleep(Duration::from_millis(1)).await;
             }
-            Ok(_) => tokio::time::sleep(Duration::from_millis(1)).await,
+            Head::Partial | Head::Other => return false,
         }
     }
 }
 
-/// Whether `head`, a complete request head, is a `GET` of [`PATH`] whose
-/// `Upgrade` header asks for a WebSocket.
-fn is_trading_upgrade(head: &[u8]) -> bool {
-    let head = String::from_utf8_lossy(head);
-    let mut lines = head.split("\r\n");
-    let Some(request_line) = lines.next() else {
-        return false;
-    };
-    let mut parts = request_line.split(' ');
-    if parts.next() != Some("GET") || parts.next() != Some(PATH) {
-        return false;
+/// The first connection on `listener` whose request is the client's
+/// upgrade. Each connection is read on its own task, so a peer that sends
+/// part of a head and stops cannot hold up the upgrade behind it; the
+/// others are dropped once the upgrade is found.
+async fn next_upgrade(listener: &tokio::net::TcpListener) -> tokio::net::TcpStream {
+    let mut reads = tokio::task::JoinSet::new();
+    loop {
+        tokio::select! {
+            accepted = listener.accept() => {
+                let (tcp, _) = accepted.unwrap();
+                reads.spawn(async move { upgrade_arrived(&tcp).await.then_some(tcp) });
+            }
+            Some(read) = reads.join_next(), if !reads.is_empty() => {
+                if let Ok(Some(tcp)) = read {
+                    return tcp;
+                }
+            }
+        }
     }
-    lines.any(|line| {
-        line.split_once(':').is_some_and(|(name, value)| {
-            name.trim().eq_ignore_ascii_case("upgrade")
-                && value.trim().eq_ignore_ascii_case("websocket")
-        })
-    })
+}
+
+/// A valid upgrade of the trading path, as the client sends it.
+fn upgrade_request() -> String {
+    format!(
+        "GET {PATH} HTTP/1.1\r\nHost: x\r\nConnection: keep-alive, Upgrade\r\n\
+         Upgrade: websocket\r\nSec-WebSocket-Version: 13\r\n\
+         Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n"
+    )
 }
 
 #[test]
-fn the_stand_in_holds_only_a_trading_upgrade() {
-    let upgrade = format!(
-        "GET {PATH} HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"
-    );
-    assert!(is_trading_upgrade(upgrade.as_bytes()));
-    for probe in [
+fn the_stand_in_holds_only_a_valid_trading_upgrade() {
+    let upgrade = upgrade_request();
+    assert_eq!(parse_head(upgrade.as_bytes()), Head::Upgrade);
+    // Every proper prefix of it is still arriving.
+    for end in 0..upgrade.len() {
+        assert_eq!(
+            parse_head(&upgrade.as_bytes()[..end]),
+            Head::Partial,
+            "{end}"
+        );
+    }
+    let without = |line: &str| upgrade.replace(line, "");
+    let with = |from: &str, to: &str| upgrade.replace(from, to);
+    for other in [
         "HEAD / HTTP/1.1\r\nHost: x\r\n\r\n".to_owned(),
-        "GET / HTTP/1.1\r\nHost: x\r\n\r\n".to_owned(),
-        format!("GET {PATH} HTTP/1.1\r\nHost: x\r\n\r\n"),
-        format!("POST {PATH} HTTP/1.1\r\nUpgrade: websocket\r\n\r\n"),
+        "\x16\x03\x01 not http\r\n\r\n".to_owned(),
+        with("GET ", "POST "),
+        with("GET /ws/trade.sbe ", "GET / "),
+        with("HTTP/1.1", "HTTP/1.0"),
+        with("HTTP/1.1", "HTTP/2.0"),
+        without("Host: x\r\n"),
+        without("Upgrade: websocket\r\n"),
+        with("Upgrade: websocket", "Upgrade: h2c"),
+        without("Connection: keep-alive, Upgrade\r\n"),
+        with("Connection: keep-alive, Upgrade", "Connection: keep-alive"),
+        without("Sec-WebSocket-Version: 13\r\n"),
+        with("Sec-WebSocket-Version: 13", "Sec-WebSocket-Version: 8"),
+        without("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"),
+        with("dGhlIHNhbXBsZSBub25jZQ==", "not base64!"),
+        with("dGhlIHNhbXBsZSBub25jZQ==", "c2hvcnQ="),
+        with(
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+            "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n",
+        ),
     ] {
-        assert!(!is_trading_upgrade(probe.as_bytes()), "{probe:?}");
+        assert_eq!(parse_head(other.as_bytes()), Head::Other, "{other:?}");
     }
 }
 
@@ -365,7 +469,15 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
         let mut scripts = scripts.into_iter();
         let mut script = scripts.next();
         while let Some(current) = script.clone() {
-            let (tcp, _) = listener.accept().await.unwrap();
+            let tcp = match &current.hold {
+                Some(hold) => {
+                    let tcp = next_upgrade(&listener).await;
+                    hold.arrived.notify_one();
+                    hold.release.notified().await;
+                    tcp
+                }
+                None => listener.accept().await.unwrap().0,
+            };
             if current.hang {
                 seen.lock().unwrap().push(Seen::default());
                 script = scripts.next();
@@ -374,13 +486,6 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                     std::future::pending::<()>().await;
                 });
                 continue;
-            }
-            if let Some(hold) = &current.hold {
-                if !upgrade_arrived(&tcp).await {
-                    continue;
-                }
-                hold.arrived.notify_one();
-                hold.release.notified().await;
             }
             let captured: Arc<Mutex<Seen>> = Arc::default();
             let capture = Arc::clone(&captured);
@@ -1983,4 +2088,101 @@ async fn a_switch_during_an_upgrade_in_flight_applies_from_the_next_upgrade() {
         "the upgrade in flight kept the opt-in; the two after it dropped it"
     );
     assert!(session.err().is_none(), "{:?}", session.err());
+}
+
+/// The upgrade in flight at a switch opted in, so the server must confirm
+/// it: an answer that does not stops the session, as at the first connect,
+/// although the switch no longer asks for the opt-in.
+#[tokio::test]
+async fn an_upgrade_in_flight_at_a_switch_must_confirm_its_opt_in() {
+    let hold = Arc::new(Hold::default());
+    let held_unconfirmed = Script {
+        hold: Some(Arc::clone(&hold)),
+        echo_cod: false,
+        ..serve()
+    };
+    let close_after_arm = Script {
+        close_after: Some(1),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![close_after_arm, held_unconfirmed, serve()]).await;
+    let mut session = start(url).await;
+    lose(&mut session, 1).await;
+    tokio::time::timeout(WAIT, hold.arrived.notified())
+        .await
+        .expect("the reconnect's upgrade is in flight");
+    session.disable_cancel_on_disconnect();
+    hold.release.notify_one();
+    tokio::time::timeout(WAIT, async {
+        while let Some(event) = session.recv().await {
+            assert!(!matches!(event, Event::Ready { .. }), "{event:?}");
+        }
+    })
+    .await
+    .expect("the session stops");
+    assert!(
+        matches!(
+            session.err(),
+            Some(Error::TradeSession(TradeError::NotProtected))
+        ),
+        "{:?}",
+        session.err()
+    );
+    assert_eq!(opt_ins(&record), [opted_in(), opted_in()]);
+}
+
+/// Other processes probe local ports on a shared machine. Probes that reach
+/// the stand-in before the client's upgrade (part of a head, left open or
+/// cut off by a shutdown; garbage; another request; an upgrade over HTTP/1.0
+/// or without its key) neither take the held script nor keep the upgrade
+/// from it.
+#[tokio::test]
+async fn probes_before_the_upgrade_neither_take_nor_block_the_hold() {
+    use tokio::io::AsyncWriteExt;
+    let hold = Arc::new(Hold::default());
+    let (url, record) = stand_in(vec![Script {
+        hold: Some(Arc::clone(&hold)),
+        ..serve()
+    }])
+    .await;
+    let addr = url
+        .strip_prefix("ws://")
+        .and_then(|rest| rest.strip_suffix(PATH))
+        .unwrap()
+        .to_owned();
+    let upgrade = upgrade_request();
+    let part = &upgrade[..upgrade.len() / 2];
+    let http_1_0 = upgrade.replace("HTTP/1.1", "HTTP/1.0");
+    let keyless = upgrade.replace("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n", "");
+    let mut probes = Vec::new();
+    for (bytes, shutdown) in [
+        (part, false),
+        (part, true),
+        ("\x16\x03\x01 garbage", true),
+        ("HEAD / HTTP/1.1\r\nHost: x\r\n\r\n", false),
+        (http_1_0.as_str(), false),
+        (keyless.as_str(), false),
+    ] {
+        let mut probe = tokio::net::TcpStream::connect(&addr).await.unwrap();
+        probe.write_all(bytes.as_bytes()).await.unwrap();
+        if shutdown {
+            probe.shutdown().await.unwrap();
+        }
+        probes.push(probe);
+    }
+    let client = tokio::spawn(connect(config(url)));
+    tokio::time::timeout(WAIT, hold.arrived.notified())
+        .await
+        .expect("the client's upgrade is held");
+    hold.release.notify_one();
+    let session = tokio::time::timeout(WAIT, client)
+        .await
+        .expect("connects in time")
+        .unwrap()
+        .expect("connects");
+    ready(&session).await;
+    let seen = record.lock().unwrap().clone();
+    assert_eq!(seen.len(), 1, "{seen:?}");
+    assert_eq!(seen[0].path, PATH);
+    drop(probes);
 }
