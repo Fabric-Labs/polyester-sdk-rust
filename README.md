@@ -2842,12 +2842,13 @@ if let Some(snapshot) = book.updates().recv().await {
 # }
 ```
 
-`orderbook.get` takes any level count per side from 1 to the `max_depth` every
-snapshot reports (5,000 levels by default) and sends it as given; `None` or
-`Some(0)` asks for the default of 50, and the result's `depth` is the depth
-requested, 50 for the default. A depth above `max_depth` is refused by the server
-with `invalid_argument` (`Error::Api` with code `InvalidArgument`), never
-truncated: ask for at most `max_depth`. A snapshot also carries `book_epoch`, the
+`orderbook.get` takes one of the contract's depth tiers, 1, 5, 10, 20, 50, 100,
+200, 500, 1000 or 5000 levels per side
+(`polyester::codecs::decode::DEPTH_TIERS`), and sends it as that tier; `None`
+asks for the default of 50. Any other count, `Some(0)` included, is
+`Error::Validation` before sending: round it up to the next tier and trim the
+result yourself. The result's `depth` is the tier the server served. A
+snapshot also carries `book_epoch`, the
 epoch of its `book_seq`: order snapshots by `(book_epoch, book_seq)` with
 `polyester::codecs::decode::compare_snapshots`, since a new epoch may restart
 `book_seq`, and keep only the newest. A snapshot is a frozen view at its own
@@ -2857,8 +2858,8 @@ position: never apply stream updates to it, and fetch it again to refresh it.
 # async fn example(client: polyester::Client) -> polyester::Result<()> {
 use polyester::codecs::decode::compare_snapshots;
 
-let first = client.orderbook.get("BTC-USDT", Some(2500)).await?;
-let again = client.orderbook.get("BTC-USDT", Some(first.max_depth)).await?;
+let first = client.orderbook.get("BTC-USDT", Some(1000)).await?;
+let again = client.orderbook.get("BTC-USDT", Some(first.depth)).await?;
 let newest = if compare_snapshots(&again, &first)?.is_ge() { again } else { first };
 println!("epoch {} seq {}", newest.book_epoch, newest.book_seq);
 # Ok(())
@@ -2880,8 +2881,7 @@ subscribe there:
   connecting, and `set_bucket` returns it and keeps the current bucket. A depth above
   500, or `Some(0)`, is `Error::Validation` before connecting; for more than 500
   levels, read a snapshot with `orderbook.get`. A managed view is not a snapshot:
-  its `book_epoch` is empty and its `max_depth` 0, since the stream carries no
-  epoch.
+  its `book_epoch` is empty, since the stream carries no epoch.
 - `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
   only a published depth and returns `Error::Validation` for any other.
 
