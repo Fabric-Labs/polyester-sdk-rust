@@ -9820,6 +9820,7 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
             .deposit
             .create_address(CreateDepositAddressRequest {
                 subaccount_id: plain_id,
+                chain_id: 1,
                 ..Default::default()
             })
             .await;
