@@ -148,8 +148,6 @@ mod leg_codes {
     pub const SLIPPAGE_BPS_INVALID: &str = "ERROR_CODE_SLIPPAGE_BPS_INVALID";
     pub const SLIPPAGE_TICKS_INVALID: &str = "ERROR_CODE_SLIPPAGE_TICKS_INVALID";
     pub const TRAILING_DISTANCE_INVALID: &str = "ERROR_CODE_TRAILING_DISTANCE_INVALID";
-    pub const TRIGGER_ACTIVATION_PRICE_INVALID: &str =
-        "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID";
     pub const TRIGGER_PRICE_INVALID: &str = "ERROR_CODE_TRIGGER_PRICE_INVALID";
 }
 
@@ -1007,14 +1005,17 @@ impl OrdersService {
             ..Default::default()
         };
         if let Some(activation) = stop.activation_price.as_ref() {
-            // 0 is no activation price on the wire: a zero one is refused
-            // rather than sent as none; leave it `None` for none.
-            proto.activation_price_ticks = coded_positive_price(
-                activation,
-                symbol,
-                "attached_risk trailing_stop activation_price",
-                leg_codes::TRIGGER_ACTIVATION_PRICE_INVALID,
-            )?;
+            // The contract reads 0 as no activation price. Only `None` means
+            // absent here, so an explicit zero is this SDK's own refusal,
+            // not a server one: leave it `None` for none. A `Price` is
+            // never negative, the case the server refuses.
+            let ticks = resolve_price_ticks(activation, symbol)?;
+            if ticks == 0 {
+                return Err(Error::validation(
+                    "attached_risk trailing_stop activation_price is zero: leave it None for no activation price",
+                ));
+            }
+            proto.activation_price_ticks = ticks;
         }
         // The trailing stop of a sell order buys back and declares the most its
         // exit pays; the trailing stop of a buy order sells and declares none.
@@ -2712,7 +2713,7 @@ mod tests {
                     ),
                     ..Default::default()
                 }),
-                "trailing_stop activation_price must be positive",
+                "leave it None for no activation price",
             ));
             for (label, params, want) in cases {
                 let err = client
@@ -2729,7 +2730,6 @@ mod tests {
                     "take_profit child limit" | "stop_loss child limit" => {
                         Some("ERROR_CODE_BAD_PRICE")
                     }
-                    "trailing activation" => Some("ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID"),
                     _ => None,
                 };
                 match code {
@@ -3481,11 +3481,6 @@ mod tests {
                 ),
                 "ERROR_CODE_MAX_SLIPPAGE_INVALID",
             ),
-            (
-                TrailingStop::new(TrailingDistance::Bps(100))
-                    .with_activation_price(Price::from_ticks(0, Some("BTC-USDT".into())).unwrap()),
-                "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID",
-            ),
         ];
         for (trailing, want) in cases {
             let risk = AttachedRisk {
@@ -3507,6 +3502,20 @@ mod tests {
                 );
             }
         }
+        // The contract reads an activation price of 0 as none; this SDK
+        // refuses an explicit zero itself, since only None means absent. It
+        // is no server refusal, so it carries no server code.
+        let mut zero = create.clone();
+        zero.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(
+                TrailingStop::new(TrailingDistance::Bps(100))
+                    .with_activation_price(Price::from_ticks(0, Some("BTC-USDT".into())).unwrap()),
+            ),
+            ..Default::default()
+        });
+        let err = client.orders.encode_create_params(&zero).unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("leave it None"), "{err}");
         // The edges stay accepted.
         let mut params = create.clone();
         params.attached_risk = Some(AttachedRisk {

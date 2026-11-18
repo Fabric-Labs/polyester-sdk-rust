@@ -776,9 +776,9 @@ missing, not positive or outside 1–10000 bps,
 `ERROR_CODE_TRAILING_DISTANCE_INVALID`; its `max_slippage` in ticks that is not
 positive, `ERROR_CODE_SLIPPAGE_TICKS_INVALID`; in bps, below 1
 `ERROR_CODE_SLIPPAGE_BPS_INVALID` and 10000 or more
-`ERROR_CODE_MAX_SLIPPAGE_INVALID`; its `activation_price` that is not
-positive, `ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID` (leave it `None` for
-no activation price).
+`ERROR_CODE_MAX_SLIPPAGE_INVALID`. An explicit zero `activation_price` is
+this SDK's own `Error::Validation`, not a server refusal: the contract reads 0
+as no activation price, so leave it `None` for none.
 
 `ModifyOrderParams.new_attached_risk` and `BatchReplaceItem.new_attached_risk`
 replace the order's legs; `None` leaves them unchanged, and an empty
