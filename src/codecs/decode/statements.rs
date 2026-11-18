@@ -1,13 +1,17 @@
-//! Account statement CSV reader.
+//! Statement export decoders and the account statement CSV reader.
 
 use crate::codecs::decode::common::require_id;
 use crate::codecs::decode::dust::prefixed_label;
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
-use crate::models::{StatementExport, StatementExportsList, StatementRow};
+use crate::models::{
+    StatementExport, StatementExportDownloadUrl, StatementExportsList, StatementRow,
+};
 use crate::proto::ledger::read::v1::{
-    CreateStatementExportResponse, GetStatementExportResponse, ListStatementExportsResponse,
-    StatementExport as ProtoStatementExport, StatementExportFailureReason, StatementExportStatus,
+    CancelStatementExportResponse, CreateStatementExportResponse,
+    GetStatementExportDownloadUrlResponse, GetStatementExportResponse,
+    ListStatementExportsResponse, StatementExport as ProtoStatementExport,
+    StatementExportFailureReason, StatementExportStatus,
 };
 use buffa_types::google::protobuf::Timestamp;
 use serde::Deserialize;
@@ -18,7 +22,7 @@ const REQUIRED_COLUMNS: [&str; 9] = [
 ];
 
 fn invalid(message: impl std::fmt::Display) -> Error {
-    Error::response_contract("ExportStatement", format!("statement csv: {message}"))
+    Error::response_contract("statement file", format!("statement csv: {message}"))
 }
 
 /// Split RFC 4180 text into records: fields separated by commas, records by
@@ -151,6 +155,47 @@ pub fn statement_export_from_get_response(
     statement_export(OP, export)
 }
 
+/// The export a `CancelStatementExport` reply returns; a reply without it,
+/// or without its export ID, is an [`Error::ResponseContract`].
+pub fn statement_export_from_cancel_response(
+    msg: &CancelStatementExportResponse,
+) -> Result<StatementExport> {
+    const OP: &str = "CancelStatementExport";
+    let export = msg
+        .export
+        .as_option()
+        .ok_or_else(|| Error::response_contract(OP, "missing export"))?;
+    statement_export(OP, export)
+}
+
+/// The download URL a `GetStatementExportDownloadUrl` reply returns; a reply
+/// without a URL is an [`Error::ResponseContract`], since the URL is all the
+/// call is for.
+pub fn statement_export_download_url_from_proto(
+    msg: &GetStatementExportDownloadUrlResponse,
+) -> Result<StatementExportDownloadUrl> {
+    if msg.url.is_empty() {
+        return Err(Error::response_contract(
+            "GetStatementExportDownloadUrl",
+            "missing url",
+        ));
+    }
+    let expires_at = msg.expires_at.as_option().cloned().ok_or_else(|| {
+        Error::response_contract("GetStatementExportDownloadUrl", "missing expires_at")
+    })?;
+    if msg.filename.is_empty() {
+        return Err(Error::response_contract(
+            "GetStatementExportDownloadUrl",
+            "missing filename",
+        ));
+    }
+    Ok(StatementExportDownloadUrl {
+        url: msg.url.clone(),
+        expires_at,
+        filename: msg.filename.clone(),
+    })
+}
+
 pub fn statement_exports_list_from_proto(
     msg: &ListStatementExportsResponse,
 ) -> Result<StatementExportsList> {
@@ -161,11 +206,13 @@ pub fn statement_exports_list_from_proto(
             .map(|e| statement_export("ListStatementExports", e))
             .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
+        in_progress_exports: msg.in_progress_exports,
+        max_in_progress_exports: msg.max_in_progress_exports,
     })
 }
 
-/// Read a complete statement's rows by header name: the CSV text of
-/// [`crate::models::Statement`], or a first page, header row first.
+/// Read a statement file's rows by header name: the CSV text of a `ready`
+/// [`crate::models::StatementExport`]'s file, header row first.
 ///
 /// Columns are found by name, so a statement with columns in another order,
 /// or with columns appended by a later release, reads the same; columns this
@@ -420,11 +467,75 @@ mod tests {
         let list = statement_exports_list_from_proto(&ListStatementExportsResponse {
             exports: vec![future],
             next_page_token: "n".into(),
+            in_progress_exports: 5,
+            max_in_progress_exports: 5,
             ..Default::default()
         })
         .unwrap();
         assert_eq!(list.exports[0].status, "UNKNOWN(42)");
         assert_eq!(list.next_page_token, "n");
+        assert_eq!(
+            (list.in_progress_exports, list.max_in_progress_exports),
+            (5, 5)
+        );
+        let mut canceled = export(10);
+        canceled.status = StatementExportStatus::STATEMENT_EXPORT_STATUS_CANCELED.into();
+        canceled.failure_reason = buffa::EnumValue::from(0);
+        let got = statement_export_from_cancel_response(&CancelStatementExportResponse {
+            export: canceled.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            (got.export_id, got.status.as_str()),
+            (format_uint64_id(10), "canceled")
+        );
+    }
+
+    /// A download URL reply keeps its URL, expiry and file name as sent, and
+    /// a reply without a URL is refused.
+    #[test]
+    fn statement_export_download_url_requires_its_url() {
+        let expires_at = Timestamp {
+            seconds: 1_763_337_660,
+            nanos: 5,
+            ..Default::default()
+        };
+        let got =
+            statement_export_download_url_from_proto(&GetStatementExportDownloadUrlResponse {
+                url: "https://files.example/s?sig=x".into(),
+                expires_at: expires_at.clone().into(),
+                filename: "statement-7.csv".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(got.url, "https://files.example/s?sig=x");
+        assert_eq!(got.expires_at, expires_at);
+        assert_eq!(got.filename, "statement-7.csv");
+        let err =
+            statement_export_download_url_from_proto(&GetStatementExportDownloadUrlResponse {
+                filename: "statement-7.csv".into(),
+                ..Default::default()
+            })
+            .unwrap_err();
+        assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+        // The expiry and the file name are part of every URL the contract
+        // returns: a reply without either is refused, not read as unknown.
+        for reply in [
+            GetStatementExportDownloadUrlResponse {
+                url: "https://files.example/s?sig=x".into(),
+                filename: "statement-7.csv".into(),
+                ..Default::default()
+            },
+            GetStatementExportDownloadUrlResponse {
+                url: "https://files.example/s?sig=x".into(),
+                expires_at: expires_at.clone().into(),
+                ..Default::default()
+            },
+        ] {
+            let err = statement_export_download_url_from_proto(&reply).unwrap_err();
+            assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+        }
     }
 
     /// An export reply must carry the export and its ID.
@@ -434,6 +545,11 @@ mod tests {
             statement_export_from_create_response(&CreateStatementExportResponse::default()),
             statement_export_from_get_response(&GetStatementExportResponse::default()),
             statement_export_from_get_response(&GetStatementExportResponse {
+                export: export(0).into(),
+                ..Default::default()
+            }),
+            statement_export_from_cancel_response(&CancelStatementExportResponse::default()),
+            statement_export_from_cancel_response(&CancelStatementExportResponse {
                 export: export(0).into(),
                 ..Default::default()
             }),

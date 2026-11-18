@@ -358,10 +358,10 @@ fn inventory_lists_every_reply_id_field() {
     );
 }
 
-/// The messages of the 0.93.3 and 0.93.4 contract changes whose every field the SDK
-/// sets from a parameter or exposes on a model, unless the inventory says
-/// why not.
-const FIELD_INVENTORY_MESSAGES: [&str; 37] = [
+/// The messages of the 0.93.3, 0.93.4 and 0.93.5 contract changes whose every
+/// field the SDK sets from a parameter or exposes on a model, unless the
+/// inventory says why not.
+const FIELD_INVENTORY_MESSAGES: [&str; 43] = [
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.GetStatementExportRequest",
     "ledger.read.v1.ListStatementExportsRequest",
@@ -369,12 +369,17 @@ const FIELD_INVENTORY_MESSAGES: [&str; 37] = [
     "ledger.read.v1.CreateStatementExportResponse",
     "ledger.read.v1.GetStatementExportResponse",
     "ledger.read.v1.ListStatementExportsResponse",
-    "ledger.read.v1.ExportStatementResponse",
+    "ledger.read.v1.GetStatementExportDownloadUrlRequest",
+    "ledger.read.v1.GetStatementExportDownloadUrlResponse",
+    "ledger.read.v1.CancelStatementExportRequest",
+    "ledger.read.v1.CancelStatementExportResponse",
     "ledger.read.v1.BalanceSeries",
     "ledger.read.v1.GetBalanceHistoryResponse",
     "transfer.v1.BatchCreateInternalTransfersRequest",
     "transfer.v1.InternalTransferBatchLeg",
     "transfer.v1.BatchCreateInternalTransfersResponse",
+    "transfer.v1.GetInternalTransferBatchRequest",
+    "transfer.v1.GetInternalTransferBatchResponse",
     "transfer.v1.InternalTransferBatchLegResult",
     "transfer.v1.ResolvedDestination",
     "transfer.v1.ListDustBalancesRequest",
@@ -399,6 +404,7 @@ const FIELD_INVENTORY_MESSAGES: [&str; 37] = [
     "auth.v1.AuthErrorDetail",
     "orderbook.v1.GetOrderBookRequest",
     "orderbook.v1.GetOrderBookResponse",
+    "system.v1.GetTimeResponse",
 ];
 
 /// Every proto field of `message` as `<message>.<field>`, a oneof's members

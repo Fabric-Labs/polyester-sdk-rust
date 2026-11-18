@@ -8,15 +8,16 @@ use crate::codecs::decode::policies::subaccount_policy_from_proto;
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::Result as SdkResult;
 use crate::models::{
-    CreateSubaccountResult, GetSubaccountResult, SubAccount, SubAccountActivityEvent,
-    SubAccountActivityList, SubAccountInvite, SubAccountInvitesList, SubAccountMember,
-    SubAccountMembersList, SubAccountsList,
+    AccountActivityEvent, AccountActivityList, CreateSubaccountResult, GetSubaccountResult,
+    SubAccount, SubAccountActivityEvent, SubAccountActivityList, SubAccountInvite,
+    SubAccountInvitesList, SubAccountMember, SubAccountMembersList, SubAccountsList,
 };
 use crate::proto::auth::v1::{
-    CreateSubaccountResponse, GetSubaccountResponse, InviteSubaccountMemberResponse,
-    ListSubaccountEventsResponse, ListSubaccountInvitesResponse, ListSubaccountMembersResponse,
-    ListSubaccountsResponse, RespondSubaccountInviteResponse, Subaccount, SubaccountInvite,
-    SubaccountInviteDirection, SubaccountMemberView, SubaccountRole, SubaccountStatus,
+    ActivityEvent as ProtoActivityEvent, CreateSubaccountResponse, GetSubaccountResponse,
+    InviteSubaccountMemberResponse, ListAccountActivityResponse, ListSubaccountEventsResponse,
+    ListSubaccountInvitesResponse, ListSubaccountMembersResponse, ListSubaccountsResponse,
+    RespondSubaccountInviteResponse, Subaccount, SubaccountInvite, SubaccountInviteDirection,
+    SubaccountMemberView, SubaccountRole, SubaccountStatus,
 };
 
 fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> i64 {
@@ -263,11 +264,115 @@ pub fn subaccount_activity_list_from_proto(
     }
 }
 
+/// A nonzero opaque ID as base58; `None` for 0, which the contract uses for
+/// an absent reference.
+fn optional_id(id: u64) -> Option<String> {
+    (id != 0).then(|| format_uint64_id(id))
+}
+
+fn account_activity_event_from_proto(e: &ProtoActivityEvent) -> SdkResult<AccountActivityEvent> {
+    let created_at = e.created_at.as_option().ok_or_else(|| {
+        crate::errors::Error::response_contract("ListAccountActivity", "event has no created_at")
+    })?;
+    Ok(AccountActivityEvent {
+        event_type: format!(
+            "{}:{}",
+            activity_label(&e.entity_kind, "ACTIVITY_ENTITY_"),
+            activity_label(&e.event_action, "ACTIVITY_ACTION_")
+        ),
+        ts_ms: timestamp_ms(Some(created_at)),
+        source: if e.source.to_i32() == 0 {
+            String::new()
+        } else {
+            activity_label(&e.source, "ACTIVITY_SOURCE_")
+        },
+        subaccount_id: optional_id(e.subaccount_id),
+        actor_account_id: optional_id(e.actor_account_id),
+        actor_api_key_id: optional_id(e.actor_api_key_id),
+        ip: e.ip.clone(),
+        user_agent: e.user_agent.clone(),
+        payload_json: e.payload_json.clone(),
+    })
+}
+
+/// One page of `ListAccountActivity`, newest first. An event without its
+/// creation time is an [`crate::errors::Error::ResponseContract`].
+pub fn account_activity_list_from_proto(
+    msg: &ListAccountActivityResponse,
+) -> SdkResult<AccountActivityList> {
+    Ok(AccountActivityList {
+        events: msg
+            .events
+            .iter()
+            .map(account_activity_event_from_proto)
+            .collect::<SdkResult<_>>()?,
+        next_page_token: msg.next_page_token.clone(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::proto::auth::v1::{ActivityEntityKind, ActivityEvent, ActivityEventAction};
     use buffa_types::google::protobuf::Timestamp;
+
+    /// The account feed names each event's sub-account, actor and API key as
+    /// base58 IDs, and reads 0 as absent: the main account's own event, or an
+    /// actor that used a session.
+    #[test]
+    fn account_activity_names_subaccount_and_api_key() {
+        use crate::proto::auth::v1::ActivityEventSource;
+
+        let list = account_activity_list_from_proto(&ListAccountActivityResponse {
+            events: vec![
+                ActivityEvent {
+                    created_at: Timestamp {
+                        seconds: 1_794_700_000,
+                        nanos: 250_000_000,
+                        ..Default::default()
+                    }
+                    .into(),
+                    entity_kind: ActivityEntityKind::ACTIVITY_ENTITY_API_KEY.into(),
+                    event_action: ActivityEventAction::ACTIVITY_ACTION_CREATED.into(),
+                    source: ActivityEventSource::ACTIVITY_SOURCE_API.into(),
+                    subaccount_id: 42,
+                    actor_account_id: 7,
+                    actor_api_key_id: 9,
+                    payload_json: "{\"name\":\"bot\"}".into(),
+                    ..Default::default()
+                },
+                ActivityEvent {
+                    created_at: Timestamp {
+                        seconds: 1_794_700_001,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                },
+            ],
+            next_page_token: "next".into(),
+            ..Default::default()
+        })
+        .unwrap();
+        let first = &list.events[0];
+        assert_eq!(first.event_type, "api_key:created");
+        assert_eq!(first.ts_ms, 1_794_700_000_250);
+        assert_eq!(first.source, "api");
+        assert_eq!(first.subaccount_id, Some(format_uint64_id(42)));
+        assert_eq!(first.actor_account_id, Some(format_uint64_id(7)));
+        assert_eq!(first.actor_api_key_id, Some(format_uint64_id(9)));
+        assert_eq!(first.payload_json, "{\"name\":\"bot\"}");
+        let main = &list.events[1];
+        assert_eq!(
+            (
+                &main.subaccount_id,
+                &main.actor_api_key_id,
+                main.source.as_str()
+            ),
+            (&None, &None, "")
+        );
+        assert_eq!(list.next_page_token, "next");
+    }
 
     #[test]
     fn subaccounts_list_maps_fields() {

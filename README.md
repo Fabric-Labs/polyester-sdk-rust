@@ -90,14 +90,18 @@ empty when unset), `READ_VIP_STATUS` for `vip.get_vip_status`,
 `READ_DEPOSIT_ADDRESSES` for `deposit.list_addresses`, `CREATE_DEPOSIT_ADDRESS`
 for `deposit.create_address`, `READ_SUBACCOUNTS` for `sub_accounts.list` and
 `sub_accounts.get`, `READ_SUBACCOUNT_ACTIVITY` for
-`sub_accounts.list_activity`, `READ_SUBACCOUNT_MEMBERS` for
+`sub_accounts.list_activity`, `READ_ACCOUNT_ACTIVITY` for
+`sub_accounts.list_account_activity` (the main account's and every
+sub-account's security and activity events in one feed, newest first; a key
+scoped to a sub-account reads only that sub-account's), `READ_SUBACCOUNT_MEMBERS` for
 `sub_accounts.list_members` (and the members of `sub_accounts.get`),
 `READ_SUBACCOUNT_INVITES` for `sub_accounts.list_invites` (and the invites of
 `sub_accounts.get`, which leaves out an expansion the key may not read rather
 than failing), `READ_GUARD_SIGNER_STATUS` for `guard_signer.get_status`, and
 `READ_BALANCES` for `withdraw.get_wallet_balances` and `dust.list_balances`,
-`READ_STATEMENTS` for `statements.export_page`, `statements.export` and the
-statement export files (`READ_BALANCES` does not grant it), `CONVERT_DUST` for
+`READ_STATEMENTS` for the statement exports (`statements.create_export`,
+`get_export`, `list_exports`, `cancel_export` and `get_export_download_url`;
+`READ_BALANCES` does not grant it), `CONVERT_DUST` for
 `dust.quote`, `dust.convert`, `dust.get_conversion` and `dust.list_conversions`,
 and `READ_FUNDING_FLOWS` for `lifecycle.list_account_flows` and
 `lifecycle.get_account_flow`. A key scoped to the main
@@ -450,7 +454,15 @@ client.wait_for_catalogs().await?;
 
 The hydrated zipper config also seeds each variant's supply, read with
 `catalogs.supply_for_zipped_asset_id`; `zipper.subscribe_zipped_asset_supply(true)`
-keeps it current.
+keeps it current. Each variant carries `supply_status` (`"available"`,
+`"stale"` or `"missing"`) and `supply_observed_at`; `supply` is `Some` only
+while the status is available or stale, and `None` never means zero: a
+missing supply is not known. `catalogs.zipped_asset_supply` returns the
+status, supply and observation time together; an available or stale supply
+without its observation time is refused with `Error::ResponseContract`. Size a withdrawal against the
+supply only while `supply_is_current()` (available): a withdrawal on a route
+whose supply is stale or missing is refused with
+`ERROR_CODE_SUPPLY_UNAVAILABLE`, and nothing is reserved for it.
 
 Each variant of `zipper.get_deposit_withdraw_config` says whether its route
 accepts new deposits and new withdrawals: `deposit_status` and
@@ -753,6 +765,20 @@ price, `ERROR_CODE_BAD_PRICE` / `buy_at_least_activation`. A modify or batch
 replace sends the maximum as given: it does not carry the order's side, so the
 server applies the side rule and answers `ERROR_CODE_BAD_PRICE` with no
 violation.
+
+The other attached-leg values the SDK refuses before sending carry the code
+the Orders API and the trading WebSocket answer for the same value, as an
+`Error::Api` with that code and no violation, on `create`, `preview`,
+`batch_create`, `modify` and `batch_replace` alike: a take-profit or stop-loss
+`trigger_price` that is not positive, `ERROR_CODE_TRIGGER_PRICE_INVALID`; its
+limit child's price, `ERROR_CODE_BAD_PRICE`; a trailing stop's distance that is
+missing, not positive or outside 1–10000 bps,
+`ERROR_CODE_TRAILING_DISTANCE_INVALID`; its `max_slippage` in ticks that is not
+positive, `ERROR_CODE_SLIPPAGE_TICKS_INVALID`; in bps, below 1
+`ERROR_CODE_SLIPPAGE_BPS_INVALID` and 10000 or more
+`ERROR_CODE_MAX_SLIPPAGE_INVALID`. An explicit zero `activation_price` is
+this SDK's own `Error::Validation`, not a server refusal: the contract reads 0
+as no activation price, so leave it `None` for none.
 
 `ModifyOrderParams.new_attached_risk` and `BatchReplaceItem.new_attached_risk`
 replace the order's legs; `None` leaves them unchanged, and an empty
@@ -1202,6 +1228,16 @@ nothing and is retryable; `SERVICE_UNAVAILABLE` leaves a create, update or
 cancel outcome unknown, so send it again with the same idempotency key
 (`cancel` is idempotent) or read the alerts back.
 
+`AlertChannel::Telegram` needs a Telegram account linked to the account and
+an environment that offers Telegram alerts. Otherwise a `create`, or an
+`update` that changes an alert whose channels then include Telegram, is
+refused (`failed_precondition`, nothing changed, final) with
+`TELEGRAM_NOT_LINKED` (link Telegram in the account settings, or send in-app
+only) or `TELEGRAM_UNAVAILABLE` (send in-app only); an update that changes
+nothing, or repeats an earlier idempotency key, answers as before. A fired
+alert whose Telegram message could not be delivered shows in the account's
+notification inbox, which this SDK does not wrap.
+
 A price bound to a market (`Price::from_ticks(t, Some("ETH-USDT".into()))`)
 is checked against the catalogs' name for the market's ID; when the catalogs
 don't know that ID (never loaded, failed to load, or not listed) `create`
@@ -1220,6 +1256,16 @@ trusting it.
 reads `"0.10.0"`; a build made after one reads `"0.10.0-12-g4e21a2f09670"`,
 which is not a semantic version, so compare `release()` (the part before the
 first `-`) rather than parsing it.
+
+## Server time
+
+`client.get_time().await?` returns the server clock that checks the timestamp
+of requests signed with an API key (`system.v1.SystemService/GetTime`), as
+`server_time_ms`, milliseconds since the Unix epoch, exact as sent. It needs no
+API key and is never cached. A signed request is accepted while its timestamp
+is at most 1000 ms ahead of this clock and at most its receive window behind
+it: estimate the local clock's offset as
+`server_time_ms - (sent + received) / 2`.
 
 ## Maintenance and incident status
 
@@ -1560,27 +1606,41 @@ SDK notes:
 - **Trading → external destination check:**
   `client.withdraw.validate_destination(chain_id, address).await?` returns
   user-safe `valid` / `code` / `message` / `canonical_destination_address`
-  without creating a withdraw (create RPCs remain authoritative). An API key
+  without creating a withdraw (create RPCs remain authoritative). `chain_id`,
+  like every withdrawal's `destination_chain_id`, is the Polyester chain ID
+  (`ZipperChainConfig::chain_id` from `zipper.get_deposit_withdraw_config`), not the
+  network's `native_chain_id`: a native ID answers `valid: false` with
+  `UNSUPPORTED_CHAIN`, and a withdrawal naming one is refused with
+  `ERROR_CODE_INVALID_DESTINATION_CHAIN` (not retryable). An API key
   needs `READ_WITHDRAW_VALIDATION`; `EXTERNAL_WITHDRAW` alone no longer
   opens it.
 - **Smart account wallet:** `client.withdraw.get_wallet_balances(SubAccountScope::Default).await?`
   lists the zTokens the account's smart account wallet holds on Polyester
   Chain, such as the refund of a withdrawal Zipper rejected (the amount less
   the fee Zipper kept), with each balance in 18-decimal units (`amount_e18`)
-  and whole units (`amount`). Pass a sub-account ID to read that sub-account's
-  wallet. An API key needs `READ_BALANCES`.
+  and whole units (`amount`). An asset whose balance could not be read is in
+  `unavailable_assets` with its `reason` (`no_contract`, `read_failed` or
+  `invalid_balance`): its balance is unknown, not zero, so check
+  `is_complete()` and read again later. Pass a sub-account ID to read that
+  sub-account's wallet. An API key needs `READ_BALANCES`.
 - **Trading → trading (another account):** `client.internal_transfers.create(...)`.
   The result's `flow_id` names the transfer's lifecycle flow
   (`client.lifecycle.get_account_flow`). Looking a transfer up by its request or
   transfer ID is session-only and not wrapped.
 - **Several Trading → trading transfers at once:**
-  `client.internal_transfers.batch_create(...)` sends 1 to 10 legs under one
-  idempotency key and one MFA check (an API key needs none). Every leg is
-  checked before any leg runs: if one fails, the batch is `refused` and nothing
-  moves. Otherwise legs run in order and are not atomic, so a leg can be
-  `refused` after earlier legs were `accepted`. A `pending` leg's outcome is not
-  known yet: retry the batch with the same key and legs to learn it. Each leg
-  counts as one internal transfer against the rate limit.
+  `client.internal_transfers.batch_create(...)` moves 1 to 500 legs together
+  under one idempotency key and one MFA check (an API key needs none): every
+  leg is credited, or none moves. The batch is `accepted` (every leg
+  `credited`, with its `transfer_id` and `flow_id`), `refused` (nothing moved,
+  and nothing will under this key: the legs that caused it carry `error_code`)
+  or `processing` (it completes on its own: follow it with
+  `client.internal_transfers.get_batch(&batch.request_id)`, or retry with the
+  same key and legs). A batch debits at most 10 distinct source accounts
+  (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
+  asset pairs. It counts once against the internal transfer rate limit, with a
+  weight of `max(ceil(legs / 50), distinct source accounts)`: a
+  `RATE_LIMIT_EXCEEDED` without `Retry-After` means the batch outweighs the
+  burst, so split it rather than retry.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1783,62 +1843,27 @@ order it arrives rather than by revision.
 
 ## Account statements
 
-`client.statements` exports an account's balance movements for a period as
-CSV (`ledger.read.v1.LedgerReadService/ExportStatement`), for reconciliation
-and tax reporting: one account (the main account or one sub-account),
-optionally one asset, for a period of at most 366 days. It is signed like the
-other ledger reads: `subaccount_id` is a `SubAccountScope`, and
-`SubAccountScope::Default` takes the configured default sub-account. `start_time` (inclusive) and `end_time` (exclusive) are required.
+`client.statements` produces an account's balance movements for a period as
+one CSV file in the background (`ledger.read.v1.StatementExportService`), for
+reconciliation and tax reporting: one account (the main account or one
+sub-account), optionally one asset, for a period of at most 366 days. It is
+signed like the other ledger reads: `subaccount_id` is a `SubAccountScope`, and
+`SubAccountScope::Default` takes the configured default sub-account.
+`start_time` (inclusive) and `end_time` (exclusive) are required.
 
-```rust,no_run
-# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
-use polyester::services::ExportStatementOptions;
-use std::time::{Duration, UNIX_EPOCH};
-
-let statement = client
-    .statements
-    .export(ExportStatementOptions {
-        start_time: Some(UNIX_EPOCH + Duration::from_secs(1_790_812_800)),
-        end_time: Some(UNIX_EPOCH + Duration::from_secs(1_793_491_200)),
-        ..Default::default()
-    })
-    .await?;
-std::fs::write("statement.csv", &statement.csv)?;
-for row in statement.rows()? {
-    println!("{} {} {} {} fee {}", row.kind, row.account, row.asset, row.amount, row.fee);
-}
-# Ok(())
-# }
-```
-
-`export` follows `next_page_token` with the same fields and concatenates the
-pages; `export_page` reads one page (at most 2000 ledger movements, an entry
-never split, the header row on the first page only). The CSV is kept as sent:
-RFC 4180, UTF-8, CRLF line endings. `rows()` and
-`codecs::decode::parse_statement_csv` read its columns by header name, so
-columns a later release appends are ignored, and keep every amount an exact
-decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
-`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
-`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
-internal transfer (empty for other entries).
-
-Each page and the whole statement carry `complete_through`: the statement covers
-movements from `start_time` up to it, exclusive, and it is the same on every
-page. When it is before `end_time`, request the rest, from `complete_through` to
-`end_time`, later. Pages that disagree on it fail with `Error::ResponseContract`.
-
-### Statement export files
-
-For a long period, `create_export` asks the server to produce the whole
-statement as one CSV file in the background (up to 366 days, idempotent per
-`idempotency_key`); `get_export` and `list_exports` report its status
-(`queued`, `processing`, `ready`, `failed` or `expired`), progress and expiry. A
-`ready` file is byte for byte the statement up to `complete_through` and is
-downloaded for 7 days over REST only, with an authenticated
-`GET /v1/statements/exports/{export_id}/file`; this SDK does not download it. A
-main account has at most 5 exports queued or processing
-(`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED`, not retryable), and a period with
-more than 4,000,000 movements fails with `failure_reason` `too_large`.
+`create_export` is idempotent per `idempotency_key`; `get_export` and
+`list_exports` report its status (`queued`, `processing`, `ready`, `failed`,
+`expired` or `canceled`), progress and expiry, and `cancel_export` cancels a
+`queued` or `processing` one (`ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE`
+otherwise). A `ready` file is byte for byte the statement up to
+`complete_through` and can be downloaded for 7 days. `get_export_download_url`
+returns a URL that downloads it without credentials, valid for at most 60
+seconds, with its `expires_at` and `filename`: anyone holding it can download
+the file, so never log or store it (its `Debug` redacts it). A main account
+has at most 5 exports queued or processing (`list_exports` reports
+`in_progress_exports` of `max_in_progress_exports`;
+`ERROR_CODE_STATEMENT_EXPORT_LIMIT_REACHED` is not retryable), and a period
+with more than 4,000,000 movements fails with `failure_reason` `too_large`.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1856,9 +1881,23 @@ let export = client
     .await?;
 let current = client.statements.get_export(&export.export_id).await?;
 println!("{} {} {} movements", current.export_id, current.status, current.movements);
+if current.status == "ready" {
+    let download = client.statements.get_export_download_url(&export.export_id).await?;
+    println!("save as {} before {:?}", download.filename, download.expires_at);
+}
 # Ok(())
 # }
 ```
+
+The file is RFC 4180 CSV, UTF-8, with CRLF line endings.
+`codecs::decode::parse_statement_csv` reads its columns by header name, so
+columns a later release appends are ignored, and keeps every amount an exact
+decimal string. The columns are `time`, `entry_id`, `type` (`kind` on a row),
+`account` (`funding` or `trading`), `asset`, `amount`, `fee`, `balance`,
+`link_id` and `flow_id`, the lifecycle flow of a deposit, withdrawal or
+internal transfer (empty for other entries). The statement covers movements
+from `start_time` up to `complete_through`, exclusive; when that is before
+`end_time`, request the rest later.
 
 ## Errors, retries, and withdrawal identity
 
@@ -1965,7 +2004,11 @@ Order permission refusals name which policy to change: `API_KEY_SPOT_TRADE_DENY`
 neither policy grants it), `API_KEY_POLICY_REQUIRED` (the key has no policy, so
 no permissions: attach one), `POLICY_SPOT_TRADE_DENY` (enable it on the
 sub-account's policy), `API_KEY_MARKET_DENY` (a main-account key whose own
-market list excludes the pair) and `POLICY_MARKET_DENY`.
+market list excludes the pair) and `POLICY_MARKET_DENY`. A trigger resume or
+modify by a key limited to some markets is judged on the trigger's own pair,
+whether or not the request names it: it needs no `symbol`, and
+`API_KEY_MARKET_DENY` there can mean the trigger's own pair is outside the
+key's markets.
 
 Services answer the same reasons with a ConnectRPC `unauthenticated` error and an
 `auth.v1.AuthErrorDetail` (`AUTH_SIGNATURE_INVALID`, `AUTH_TIMESTAMP_SKEW`,
@@ -2021,12 +2064,28 @@ quantity or `order.limit_gtc.price_ticks` for an off-tick price. Branch on the
 code, then on `rule_id`.
 
 A cancel of an order that has already ended, a repeat of the cancel that ended
-it included, is refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`:
-`Error::is_order_already_terminal()` is true. Treat it as "already done" and
-read the order for how it ended. Retry a cancel by order ID once you have it: a
-client order ID names its order for at least a minute after the order ends,
-then reads `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
-rate limit, repeats included.
+it included, is refused with `ERROR_CODE_ORDER_ALREADY_TERMINAL`
+(`Error::is_order_already_terminal()`) while the exchange can still confirm the
+order: treat it as "already done" and read the order for how it ended. An
+ended order can also answer `ERROR_CODE_ORDER_UNKNOWN`
+(`Error::is_order_unknown()`, ConnectRPC `not_found`): by client order ID once
+its window of at least a minute after the order ended has passed, and by order
+ID after exchange maintenance, such as a market listing or a recovery, that
+the order ended before. So `ERROR_CODE_ORDER_UNKNOWN` on a cancel or modify of
+an order you placed does not prove the order never existed:
+
+- if you know the order ended (you saw its final update, or this retries a
+  cancel that timed out), treat the cancel as done: an open order is never
+  reported unknown under its own order ID and market;
+- otherwise read the order with `orders.get`: an ended status (filled,
+  canceled, expired or rejected) means nothing is left to cancel or modify.
+  A retry by client order ID within its window answers
+  `ERROR_CODE_ORDER_ALREADY_TERMINAL` for an ended order too.
+
+Do not retry a cancel by order ID to tell an ended order from an unknown one:
+the retry can itself answer `ERROR_CODE_ORDER_UNKNOWN`. Neither code is
+retryable. Every cancel counts against the cancel rate limit, repeats
+included.
 
 A sub-account member call that targets the sub-account's owner (inviting the owner, accepting
 an invite for the owner, changing the owner's role or removing the owner) is refused with
@@ -2243,8 +2302,14 @@ unsigned: a plain-text `description`, official links (`website_url`,
 (an exact decimal `amount` in `USD`; `None` when unknown, distinct from a known
 zero). Pass the numeric asset IDs (the spot config's `ledger_id`), or none for
 every saved entry. The result is complete, in ascending `asset_id` order, with
-no paging; assets never edited are left out. Empty strings and lists mean
-unknown: hide them.
+no paging; assets with neither an editorial nor market datapoints are left
+out. Empty strings and lists mean unknown: hide them. `market_stats` holds the
+asset's market datapoints when it has any: `circulating_supply`,
+`total_supply`, `max_supply` (or the `max_supply_unlimited` flag),
+`market_cap_usd`, `fully_diluted_market_cap_usd` and `rank`, each an exact
+decimal `value` string with its `source` (`coinmarketcap`, shown as "Source:
+CoinMarketCap", or `polyester`) and `as_of` time. An absent value is unknown;
+a value stays until a newer observation replaces it, so show its `as_of`.
 
 Merged market overview stream (snapshot + live updates):
 

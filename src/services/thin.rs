@@ -328,22 +328,32 @@ impl InternalTransfersService {
         internal_transfer_from_proto(&resp)
     }
 
-    /// Submit 1 to 10 Trading to Trading transfers under one idempotency key
-    /// and one MFA check (`BatchCreateInternalTransfers`). An API key needs
-    /// no MFA. Each leg's amount is rescaled exactly to 18 decimals as for
+    /// Move 1 to 500 Trading to Trading transfers together, under one
+    /// idempotency key and one MFA check (`BatchCreateInternalTransfers`):
+    /// every leg is credited, or no leg moves. An API key needs no MFA. Each
+    /// leg's amount is rescaled exactly to 18 decimals as for
     /// [`Self::create`].
     ///
-    /// Every leg passes the same checks as a single transfer before any leg
-    /// runs: if one fails, the result's `status` is `refused`, nothing moves
-    /// and no step-up is used. Otherwise legs run in order and are not
-    /// atomic: a leg can be refused after earlier legs were accepted. Read
-    /// each leg's `status`; a `pending` leg's outcome is not known yet, so
-    /// retry the batch with the same `idempotency_key` and legs to learn it
-    /// (accepted legs answer the same transfers; looking one transfer up
-    /// needs an interactive session). Each leg counts as one internal
-    /// transfer against the rate limit.
+    /// The result's `status` is `accepted` (every leg `credited`, with its
+    /// `transfer_id` and `flow_id`), `refused` (nothing moved, and nothing
+    /// will under this key: the legs that caused it carry `error_code`;
+    /// submit again under a new key) or `processing` (the outcome is not
+    /// known yet: the batch completes on its own; follow it with
+    /// [`Self::get_batch`], or retry with the same key and legs, which
+    /// returns its current state).
     ///
-    /// Refused before sending: no legs or more than 10, an idempotency key
+    /// The legs may debit at most 10 distinct source accounts (more is
+    /// refused with
+    /// [`crate::errors::transfer_codes::BATCH_TOO_MANY_SOURCES`]) and at most
+    /// 50 distinct source account and asset pairs, and a source, destination
+    /// and asset combination may appear only once (both refused by the API
+    /// with `INVALID_REQUEST`). A batch counts once against the internal
+    /// transfer rate limit, with a weight of `max(ceil(legs / 50), distinct
+    /// source accounts)`; one that outweighs the account's burst is refused
+    /// with `RATE_LIMIT_EXCEEDED` and no `Retry-After`: waiting does not admit
+    /// it, so split it rather than retry.
+    ///
+    /// Refused before sending: no legs or more than 500, an idempotency key
     /// that is empty or over 128 characters, a leg without an asset ID or
     /// without exactly one destination, and an amount that is not exact at
     /// 18 decimals. A reply that breaks the contract is an
@@ -366,6 +376,55 @@ impl InternalTransfersService {
         .await?
         .into_owned();
         internal_transfer_batch_from_proto(&resp, requested)
+    }
+
+    /// Read a batch's current outcome and the state of every leg by the
+    /// `request_id` [`Self::batch_create`] returned
+    /// (`GetInternalTransferBatch`), as the batch was answered: for example
+    /// to follow a `processing` batch without resubmitting it. The read
+    /// does not submit or retry the batch and needs no fresh MFA. The caller
+    /// must be allowed to read the transfers of every source account of the
+    /// batch; any other batch is not found, as an unknown one is.
+    ///
+    /// `request_id` is sent as given; one that is empty, over 39 characters,
+    /// or not decimal digits without a leading zero is refused before
+    /// sending. A reply that breaks the contract, or names no batch, is an
+    /// [`crate::errors::Error::ResponseContract`].
+    pub async fn get_batch(
+        &self,
+        request_id: &str,
+    ) -> crate::errors::Result<crate::models::InternalTransferBatchResult> {
+        use super::limits::{BATCH_TRANSFER_REQUEST_ID_MAX_LEN, check_len};
+        use crate::codecs::decode::internal_transfer_batch_from_get_response;
+        use crate::errors::Error;
+        use crate::proto::transfer::v1::GetInternalTransferBatchRequest;
+        const OP: &str = "get_internal_transfer_batch";
+        check_len(
+            OP,
+            "request_id",
+            request_id,
+            BATCH_TRANSFER_REQUEST_ID_MAX_LEN,
+        )?;
+        let bytes = request_id.as_bytes();
+        if !(bytes[0] != b'0' && bytes.iter().all(u8::is_ascii_digit)) {
+            return Err(Error::validation(format!(
+                "{OP} request_id {request_id:?} is not a batch request ID: decimal digits without a leading zero"
+            )));
+        }
+        let req = GetInternalTransferBatchRequest {
+            request_id: request_id.to_owned(),
+            ..Default::default()
+        };
+        let client = self.connect_client();
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/transfer.v1.InternalTransferService/GetInternalTransferBatch",
+            req,
+            |req, opts| client.get_internal_transfer_batch_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        internal_transfer_batch_from_get_response(&resp)
     }
 
     /// The `BatchCreateInternalTransfersRequest` [`Self::batch_create`]
@@ -697,6 +756,46 @@ impl SubAccountsService {
             .into_owned()
         };
         Ok(subaccount_activity_list_from_proto(&resp))
+    }
+
+    /// List the security and activity events of the main account and its
+    /// sub-accounts in one feed, newest first
+    /// (`auth.v1.AccountActivityService/ListAccountActivity`): sign-ins, API
+    /// key, MFA, policy, member, invite and saved-destination changes. Only
+    /// the main account's own session, or an API key with
+    /// `READ_ACCOUNT_ACTIVITY`, may call it; a key scoped to a sub-account
+    /// reads only that sub-account's events.
+    ///
+    /// Every filter of `req` narrows the feed and is sent as given:
+    /// `subaccount_ids` with `include_main_account` select the accounts
+    /// (neither: the main account and every sub-account the caller may
+    /// read), and `entity_kinds`, `event_actions`, `sources`, `api_key_id`,
+    /// `start_time` and `end_time` narrow the events. Follow
+    /// `next_page_token` with the same filters. A `limit` above 200 is
+    /// refused before sending; 0 takes the server's default of 50.
+    pub async fn list_account_activity(
+        &self,
+        req: crate::proto::auth::v1::ListAccountActivityRequest,
+    ) -> crate::errors::Result<crate::models::AccountActivityList> {
+        use crate::codecs::decode::account_activity_list_from_proto;
+        super::limits::check_limit(
+            "sub_accounts.list_account_activity",
+            req.limit,
+            super::limits::ACCOUNT_ACTIVITY_LIMIT_MAX,
+        )?;
+        let client = crate::connect::auth::v1::AccountActivityServiceClient::new(
+            self.ctx.factory.transport(),
+            self.ctx.factory.connect_config(),
+        );
+        let resp = super::unary::await_auth(
+            &self.ctx.factory,
+            "/auth.v1.AccountActivityService/ListAccountActivity",
+            req,
+            |req, opts| client.list_account_activity_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        account_activity_list_from_proto(&resp)
     }
 }
 
@@ -1683,7 +1782,11 @@ impl SocialVerificationService {
     /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED` carries `retryAfter`, the time
     /// from which a new one may succeed; a restarted X/Twitter or Discord
     /// verification keeps the linked account's `providerUserId` and
-    /// `verifiedAt` until it succeeds. Starting, confirming and
+    /// `verifiedAt` until it succeeds. A linked X/Twitter or Discord account
+    /// carries `changeAvailableAt` (UTC) while it is inside its one change or
+    /// unlink per 30 days: a change or unlink before then is refused with
+    /// `AUTH_SOCIAL_CHANGE_LIMIT_REACHED`, so offer it only from that time;
+    /// an API key's read leaves it out. Starting, confirming and
     /// unlinking a verification stay session-only; confirming a Telegram link
     /// also needs a fresh MFA step-up.
     pub async fn get(&self, provider: &str) -> crate::errors::Result<crate::models::ApiData> {

@@ -1,11 +1,13 @@
 //! POLY-9237: `ZipperService::get_deposit_withdraw_config` keeps each asset
 //! variant's supply, `supply_q` at its asset's quantity scale, and the
-//! catalogs hydrated at construction know it before any supply update.
+//! catalogs hydrated at construction know it before any supply update. A
+//! variant whose supply is missing reads no supply, in both places.
 
 use super::hardening_support::RefusedPort;
 use buffa::Message as _;
 use polyester::proto::chain::zipper::v1::{
     AssetChainVariant, AssetConfig as ZipperAsset, ChainConfig, GetDepositWithdrawConfigResponse,
+    SupplyStatus,
 };
 use polyester::proto::marketdata::v1::{AssetConfig, GetSpotConfigResponse, PairConfig};
 use polyester::transport::WireFormat;
@@ -20,6 +22,10 @@ const ZIPPER_CONFIG: &str = "/chain.zipper.v1.ZipperService/GetDepositWithdrawCo
 /// zipped_asset_id, supply_q and the decimal supply the SDK must report.
 const SCALE_0: [(u32, u64, &str); 2] = [(11, 3_582_802, "3582802"), (12, 0, "0")];
 const SCALE_8: [(u32, u64, &str); 2] = [(21, 9_708_173_223, "97.08173223"), (22, 0, "0")];
+/// Each asset also has a variant with no known supply, at its first
+/// variant's ID plus this offset (16 and 26).
+const MISSING_OFFSET: u32 = 5;
+const MISSING: [u32; 2] = [16, 26];
 
 fn spot_config() -> GetSpotConfigResponse {
     GetSpotConfigResponse {
@@ -53,8 +59,23 @@ fn zipper_config() -> GetDepositWithdrawConfigResponse {
                 deposit_min_amount: "0.001".into(),
                 withdraw_min_amount: "0.002".into(),
                 supply_q: *supply_q,
+                supply_status: SupplyStatus::AVAILABLE.into(),
+                supply_observed_at: buffa_types::google::protobuf::Timestamp {
+                    seconds: 1_794_744_000,
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             })
+            .chain(std::iter::once(AssetChainVariant {
+                zipped_asset_id: rows[0].0 + MISSING_OFFSET,
+                chain_id: rows[0].0,
+                network_fee: "0.0001".into(),
+                deposit_min_amount: "0.001".into(),
+                withdraw_min_amount: "0.002".into(),
+                supply_status: SupplyStatus::MISSING.into(),
+                ..Default::default()
+            }))
             .collect()
     };
     GetDepositWithdrawConfigResponse {
@@ -172,6 +193,11 @@ async fn deposit_withdraw_config_keeps_variant_supply() {
             for variant in asset["variants"].as_array().expect("variants") {
                 seen += 1;
                 let id = variant["zipped_asset_id"].as_u64().unwrap() as u32;
+                if MISSING.contains(&id) {
+                    assert!(variant["supply"].is_null(), "{wire_format:?}: {variant}");
+                    assert_eq!(variant["supply_status"], "missing", "{wire_format:?}");
+                    continue;
+                }
                 let expected = want.iter().find(|(w, _)| *w == id).unwrap().1;
                 if variant["supply"].as_str() != Some(expected) {
                     failures.push(format!(
@@ -191,7 +217,7 @@ async fn deposit_withdraw_config_keeps_variant_supply() {
                 );
             }
         }
-        assert_eq!(seen, want.len(), "{wire_format:?}");
+        assert_eq!(seen, want.len() + MISSING.len(), "{wire_format:?}");
 
         client.wait_for_catalogs().await.expect("hydrated");
         for (id, expected) in &want {
@@ -201,6 +227,13 @@ async fn deposit_withdraw_config_keeps_variant_supply() {
                     "{wire_format:?}: catalog variant {id} supply {got:?}, want {expected}"
                 ));
             }
+        }
+        for id in MISSING {
+            assert_eq!(
+                client.catalogs.supply_for_zipped_asset_id(id),
+                None,
+                "{wire_format:?}"
+            );
         }
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));

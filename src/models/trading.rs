@@ -42,9 +42,11 @@ pub struct Order {
     /// risk leg, TWAP or trailing stop). A BUY fills at or below it and a SELL
     /// at or above it. It is the order's reference price moved by its maximum
     /// slippage (`market_max_slippage_bps` or `market_max_slippage`), or
-    /// by the pair's default market slippage for its side, on the pair's tick
-    /// grid; a triggered market order takes the price that fired it as its
-    /// reference. `None` when the server sent no price. Tell a market order
+    /// by the pair's default market slippage for its side, then put on the
+    /// pair's tick grid toward the reference (a BUY's rounded down, a SELL's
+    /// up), so it never allows more than the slippage and can be up to one
+    /// tick tighter; a triggered market order takes the price that fired it
+    /// as its reference. `None` when the server sent no price. Tell a market order
     /// from a limit order by `order_type`, never by its price.
     pub price: Option<Price>,
     /// Average execution price in 1e9 price ticks, rounded down. Prefer
@@ -66,15 +68,29 @@ pub struct Order {
     /// `base_quantity_scale` is at most 9. Above that it can exceed the
     /// settled quote by less than 1e-18 per fill.
     pub cum_notional: String,
-    /// Total fee of the fills, net of rebates, in `fee_asset`. Order history
-    /// reads and single-order reads with execution history (the default)
-    /// carry it; open-order reads, single-order reads without execution
-    /// history and private stream updates leave it `None`.
+    /// Total fee of the fills recorded so far, net of rebates, in
+    /// `fee_asset`. Order history reads and single-order reads with execution
+    /// history (the default) carry it; open-order reads, single-order reads
+    /// without execution history and private stream updates leave it `None`,
+    /// an ended order's update included. A fill's fee is recorded once the
+    /// fill settles, which can be seconds after the order ended: the total is
+    /// the order's whole fee once its quantity equals `cum_qty`. It is not
+    /// covered by `version`: two reads at one version can show different
+    /// totals.
     pub fee_total: Option<OrderFeeTotal>,
     pub created_ts_ns: String,
     /// When the order became terminal, in Unix nanoseconds (UTC) as a decimal
     /// string. Empty while the order is open.
     pub terminal_ts_ns: String,
+    /// The order's change counter, the same one its events carry on the
+    /// private and trading WebSockets: 0 while it is `PENDING`, 1 from its
+    /// first book state, and higher on every later change of its state (an
+    /// amend in place, a fill, a change of its attached risk, a cancel or a
+    /// replace). A replace that gives the order a new ID starts that order's
+    /// own counter. A read can lag behind events already applied: keep one
+    /// high-water mark per order ID across reads and both streams, and do
+    /// not let a read with a lower version undo a newer state. A read at the
+    /// version already applied can still carry a newer `fee_total`.
     pub version: u32,
     pub post_only: bool,
     /// Asset selected to pay fees: `quote`, `base`, or an
@@ -104,8 +120,9 @@ pub struct Order {
     /// Reference price a MARKET order's slippage protection was measured
     /// from; `None` when none was supplied.
     pub market_client_ref_price: Option<Price>,
-    /// A MARKET order's maximum slippage as an absolute price distance;
-    /// `None` when it has no cap of that form.
+    /// A MARKET order's maximum slippage as an absolute price distance, as
+    /// given (it need not be on the pair's tick); `None` when it has no cap of
+    /// that form.
     pub market_max_slippage: Option<Price>,
     /// A MARKET order's maximum slippage in basis points; 0 when it has no cap
     /// of that form.
@@ -616,7 +633,9 @@ pub enum TrailingDistance {
 /// Optional max slippage for a trailing stop's child.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaxSlippage {
-    /// Absolute Q9 price ticks (proto field is int64).
+    /// An absolute price distance in 1e-9 quote units (proto field is
+    /// int64), not a count of the pair's tick size: 1.5 USDT is
+    /// 1_500_000_000. It need not be a multiple of the pair's tick.
     Ticks(i64),
     Bps(i32),
 }
@@ -794,17 +813,21 @@ pub struct InternalTransferBatchLeg {
     pub destination_smart_account_address: Option<String>,
 }
 
-/// Typed batch internal-transfer params: 1 to 10 Trading to Trading
-/// transfers under one idempotency key and one MFA check.
+/// Typed batch internal-transfer params: 1 to 500 Trading to Trading
+/// transfers that move together or not at all, under one idempotency key and
+/// one MFA check.
 #[derive(Debug, Clone)]
 pub struct BatchCreateInternalTransfersParams {
-    /// The transfers, run in order: 1 to 10 legs.
+    /// The transfers, in order: 1 to 500 legs, debiting at most 50 distinct
+    /// source account and asset pairs from at most 10 distinct source
+    /// accounts. A source, destination and asset combination appears at most
+    /// once; legs may otherwise repeat an asset, a source or a destination.
     pub legs: Vec<InternalTransferBatchLeg>,
     /// Stable key for the whole batch, 1 to 128 characters, scoped to the
-    /// caller. Persist it and retry with the same key and the same legs in
-    /// the same order: accepted legs answer the same transfers and legs not
-    /// yet accepted run again. Different legs under the key are refused with
-    /// `ERROR_CODE_IDEMPOTENCY_CONFLICT`.
+    /// caller. Persist it: a retry with the same key and the same legs in
+    /// the same order returns the batch's current state. Different legs
+    /// under the key are refused with `ERROR_CODE_IDEMPOTENCY_CONFLICT`. A
+    /// `refused` batch is final for its key: submit again under a new key.
     pub idempotency_key: String,
 }
 
@@ -1444,6 +1467,12 @@ pub struct OrderErrorDetail {
     pub violations: Vec<OrderFieldViolation>,
     /// Structured quota rejection when `ErrorDetail.rate_limit` is present.
     pub rate_limit: Option<super::RateLimitDetail>,
+    /// With `PRICE_BAND_VIOLATION` on a preview, the band limit the order's
+    /// limit price is past, as the market last published its band: the
+    /// highest admitted price for a buy, the lowest for a sell, both edges
+    /// admitted. `None` for every other rejection. A preview with no current
+    /// band skips the check, and `create` checks the band again.
+    pub price_band_limit: Option<crate::Price>,
 }
 
 /// Advisory admission result for [`crate::services::OrdersService::preview`].
@@ -1560,20 +1589,25 @@ pub struct InternalTransferResult {
 }
 
 /// The outcome of a batch of internal transfers, from
-/// [`crate::services::InternalTransfersService::batch_create`].
+/// [`crate::services::InternalTransfersService::batch_create`] or
+/// [`crate::services::InternalTransfersService::get_batch`].
 ///
-/// Legs are not atomic. When `status` is `refused`, at least one leg failed
-/// its checks (`refused`, with `error_code`), every other leg is
-/// `not_submitted`, and nothing moved. When it is `submitted`, legs ran in
-/// order, each on its own: a leg can be `refused` (for example
-/// `insufficient_funds`) after earlier legs were `accepted`.
+/// A batch is all or nothing: every leg is credited, or no leg moves.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferBatchResult {
-    /// Stable ID of the batch request; empty when the batch was refused.
+    /// Stable ID of the batch, for
+    /// [`crate::services::InternalTransfersService::get_batch`]: a decimal
+    /// string. Never empty for an `accepted` or `processing` batch, nor on a
+    /// read; empty when the batch was refused before it was accepted for
+    /// processing.
     pub request_id: String,
-    /// `submitted` or `refused`.
+    /// `accepted` (every leg is `credited`), `processing` (the outcome is
+    /// not known yet: the batch completes on its own, ending `accepted` or
+    /// `refused`; follow it with `get_batch` or retry it with the same key
+    /// and legs) or `refused` (nothing moved, and nothing will under this
+    /// idempotency key; the legs that caused it carry `error_code`).
     pub status: String,
-    /// One result per requested leg, in request order.
+    /// One result per leg, in request order.
     pub legs: Vec<InternalTransferBatchLegResult>,
 }
 
@@ -1590,45 +1624,44 @@ pub struct ResolvedDestination {
     pub smart_account_address: String,
 }
 
-/// The outcome of one leg of a batch.
+/// The state of one leg of a batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InternalTransferBatchLegResult {
     /// Zero-based position of the leg in the request.
     pub leg_index: u32,
-    /// `accepted` (the transfer has a durable `transfer_id`; it has not
-    /// necessarily settled), `pending` (the outcome is not known yet: it
-    /// completes without the caller; retry the batch with the same
-    /// idempotency key to learn it, since reading one transfer needs an
-    /// interactive session), `refused` (no funds moved; `error_code` says
-    /// why) or `not_submitted` (the leg did not run; a retry with the same
-    /// key runs it). `UNKNOWN(<n>)` for a status this SDK does not know:
-    /// treat it as not known yet.
+    /// `credited` (the leg is credited to its destination; its batch is
+    /// `accepted`), `processing` (the leg's outcome is its batch's, not known
+    /// yet) or `not_moved` (the leg moved nothing: its batch was refused;
+    /// `error_code` is set on the legs that caused the refusal).
+    /// `UNKNOWN(<n>)` for a status this SDK does not know: treat it as not
+    /// known yet.
     pub status: String,
-    /// Stable request ID of the leg's transfer; empty while the leg has not
-    /// been submitted.
-    pub request_id: String,
-    /// Transfer ID, set once the leg is accepted.
+    /// Stable transfer ID of the leg, a decimal string. Never empty for a
+    /// `credited` or `processing` leg; it names the leg in the transfer
+    /// history.
     pub transfer_id: String,
-    /// Lifecycle flow ID, set once the leg is accepted.
+    /// Lifecycle flow ID of the leg, readable by its sender and its
+    /// recipient with `LifecycleService::get_account_flow`. Never empty for
+    /// a `credited` leg; empty otherwise.
     pub flow_id: String,
-    /// Acceptance time in nanoseconds since the Unix epoch (server time),
-    /// set once the leg is accepted; 0 otherwise.
-    pub accepted_at_ts_ns: u64,
+    /// Credit time in nanoseconds since the Unix epoch (server time). Never
+    /// 0 for a `credited` leg, which also always carries its asset code and
+    /// destination; 0 otherwise.
+    pub credited_at_ts_ns: u64,
     /// The leg's asset, echoed.
     pub asset_id: u32,
-    /// Resolved asset code, set once the leg is submitted.
+    /// Resolved asset code, set once the leg passed its checks.
     pub asset_code: String,
     /// The leg's amount, echoed, exact at 18 decimals; `None` when the
     /// server sent none.
     pub quantity: Option<AssetAmount>,
-    /// The destination the server resolved for the leg, set once the leg is
-    /// submitted; `None` when the server sent none.
+    /// The destination the server resolved for the leg, set once the leg
+    /// passed its checks; `None` when the server sent none.
     pub destination: Option<ResolvedDestination>,
-    /// Why the leg was refused, or why its outcome is not known yet: the
-    /// `transfer.v1.ErrorCode` as a lowercase label without its
-    /// `ERROR_CODE_` prefix, such as `insufficient_funds`;
-    /// `UNKNOWN_ERROR_CODE(<n>)` for a code this SDK does not know. `None`
-    /// for an accepted or not-submitted leg.
+    /// Why the leg caused its batch's refusal: the `transfer.v1.ErrorCode`
+    /// as a lowercase label without its `ERROR_CODE_` prefix, such as
+    /// `insufficient_funds`; `UNKNOWN_ERROR_CODE(<n>)` for a code this SDK
+    /// does not know. `None` for every other leg.
     pub error_code: Option<String>,
     /// Human-readable description of `error_code`.
     pub error_message: String,

@@ -66,6 +66,38 @@ async fn get_version_reads_the_build_without_credentials() {
     assert_eq!(release.release(), "0.10.0");
 }
 
+/// `get_time` (contract 0.93.5) needs no API key, is never signed, keeps the
+/// server time exact, and refuses a reply without it.
+#[tokio::test]
+async fn get_time_reads_the_server_clock_unsigned() {
+    use polyester::proto::system::v1::GetTimeResponse;
+
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let server = MockHttpServer::spawn(move |request| {
+        if request.path != "/system.v1.SystemService/GetTime" {
+            return HttpScript::NotFound;
+        }
+        let mut log = log.lock().unwrap();
+        log.push(request.has_header("X-API-KEY-ID"));
+        connect_proto_ok(&GetTimeResponse {
+            server_time_ms: if log.len() < 3 { 1_763_337_600_123 } else { 0 },
+            ..Default::default()
+        })
+    })
+    .await;
+    for client in [public_client(&server), keyed_client(&server)] {
+        let time = client.get_time().await.unwrap();
+        assert_eq!(time.server_time_ms, 1_763_337_600_123);
+    }
+    let err = public_client(&server).get_time().await.unwrap_err();
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err:?}"
+    );
+    assert_eq!(*seen.lock().unwrap(), [false, false, false]);
+}
+
 /// Wallet balances are signed reads of the account's smart account wallet:
 /// the root account by default, or the named sub-account. Amounts keep all
 /// 18 decimals.
@@ -149,6 +181,251 @@ async fn get_wallet_balances_refuses_a_balance_without_amount() {
     let err = keyed_client(&server)
         .withdraw
         .get_wallet_balances(SubAccountScope::Default)
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err:?}"
+    );
+}
+
+/// An asset whose balance could not be read is listed as unavailable, with
+/// its reason, and the read is incomplete: its balance is unknown, not zero.
+#[tokio::test]
+async fn get_wallet_balances_reports_unreadable_assets() {
+    use polyester::proto::chain::withdraw::v1::{
+        GetWalletBalancesResponse, UnavailableWalletAsset, WalletAssetUnavailableReason,
+    };
+
+    let server = MockHttpServer::spawn(|_| {
+        connect_proto_ok(&GetWalletBalancesResponse {
+            smart_account_address: "0x1111".into(),
+            unavailable_assets: vec![
+                UnavailableWalletAsset {
+                    zipped_asset_id: 12,
+                    unified_asset_id: 3,
+                    chain_id: 1,
+                    ztoken_address: "0x2222".into(),
+                    reason: WalletAssetUnavailableReason::READ_FAILED.into(),
+                    ..Default::default()
+                },
+                UnavailableWalletAsset {
+                    zipped_asset_id: 13,
+                    reason: buffa::EnumValue::from(9),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        })
+    })
+    .await;
+    let wallet = keyed_client(&server)
+        .withdraw
+        .get_wallet_balances(SubAccountScope::Default)
+        .await
+        .unwrap();
+    assert!(wallet.balances.is_empty());
+    assert!(!wallet.is_complete());
+    let reasons: Vec<_> = wallet
+        .unavailable_assets
+        .iter()
+        .map(|a| (a.zipped_asset_id, a.reason.as_str()))
+        .collect();
+    assert_eq!(reasons, [(12, "read_failed"), (13, "unknown(9)")]);
+    assert_eq!(wallet.unavailable_assets[0].ztoken_address, "0x2222");
+}
+
+/// The deposit and withdraw config refuses an available or stale route
+/// supply without its observation time, rather than reporting it as current;
+/// a missing supply carries no time and still decodes.
+#[tokio::test]
+async fn deposit_withdraw_config_refuses_supply_without_observation_time() {
+    use polyester::proto::chain::zipper::v1::{
+        AssetChainVariant, AssetConfig, GetDepositWithdrawConfigResponse, SupplyStatus,
+    };
+
+    let config = |status: SupplyStatus| GetDepositWithdrawConfigResponse {
+        ts_sec: 1,
+        assets: vec![AssetConfig {
+            asset: "USDT".into(),
+            ledger_id: 7,
+            quantity_scale: 6,
+            variants: vec![AssetChainVariant {
+                zipped_asset_id: 3,
+                chain_id: 1,
+                supply_q: 1_000_000,
+                supply_status: status.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    for status in [SupplyStatus::AVAILABLE, SupplyStatus::STALE] {
+        let body = config(status);
+        let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+        let err = keyed_client(&server)
+            .zipper
+            .get_deposit_withdraw_config()
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{status:?}: {err:?}"
+        );
+    }
+    let body = config(SupplyStatus::MISSING);
+    let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+    let cfg = keyed_client(&server)
+        .zipper
+        .get_deposit_withdraw_config()
+        .await
+        .unwrap();
+    assert_eq!(cfg.assets[0].variants[0].supply, None);
+}
+
+/// A present market datapoint carries its value, source and observation
+/// time, and a present unlimited-supply flag its source and time: one that
+/// lacks any of them is refused. An absent datapoint stays unknown, and a
+/// value of "0" is valid.
+#[tokio::test]
+async fn asset_market_datapoints_refuse_missing_parts() {
+    use buffa_types::google::protobuf::Timestamp;
+    use polyester::proto::marketdata::v1::{
+        AssetDataSource, AssetInfo, AssetMarketFlag, AssetMarketStats, AssetMarketValue,
+        ListAssetInfoResponse,
+    };
+
+    let at = || -> buffa::MessageField<Timestamp> {
+        Timestamp {
+            seconds: 1_794_700_000,
+            ..Default::default()
+        }
+        .into()
+    };
+    let value = |v: &str| AssetMarketValue {
+        value: v.into(),
+        source: AssetDataSource::COINMARKETCAP.into(),
+        as_of: at(),
+        ..Default::default()
+    };
+    let reply = |stats: AssetMarketStats| ListAssetInfoResponse {
+        asset_info: vec![AssetInfo {
+            asset_id: 1,
+            market_stats: stats.into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let read = |body: ListAssetInfoResponse| async move {
+        let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+        public_client(&server)
+            .market_data
+            .list_asset_info(&[1])
+            .await
+    };
+
+    let bad = [
+        (
+            "no value",
+            AssetMarketValue {
+                value: String::new(),
+                ..value("1")
+            },
+        ),
+        (
+            "no source",
+            AssetMarketValue {
+                source: AssetDataSource::SOURCE_UNSPECIFIED.into(),
+                ..value("1")
+            },
+        ),
+        (
+            "no as_of",
+            AssetMarketValue {
+                as_of: Default::default(),
+                ..value("1")
+            },
+        ),
+        ("signed", value("-1")),
+        ("exponent", value("1e9")),
+    ];
+    for (label, datapoint) in bad {
+        let err = read(reply(AssetMarketStats {
+            circulating_supply: datapoint.into(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{label}: {err:?}"
+        );
+    }
+    for (label, flag) in [
+        (
+            "flag without source",
+            AssetMarketFlag {
+                as_of: at(),
+                ..Default::default()
+            },
+        ),
+        (
+            "flag without as_of",
+            AssetMarketFlag {
+                source: AssetDataSource::POLYESTER.into(),
+                ..Default::default()
+            },
+        ),
+    ] {
+        let err = read(reply(AssetMarketStats {
+            max_supply_unlimited: flag.into(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{label}: {err:?}"
+        );
+    }
+
+    // Absent datapoints stay unknown; "0" is a valid value.
+    let infos = read(reply(AssetMarketStats {
+        total_supply: value("0").into(),
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
+    let stats = infos[0].market_stats.as_ref().expect("stats");
+    assert_eq!(
+        stats.total_supply.as_ref().map(|v| v.value.as_str()),
+        Some("0")
+    );
+    assert!(stats.circulating_supply.is_none() && stats.max_supply_unlimited.is_none());
+}
+
+/// Every account activity event carries its creation time: an event without
+/// it is refused, never dated at the epoch.
+#[tokio::test]
+async fn account_activity_refuses_an_event_without_its_time() {
+    use polyester::proto::auth::v1::{
+        ActivityEntityKind, ActivityEvent, ActivityEventAction, ListAccountActivityRequest,
+        ListAccountActivityResponse,
+    };
+
+    let body = ListAccountActivityResponse {
+        events: vec![ActivityEvent {
+            entity_kind: ActivityEntityKind::ACTIVITY_ENTITY_API_KEY.into(),
+            event_action: ActivityEventAction::ACTIVITY_ACTION_CREATED.into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+    let err = keyed_client(&server)
+        .sub_accounts
+        .list_account_activity(ListAccountActivityRequest::default())
         .await
         .unwrap_err();
     assert!(

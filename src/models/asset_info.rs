@@ -1,8 +1,10 @@
 //! Asset information (`marketdata.v1.MarketDataService/ListAssetInfo`).
 //!
 //! Team-maintained descriptions, official links and known launch dates and
-//! prices, loaded independently of the trading and funding configs. Empty
-//! strings and lists, and an absent `issue_price`, mean unknown: hide them.
+//! prices, and market datapoints (supply, market capitalization, rank) with
+//! their source and observation time, loaded independently of the trading
+//! and funding configs. Empty strings and lists, and an absent `issue_price`
+//! or market value, mean unknown: hide them.
 
 use buffa_types::google::protobuf::Timestamp;
 
@@ -50,6 +52,59 @@ pub struct AssetInfo {
     /// Team-maintained information. All fields are empty when it was
     /// cleared.
     pub editorial: AssetEditorialInfo,
-    /// Time of the last effective editorial change, in UTC.
+    /// Time of the last effective editorial change, in UTC; `None` when it
+    /// was never edited.
     pub editorial_updated_at: Option<Timestamp>,
+    /// Market datapoints; `None` when the asset has none.
+    pub market_stats: Option<AssetMarketStats>,
+}
+
+/// Market datapoints of one asset. An absent value is unknown: hide it.
+/// Show each value with its source and `as_of` time, such as "Source:
+/// CoinMarketCap": a value stays until a newer observation replaces it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AssetMarketStats {
+    /// Coins circulating in the market and in public hands, in asset units.
+    pub circulating_supply: Option<AssetMarketValue>,
+    /// Coins in existence now, minus any verifiably burned, in asset units.
+    pub total_supply: Option<AssetMarketValue>,
+    /// Maximum coins that will ever exist, in asset units; `None` when
+    /// unknown or when `max_supply_unlimited` is set.
+    pub max_supply: Option<AssetMarketValue>,
+    /// Set when the source reports no maximum supply (`max_supply` is then
+    /// `None`); `None` when a maximum is known or when it is unknown.
+    pub max_supply_unlimited: Option<AssetMarketFlag>,
+    /// Price multiplied by circulating supply, in US dollars.
+    pub market_cap_usd: Option<AssetMarketValue>,
+    /// Price multiplied by maximum supply, or by total supply when the
+    /// maximum is unknown or unlimited, in US dollars.
+    pub fully_diluted_market_cap_usd: Option<AssetMarketValue>,
+    /// Market capitalization rank among all listed coins as a positive
+    /// integer string, 1 the largest.
+    pub rank: Option<AssetMarketValue>,
+}
+
+/// One market datapoint with its source and observation time.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AssetMarketValue {
+    /// Exact nonnegative decimal string without sign or exponent, as sent;
+    /// never parsed into a float.
+    pub value: String,
+    /// Who supplied it: `coinmarketcap` (show "Source: CoinMarketCap") or
+    /// `polyester` (set by the Polyester team); `unknown(<n>)` for a source
+    /// this SDK does not name.
+    pub source: String,
+    /// When the source last observed or set the value, in UTC. Always set:
+    /// a datapoint without it is an [`crate::Error::ResponseContract`].
+    pub as_of: Timestamp,
+}
+
+/// A market fact that holds when present, with its source and observation
+/// time.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct AssetMarketFlag {
+    /// Who reported it, as [`AssetMarketValue::source`].
+    pub source: String,
+    /// When the source last observed it, in UTC.
+    pub as_of: Timestamp,
 }

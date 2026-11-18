@@ -1,53 +1,12 @@
-//! Account statements (`ledger.read.v1.LedgerReadService/ExportStatement`).
+//! Account statements (`ledger.read.v1.StatementExportService`).
 //!
-//! A statement is RFC 4180 CSV text in UTF-8 with CRLF line endings, kept as
-//! sent. Read its columns by header name: later releases may append columns.
+//! A statement file is RFC 4180 CSV text in UTF-8 with CRLF line endings.
+//! Read its columns by header name, with
+//! [`crate::codecs::decode::parse_statement_csv`]: later releases may append
+//! columns.
 
-use crate::errors::Result;
 use buffa_types::google::protobuf::Timestamp;
-
-/// One page of a statement, from
-/// [`crate::services::StatementsService::export_page`]. Only the first page
-/// starts with the header row; later pages carry rows only, so the pages
-/// concatenated in order are the whole statement.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StatementPage {
-    /// This page's CSV text, as sent.
-    pub csv: String,
-    /// Cursor for the next page; empty when no more rows follow. Send it
-    /// back with the same request fields.
-    pub next_page_token: String,
-    /// How far the statement is complete: it covers movements from
-    /// `start_time` up to this time, exclusive. It is the earliest of
-    /// `end_time`, the time of the first page's request and the time through
-    /// which account history was complete then, never before `start_time`,
-    /// and the same on every page of one statement. When it is before
-    /// `end_time`, request the rest, from it to `end_time`, later. `None`
-    /// when the server sent none.
-    pub complete_through: Option<Timestamp>,
-}
-
-/// A whole statement, from [`crate::services::StatementsService::export`]:
-/// every page's CSV text concatenated in order, the header row first. A
-/// period without movements is the header row alone.
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Statement {
-    /// The statement's CSV text, as sent; save it as a `.csv` file as is.
-    pub csv: String,
-    /// How far the statement is complete, as on every
-    /// [`StatementPage::complete_through`]: the statement covers movements
-    /// from `start_time` up to this time, exclusive; request the rest, up to
-    /// `end_time`, later. `None` when the server sent none.
-    pub complete_through: Option<Timestamp>,
-}
-
-impl Statement {
-    /// The statement's rows, read by header name; see
-    /// [`crate::codecs::decode::parse_statement_csv`].
-    pub fn rows(&self) -> Result<Vec<StatementRow>> {
-        crate::codecs::decode::parse_statement_csv(&self.csv)
-    }
-}
+use std::fmt;
 
 /// One statement row: the effect of one ledger entry on one account bucket
 /// in one asset. Amounts are exact decimal strings in whole units of the
@@ -91,11 +50,14 @@ pub struct StatementRow {
 /// [`crate::services::StatementsService::get_export`] or
 /// [`crate::services::StatementsService::list_exports`].
 ///
-/// A `ready` file is byte for byte the [`Statement`] of the same account,
-/// asset and period up to `complete_through`. It is downloaded over REST
-/// only, with an authenticated `GET /v1/statements/exports/{export_id}/file`
-/// (`text/csv`, single-range `Range` requests with `If-Range`), for 7 days;
-/// this SDK does not download it.
+/// A `ready` file holds the header row, then every row of the period up to
+/// `complete_through`, oldest first; read it with
+/// [`crate::codecs::decode::parse_statement_csv`]. It can be downloaded for
+/// 7 days, from the short-lived URL
+/// [`crate::services::StatementsService::get_export_download_url`] returns,
+/// which needs no credentials, or with an authenticated REST
+/// `GET /v1/statements/exports/{export_id}/file` (`text/csv`, with HTTP
+/// `Range` requests). This SDK does not download it.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StatementExport {
     /// Public ID of the export. Never empty.
@@ -111,9 +73,10 @@ pub struct StatementExport {
     pub asset_id: u32,
     /// Idempotency key of the request that created the export.
     pub idempotency_key: String,
-    /// Where the export is: `queued`, `processing`, `ready`, `failed` or
-    /// `expired` (create a new export); `UNKNOWN(<n>)` for a status this SDK
-    /// does not know.
+    /// Where the export is: `queued`, `processing`, `ready`, `failed`,
+    /// `expired` (create a new export) or `canceled` (stopped with
+    /// [`crate::services::StatementsService::cancel_export`]; it has no
+    /// file); `UNKNOWN(<n>)` for a status this SDK does not know.
     pub status: String,
     /// End of what the file covers (UTC), exclusive: the earlier of
     /// `end_time` and the time the export was created.
@@ -140,4 +103,66 @@ pub struct StatementExportsList {
     pub exports: Vec<StatementExport>,
     /// Cursor for the next page; empty on the last page.
     pub next_page_token: String,
+    /// Exports `queued` or `processing` across the whole main account, its
+    /// sub-accounts included, whichever account the list selects.
+    pub in_progress_exports: u32,
+    /// Most exports the main account may have `queued` or `processing` at a
+    /// time. While `in_progress_exports` is at it, a create is refused with
+    /// [`crate::errors::ledger_codes::STATEMENT_EXPORT_LIMIT_REACHED`].
+    pub max_in_progress_exports: u32,
+}
+
+/// A short-lived URL of a `ready` export's file, from
+/// [`crate::services::StatementsService::get_export_download_url`].
+///
+/// The URL carries its own authorization: anyone who holds it can download
+/// the file until `expires_at`. [`Debug`] redacts `url`, so logging the
+/// result cannot leak it; read the field explicitly to hand it to a
+/// browser, and never log, store or share it.
+#[derive(Clone, PartialEq)]
+pub struct StatementExportDownloadUrl {
+    /// URL of the file, valid until `expires_at`. Never empty.
+    pub url: String,
+    /// When the URL stops working: 60 seconds after it was signed for this
+    /// call, or when the file expires if that is sooner. Request a new URL
+    /// after it. Always set: a reply without it is an
+    /// [`crate::Error::ResponseContract`].
+    pub expires_at: Timestamp,
+    /// Name the download saves the file as, `statement-<export_id>.csv`.
+    /// Never empty.
+    pub filename: String,
+}
+
+impl fmt::Debug for StatementExportDownloadUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("StatementExportDownloadUrl")
+            .field("url", &"[REDACTED]")
+            .field("expires_at", &self.expires_at)
+            .field("filename", &self.filename)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `Debug` never prints the download URL, which is a bearer secret.
+    #[test]
+    fn download_url_debug_redacts_the_url() {
+        let url = StatementExportDownloadUrl {
+            url: "https://files.example/statement?signature=fake-signature-marker".into(),
+            expires_at: Timestamp {
+                seconds: 1_763_337_660,
+                ..Default::default()
+            },
+            filename: "statement-7.csv".into(),
+        };
+        for rendered in [format!("{url:?}"), format!("{url:#?}")] {
+            assert!(!rendered.contains("fake-signature-marker"), "{rendered}");
+            assert!(!rendered.contains("files.example"), "{rendered}");
+            assert!(rendered.contains("[REDACTED]"), "{rendered}");
+            assert!(rendered.contains("statement-7.csv"), "{rendered}");
+        }
+    }
 }

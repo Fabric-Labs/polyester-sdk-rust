@@ -1,15 +1,17 @@
-//! Server build version and status events (`system.v1.SystemService`):
-//! public, no credentials, never signed.
+//! Server build version, server time and status events
+//! (`system.v1.SystemService`): public, no credentials, never signed.
 
 use super::changelog::{filter_labels_to_enums, paginate};
 use super::limits::{STATUS_EVENTS_LIMIT_MAX, check_limit};
 use super::unary;
-use crate::codecs::decode::{server_version_from_proto, status_events_page_from_proto};
+use crate::codecs::decode::{
+    server_time_from_proto, server_version_from_proto, status_events_page_from_proto,
+};
 use crate::connect::system::v1::SystemServiceClient;
 use crate::errors::Result;
-use crate::models::{ServerVersion, StatusEvent, StatusEventsPage};
+use crate::models::{ServerTime, ServerVersion, StatusEvent, StatusEventsPage};
 use crate::proto::system::v1::{
-    GetVersionRequest, ListStatusEventsRequest, StatusEventKind, StatusEventState,
+    GetTimeRequest, GetVersionRequest, ListStatusEventsRequest, StatusEventKind, StatusEventState,
 };
 use crate::transport::Factory;
 use futures_util::stream::Stream;
@@ -43,6 +45,15 @@ pub(crate) async fn get_version(factory: &Factory) -> Result<ServerVersion> {
         .await?
         .into_owned();
     Ok(server_version_from_proto(&resp))
+}
+
+/// Read the server clock; see [`crate::Client::get_time`].
+pub(crate) async fn get_time(factory: &Factory) -> Result<ServerTime> {
+    // "/system.v1.SystemService/GetTime"
+    let resp = unary::await_public(client(factory).get_time(GetTimeRequest::default()))
+        .await?
+        .into_owned();
+    server_time_from_proto(&resp)
 }
 
 fn list_status_events_request(opts: ListStatusEventsOptions) -> Result<ListStatusEventsRequest> {

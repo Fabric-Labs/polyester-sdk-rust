@@ -111,9 +111,8 @@ pub(crate) async fn load_funding(
     )
     .await?;
     let (response, attempts, elapsed) = response;
-    let config = deposit_withdraw_config_from_proto(&response);
-    catalogs
-        .hydrate_zipper_config(&config)
+    deposit_withdraw_config_from_proto(&response)
+        .and_then(|config| catalogs.hydrate_zipper_config(&config))
         .map_err(|source| invalid("funding", FUNDING_OPERATION, attempts, elapsed, source))
 }
 

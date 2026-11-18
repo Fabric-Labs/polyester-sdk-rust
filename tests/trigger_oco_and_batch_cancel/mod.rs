@@ -339,7 +339,11 @@ async fn create_oco_refuses_invalid_params_before_sending() {
         no_limit.take_profit.limit_price = None;
         for (params, want, code) in [
             (unknown_source, "trigger_price_source", None),
-            (no_id, "client_list_id", None),
+            (
+                no_id,
+                "client_list_id",
+                Some("ERROR_CODE_CLIENT_LIST_ID_INVALID"),
+            ),
             (no_limit, "limit_price", Some("ERROR_CODE_BAD_PRICE")),
         ] {
             let err = s
@@ -713,7 +717,7 @@ async fn create_and_list_send_the_same_client_oco_id_bytes() {
             params.client_list_id = bad.clone();
             let err = s.client.triggers.create_oco(params).await.unwrap_err();
             assert!(
-                matches!(err, Error::Validation(_)),
+                matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_CLIENT_LIST_ID_INVALID"),
                 "{wire:?} {bad:?}: {err}"
             );
             let err = s
@@ -726,7 +730,7 @@ async fn create_and_list_send_the_same_client_oco_id_bytes() {
                 .await
                 .expect_err("invalid client OCO ID");
             assert!(
-                matches!(err, Error::Validation(_)),
+                matches!(&err, Error::Api { code, .. } if code == "ERROR_CODE_CLIENT_LIST_ID_INVALID"),
                 "{wire:?} {bad:?}: {err}"
             );
             assert!(err.to_string().contains("client_list_id"), "{err}");

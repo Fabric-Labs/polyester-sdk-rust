@@ -402,6 +402,11 @@ pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 /// [`crate::errors::map_connect_error`] reads it into the error's detail.
 pub(crate) const RATE_LIMIT_PROBLEM_TYPE: &str = "polyester.sdk.rate_limit_problem";
 
+/// Type URL of the SDK-local Connect error detail that carries the
+/// `timestampWindow` object of a REST timestamp-skew problem, as sent, in
+/// `debug`. [`crate::errors::map_connect_error`] reads it into the error.
+pub(crate) const TIMESTAMP_WINDOW_PROBLEM_TYPE: &str = "polyester.sdk.timestamp_window_problem";
+
 /// Longest body excerpt kept in a bare HTTP error message.
 const BARE_HTTP_ERROR_EXCERPT_CHARS: usize = 256;
 
@@ -617,6 +622,8 @@ fn classify_failed_response_inner(
         details: Option<Vec<BodyDetail>>,
         #[serde(rename = "rateLimit")]
         rate_limit: Option<serde_json::Value>,
+        #[serde(rename = "timestampWindow")]
+        timestamp_window: Option<serde_json::Value>,
     }
     let parsed = is_json
         .then(|| serde_json::from_slice::<Body>(body).ok())
@@ -854,7 +861,18 @@ fn classify_failed_response_inner(
                     }),
             );
         }
-        if let Some(err) = gateway_rejection(status, code.clone()) {
+        if let Some(mut err) = gateway_rejection(status, code.clone()) {
+            if code == crate::errors::auth_codes::TIMESTAMP_SKEW
+                && let Some(window) = parsed
+                    .as_ref()
+                    .and_then(|body| body.timestamp_window.clone())
+            {
+                err = err.with_detail(ErrorDetail {
+                    type_url: TIMESTAMP_WINDOW_PROBLEM_TYPE.into(),
+                    value: None,
+                    debug: Some(window),
+                });
+            }
             return Some(err);
         }
         let message = parsed

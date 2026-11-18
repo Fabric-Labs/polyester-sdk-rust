@@ -17,11 +17,11 @@ use crate::proto::orders::v1::{
 use crate::proto::triggers::v1::{
     BatchCancelTriggersResponse, CancelOcoResponse, CancelTriggerResponse, ConditionalTrigger,
     CreateOcoResponse, CreateTriggerResponse, GetTriggerResponse, LadderDistribution,
-    ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse, PauseTriggerResponse,
-    ResumeTriggerResponse, Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent,
-    TriggerEventType, TriggerStatus, TriggerType, batch_cancel_triggers_result_item,
-    conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
-    twap_market_ioc, twap_trigger,
+    LadderOutcome, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
+    PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
+    TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
+    batch_cancel_triggers_result_item, conditional_child_execution, trailing_stop_trigger, trigger,
+    trigger_event, trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -99,6 +99,18 @@ fn ladder_distribution_label(value: buffa::EnumValue<LadderDistribution>) -> Str
         Some(LadderDistribution::WeightedFavorable) => "weighted_favorable".to_owned(),
         Some(_) => String::new(),
         None => format!("UNKNOWN({})", value.to_i32()),
+    }
+}
+
+/// An ended ladder's placement outcome; `None` while it runs
+/// (`LADDER_OUTCOME_UNSPECIFIED`).
+fn ladder_outcome_label(value: buffa::EnumValue<LadderOutcome>) -> Option<String> {
+    match value.as_known() {
+        Some(LadderOutcome::LADDER_OUTCOME_UNSPECIFIED) => None,
+        Some(LadderOutcome::ALL_ADMITTED) => Some("all_admitted".to_owned()),
+        Some(LadderOutcome::MIXED_REJECTIONS) => Some("mixed_rejections".to_owned()),
+        Some(LadderOutcome::ALL_CHILDREN_REJECTED) => Some("all_children_rejected".to_owned()),
+        None => Some(format!("UNKNOWN({})", value.to_i32())),
     }
 }
 
@@ -241,6 +253,11 @@ fn trigger_details_from_proto(
                     symbol.clone(),
                     symbol_id_opt,
                 ),
+                requested_levels: ladder.requested_levels,
+                placed_levels: ladder.placed_levels,
+                rejected_levels: ladder.rejected_levels,
+                canceled_levels: ladder.canceled_levels,
+                outcome: ladder_outcome_label(ladder.outcome),
             }))
         }
         None => None,
@@ -1292,6 +1309,11 @@ mod tests {
                     ladder_levels: 4,
                     executed_qty_scaled: 25_000_000,
                     executed_levels: 2,
+                    requested_levels: 4,
+                    placed_levels: 3,
+                    rejected_levels: 1,
+                    canceled_levels: 1,
+                    outcome: LadderOutcome::MIXED_REJECTIONS.into(),
                     ..Default::default()
                 },
             ))),
@@ -1305,6 +1327,24 @@ mod tests {
         assert_eq!(
             ladder.executed_qty.as_ref().unwrap().as_scaled(),
             25_000_000
+        );
+        assert_eq!(
+            (
+                ladder.requested_levels,
+                ladder.placed_levels,
+                ladder.rejected_levels,
+                ladder.canceled_levels
+            ),
+            (4, 3, 1, 1)
+        );
+        assert_eq!(ladder.outcome.as_deref(), Some("mixed_rejections"));
+        assert_eq!(
+            ladder_outcome_label(LadderOutcome::LADDER_OUTCOME_UNSPECIFIED.into()),
+            None
+        );
+        assert_eq!(
+            ladder_outcome_label(buffa::EnumValue::from(9)).as_deref(),
+            Some("UNKNOWN(9)")
         );
     }
 

@@ -615,7 +615,7 @@ pub(super) fn field_violations_from_proto(msg: Option<&ErrorDetail>) -> Vec<Orde
     })
 }
 
-fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
+fn order_error_detail_from_proto(msg: &ErrorDetail, symbol: Option<String>) -> OrderErrorDetail {
     OrderErrorDetail {
         code: match msg.code.as_known() {
             Some(code) => code
@@ -630,6 +630,9 @@ fn order_error_detail_from_proto(msg: &ErrorDetail) -> OrderErrorDetail {
             .rate_limit
             .as_option()
             .map(crate::codecs::decode::rate_limit_detail_from_proto),
+        price_band_limit: msg
+            .price_band_limit_ticks
+            .and_then(|ticks| decode_price_ticks_allow_zero(ticks, symbol)),
     }
 }
 
@@ -653,7 +656,10 @@ pub fn preview_order_from_proto(
     })?;
     Ok(PreviewOrderResult {
         admissible: msg.admissible,
-        rejection: msg.rejection.as_option().map(order_error_detail_from_proto),
+        rejection: msg
+            .rejection
+            .as_option()
+            .map(|detail| order_error_detail_from_proto(detail, symbol.clone())),
         resolved_base_qty: msg.resolved_base_qty_scaled.and_then(|scaled| {
             decode_qty_scaled_allow_zero(scaled, Some(base_scale), symbol.clone(), symbol_id)
         }),
@@ -2734,6 +2740,40 @@ mod tests {
             Some(5_000)
         );
         assert_eq!(preview.evaluated_at_ms, 1_250);
+        assert!(rejection.price_band_limit.is_none());
+    }
+
+    #[test]
+    fn preview_past_the_price_band_names_the_band_limit() {
+        use crate::proto::orders::v1::{ErrorCode, ErrorDetail, PreviewOrderResponse};
+        use buffa_types::google::protobuf::Timestamp;
+
+        let preview = preview_order_from_proto(
+            &PreviewOrderResponse {
+                admissible: Some(false),
+                rejection: ErrorDetail {
+                    code: ErrorCode::ERROR_CODE_PRICE_BAND_VIOLATION.into(),
+                    price_band_limit_ticks: Some(1_837_500_000_000),
+                    ..Default::default()
+                }
+                .into(),
+                evaluated_at: Timestamp {
+                    seconds: 1,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            },
+            8,
+            "ETH-USDT",
+            Some(2),
+        )
+        .unwrap();
+        let rejection = preview.rejection.expect("rejection");
+        assert_eq!(rejection.code, "PRICE_BAND_VIOLATION");
+        let limit = rejection.price_band_limit.expect("band limit");
+        assert_eq!(limit.as_ticks(), 1_837_500_000_000);
+        assert_eq!(limit.symbol(), Some("ETH-USDT"));
     }
 
     #[test]

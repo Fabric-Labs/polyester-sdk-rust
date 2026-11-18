@@ -1,12 +1,12 @@
-//! Server build version and status event decoders.
+//! Server build version, server time and status event decoders.
 
 use crate::codecs::decode::changelog_enum_label;
 use crate::codecs::decode::common::require_id;
 use crate::codecs::scalars::format_id;
-use crate::errors::Result;
-use crate::models::{ServerVersion, StatusEvent, StatusEventUpdate, StatusEventsPage};
+use crate::errors::{Error, Result};
+use crate::models::{ServerTime, ServerVersion, StatusEvent, StatusEventUpdate, StatusEventsPage};
 use crate::proto::system::v1::{
-    GetVersionResponse, ListStatusEventsResponse, StatusEvent as ProtoStatusEvent,
+    GetTimeResponse, GetVersionResponse, ListStatusEventsResponse, StatusEvent as ProtoStatusEvent,
     StatusEventUpdate as ProtoStatusEventUpdate,
 };
 
@@ -16,6 +16,21 @@ pub fn server_version_from_proto(msg: &GetVersionResponse) -> ServerVersion {
         commit: msg.commit.clone(),
         environment: msg.environment.clone(),
     }
+}
+
+/// The server time a `GetTime` reply carries; a reply without it (0, the
+/// proto default of an absent field) is an [`Error::ResponseContract`]:
+/// reading it as the epoch would skew every clock offset taken from it.
+pub fn server_time_from_proto(msg: &GetTimeResponse) -> Result<ServerTime> {
+    if msg.server_time_ms == 0 {
+        return Err(Error::response_contract(
+            "GetTime",
+            "missing server_time_ms",
+        ));
+    }
+    Ok(ServerTime {
+        server_time_ms: msg.server_time_ms,
+    })
 }
 
 fn status_event_update_from_proto(msg: &ProtoStatusEventUpdate) -> StatusEventUpdate {
@@ -76,6 +91,25 @@ mod tests {
         AffectedService, StatusEventImpact, StatusEventKind, StatusEventState,
     };
     use buffa_types::google::protobuf::Timestamp;
+
+    /// The server time is kept exact, and a reply without it is refused.
+    #[test]
+    fn server_time_is_exact_and_required() {
+        let got = server_time_from_proto(&GetTimeResponse {
+            server_time_ms: 1_763_337_600_123,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(got.server_time_ms, 1_763_337_600_123);
+        let got = server_time_from_proto(&GetTimeResponse {
+            server_time_ms: i64::MAX,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(got.server_time_ms, i64::MAX);
+        let err = server_time_from_proto(&GetTimeResponse::default()).unwrap_err();
+        assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+    }
 
     fn ts(seconds: i64, nanos: i32) -> buffa::MessageField<Timestamp> {
         Timestamp {

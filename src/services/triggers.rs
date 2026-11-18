@@ -77,6 +77,7 @@ mod refusal_codes {
     pub const TRIGGER_ACTIVATION_PRICE_INVALID: &str =
         "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_INVALID";
     pub const TRIGGER_PRICE_INVALID: &str = "ERROR_CODE_TRIGGER_PRICE_INVALID";
+    pub const TRIGGER_PATCH_EMPTY: &str = "ERROR_CODE_TRIGGER_PATCH_EMPTY";
     pub const TRIGGER_QTY_INVALID: &str = "ERROR_CODE_TRIGGER_QTY_INVALID";
     pub const TWAP_DURATION_INVALID: &str = "ERROR_CODE_TWAP_DURATION_INVALID";
     pub const TWAP_INTERVAL_INVALID: &str = "ERROR_CODE_TWAP_INTERVAL_INVALID";
@@ -1133,7 +1134,8 @@ impl TriggersService {
             && params.max_slippage_ticks.is_none()
             && params.max_slippage_bps.is_none()
         {
-            return Err(Error::validation(
+            return Err(field_refusal(
+                codes::TRIGGER_PATCH_EMPTY,
                 "modify requires at least one of trigger_price, trailing_distance_ticks, trailing_distance_bps, activation_price, max_slippage_ticks, or max_slippage_bps",
             ));
         }
@@ -1513,6 +1515,10 @@ impl TriggersService {
     /// ended, nothing to do" for a trigger you know you created; read it with
     /// [`Self::get_by_id`] for how it ended. `TRIGGER_NOT_FOUND` also names an
     /// ID that is none of the account's triggers.
+    ///
+    /// The trigger's own market is used: an API key limited to some markets
+    /// is judged on that pair, and is refused `ERROR_CODE_API_KEY_MARKET_DENY`
+    /// when it is outside the key's markets.
     pub async fn resume_by_id(
         &self,
         trigger_id: &str,
@@ -2222,7 +2228,14 @@ mod tests {
             max_slippage_ticks: None,
             max_slippage_bps: None,
         };
-        assert!(client.triggers.encode_modify_params(&params).is_err());
+        // A modify that names no field to change carries the code the
+        // Triggers API and the trading engine answer for it.
+        let err = client.triggers.encode_modify_params(&params).unwrap_err();
+        assert!(
+            matches!(&err, Error::Api { code, violations, .. }
+                if code == "ERROR_CODE_TRIGGER_PATCH_EMPTY" && violations.is_empty()),
+            "{err:?}"
+        );
 
         let nonpositive = ModifyTriggerParams {
             trailing_distance_bps: Some(0),
@@ -3835,13 +3848,25 @@ mod tests {
 
         let mut p = sell_oco();
         p.client_list_id = String::new();
-        refused(p, "client_list_id must be 1 to 36 characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id must be 1 to 36 characters",
+        );
         let mut p = sell_oco();
         p.client_list_id = "x".repeat(37);
-        refused(p, "client_list_id must be 1 to 36 characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id must be 1 to 36 characters",
+        );
         let mut p = sell_oco();
         p.client_list_id = "\u{30b9}".repeat(12);
-        refused(p, "client_list_id contains invalid characters");
+        coded(
+            p,
+            crate::services::correlation_id::CLIENT_LIST_ID_INVALID,
+            "client_list_id contains invalid characters",
+        );
 
         let mut p = sell_oco();
         p.take_profit.limit_price = None;

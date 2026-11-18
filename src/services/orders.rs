@@ -82,10 +82,6 @@ const MAX_BPS: i32 = 10_000;
 /// stop: a 100% cap would leave a sell no positive price to sell at.
 const MAX_SELLING_SLIPPAGE_BPS: i32 = MAX_BPS - 1;
 
-fn validate_bps(field: &str, value: i32) -> Result<()> {
-    validate_bps_at_most(field, value, MAX_BPS)
-}
-
 fn validate_bps_at_most(field: &str, value: i32, max: i32) -> Result<()> {
     if !(1..=max).contains(&value) {
         return Err(Error::validation(format!(
@@ -130,6 +126,29 @@ fn order_field_refusal(code: &str, field_path: String, rule_id: &str, message: &
         }],
         answer: None,
     }
+}
+
+/// An attached leg's value refused before sending, as [`Error::Api`] with the
+/// code the server answers for the same mistake and no violation: the same
+/// codes a standalone trigger's refusal carries.
+fn order_code_refusal(code: &str, message: impl Into<String>) -> Error {
+    Error::Api {
+        message: message.into(),
+        code: code.to_owned(),
+        metadata: Vec::new(),
+        violations: Vec::new(),
+        answer: None,
+    }
+}
+
+/// Codes of the attached-leg refusals ([`order_code_refusal`]).
+mod leg_codes {
+    pub const BAD_PRICE: &str = "ERROR_CODE_BAD_PRICE";
+    pub const MAX_SLIPPAGE_INVALID: &str = "ERROR_CODE_MAX_SLIPPAGE_INVALID";
+    pub const SLIPPAGE_BPS_INVALID: &str = "ERROR_CODE_SLIPPAGE_BPS_INVALID";
+    pub const SLIPPAGE_TICKS_INVALID: &str = "ERROR_CODE_SLIPPAGE_TICKS_INVALID";
+    pub const TRAILING_DISTANCE_INVALID: &str = "ERROR_CODE_TRAILING_DISTANCE_INVALID";
+    pub const TRIGGER_PRICE_INVALID: &str = "ERROR_CODE_TRIGGER_PRICE_INVALID";
 }
 
 /// When a batch's status window ends, as a local instant: `window` after
@@ -909,10 +928,11 @@ impl OrdersService {
             }
             (CreateOrderType::Limit, Some(price)) => {
                 risk_execution::Execution::LimitGtc(Box::new(RiskLimitGtc {
-                    price_ticks: positive_constraint_price(
+                    price_ticks: coded_positive_price(
                         price,
                         symbol,
                         &format!("attached_risk {leg_name} limit_price"),
+                        leg_codes::BAD_PRICE,
                     )?,
                     ..Default::default()
                 }))
@@ -931,12 +951,13 @@ impl OrdersService {
 
     fn encode_take_profit(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<TakeProfitPolicy> {
         let mut policy = TakeProfitPolicy {
-            trigger_price_ticks: positive_constraint_price(
+            trigger_price_ticks: coded_positive_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached take_profit requires trigger_price")
                 })?,
                 symbol,
                 "attached_risk take_profit trigger_price",
+                leg_codes::TRIGGER_PRICE_INVALID,
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
@@ -948,12 +969,13 @@ impl OrdersService {
 
     fn encode_stop_loss(&self, leg: &RiskLeg, symbol: Option<&str>) -> Result<StopLossPolicy> {
         let mut policy = StopLossPolicy {
-            trigger_price_ticks: positive_constraint_price(
+            trigger_price_ticks: coded_positive_price(
                 leg.trigger_price.as_ref().ok_or_else(|| {
                     Error::validation("attached stop_loss requires trigger_price")
                 })?,
                 symbol,
                 "attached_risk stop_loss trigger_price",
+                leg_codes::TRIGGER_PRICE_INVALID,
             )?,
             trigger_price_source: risk_trigger_price_source(leg.trigger_price_source)?,
             ..Default::default()
@@ -983,13 +1005,17 @@ impl OrdersService {
             ..Default::default()
         };
         if let Some(activation) = stop.activation_price.as_ref() {
-            // 0 is no activation price on the wire: a zero one is refused
-            // rather than sent as none.
-            proto.activation_price_ticks = positive_constraint_price(
-                activation,
-                symbol,
-                "attached_risk trailing_stop activation_price",
-            )?;
+            // The contract reads 0 as no activation price. Only `None` means
+            // absent here, so an explicit zero is this SDK's own refusal,
+            // not a server one: leave it `None` for none. A `Price` is
+            // never negative, the case the server refuses.
+            let ticks = resolve_price_ticks(activation, symbol)?;
+            if ticks == 0 {
+                return Err(Error::validation(
+                    "attached_risk trailing_stop activation_price is zero: leave it None for no activation price",
+                ));
+            }
+            proto.activation_price_ticks = ticks;
         }
         // The trailing stop of a sell order buys back and declares the most its
         // exit pays; the trailing stop of a buy order sells and declares none.
@@ -1039,21 +1065,30 @@ impl OrdersService {
             }
             proto.limit_price_ticks = ticks;
         }
+        // Refusals carry the codes a standalone trailing stop answers for
+        // the same mistake.
         proto.trailing_distance = Some(match stop.distance.ok_or_else(|| {
-            Error::validation(
+            order_code_refusal(
+                leg_codes::TRAILING_DISTANCE_INVALID,
                 "attached trailing_stop requires trailing_distance_ticks or trailing_distance_bps",
             )
         })? {
             TrailingDistance::Ticks(v) => {
                 if v <= 0 {
-                    return Err(Error::validation(
+                    return Err(order_code_refusal(
+                        leg_codes::TRAILING_DISTANCE_INVALID,
                         "trailing_distance_ticks must be positive",
                     ));
                 }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceTicks(v)
             }
             TrailingDistance::Bps(v) => {
-                validate_bps("trailing_distance_bps", v)?;
+                if !(1..=MAX_BPS).contains(&v) {
+                    return Err(order_code_refusal(
+                        leg_codes::TRAILING_DISTANCE_INVALID,
+                        format!("trailing_distance_bps must be between 1 and {MAX_BPS}"),
+                    ));
+                }
                 trailing_stop_policy::TrailingDistance::TrailingDistanceBps(v)
             }
         });
@@ -1061,14 +1096,32 @@ impl OrdersService {
             proto.max_slippage = Some(match slip {
                 MaxSlippage::Ticks(v) => {
                     if v <= 0 {
-                        return Err(Error::validation("max_slippage_ticks must be positive"));
+                        return Err(order_code_refusal(
+                            leg_codes::SLIPPAGE_TICKS_INVALID,
+                            "max_slippage_ticks must be positive",
+                        ));
                     }
                     trailing_stop_policy::MaxSlippage::MaxSlippageTicks(v)
                 }
                 MaxSlippage::Bps(v) => {
                     // The trailing stop's child can sell whichever side the
-                    // parent order is on.
-                    validate_bps_at_most("max_slippage_bps", v, MAX_SELLING_SLIPPAGE_BPS)?;
+                    // parent order is on, so a 100% cap is refused too.
+                    if v <= 0 {
+                        return Err(order_code_refusal(
+                            leg_codes::SLIPPAGE_BPS_INVALID,
+                            format!(
+                                "max_slippage_bps must be between 1 and {MAX_SELLING_SLIPPAGE_BPS}"
+                            ),
+                        ));
+                    }
+                    if v > MAX_SELLING_SLIPPAGE_BPS {
+                        return Err(order_code_refusal(
+                            leg_codes::MAX_SLIPPAGE_INVALID,
+                            format!(
+                                "max_slippage_bps must be between 1 and {MAX_SELLING_SLIPPAGE_BPS}"
+                            ),
+                        ));
+                    }
                     trailing_stop_policy::MaxSlippage::MaxSlippageBps(v)
                 }
             });
@@ -1738,11 +1791,16 @@ impl OrdersService {
     /// `ERROR_CODE_ORDER_ALREADY_TERMINAL`
     /// ([`crate::Error::is_order_already_terminal`]): treat it as "already
     /// done" and read the order for how it ended. A repeat sent while the
-    /// first cancel is still in progress answers `accepted` again. Retry by
-    /// order ID once you have it: a client order ID names its order for at
-    /// least a minute after the order ends, then reads
-    /// `ERROR_CODE_ORDER_UNKNOWN`. Every cancel counts against the cancel
-    /// rate limit, repeats included.
+    /// first cancel is still in progress answers `accepted` again.
+    ///
+    /// An ended order can also answer `ERROR_CODE_ORDER_UNKNOWN`
+    /// ([`crate::Error::is_order_unknown`]): by client order ID once its
+    /// window of at least a minute after the order ended has passed, and by
+    /// order ID after exchange maintenance that the order ended before. For
+    /// an order you know ended, treat it as done; otherwise read the order
+    /// with [`Self::get`]: an ended status means nothing is left to cancel.
+    /// Do not retry by order ID to tell an ended order from an unknown one.
+    /// Every cancel counts against the cancel rate limit, repeats included.
     ///
     /// An unset `subaccount_id` takes the configured default sub-account, as
     /// the typed helpers do; a sub-account set on `req` is sent unchanged.
@@ -2207,14 +2265,23 @@ fn order_trades_projection_complete(result: &GetOrderResult) -> bool {
     trade_sum == cum
 }
 
-/// A modify or batch replace price. The API reads a new price of 0 as no
-/// change, so 0 is refused: leave `new_price` `None` to keep the price.
 /// An attached leg's trigger, child limit or activation price: positive, as
-/// the contract's `gt: 0` rules take them. 0 would read as no price.
-fn positive_constraint_price(price: &Price, symbol: Option<&str>, field: &str) -> Result<i64> {
-    let ticks = resolve_price_ticks(price, symbol)?;
+/// the contract takes them; 0 would read as no price. One that is not
+/// positive is refused with `code`, the code the Orders API and the trading
+/// WebSocket answer for the same field.
+fn coded_positive_price(
+    price: &Price,
+    symbol: Option<&str>,
+    field: &str,
+    code: &str,
+) -> Result<i64> {
+    price.compatible_with(symbol)?;
+    let ticks = price.as_ticks();
     if ticks <= 0 {
-        return Err(Error::validation(format!("{field} must be positive")));
+        return Err(order_code_refusal(
+            code,
+            format!("{field} must be positive"),
+        ));
     }
     Ok(ticks)
 }
@@ -2646,17 +2713,36 @@ mod tests {
                     ),
                     ..Default::default()
                 }),
-                "trailing_stop activation_price must be positive",
+                "leave it None for no activation price",
             ));
             for (label, params, want) in cases {
                 let err = client
                     .orders
                     .encode_create_params(&params)
                     .expect_err(&format!("{label} {form}"));
-                assert!(
-                    matches!(err, Error::Validation(_)),
-                    "{label} {form}: {err:?}"
-                );
+                // An attached leg's price carries the code the Orders API
+                // answers for it; the order's own prices stay validation
+                // errors.
+                let code = match label {
+                    "take_profit trigger" | "stop_loss trigger" => {
+                        Some("ERROR_CODE_TRIGGER_PRICE_INVALID")
+                    }
+                    "take_profit child limit" | "stop_loss child limit" => {
+                        Some("ERROR_CODE_BAD_PRICE")
+                    }
+                    _ => None,
+                };
+                match code {
+                    Some(code) => assert!(
+                        matches!(&err, Error::Api { code: got, violations, .. }
+                            if got == code && violations.is_empty()),
+                        "{label} {form}: {err:?}"
+                    ),
+                    None => assert!(
+                        matches!(err, Error::Validation(_)),
+                        "{label} {form}: {err:?}"
+                    ),
+                }
                 assert!(err.to_string().contains(want), "{label} {form}: {err}");
             }
         }
@@ -3334,6 +3420,112 @@ mod tests {
                 result.unwrap();
             }
         }
+    }
+
+    /// An attached trailing stop's refused value carries the code a
+    /// standalone trailing stop answers for it, on create and modify alike,
+    /// so a pre-checked request and a server refusal read the same.
+    #[test]
+    fn attached_trailing_stop_refusals_carry_the_standalone_codes() {
+        use crate::models::{AttachedRisk, MaxSlippage, TrailingDistance, TrailingStop};
+
+        let client = client();
+        let create = create_params(
+            Quantity::from_scaled(
+                10_000_000,
+                Some(8),
+                crate::QuantityDomain::OrderBase,
+                Some("BTC-USDT".into()),
+                Some(7),
+            )
+            .unwrap(),
+            Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
+        );
+        let stop = |distance, max_slippage| TrailingStop {
+            distance,
+            max_slippage,
+            ..TrailingStop::new(TrailingDistance::Bps(100))
+        };
+        let cases = [
+            (stop(None, None), "ERROR_CODE_TRAILING_DISTANCE_INVALID"),
+            (
+                stop(Some(TrailingDistance::Ticks(-1)), None),
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                stop(Some(TrailingDistance::Bps(10_001)), None),
+                "ERROR_CODE_TRAILING_DISTANCE_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Ticks(0)),
+                ),
+                "ERROR_CODE_SLIPPAGE_TICKS_INVALID",
+            ),
+            (
+                stop(Some(TrailingDistance::Bps(100)), Some(MaxSlippage::Bps(0))),
+                "ERROR_CODE_SLIPPAGE_BPS_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Bps(10_000)),
+                ),
+                "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+            ),
+            (
+                stop(
+                    Some(TrailingDistance::Bps(100)),
+                    Some(MaxSlippage::Bps(10_001)),
+                ),
+                "ERROR_CODE_MAX_SLIPPAGE_INVALID",
+            ),
+        ];
+        for (trailing, want) in cases {
+            let risk = AttachedRisk {
+                trailing_stop: Some(trailing.clone()),
+                ..Default::default()
+            };
+            let mut params = create.clone();
+            params.attached_risk = Some(risk.clone());
+            let mut modify = modify_params(None, None);
+            modify.new_attached_risk = Some(risk);
+            for err in [
+                client.orders.encode_create_params(&params).unwrap_err(),
+                client.orders.encode_modify_params(modify).unwrap_err(),
+            ] {
+                assert!(
+                    matches!(&err, Error::Api { code, violations, .. }
+                        if code == want && violations.is_empty()),
+                    "{trailing:?}: {err:?}"
+                );
+            }
+        }
+        // The contract reads an activation price of 0 as none; this SDK
+        // refuses an explicit zero itself, since only None means absent. It
+        // is no server refusal, so it carries no server code.
+        let mut zero = create.clone();
+        zero.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(
+                TrailingStop::new(TrailingDistance::Bps(100))
+                    .with_activation_price(Price::from_ticks(0, Some("BTC-USDT".into())).unwrap()),
+            ),
+            ..Default::default()
+        });
+        let err = client.orders.encode_create_params(&zero).unwrap_err();
+        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+        assert!(err.to_string().contains("leave it None"), "{err}");
+        // The edges stay accepted.
+        let mut params = create.clone();
+        params.attached_risk = Some(AttachedRisk {
+            trailing_stop: Some(stop(
+                Some(TrailingDistance::Bps(10_000)),
+                Some(MaxSlippage::Bps(9_999)),
+            )),
+            ..Default::default()
+        });
+        client.orders.encode_create_params(&params).unwrap();
     }
 
     #[test]
