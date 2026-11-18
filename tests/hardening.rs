@@ -10188,10 +10188,14 @@ fn zero_scale_zipped_supply_reads_whole_units() {
     .unwrap();
     let catalogs = Manager::new();
     catalogs
-        .hydrate_zipper_config(&deposit_withdraw_config_from_proto(&config))
+        .hydrate_zipper_config(&deposit_withdraw_config_from_proto(&config).unwrap())
         .unwrap();
     assert_eq!(catalogs.quantity_scale_for_zipped_asset_id(245), Some(0));
 
+    let observed = buffa_types::google::protobuf::Timestamp {
+        seconds: 1_794_744_000,
+        ..Default::default()
+    };
     let updates = [
         (245, 3_582_802, "3582802"),
         (247, 2_232_802, "2232802"),
@@ -10206,6 +10210,7 @@ fn zero_scale_zipped_supply_reads_whole_units() {
                 zipped_asset_id: *id,
                 supply_q: *q,
                 status: SupplyStatus::AVAILABLE.into(),
+                observed_at: observed.clone().into(),
                 ..Default::default()
             })
             .collect(),
@@ -10231,10 +10236,32 @@ fn zero_scale_zipped_supply_reads_whole_units() {
             zipped_asset_id: 999,
             supply_q: 3_582_802,
             status: SupplyStatus::AVAILABLE.into(),
+            observed_at: observed.clone().into(),
             ..Default::default()
         }],
         ..Default::default()
     };
+    // An available or stale update without its observation time is refused
+    // before anything reads or caches it.
+    for status in [SupplyStatus::AVAILABLE, SupplyStatus::STALE] {
+        let untimed = ZippedAssetSupplyBatch {
+            updates: vec![ZippedAssetSupplyUpdate {
+                zipped_asset_id: 3,
+                supply_q: 1_500_000,
+                status: status.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let err = zipped_asset_supply_batch_from_bytes(&untimed.encode_to_vec(), |id| {
+            catalogs.quantity_scale_for_zipped_asset_id(id)
+        })
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{status:?}: {err:?}"
+        );
+    }
     assert!(
         zipped_asset_supply_batch_from_bytes(&unknown.encode_to_vec(), |id| {
             catalogs.quantity_scale_for_zipped_asset_id(id)

@@ -60,6 +60,11 @@ fn zipper_config() -> GetDepositWithdrawConfigResponse {
                 withdraw_min_amount: "0.002".into(),
                 supply_q: *supply_q,
                 supply_status: SupplyStatus::AVAILABLE.into(),
+                supply_observed_at: buffa_types::google::protobuf::Timestamp {
+                    seconds: 1_794_744_000,
+                    ..Default::default()
+                }
+                .into(),
                 ..Default::default()
             })
             .chain(std::iter::once(AssetChainVariant {

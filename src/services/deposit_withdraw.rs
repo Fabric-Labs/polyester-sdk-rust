@@ -596,7 +596,7 @@ impl ZipperService {
         )
         .await?
         .into_owned();
-        Ok(deposit_withdraw_config_from_proto(&resp))
+        deposit_withdraw_config_from_proto(&resp)
     }
 
     /// Subscribe to zipped-asset supply updates (requires `realtime` feature).

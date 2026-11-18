@@ -234,3 +234,52 @@ async fn get_wallet_balances_reports_unreadable_assets() {
     assert_eq!(reasons, [(12, "read_failed"), (13, "unknown(9)")]);
     assert_eq!(wallet.unavailable_assets[0].ztoken_address, "0x2222");
 }
+
+/// The deposit and withdraw config refuses an available or stale route
+/// supply without its observation time, rather than reporting it as current;
+/// a missing supply carries no time and still decodes.
+#[tokio::test]
+async fn deposit_withdraw_config_refuses_supply_without_observation_time() {
+    use polyester::proto::chain::zipper::v1::{
+        AssetChainVariant, AssetConfig, GetDepositWithdrawConfigResponse, SupplyStatus,
+    };
+
+    let config = |status: SupplyStatus| GetDepositWithdrawConfigResponse {
+        ts_sec: 1,
+        assets: vec![AssetConfig {
+            asset: "USDT".into(),
+            ledger_id: 7,
+            quantity_scale: 6,
+            variants: vec![AssetChainVariant {
+                zipped_asset_id: 3,
+                chain_id: 1,
+                supply_q: 1_000_000,
+                supply_status: status.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    for status in [SupplyStatus::AVAILABLE, SupplyStatus::STALE] {
+        let body = config(status);
+        let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+        let err = keyed_client(&server)
+            .zipper
+            .get_deposit_withdraw_config()
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{status:?}: {err:?}"
+        );
+    }
+    let body = config(SupplyStatus::MISSING);
+    let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+    let cfg = keyed_client(&server)
+        .zipper
+        .get_deposit_withdraw_config()
+        .await
+        .unwrap();
+    assert_eq!(cfg.assets[0].variants[0].supply, None);
+}

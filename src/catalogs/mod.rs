@@ -435,7 +435,7 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
                 }
                 zipped_id_to_asset.insert(zipped_id, sym.to_owned());
                 snap.zipped_id_to_supply
-                    .insert(zipped_id, variant_supply(zipped_id, variant));
+                    .insert(zipped_id, variant_supply(zipped_id, variant)?);
             }
         }
     }
@@ -450,8 +450,10 @@ fn build_zipper_snapshot(value: Value) -> Result<ZipperSnapshot> {
 /// A config variant's supply state. The supply and its observation time are
 /// kept only while the status is available or stale (`supply_status` or
 /// `supplyStatus`, in any case); a variant without such a status has no known
-/// supply, whatever `supply` holds.
-fn variant_supply(zipped_asset_id: u32, variant: &Value) -> ZippedAssetSupplyUpdate {
+/// supply, whatever `supply` holds. An available or stale supply without a
+/// readable observation time is an [`Error::ResponseContract`], as the
+/// contract sets the time of every such supply.
+fn variant_supply(zipped_asset_id: u32, variant: &Value) -> Result<ZippedAssetSupplyUpdate> {
     let status = variant
         .get("supply_status")
         .or_else(|| variant.get("supplyStatus"))
@@ -459,28 +461,36 @@ fn variant_supply(zipped_asset_id: u32, variant: &Value) -> ZippedAssetSupplyUpd
         .map(|status| status.trim().to_ascii_lowercase())
         .unwrap_or_default();
     if !supply_status_carries_supply(&status) {
-        return ZippedAssetSupplyUpdate {
+        return Ok(ZippedAssetSupplyUpdate {
             zipped_asset_id,
             status,
             ..Default::default()
-        };
+        });
     }
     let supply = variant
         .get("supply")
         .and_then(Value::as_str)
         .filter(|supply| !supply.is_empty())
         .map(str::to_owned);
-    let observed_at = variant
+    let observed_at: buffa_types::google::protobuf::Timestamp = variant
         .get("supply_observed_at")
         .or_else(|| variant.get("supplyObservedAt"))
         .filter(|observed_at| !observed_at.is_null())
-        .and_then(|observed_at| serde_json::from_value(observed_at.clone()).ok());
-    ZippedAssetSupplyUpdate {
+        .and_then(|observed_at| serde_json::from_value(observed_at.clone()).ok())
+        .ok_or_else(|| {
+            Error::response_contract(
+                "GetDepositWithdrawConfig",
+                format!(
+                    "{status} supply of zipped asset {zipped_asset_id} has no observation time"
+                ),
+            )
+        })?;
+    Ok(ZippedAssetSupplyUpdate {
         zipped_asset_id,
-        observed_at: supply.as_ref().and(observed_at),
+        observed_at: Some(observed_at),
         supply,
         status,
-    }
+    })
 }
 
 impl Manager {
@@ -1482,10 +1492,12 @@ mod tests {
                 "variants": [
                     {"zipped_asset_id": 7, "supply": "97.08173223", "supply_status": "available",
                      "supply_observed_at": "2026-11-15T12:00:00.500Z"},
-                    {"zipped_asset_id": 8, "supply": "0", "supplyStatus": "AVAILABLE"},
+                    {"zipped_asset_id": 8, "supply": "0", "supplyStatus": "AVAILABLE",
+                     "supplyObservedAt": "2026-11-15T12:00:00Z"},
                     {"zipped_asset_id": 9, "supply_status": "missing"},
                     {"zipped_asset_id": 10, "supply": "5"},
-                    {"zipped_asset_id": 11, "supply": "6", "supply_status": "stale"}
+                    {"zipped_asset_id": 11, "supply": "6", "supply_status": "stale",
+                     "supply_observed_at": "2026-11-15T11:00:00Z"}
                 ]
             }]
         }))
@@ -1520,7 +1532,8 @@ mod tests {
                 "quantity_scale": 8,
                 "variants": [
                     {"zipped_asset_id": 7, "supply_status": "missing"},
-                    {"zipped_asset_id": 9, "supply": "98", "supply_status": "available"}
+                    {"zipped_asset_id": 9, "supply": "98", "supply_status": "available",
+                     "supply_observed_at": "2026-11-15T13:00:00Z"}
                 ]
             }]
         }))
@@ -1588,6 +1601,30 @@ mod tests {
         );
         assert_eq!(stale.observed_at.map(|t| t.seconds), Some(1_763_208_000));
         assert_eq!(mgr.zipped_asset_supply(5), Some(supply(5, "missing", None)));
+    }
+
+    /// A hydrated variant whose supply is available or stale must carry its
+    /// observation time: a config without it is refused and changes nothing.
+    #[test]
+    fn zipper_config_without_supply_observation_time_is_refused() {
+        for status in ["available", "STALE"] {
+            let mgr = Manager::new();
+            let err = mgr
+                .hydrate_zipper_config_json(json!({
+                    "assets": [{
+                        "asset": "BTC",
+                        "ledger_id": 1,
+                        "quantity_scale": 8,
+                        "variants": [{"zipped_asset_id": 7, "supply": "1", "supply_status": status}]
+                    }]
+                }))
+                .unwrap_err();
+            assert!(
+                matches!(err, Error::ResponseContract { .. }),
+                "{status}: {err:?}"
+            );
+            assert_eq!(mgr.zipped_asset_supply(7), None, "{status}");
+        }
     }
 
     #[test]
