@@ -122,9 +122,15 @@ impl Transport for LiveTransport {
             let config = WebSocketConfig::default()
                 .max_message_size(Some(super::MAX_REALTIME_MESSAGE_BYTES))
                 .max_frame_size(Some(super::MAX_REALTIME_MESSAGE_BYTES));
+            let connector = crate::tls::websocket_connector()?;
             let (ws, response) = tokio::time::timeout(
                 CONNECT_TIMEOUT,
-                tokio_tungstenite::connect_async_with_config(request, Some(config), false),
+                tokio_tungstenite::connect_async_tls_with_config(
+                    request,
+                    Some(config),
+                    false,
+                    Some(connector),
+                ),
             )
             .await
             .map_err(|_| Error::realtime("private WebSocket connect timed out"))?

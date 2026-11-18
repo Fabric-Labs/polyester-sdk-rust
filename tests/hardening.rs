@@ -32,6 +32,8 @@ mod contract_e339360;
 mod contract_ebbbeac;
 #[path = "contract_page_limits/mod.rs"]
 mod contract_page_limits;
+#[path = "contract_request_ranges/mod.rs"]
+mod contract_request_ranges;
 #[path = "error_chain_redaction/mod.rs"]
 mod error_chain_redaction;
 mod hardening_support;
@@ -9818,6 +9820,7 @@ async fn raw_requests_use_the_default_subaccount_when_unset() {
             .deposit
             .create_address(CreateDepositAddressRequest {
                 subaccount_id: plain_id,
+                chain_id: 1,
                 ..Default::default()
             })
             .await;

@@ -104,6 +104,31 @@ pub(crate) const CHANGELOG_PAGE_LIMIT_MAX: u32 = 100;
 /// `ListChangesRequest.limit`.
 pub(crate) const CHANGELOG_CHANGES_LIMIT_MAX: u32 = 500;
 
+/// Most IDs one `ListAssetInfo` request takes: the `repeated.max_items` rule
+/// on `ListAssetInfoRequest.asset_ids`.
+pub(crate) const ASSET_INFO_IDS_MAX: usize = 1_000;
+/// Largest asset ID `ListAssetInfo` takes: the `items.uint32.lte` rule on
+/// `ListAssetInfoRequest.asset_ids` (with `gt: 0`).
+pub(crate) const ASSET_INFO_ID_MAX: u32 = 2_147_483_647;
+
+/// Refuse `ListAssetInfoRequest.asset_ids` outside its `repeated` rule: more
+/// than [`ASSET_INFO_IDS_MAX`] IDs, or an ID of 0 or above
+/// [`ASSET_INFO_ID_MAX`]. A repeated ID is the server's to ignore.
+pub(crate) fn check_asset_info_ids(ids: &[u32]) -> Result<()> {
+    if ids.len() > ASSET_INFO_IDS_MAX {
+        return Err(Error::validation(format!(
+            "asset_ids holds at most {ASSET_INFO_IDS_MAX} IDs, not {}",
+            ids.len()
+        )));
+    }
+    if let Some(id) = ids.iter().find(|id| **id == 0 || **id > ASSET_INFO_ID_MAX) {
+        return Err(Error::validation(format!(
+            "asset_ids must be from 1 to {ASSET_INFO_ID_MAX}, not {id}"
+        )));
+    }
+    Ok(())
+}
+
 /// Refuse an ID filter that breaks its `repeated` rule: more than `max`
 /// IDs, an ID of 0, or an ID listed twice.
 pub(crate) fn check_id_filter(field: &str, ids: &[u32], max: usize) -> Result<()> {
@@ -220,6 +245,12 @@ mod tests {
                 ),
             );
         }
+        assert_docs(
+            include_str!("../gen/buffa/marketdata.v1.rs"),
+            &format!(
+                "/// At most {ASSET_INFO_IDS_MAX} IDs. Duplicate and unknown IDs are ignored.\n    ///\n    /// Field 1: `asset_ids`\n"
+            ),
+        );
         let transfer = include_str!("../gen/buffa/transfer.v1.rs");
         assert_docs(
             transfer,

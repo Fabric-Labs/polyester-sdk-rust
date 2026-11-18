@@ -13,6 +13,27 @@ pub struct MeResult {
     pub username: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root_smart_account_address: Option<String>,
+    /// The session of the presented access token; `None` when the server
+    /// sends none, as for an API key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session: Option<MeSession>,
+}
+
+/// The assurance of a session, as `auth.me` reads it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct MeSession {
+    /// Shared by the session's primary and MFA-elevated tokens.
+    pub session_id: String,
+    /// The session's assurance level as its proto name
+    /// (`"PRIMARY_AUTHENTICATED"`, `"MFA_ELEVATED"`, `"FRESH_STEP_UP"`), or
+    /// `"UNKNOWN(n)"` for a level this version does not know.
+    pub session_level: String,
+    /// How the session authenticated, such as `"wallet"` or `"totp"`.
+    pub authentication_methods: Vec<String>,
+    /// When the session authenticated or was elevated, in Unix milliseconds;
+    /// `None` when the server sends no time.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_time_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]

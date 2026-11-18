@@ -72,6 +72,15 @@ pub fn subaccount_from_proto(msg: &Subaccount) -> SubAccount {
         revision: msg.revision,
         role: subaccount_role(&msg.role),
         removed: msg.removed,
+        subaccount_policy_id: (msg.subaccount_policy_id != 0)
+            .then(|| format_uint64_id(msg.subaccount_policy_id)),
+        require_member_mfa: msg.require_member_mfa,
+        smart_account_salt_nonce: msg.smart_account_salt_nonce,
+        icon: msg.icon.clone(),
+        color: msg.color.clone(),
+        owner_username: msg.owner_username.clone(),
+        owner_avatar_url: msg.owner_avatar_url.clone(),
+        owner_root_smart_account_address: msg.owner_root_smart_account_address.clone(),
     }
 }
 
@@ -153,6 +162,10 @@ fn member_from_proto(operation: &str, msg: &SubaccountMemberView) -> SdkResult<S
     Ok(SubAccountMember {
         grantee_account_id: format_uint64_id(msg.account_id),
         role: enum_proto_name(&msg.role),
+        mfa_enrolled: msg.mfa_enrolled,
+        username: msg.username.clone(),
+        smart_account_address: msg.smart_account_address.clone(),
+        avatar_url: msg.avatar_url.clone(),
     })
 }
 
@@ -171,9 +184,20 @@ pub fn subaccount_members_list_from_proto(
 fn invite_from_proto(msg: &SubaccountInvite) -> SubAccountInvite {
     SubAccountInvite {
         invite_id: format_uint64_id(msg.id),
+        subaccount_id: format_uint64_id(msg.subaccount_id),
         grantee_account_id: format_uint64_id(msg.grantee_account_id),
+        inviter_account_id: (msg.inviter_account_id != 0)
+            .then(|| format_uint64_id(msg.inviter_account_id)),
         role: enum_proto_name(&msg.role),
         status: enum_proto_name(&msg.status),
+        created_at_ms: msg.created_at.as_option().map(|t| timestamp_ms(Some(t))),
+        responded_at_ms: msg.responded_at.as_option().map(|t| timestamp_ms(Some(t))),
+        grantee_username: msg.grantee_username.clone(),
+        inviter_username: msg.inviter_username.clone(),
+        subaccount_label: msg.subaccount_label.clone(),
+        inviter_root_smart_account_address: msg.inviter_root_smart_account_address.clone(),
+        grantee_root_smart_account_address: msg.grantee_root_smart_account_address.clone(),
+        require_member_mfa: msg.require_member_mfa,
     }
 }
 
@@ -400,5 +424,113 @@ mod tests {
             SubaccountInviteDirection::Outgoing
         );
         assert!(invite_direction_from_label("sideways").is_err());
+    }
+
+    /// Reads keep every field of `SubaccountInvite`, `SubaccountMemberView`
+    /// and `Subaccount`: an invite names its sub-account, inviter and times, a
+    /// member whether it enrolled MFA, a sub-account its policy and MFA rule.
+    #[test]
+    fn reads_keep_every_invite_member_and_subaccount_field() {
+        use crate::proto::auth::v1::SubaccountInviteStatus;
+        let ts = |seconds| -> buffa::MessageField<Timestamp> {
+            Timestamp {
+                seconds,
+                ..Default::default()
+            }
+            .into()
+        };
+        let invites = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {
+            invites: vec![SubaccountInvite {
+                id: 1,
+                subaccount_id: 2,
+                grantee_account_id: 3,
+                inviter_account_id: 4,
+                role: SubaccountRole::TRADER.into(),
+                status: SubaccountInviteStatus::SUBACCOUNT_INVITE_STATUS_PENDING.into(),
+                created_at: ts(10),
+                responded_at: ts(20),
+                grantee_username: "bob".into(),
+                inviter_username: "alice".into(),
+                subaccount_label: "desk".into(),
+                inviter_root_smart_account_address: "0xaaaa".into(),
+                grantee_root_smart_account_address: "0xbbbb".into(),
+                require_member_mfa: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        let invite = &invites.invites[0];
+        assert_eq!(invite.subaccount_id, format_uint64_id(2));
+        assert_eq!(invite.inviter_account_id, Some(format_uint64_id(4)));
+        assert_eq!(invite.created_at_ms, Some(10_000));
+        assert_eq!(invite.responded_at_ms, Some(20_000));
+        assert_eq!(invite.grantee_username, "bob");
+        assert_eq!(invite.inviter_username, "alice");
+        assert_eq!(invite.subaccount_label, "desk");
+        assert_eq!(invite.inviter_root_smart_account_address, "0xaaaa");
+        assert_eq!(invite.grantee_root_smart_account_address, "0xbbbb");
+        assert!(invite.require_member_mfa);
+
+        // A pending invite has no answer time, and an unset inviter is absent.
+        let pending = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {
+            invites: vec![SubaccountInvite {
+                id: 1,
+                subaccount_id: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(pending.invites[0].inviter_account_id, None);
+        assert_eq!(pending.invites[0].created_at_ms, None);
+        assert_eq!(pending.invites[0].responded_at_ms, None);
+
+        let members = subaccount_members_list_from_proto(&ListSubaccountMembersResponse {
+            members: vec![SubaccountMemberView {
+                account_id: 9,
+                role: SubaccountRole::OWNER.into(),
+                username: "carol".into(),
+                smart_account_address: "0xcccc".into(),
+                avatar_url: "https://example.com/a.png".into(),
+                mfa_enrolled: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        let member = &members.members[0];
+        assert!(member.mfa_enrolled);
+        assert_eq!(member.username, "carol");
+        assert_eq!(member.smart_account_address, "0xcccc");
+        assert_eq!(member.avatar_url, "https://example.com/a.png");
+
+        let subaccount = subaccount_from_proto(&Subaccount {
+            id: 3,
+            icon: "rocket".into(),
+            color: "#ff0000".into(),
+            owner_username: "alice".into(),
+            owner_avatar_url: "https://example.com/o.png".into(),
+            owner_root_smart_account_address: "0xdddd".into(),
+            subaccount_policy_id: 5,
+            require_member_mfa: true,
+            smart_account_salt_nonce: Some(0),
+            ..Default::default()
+        });
+        assert_eq!(subaccount.subaccount_policy_id, Some(format_uint64_id(5)));
+        assert!(subaccount.require_member_mfa);
+        assert_eq!(subaccount.smart_account_salt_nonce, Some(0));
+        assert_eq!(subaccount.icon, "rocket");
+        assert_eq!(subaccount.color, "#ff0000");
+        assert_eq!(subaccount.owner_username, "alice");
+        assert_eq!(subaccount.owner_avatar_url, "https://example.com/o.png");
+        assert_eq!(subaccount.owner_root_smart_account_address, "0xdddd");
+
+        let bare = subaccount_from_proto(&Subaccount {
+            id: 3,
+            ..Default::default()
+        });
+        assert_eq!(bare.subaccount_policy_id, None);
+        assert_eq!(bare.smart_account_salt_nonce, None);
     }
 }

@@ -292,16 +292,8 @@ fn content_length_exceeds_limit(headers: &http::HeaderMap, max_bytes: usize) -> 
 }
 
 fn build_http_client(url: &str, allow_insecure: bool) -> Result<HyperClient> {
-    static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-    });
     let parsed = crate::transport::validate_http_url(url, allow_insecure)?;
-    let mut roots = connectrpc::rustls::RootCertStore::empty();
-    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    let tls = connectrpc::rustls::ClientConfig::builder()
-        .with_root_certificates(roots)
-        .with_no_client_auth();
+    let tls = (*crate::tls::client_config()?).clone();
     let builder = hyper_rustls::HttpsConnectorBuilder::new().with_tls_config(tls);
     let https = if parsed.scheme() == "http" {
         builder.https_or_http().enable_http1().build()

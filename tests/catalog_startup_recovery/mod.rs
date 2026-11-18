@@ -601,9 +601,10 @@ async fn deposit_addresses_and_withdrawals_do_not_wait_for_the_funding_config() 
         .expect("list ended");
         let create = tokio::time::timeout(
             Duration::from_secs(5),
-            client
-                .deposit
-                .create_address(CreateDepositAddressRequest::default()),
+            client.deposit.create_address(CreateDepositAddressRequest {
+                chain_id: 1,
+                ..Default::default()
+            }),
         )
         .await
         .expect("create ended");

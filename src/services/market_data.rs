@@ -131,7 +131,11 @@ impl MarketDataService {
     /// none for every saved entry. Duplicate and unknown IDs are ignored, and
     /// assets never edited are left out. The result is complete, with no
     /// paging, in ascending `asset_id` order.
+    ///
+    /// At most 1000 IDs, each from 1 to 2147483647, as the contract allows;
+    /// any other list is refused with [`Error::Validation`] before sending.
     pub async fn list_asset_info(&self, asset_ids: &[u32]) -> Result<Vec<AssetInfo>> {
+        super::limits::check_asset_info_ids(asset_ids)?;
         let req = ListAssetInfoRequest {
             asset_ids: asset_ids.to_vec(),
             ..Default::default()

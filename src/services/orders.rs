@@ -582,6 +582,11 @@ impl OrdersService {
         {
             intent.client_order_id = client_order_id;
         }
+        // A market order is always IOC; a limit order only with IOC.
+        let ioc = match params.order_type {
+            CreateOrderType::Market => true,
+            CreateOrderType::Limit => matches!(params.time_in_force, Some(CreateTimeInForce::Ioc)),
+        };
         intent.sizing = Some(
             match (
                 &params.quantity,
@@ -597,6 +602,13 @@ impl OrdersService {
                     )?)
                 }
                 (None, Some(max_quote_debit), None) => {
+                    // The contract's `order_intent.max_quote_debit_eligibility`
+                    // rule: a BUY market IOC or BUY limit IOC only.
+                    if !matches!(params.side, CreateSide::Buy) || !ioc {
+                        return Err(Error::validation(
+                            "max_quote_debit_scaled is valid only for BUY market IOC or BUY limit IOC orders",
+                        ));
+                    }
                     order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
                         max_quote_debit,
                         Self::require_quote_quantity_scale(pair)?,
@@ -607,12 +619,6 @@ impl OrdersService {
                 (None, None, Some(quote_proceeds)) => {
                     // The contract's `order_intent.quote_proceeds_eligibility`
                     // rule: a SELL market IOC or SELL limit IOC only.
-                    let ioc = match params.order_type {
-                        CreateOrderType::Market => true,
-                        CreateOrderType::Limit => {
-                            matches!(params.time_in_force, Some(CreateTimeInForce::Ioc))
-                        }
-                    };
                     if !matches!(params.side, CreateSide::Sell) || !ioc {
                         return Err(Error::validation(
                             "quote_proceeds_scaled is valid only for SELL market IOC or SELL limit IOC orders",
@@ -3720,6 +3726,9 @@ mod tests {
             Price::from_ticks(50_000_000_000, Some("BTC-USDT".into())).unwrap(),
         );
         params.quantity = None;
+        // A quote budget goes on a BUY IOC only (`order_intent.max_quote_debit_eligibility`).
+        params.time_in_force = Some(CreateTimeInForce::Ioc);
+        params.post_only = None;
         params.max_quote_debit_scaled = Some(
             Quantity::from_quote_scaled(5_000_000, 6, Some("BTC-USDT".into()), Some(7)).unwrap(),
         );
@@ -3747,6 +3756,71 @@ mod tests {
             Some(Quantity::from_quote_scaled(5_000_000, 8, None, None).unwrap());
         let err = client.orders.encode_create_params(&params).unwrap_err();
         assert!(err.to_string().contains("scale mismatch"));
+    }
+
+    /// The contract's `order_intent.max_quote_debit_eligibility` rule:
+    /// "max_quote_debit_scaled is valid only for BUY market IOC or BUY limit
+    /// IOC orders". Any other side or time in force is refused before sending.
+    #[test]
+    fn quote_budget_sizing_encodes_on_buy_ioc_only() {
+        let client = client();
+        let mut market =
+            CreateOrderParams::new("BTC-USDT", CreateSide::Buy, CreateOrderType::Market);
+        market.max_quote_debit_scaled = quote_amount(100_000_000);
+        market.market_max_slippage = Some(MaxSlippage::Bps(50));
+        let intent = client.orders.order_intent_from_params(&market).unwrap();
+        assert_eq!(
+            intent.sizing,
+            Some(order_intent::Sizing::MaxQuoteDebitScaled(100_000_000))
+        );
+
+        let mut limit_ioc = market.clone();
+        limit_ioc.order_type = CreateOrderType::Limit;
+        limit_ioc.time_in_force = Some(CreateTimeInForce::Ioc);
+        limit_ioc.market_max_slippage = None;
+        limit_ioc.price = Some(btc_price(60_000_000_000_000));
+        let intent = client.orders.order_intent_from_params(&limit_ioc).unwrap();
+        assert!(matches!(
+            intent.sizing,
+            Some(order_intent::Sizing::MaxQuoteDebitScaled(100_000_000))
+        ));
+        assert!(matches!(
+            intent.execution,
+            Some(order_intent::Execution::LimitIoc(_))
+        ));
+
+        let eligibility =
+            "max_quote_debit_scaled is valid only for BUY market IOC or BUY limit IOC";
+        let mut sell_market = market.clone();
+        sell_market.side = CreateSide::Sell;
+        assert_refused(&client, &sell_market, eligibility);
+        let mut sell_limit = limit_ioc.clone();
+        sell_limit.side = CreateSide::Sell;
+        for tif in [
+            None,
+            Some(CreateTimeInForce::Gtc),
+            Some(CreateTimeInForce::Ioc),
+        ] {
+            sell_limit.time_in_force = tif;
+            assert_refused(&client, &sell_limit, eligibility);
+        }
+        for tif in [
+            None,
+            Some(CreateTimeInForce::Gtc),
+            Some(CreateTimeInForce::Fok),
+            Some(CreateTimeInForce::Gtd),
+        ] {
+            let mut resting = limit_ioc.clone();
+            resting.time_in_force = tif;
+            assert_refused(&client, &resting, eligibility);
+        }
+
+        // Preview builds the same intent.
+        let mut preview =
+            PreviewOrderParams::new("BTC-USDT", CreateSide::Sell, CreateOrderType::Market);
+        preview.max_quote_debit_scaled = quote_amount(100_000_000);
+        let err = client.orders.encode_preview_params(&preview).unwrap_err();
+        assert!(err.to_string().contains(eligibility), "{err}");
     }
 
     fn btc_qty(scaled: i64) -> Quantity {

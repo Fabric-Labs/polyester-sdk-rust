@@ -13,7 +13,7 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::http::header::USER_AGENT;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_tls_with_config};
 
 use super::backfill::{Pacing, TradeHistory, backfill_paced};
 use super::book::{Book, OrderBook, Refusal};
@@ -665,9 +665,10 @@ impl Shared {
         let config = WebSocketConfig::default()
             .max_message_size(Some(MAX_MESSAGE_BYTES))
             .max_frame_size(Some(MAX_MESSAGE_BYTES));
+        let connector = crate::tls::websocket_connector()?;
         let (ws, _) = tokio::time::timeout(
             self.cfg.connect_timeout(),
-            connect_async_with_config(request, Some(config), false),
+            connect_async_tls_with_config(request, Some(config), false, Some(connector)),
         )
         .await
         .map_err(|_| Error::realtime("market stream connect timed out"))?

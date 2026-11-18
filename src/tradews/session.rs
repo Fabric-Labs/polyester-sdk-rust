@@ -42,7 +42,7 @@ use tokio_tungstenite::tungstenite::http::header::USER_AGENT;
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderName, HeaderValue};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::{self, Message};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_with_config};
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_tls_with_config};
 
 use super::codec::{self, Answer, CHANNELS, Msg};
 use super::{
@@ -880,9 +880,10 @@ async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws
     let config = WebSocketConfig::default()
         .max_message_size(Some(MAX_MESSAGE_BYTES))
         .max_frame_size(Some(MAX_MESSAGE_BYTES));
+    let connector = crate::tls::websocket_connector()?;
     let (mut ws, response) = tokio::time::timeout(
         cfg.connect_timeout(),
-        connect_async_with_config(request, Some(config), true),
+        connect_async_tls_with_config(request, Some(config), true, Some(connector)),
     )
     .await
     .map_err(|_| Error::realtime("tradews connect timed out"))?

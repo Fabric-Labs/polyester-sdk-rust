@@ -167,11 +167,18 @@ impl DepositService {
 
     /// A `subaccount_id` of 0 (unset) takes the configured default
     /// sub-account, as the typed helpers do; a non-zero one is sent unchanged.
+    /// `chain_id` is required: 0 is refused with [`Error::Validation`] before
+    /// sending, by the contract's `uint32.gt = 0` rule on it.
     /// An API key needs `CREATE_DEPOSIT_ADDRESS` on its API-key policy.
     pub async fn create_address(
         &self,
         mut req: CreateDepositAddressRequest,
     ) -> Result<DepositAddress> {
+        if req.chain_id == 0 {
+            return Err(Error::validation(
+                "chain_id is required to create a deposit address",
+            ));
+        }
         req.subaccount_id = scope::plain_subaccount(&self.ctx, req.subaccount_id)?;
         let client = DepositAddressServiceClient::new(
             self.ctx.factory.transport(),

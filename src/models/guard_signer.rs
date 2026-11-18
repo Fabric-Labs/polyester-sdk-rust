@@ -6,6 +6,14 @@ use std::fmt;
 pub struct GuardSignerStatus {
     pub signer_wallet: String,
     pub status: String,
+    /// The live on-chain signer, when the server could read the chain; empty
+    /// otherwise. `status` is `"initialized"` only when it equals
+    /// `signer_wallet`.
+    pub onchain_signer_address: String,
+    /// The guard signer's current nonce in `nonce_space`, as base-10 text.
+    pub nonce: String,
+    /// The default nonce space, the one normal approvals use.
+    pub nonce_space: u64,
 }
 
 /// A signed protected-action approval. Submit `nonce_space` and
