@@ -738,6 +738,7 @@ pub fn cancel_all_from_proto(msg: &CancelAllOrdersResponse) -> Result<CancelAllO
         matched_orders: msg.matched_orders,
         submitted_cancels: msg.submitted_cancels,
         failed_cancels: msg.failed_cancels,
+        matched_triggers: msg.matched_triggers,
         cancelled_orders: msg
             .cancelled_orders
             .iter()

@@ -1522,8 +1522,20 @@ malformed sub-account ID is refused with the ledger code
 `ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), read from `Error::Api`'s `code`.
 
 To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
-and the dead-man switch cancel open orders, never triggers: an unfired stop
-stays armed, a TWAP keeps running. An attached stop-loss, take-profit or
+and the dead-man switch cancel open orders only, unless asked to stop triggers
+too: by default an unfired stop stays armed, a TWAP keeps running. With
+`CancelAllOpts { include_triggers: true, .. }` (`orders.cancel_all_with`) a
+cancel-all also stops every trigger in its scope that was created before the
+request was accepted: stop-loss, take-profit, trailing stop, TWAP, ladder and
+attached legs on the matched markets whose orders trade on the side filter.
+Each ends canceled with cancel reason `cancel_all`, releases its reserved
+funds and places nothing after the response; `matched_triggers` counts them.
+`orders.cancel_all_after_with(CancelAllAfterOpts { include_triggers: true, .. })`
+arms the dead-man switch to do the same when it expires, for triggers created
+before the expiry time; every arm or refresh sets it again. A trigger that
+tried to fire while it was being stopped placed no order: its `fire_refused`
+event carries `fire_refusal_reason` `trigger_stopping`, and it then ends
+canceled `cancel_all`. Without `include_triggers`, an attached stop-loss, take-profit or
 trailing leg whose working exit order a cancel-all cancels ends, and with
 `oco` so do its siblings, so the position loses that protection.
 `stop_all_trading` pages through the live
@@ -2106,7 +2118,8 @@ prove a request was refused. Only a 401 or 403 is a refusal on its status alone 
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 
-A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
+A `cancel_all_with` retry with the same `request_id` (and the same criteria,
+`include_triggers` included) within 120 seconds returns the original
 counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.
 An empty retried list does not mean nothing was canceled: read open orders for current state.
 

@@ -3072,6 +3072,109 @@ async fn l2_cancel_all_after_refuses_timeouts_outside_the_contract_before_sendin
     assert_eq!(*sent.lock().unwrap(), vec![0, 10, 11, 119, 120]);
 }
 
+/// Cancel-all and the dead-man switch send `include_triggers` only when
+/// asked, and cancel-all reports how many triggers matched.
+#[tokio::test]
+async fn l2_cancel_all_and_the_switch_send_include_triggers() {
+    use polyester::models::{CancelAllAfterOpts, CancelAllOpts};
+    use polyester::proto::orders::v1::{
+        CancelAllAfterRequest, CancelAllAfterResponse, CancelAllOrdersRequest,
+        CancelAllOrdersResponse, cancel_all_after_response, cancel_all_orders_response,
+    };
+
+    let sent = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
+        "/orders.v1.OrdersService/CancelAllOrders" => {
+            let request = CancelAllOrdersRequest::decode_from_slice(&req.body).unwrap();
+            seen.lock()
+                .unwrap()
+                .push(("cancel_all", request.include_triggers));
+            connect_proto_ok(&CancelAllOrdersResponse {
+                status: cancel_all_orders_response::Status::Submitted.into(),
+                matched_triggers: if request.include_triggers { 4 } else { 0 },
+                ..Default::default()
+            })
+        }
+        "/orders.v1.OrdersService/CancelAllAfter" => {
+            let request = CancelAllAfterRequest::decode_from_slice(&req.body).unwrap();
+            seen.lock()
+                .unwrap()
+                .push(("switch", request.include_triggers));
+            connect_proto_ok(&CancelAllAfterResponse {
+                status: cancel_all_after_response::Status::Armed.into(),
+                effective_timeout_sec: request.timeout_sec,
+                ..Default::default()
+            })
+        }
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let orders_only = client
+        .orders
+        .cancel_all(None, false, SubAccountScope::Default)
+        .await
+        .expect("cancel all");
+    assert_eq!(orders_only.matched_triggers, 0);
+    let with_triggers = client
+        .orders
+        .cancel_all_with(CancelAllOpts {
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+        .expect("cancel all with triggers");
+    assert_eq!(with_triggers.matched_triggers, 4);
+
+    client
+        .orders
+        .cancel_all_after(15, None, SubAccountScope::Default, None)
+        .await
+        .expect("arm");
+    client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 15,
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+        .expect("arm with triggers");
+    match client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 9,
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+    {
+        Err(polyester::Error::Validation(message)) => {
+            assert!(message.contains("timeout_sec"), "{message}")
+        }
+        other => panic!("expected a validation error, got {other:?}"),
+    }
+
+    assert_eq!(
+        *sent.lock().unwrap(),
+        vec![
+            ("cancel_all", false),
+            ("cancel_all", true),
+            ("switch", false),
+            ("switch", true),
+        ]
+    );
+}
+
 #[tokio::test]
 async fn l2_batch_replace_rejects_inconsistent_server_counts_through_public_service() {
     use polyester::Price;
