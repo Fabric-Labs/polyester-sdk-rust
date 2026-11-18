@@ -641,11 +641,9 @@ mod tests {
     /// naming the field.
     #[test]
     fn id_strings_are_base58_only_and_never_trimmed() {
-        for (raw, want) in [("123", 60), ("23", 60), ("2", 1), ("12", 1), ("z", 57)] {
+        for (raw, want) in [("23", 60), ("2", 1), ("z", 57)] {
             assert_eq!(id_to_u64(raw, "order_id").unwrap(), want, "{raw:?}");
         }
-        // Leading base58 zeros ("1") add nothing, as on the server.
-        assert_eq!(id_to_u64("111111111112", "order_id").unwrap(), 1);
         assert_eq!(
             id_to_u64(&format_id(u64::MAX), "order_id").unwrap(),
             u64::MAX
@@ -674,6 +672,44 @@ mod tests {
         // The formatter's output always parses back.
         for id in [23, 60, 100, 1 << 40] {
             assert_eq!(id_to_u64(&format_id(id), "order_id").unwrap(), id);
+        }
+    }
+
+    /// A text ID is accepted only in canonical form, `format_id(id)`: a
+    /// leading `1` (the base58 zero) adds nothing, so `"123"` would name the
+    /// same ID as `"23"` under another spelling. It is refused, naming the
+    /// field.
+    #[test]
+    fn id_to_u64_refuses_non_canonical_text() {
+        assert_eq!(id_to_u64("23", "order_id").unwrap(), 60);
+        for raw in ["123", "1123", "12", "111111111112", "1z"] {
+            let err = id_to_u64(raw, "order_id").unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{raw:?}: {err:?}");
+            let text = err.to_string();
+            assert!(
+                text.contains("order_id") && text.contains("canonical"),
+                "{raw:?}: {text}"
+            );
+            assert!(parse_account_id(raw, "sub_account_id").is_err(), "{raw:?}");
+        }
+    }
+
+    /// Every canonical ID parses back to its number, and the same ID with a
+    /// leading `1` is refused.
+    #[test]
+    fn canonical_ids_round_trip() {
+        let ids = (1u64..5000)
+            .chain((0..64).map(|shift| 1u64 << shift))
+            .chain((1..64).map(|shift| (1u64 << shift) - 1))
+            .chain((1..=10).map(|power| 58u64.pow(power)))
+            .chain([u64::MAX - 1, u64::MAX]);
+        for id in ids {
+            let text = format_id(id);
+            assert_eq!(id_to_u64(&text, "order_id").unwrap(), id, "{text:?}");
+            assert!(
+                id_to_u64(&format!("1{text}"), "order_id").is_err(),
+                "1{text}"
+            );
         }
     }
 
