@@ -1034,6 +1034,9 @@ pub struct CancelAllAfterOpts {
     /// Market whose orders the switch cancels; `None` covers every market.
     pub symbol: Option<String>,
     pub subaccount_id: SubAccountScope,
+    /// `buy` or `sell` to cancel one side only on expiry; `None` covers
+    /// both.
+    pub side: Option<String>,
     /// When the switch expires, also stop the account's triggers in its
     /// scope, as [`CancelAllOpts::include_triggers`] does: those created
     /// before the expiry time, even when the expiry is processed later, and
@@ -1640,7 +1643,11 @@ pub struct InternalTransferBatchResult {
     /// not known yet: the batch completes on its own, ending `accepted` or
     /// `refused`; follow it with `get_batch` or retry it with the same key
     /// and legs) or `refused` (nothing moved, and nothing will under this
-    /// idempotency key; the legs that caused it carry `error_code`).
+    /// idempotency key; the legs that caused it carry `error_code`). A
+    /// refusal is final for its key in every case: a retry with the same
+    /// key and legs answers `refused` again, even once the leg would pass,
+    /// and one with other legs is refused `IDEMPOTENCY_CONFLICT`. Fix the
+    /// cause and submit under a new key.
     pub status: String,
     /// One result per leg, in request order.
     pub legs: Vec<InternalTransferBatchLegResult>,
@@ -1762,9 +1769,11 @@ pub struct ApiKeySummary {
     pub expires_at: Option<Timestamp>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
-    /// What the key is for: `"STANDARD"` for a key the user created and
+    /// What the key is for: `"STANDARD"` for a key the user created,
     /// `"ASSISTANT"` for a key the user set up for the Polyester assistant
-    /// (listed and revoked like any key); empty when the server names none,
+    /// (listed and revoked like any key) and `"ADMIN_KEY"` for an elevated
+    /// key that manages the account's other keys and its sub-accounts'
+    /// policies (show it as elevated); empty when the server names none,
     /// and `"UNKNOWN(n)"` for a purpose this SDK version does not know.
     /// Existing keys read `"STANDARD"`.
     pub purpose: String,

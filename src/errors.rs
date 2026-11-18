@@ -510,6 +510,33 @@ pub mod auth_codes {
     /// again. Log in with the account address the wallet already uses; see
     /// [`super::Error::is_wallet_already_linked`].
     pub const WALLET_ALREADY_LINKED: &str = "AUTH_WALLET_ALREADY_LINKED";
+    /// The call accepts an API key only when it is an admin key, and the key
+    /// that signed it is not one (HTTP 403). Final.
+    pub const ADMIN_KEY_REQUIRED: &str = "AUTH_ADMIN_KEY_REQUIRED";
+    /// An API key tried to create, promote or change an admin key, or attach
+    /// an admin permission (`MANAGE_*`); only the main account's owner may,
+    /// in a signed-in session with a fresh step-up proof (HTTP 403). Final.
+    pub const ADMIN_KEY_ESCALATION_DENIED: &str = "AUTH_ADMIN_KEY_ESCALATION_DENIED";
+    /// An admin key's change would give a key more than the admin key's own
+    /// scope: an IP allowlist entry outside its allowlist, or more actions or
+    /// markets on a sub-account key than the sub-account's policy (HTTP 403).
+    /// Final.
+    pub const ADMIN_KEY_SCOPE_EXCEEDED: &str = "AUTH_ADMIN_KEY_SCOPE_EXCEEDED";
+    /// An admin key can never reach this target: an assistant key, a key or
+    /// policy that allows a money-out action, a locked sub-account policy, or
+    /// a sub-account the main account does not own (HTTP 403). Final.
+    pub const ADMIN_KEY_FORBIDDEN_TARGET: &str = "AUTH_ADMIN_KEY_FORBIDDEN_TARGET";
+    /// An admin key's IP allowlist is empty or has an entry broader than /24
+    /// (IPv4) or /48 (IPv6), or an IPv4-mapped IPv6 entry (HTTP 400). Final.
+    pub const ADMIN_KEY_ALLOWLIST_INVALID: &str = "AUTH_ADMIN_KEY_ALLOWLIST_INVALID";
+    /// An admin key's policy can never allow an action that moves value out
+    /// of the account or manages where it goes (`EXTERNAL_WITHDRAW`,
+    /// `INTERNAL_TRANSFER`, `MANAGE_ADDRESS_BOOK`, `MANAGE_AUTO_WITHDRAW`)
+    /// (HTTP 412). Final.
+    pub const ADMIN_KEY_ACTION_NOT_ALLOWED: &str = "AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED";
+    /// The account already has the most connected apps it may have (20);
+    /// disconnect one before connecting another (`failed_precondition`).
+    pub const CONNECTED_APP_LIMIT_REACHED: &str = "AUTH_CONNECTED_APP_LIMIT_REACHED";
 
     /// The `auth.v1.AuthErrorCode` of a REST problem `code` or an API-gateway
     /// rejection code: the code with the `AUTH_` prefix added
@@ -3005,6 +3032,46 @@ mod tests {
             assert!(!matches!(mapped, Error::Auth { .. }));
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
             assert!(mapped.mutation_outcome_unknown());
+        }
+    }
+
+    #[test]
+    fn admin_key_and_connected_app_codes_are_the_contract_names() {
+        for (constant, code) in [
+            (
+                auth_codes::ADMIN_KEY_REQUIRED,
+                AuthErrorCode::AUTH_ADMIN_KEY_REQUIRED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ESCALATION_DENIED,
+                AuthErrorCode::AUTH_ADMIN_KEY_ESCALATION_DENIED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_SCOPE_EXCEEDED,
+                AuthErrorCode::AUTH_ADMIN_KEY_SCOPE_EXCEEDED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_FORBIDDEN_TARGET,
+                AuthErrorCode::AUTH_ADMIN_KEY_FORBIDDEN_TARGET,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ALLOWLIST_INVALID,
+                AuthErrorCode::AUTH_ADMIN_KEY_ALLOWLIST_INVALID,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ACTION_NOT_ALLOWED,
+                AuthErrorCode::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED,
+            ),
+            (
+                auth_codes::CONNECTED_APP_LIMIT_REACHED,
+                AuthErrorCode::AUTH_CONNECTED_APP_LIMIT_REACHED,
+            ),
+        ] {
+            assert_eq!(constant, code.proto_name());
+            assert_eq!(auth_codes::from_rest_code(constant), Some(code));
+            let err = map_auth(code, "refused");
+            assert_eq!(err.auth_error_code(), Some(constant), "{err:?}");
+            assert!(!err.is_retryable(), "{err:?}");
         }
     }
 

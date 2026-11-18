@@ -117,7 +117,25 @@ and the message names the missing permission. A client that rewrites a
 policy's whole action list must keep the permissions it read back. Starting,
 confirming and unlinking a social verification (Telegram included) stay
 session-only.
+
+An **admin API key** (`ApiKeySummary::purpose` `"ADMIN_KEY"`) is an elevated
+key the main account's owner creates in a signed-in session; it can create,
+change and revoke the account's other API keys and attach or update its keys'
+and sub-accounts' policies by API, with the admin permissions
+`MANAGE_API_KEYS`, `MANAGE_API_KEY_POLICIES` and `MANAGE_SUBACCOUNT_POLICIES`
+on its policy (they mean nothing on any other key). It needs an IP allowlist of
+/24 (IPv4) or /48 (IPv6) or narrower, can never be allowed a money-out action,
+and can never create, promote or change an admin key. Its refusals are the
+`auth_codes::ADMIN_KEY_*` codes, all final. This SDK lists admin keys like any
+key but does not wrap the key and policy writes yet. Connecting outside apps
+(`auth.v1.ConnectedAppService`) is session-only and not wrapped either.
+
 Private streams require an Account ID and the corresponding API-key permission.
+`auth.me()` names the key's scope: `MeResult::api_key_scope` is `"SCOPE_ROOT"`
+for a main-account key and `"SCOPE_SUBACCOUNT"` for a key bound to one
+sub-account, whose ID is `MeResult::subaccount_id`.
+`MeResult::account_channel_target()` returns the account a key's private
+channels and account reads name: the bound sub-account, else `account_id`.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The connection and subscription tokens are renewed on the
 same connection before they expire; a renewal the API or the server refuses is
@@ -1660,7 +1678,14 @@ SDK notes:
   and nothing will under this key: the legs that caused it carry `error_code`)
   or `processing` (it completes on its own: follow it with
   `client.internal_transfers.get_batch(&batch.request_id)`, or retry with the
-  same key and legs). A batch debits at most 10 distinct source accounts
+  same key and legs). `refused` is final for its key in every case, a leg that
+  failed its checks included: a retry with the same key and legs answers
+  `refused` again even once the leg would pass, and one with other legs is
+  refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key. A
+  check that cannot be decided right now fails the whole call `unavailable`
+  instead (`Error::Server` with `ERROR_CODE_SERVICE_UNAVAILABLE` or
+  `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`): nothing is recorded under the key,
+  so retry with the same key and legs. A batch debits at most 10 distinct source accounts
   (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
   asset pairs. It counts once against the internal transfer rate limit, with a
   weight of `max(ceil(legs / 50), distinct source accounts)`: a

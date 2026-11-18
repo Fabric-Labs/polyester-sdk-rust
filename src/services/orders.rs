@@ -1756,6 +1756,7 @@ impl OrdersService {
             timeout_sec,
             symbol: symbol.map(str::to_owned),
             subaccount_id,
+            side: None,
             include_triggers: false,
             request_id,
         })
@@ -1787,7 +1788,7 @@ impl OrdersService {
         if opts.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
-        let req = CancelAllAfterRequest {
+        let mut req = CancelAllAfterRequest {
             subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             timeout_sec,
             symbol_id: self
@@ -1798,6 +1799,9 @@ impl OrdersService {
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-after")?,
             ..Default::default()
         };
+        if let Some(side) = opts.side.as_deref() {
+            req.side = Self::parse_side(side)?.into();
+        }
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,

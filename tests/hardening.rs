@@ -3098,9 +3098,14 @@ async fn l2_cancel_all_and_the_switch_send_include_triggers() {
         }
         "/orders.v1.OrdersService/CancelAllAfter" => {
             let request = CancelAllAfterRequest::decode_from_slice(&req.body).unwrap();
-            seen.lock()
-                .unwrap()
-                .push(("switch", request.include_triggers));
+            seen.lock().unwrap().push((
+                if request.side.as_known() == Some(polyester::proto::orders::v1::Side::SELL) {
+                    "switch sell"
+                } else {
+                    "switch"
+                },
+                request.include_triggers,
+            ));
             connect_proto_ok(&CancelAllAfterResponse {
                 status: cancel_all_after_response::Status::Armed.into(),
                 effective_timeout_sec: request.timeout_sec,
@@ -3149,6 +3154,15 @@ async fn l2_cancel_all_and_the_switch_send_include_triggers() {
         })
         .await
         .expect("arm with triggers");
+    client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 15,
+            side: Some("sell".into()),
+            ..Default::default()
+        })
+        .await
+        .expect("arm for one side");
     match client
         .orders
         .cancel_all_after_with(CancelAllAfterOpts {
@@ -3171,6 +3185,7 @@ async fn l2_cancel_all_and_the_switch_send_include_triggers() {
             ("cancel_all", true),
             ("switch", false),
             ("switch", true),
+            ("switch sell", false),
         ]
     );
 }
