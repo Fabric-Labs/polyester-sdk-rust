@@ -10048,13 +10048,10 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     })
     .unwrap();
 
-    // A leading `1` is a base58 zero: both strings name SUB.
-    for id in [format_id(SUB), format!("1{}", format_id(SUB))] {
-        let _ = client
-            .sub_accounts
-            .get(&id, GetSubaccountOpts::default())
-            .await;
-    }
+    let _ = client
+        .sub_accounts
+        .get(&format_id(SUB), GetSubaccountOpts::default())
+        .await;
     let _ = client
         .triggers
         .list_events_by_id(&format_id(TRIGGER), ListTriggerEventsOpts::default())
@@ -10075,7 +10072,6 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
     assert_eq!(
         std::mem::take(&mut *seen.lock().unwrap()),
         vec![
-            ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             ("GetSubaccount".to_owned(), SUB, None, 0, 0, String::new()),
             (
                 "ListTriggerEvents".to_owned(),
@@ -10111,6 +10107,15 @@ async fn subaccount_and_trigger_event_reads_take_public_ids() {
             .sub_accounts
             .get(
                 &format!(" {} ", format_id(SUB)),
+                GetSubaccountOpts::default(),
+            )
+            .await
+            .map(|_| ()),
+        // A leading `1` is a base58 zero: another spelling of SUB.
+        client
+            .sub_accounts
+            .get(
+                &format!("1{}", format_id(SUB)),
                 GetSubaccountOpts::default(),
             )
             .await

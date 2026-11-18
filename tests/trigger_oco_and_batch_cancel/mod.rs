@@ -362,14 +362,13 @@ async fn create_oco_refuses_invalid_params_before_sending() {
 }
 
 /// `cancel_oco_by_id` sends the OCO's base58 ID and returns it with both
-/// legs' status; an ID that is not bare base58 (decimal, or with whitespace)
-/// is refused before sending.
+/// legs' status; an ID that is not bare canonical base58 (decimal, with
+/// whitespace, or with a leading `1`) is refused before sending.
 #[tokio::test]
 async fn cancel_oco_sends_the_oco_id() {
     for wire in WIRES {
         let s = server(wire).await;
-        // A leading `1` is a base58 zero: both strings name OCO 70.
-        for raw in [id(70), format!("1{}", id(70))] {
+        for raw in [id(70)] {
             let canceled = s
                 .client
                 .triggers
@@ -383,7 +382,9 @@ async fn cancel_oco_sends_the_oco_id() {
             assert_eq!(sent.subaccount_id, Some(3), "{wire:?} {raw}");
         }
         let sent = s.sent();
-        for bad in ["", "0", "70", " 2 ", "not an id"] {
+        // A leading `1` is a base58 zero: another spelling of OCO 70.
+        let padded = format!("1{}", id(70));
+        for bad in ["", "0", "70", " 2 ", "not an id", padded.as_str()] {
             let err = s
                 .client
                 .triggers
@@ -469,8 +470,9 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
         for (ids, want) in [
             (Vec::new(), "at least one trigger_id"),
             (fifty_one, "at most 50"),
-            // The same trigger written twice: a leading `1` is a base58 zero.
-            (vec![id(40), format!("1{}", id(40))], "duplicate trigger_id"),
+            (vec![id(40), id(40)], "duplicate trigger_id"),
+            // A leading `1` is a base58 zero: another spelling of trigger 40.
+            (vec![format!("1{}", id(40))], "canonical form"),
             (vec!["40".into()], "trigger_id must be a base58 ID"),
         ] {
             let err = s
@@ -604,8 +606,7 @@ async fn list_sends_the_oco_filters() {
         assert_eq!(unfiltered.order_list_id, None, "{wire:?}");
         assert_eq!(unfiltered.client_list_id, None, "{wire:?}");
 
-        // A leading `1` is a base58 zero: both strings name OCO 70.
-        for raw in [id(70), format!("1{}", id(70))] {
+        for raw in [id(70)] {
             s.client
                 .triggers
                 .list_with(ListTriggersOpts {
@@ -636,7 +637,9 @@ async fn list_sends_the_oco_filters() {
         assert_eq!(sent.order_list_id, None, "{wire:?}");
 
         let sent_before = s.sent();
-        for bad in ["", "0", "70", " 2 ", "not an id"] {
+        // A leading `1` is a base58 zero: another spelling of OCO 70.
+        let padded = format!("1{}", id(70));
+        for bad in ["", "0", "70", " 2 ", "not an id", padded.as_str()] {
             let err = s
                 .client
                 .triggers
