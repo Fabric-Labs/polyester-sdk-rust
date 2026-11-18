@@ -389,6 +389,9 @@ async fn call_public(client: &Client, procedure: &str) -> Vec<(&'static str, Res
             "rate_limits.get_rate_limit_config",
             done(client.rate_limits.get_rate_limit_config().await),
         )],
+        "/system.v1.SystemService/GetTime" => {
+            vec![("get_time", done(client.get_time().await))]
+        }
         "/system.v1.SystemService/GetVersion" => {
             vec![("get_version", done(client.get_version().await))]
         }

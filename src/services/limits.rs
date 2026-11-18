@@ -2,7 +2,8 @@
 //! calls, and the account-flow, batch-transfer, dust-conversion and
 //! statement-export limits.
 //!
-//! Each value is a `buf.validate` rule of the contract. Where the generated
+//! Each value is a `buf.validate` rule of the contract, or a limit its
+//! generated field docs state and the API enforces. Where the generated
 //! field docs state it, a test pins the constant to that text, so a contract
 //! change that regenerates the docs breaks the build; where they do not, the
 //! test pins the rule's value and names the rule.
@@ -16,11 +17,17 @@ pub(crate) const LIST_ACCOUNT_FLOWS_LIMIT_MAX: u32 = 500;
 /// (`polyester_chain_ids`, `zipped_asset_ids`, `unified_asset_ids`): the
 /// `repeated.max_items` rule, with `unique: true` and `items.uint32.gt: 0`.
 pub(crate) const ACCOUNT_FLOWS_ID_FILTER_MAX: usize = 100;
-/// Most legs one `BatchCreateInternalTransfers` request takes: the
-/// `repeated.max_items` rule on `BatchCreateInternalTransfersRequest.legs`.
-pub(crate) const BATCH_TRANSFER_LEGS_MAX: usize = 10;
+/// Most legs one `BatchCreateInternalTransfers` request takes, as the
+/// generated docs of `BatchCreateInternalTransfersRequest.legs` state it
+/// ("A batch holds at most 500 legs"); the API refuses more with
+/// `INVALID_REQUEST`.
+pub(crate) const BATCH_TRANSFER_LEGS_MAX: usize = 500;
 /// Fewest legs a batch takes: the `repeated.min_items` rule on the same field.
 pub(crate) const BATCH_TRANSFER_LEGS_MIN: usize = 1;
+/// Longest batch request ID, in characters: the `string.max_len` rule on
+/// `GetInternalTransferBatchRequest.request_id`, whose `pattern` is
+/// `^[1-9][0-9]*$` (also `min_len: 1`).
+pub(crate) const BATCH_TRANSFER_REQUEST_ID_MAX_LEN: usize = 39;
 /// Longest idempotency key of a batch transfer or a dust conversion, in
 /// characters: the `string.max_len` rule on
 /// `BatchCreateInternalTransfersRequest.idempotency_key` and
@@ -78,6 +85,9 @@ pub(crate) const MARKET_OVERVIEW_LIMIT_MAX: u32 = 2_000;
 /// Largest sub-account activity page: the `uint32.lte` rule on
 /// `ListSubaccountEventsRequest.limit`.
 pub(crate) const SUBACCOUNT_EVENTS_LIMIT_MAX: u32 = 200;
+/// Largest account activity page: the `uint32.lte` rule on
+/// `ListAccountActivityRequest.limit`.
+pub(crate) const ACCOUNT_ACTIVITY_LIMIT_MAX: u32 = 200;
 /// Largest `ListTriggers` and `ListTriggerEvents` page: the `uint32.lte` rule
 /// on their `limit`.
 pub(crate) const TRIGGER_LIST_LIMIT_MAX: u32 = 1_000;
@@ -255,7 +265,7 @@ mod tests {
         assert_docs(
             transfer,
             &format!(
-                "/// Transfers to run, in order. At most {BATCH_TRANSFER_LEGS_MAX} legs; each leg counts as one\n"
+                "/// Transfers to move, in order. A batch holds at most {BATCH_TRANSFER_LEGS_MAX} legs, debiting at\n"
             ),
         );
         assert_docs(
@@ -360,6 +370,11 @@ mod tests {
                 maximum_is(SUBACCOUNT_EVENTS_LIMIT_MAX),
             ),
             (
+                auth,
+                "ListAccountActivityRequest",
+                maximum_is(ACCOUNT_ACTIVITY_LIMIT_MAX),
+            ),
+            (
                 triggers,
                 "ListTriggersRequest",
                 maximum_is(TRIGGER_LIST_LIMIT_MAX),
@@ -432,7 +447,8 @@ mod tests {
 
     /// The generated docs do not state these rules, so their values are
     /// pinned here: legs `min_items: 1`; idempotency keys `max_len: 128`;
-    /// `quote_id` `max_len: 64`; `conversion_id` `max_len: 39`; page tokens
+    /// `quote_id` `max_len: 64`; `conversion_id` and the batch `request_id`
+    /// `max_len: 39`; page tokens
     /// `max_len: 256` (dust) and `512` (statement exports); the statement
     /// export period `duration('8784h')`.
     #[test]
@@ -441,6 +457,7 @@ mod tests {
         assert_eq!(IDEMPOTENCY_KEY_MAX_LEN, 128);
         assert_eq!(DUST_QUOTE_ID_MAX_LEN, 64);
         assert_eq!(DUST_CONVERSION_ID_MAX_LEN, 39);
+        assert_eq!(BATCH_TRANSFER_REQUEST_ID_MAX_LEN, 39);
         assert_eq!(DUST_PAGE_TOKEN_MAX_LEN, 256);
         assert_eq!(STATEMENT_EXPORT_PAGE_TOKEN_MAX_LEN, 512);
         assert_eq!(STATEMENT_EXPORT_PERIOD_MAX_SECS, 366 * 24 * 3_600);

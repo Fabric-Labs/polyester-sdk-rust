@@ -3036,6 +3036,172 @@ impl ::buffa::Enumeration for LadderDistribution {
         ]
     }
 }
+/// LadderOutcome summarizes how many of an ended ladder's child orders were
+/// placed on the book. It does not state what filled: see the executed
+/// quantity and executed levels.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum LadderOutcome {
+    /// The ladder is still running, or was rejected at its creation before any
+    /// child order.
+    LADDER_OUTCOME_UNSPECIFIED = 0i32,
+    /// No child order was rejected before it was placed on the book.
+    ALL_ADMITTED = 1i32,
+    /// Some child orders were placed on the book and the others were rejected
+    /// before they were placed.
+    MIXED_REJECTIONS = 2i32,
+    /// Every child order that reached the book was rejected before it was
+    /// placed: the ladder placed nothing.
+    ALL_CHILDREN_REJECTED = 3i32,
+}
+impl LadderOutcome {
+    ///Idiomatic alias for [`Self::LADDER_OUTCOME_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LadderOutcomeUnspecified: Self = Self::LADDER_OUTCOME_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ALL_ADMITTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AllAdmitted: Self = Self::ALL_ADMITTED;
+    ///Idiomatic alias for [`Self::MIXED_REJECTIONS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const MixedRejections: Self = Self::MIXED_REJECTIONS;
+    ///Idiomatic alias for [`Self::ALL_CHILDREN_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AllChildrenRejected: Self = Self::ALL_CHILDREN_REJECTED;
+}
+impl ::core::default::Default for LadderOutcome {
+    fn default() -> Self {
+        Self::LADDER_OUTCOME_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for LadderOutcome {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for LadderOutcome {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = LadderOutcome;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(LadderOutcome)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<LadderOutcome, E> {
+                <LadderOutcome as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<LadderOutcome, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <LadderOutcome as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<LadderOutcome, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <LadderOutcome as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<LadderOutcome, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LadderOutcome {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for LadderOutcome {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::LADDER_OUTCOME_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ALL_ADMITTED),
+            2i32 => ::core::option::Option::Some(Self::MIXED_REJECTIONS),
+            3i32 => ::core::option::Option::Some(Self::ALL_CHILDREN_REJECTED),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::LADDER_OUTCOME_UNSPECIFIED => "LADDER_OUTCOME_UNSPECIFIED",
+            Self::ALL_ADMITTED => "ALL_ADMITTED",
+            Self::MIXED_REJECTIONS => "MIXED_REJECTIONS",
+            Self::ALL_CHILDREN_REJECTED => "ALL_CHILDREN_REJECTED",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "LADDER_OUTCOME_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::LADDER_OUTCOME_UNSPECIFIED)
+            }
+            "ALL_ADMITTED" => ::core::option::Option::Some(Self::ALL_ADMITTED),
+            "MIXED_REJECTIONS" => ::core::option::Option::Some(Self::MIXED_REJECTIONS),
+            "ALL_CHILDREN_REJECTED" => {
+                ::core::option::Option::Some(Self::ALL_CHILDREN_REJECTED)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::LADDER_OUTCOME_UNSPECIFIED,
+            Self::ALL_ADMITTED,
+            Self::MIXED_REJECTIONS,
+            Self::ALL_CHILDREN_REJECTED,
+        ]
+    }
+}
 /// =============================================================================
 /// Create Trigger Request/Response
 /// =============================================================================
@@ -7411,7 +7577,8 @@ pub struct OcoIntent {
     /// OCO, and a different intent with the same ID returns
     /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. 1 to 36 ASCII characters using
     /// letters, digits, period, underscore, colon, slash, or hyphen, as a
-    /// client_order_id; other IDs are rejected with INVALID_ARGUMENT.
+    /// client_order_id; other IDs are rejected with INVALID_ARGUMENT and
+    /// ERROR_CODE_CLIENT_LIST_ID_INVALID.
     ///
     /// Field 5: `client_list_id`
     #[serde(
@@ -8891,8 +9058,9 @@ pub struct ListTriggersRequest {
     pub order_list_id: ::core::option::Option<u64>,
     /// Optional filter by OCO client ID: the take-profit and the stop-loss of
     /// the OCO created with this client_list_id, which follows the same rule as
-    /// OcoIntent.client_list_id. Use it to find an OCO whose create failed with
-    /// TRIGGER_CREATE_OUTCOME_UNKNOWN.
+    /// OcoIntent.client_list_id: other IDs are rejected with INVALID_ARGUMENT and
+    /// ERROR_CODE_CLIENT_LIST_ID_INVALID. Use it to find an OCO whose create
+    /// failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
     ///
     /// Field 7: `client_list_id`
     #[serde(
@@ -12013,8 +12181,10 @@ pub struct ModifyTriggerRequest {
     /// trigger's own pair. When set, it must be the trigger's pair: another
     /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
     /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-    /// trigger unchanged. An API key limited to specific markets must name the
-    /// trigger's pair.
+    /// trigger unchanged. An API key limited to specific markets may act only
+    /// on a trigger whose pair is one of its markets, whether or not the
+    /// request names it: any other trigger, or a named pair outside those
+    /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -13349,8 +13519,10 @@ pub struct ResumeTriggerRequest {
     /// trigger's own pair. When set, it must be the trigger's pair: another
     /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
     /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-    /// trigger unchanged. An API key limited to specific markets must name the
-    /// trigger's pair.
+    /// trigger unchanged. An API key limited to specific markets may act only
+    /// on a trigger whose pair is one of its markets, whether or not the
+    /// request names it: any other trigger, or a named pair outside those
+    /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -13993,8 +14165,9 @@ pub struct TrailingDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub trailing_distance_bps: i32,
-    /// Non-negative maximum absolute price delta in Q9 execution-price ticks
-    /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+    /// Non-negative maximum absolute price delta in quote units scaled by 1e9
+    /// (1e-9 quote units, not the pair's tick size), as set. Zero means no
+    /// absolute cap is configured.
     ///
     /// Field 6: `max_slippage_ticks`
     #[serde(
@@ -14650,6 +14823,63 @@ pub struct LadderDetails {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub executed_levels: i32,
+    /// Number of child orders the ladder requested, one per level.
+    ///
+    /// Field 7: `requested_levels`
+    #[serde(
+        rename = "requestedLevels",
+        alias = "requested_levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub requested_levels: i32,
+    /// Number of child orders placed on the book, including those still open.
+    ///
+    /// Field 8: `placed_levels`
+    #[serde(
+        rename = "placedLevels",
+        alias = "placed_levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub placed_levels: i32,
+    /// Number of child orders rejected before they were placed on the book.
+    /// Each child order's own status states why.
+    ///
+    /// Field 9: `rejected_levels`
+    #[serde(
+        rename = "rejectedLevels",
+        alias = "rejected_levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub rejected_levels: i32,
+    /// Number of placed child orders that were canceled or expired, whether
+    /// partly filled or not. When the ladder itself ends, its open child orders
+    /// are canceled with it and are counted here. A placed child order rejected
+    /// after a partial fill counts as neither rejected nor canceled.
+    ///
+    /// Field 10: `canceled_levels`
+    #[serde(
+        rename = "canceledLevels",
+        alias = "canceled_levels",
+        with = "::buffa::json_helpers::int32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
+    )]
+    pub canceled_levels: i32,
+    /// How the ended ladder's child orders were placed; unspecified while it
+    /// runs, and for a ladder rejected at its creation, before any child order
+    /// (its failure reason states why). A completed ladder with MIXED_REJECTIONS
+    /// completed with some levels rejected: placed_levels of requested_levels
+    /// were placed.
+    ///
+    /// Field 11: `outcome`
+    #[serde(
+        rename = "outcome",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub outcome: ::buffa::EnumValue<LadderOutcome>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -14663,6 +14893,11 @@ impl ::core::fmt::Debug for LadderDetails {
             .field("ladder_distribution", &self.ladder_distribution)
             .field("executed_qty_scaled", &self.executed_qty_scaled)
             .field("executed_levels", &self.executed_levels)
+            .field("requested_levels", &self.requested_levels)
+            .field("placed_levels", &self.placed_levels)
+            .field("rejected_levels", &self.rejected_levels)
+            .field("canceled_levels", &self.canceled_levels)
+            .field("outcome", &self.outcome)
             .finish()
     }
 }
@@ -14721,6 +14956,28 @@ impl ::buffa::Message for LadderDetails {
             size
                 += 1u32 + ::buffa::types::int32_encoded_len(self.executed_levels) as u32;
         }
+        if self.requested_levels != 0i32 {
+            size
+                += 1u32
+                    + ::buffa::types::int32_encoded_len(self.requested_levels) as u32;
+        }
+        if self.placed_levels != 0i32 {
+            size += 1u32 + ::buffa::types::int32_encoded_len(self.placed_levels) as u32;
+        }
+        if self.rejected_levels != 0i32 {
+            size
+                += 1u32 + ::buffa::types::int32_encoded_len(self.rejected_levels) as u32;
+        }
+        if self.canceled_levels != 0i32 {
+            size
+                += 1u32 + ::buffa::types::int32_encoded_len(self.canceled_levels) as u32;
+        }
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -14751,6 +15008,24 @@ impl ::buffa::Message for LadderDetails {
         }
         if self.executed_levels != 0i32 {
             ::buffa::types::put_int32_field(6u32, self.executed_levels, buf);
+        }
+        if self.requested_levels != 0i32 {
+            ::buffa::types::put_int32_field(7u32, self.requested_levels, buf);
+        }
+        if self.placed_levels != 0i32 {
+            ::buffa::types::put_int32_field(8u32, self.placed_levels, buf);
+        }
+        if self.rejected_levels != 0i32 {
+            ::buffa::types::put_int32_field(9u32, self.rejected_levels, buf);
+        }
+        if self.canceled_levels != 0i32 {
+            ::buffa::types::put_int32_field(10u32, self.canceled_levels, buf);
+        }
+        {
+            let val = self.outcome.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(11u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -14809,6 +15084,43 @@ impl ::buffa::Message for LadderDetails {
                 )?;
                 self.executed_levels = ::buffa::types::decode_int32(buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.requested_levels = ::buffa::types::decode_int32(buf)?;
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.placed_levels = ::buffa::types::decode_int32(buf)?;
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.rejected_levels = ::buffa::types::decode_int32(buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.canceled_levels = ::buffa::types::decode_int32(buf)?;
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.outcome = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -14823,6 +15135,11 @@ impl ::buffa::Message for LadderDetails {
         self.ladder_distribution = ::buffa::EnumValue::from(0);
         self.executed_qty_scaled = 0i64;
         self.executed_levels = 0i32;
+        self.requested_levels = 0i32;
+        self.placed_levels = 0i32;
+        self.rejected_levels = 0i32;
+        self.canceled_levels = 0i32;
+        self.outcome = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -22935,7 +23252,8 @@ pub mod __buffa {
             /// OCO, and a different intent with the same ID returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. 1 to 36 ASCII characters using
             /// letters, digits, period, underscore, colon, slash, or hyphen, as a
-            /// client_order_id; other IDs are rejected with INVALID_ARGUMENT.
+            /// client_order_id; other IDs are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_LIST_ID_INVALID.
             ///
             /// Field 5: `client_list_id`
             pub client_list_id: &'a str,
@@ -23423,7 +23741,8 @@ pub mod __buffa {
             /// OCO, and a different intent with the same ID returns
             /// CONFLICT_DUPLICATE_CLIENT_TRIGGER_ID. 1 to 36 ASCII characters using
             /// letters, digits, period, underscore, colon, slash, or hyphen, as a
-            /// client_order_id; other IDs are rejected with INVALID_ARGUMENT.
+            /// client_order_id; other IDs are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_LIST_ID_INVALID.
             ///
             /// Field 5: `client_list_id`
             #[must_use]
@@ -25717,8 +26036,9 @@ pub mod __buffa {
             pub order_list_id: ::core::option::Option<u64>,
             /// Optional filter by OCO client ID: the take-profit and the stop-loss of
             /// the OCO created with this client_list_id, which follows the same rule as
-            /// OcoIntent.client_list_id. Use it to find an OCO whose create failed with
-            /// TRIGGER_CREATE_OUTCOME_UNKNOWN.
+            /// OcoIntent.client_list_id: other IDs are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_LIST_ID_INVALID. Use it to find an OCO whose create
+            /// failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
             ///
             /// Field 7: `client_list_id`
             pub client_list_id: ::core::option::Option<&'a str>,
@@ -26230,8 +26550,9 @@ pub mod __buffa {
             }
             /// Optional filter by OCO client ID: the take-profit and the stop-loss of
             /// the OCO created with this client_list_id, which follows the same rule as
-            /// OcoIntent.client_list_id. Use it to find an OCO whose create failed with
-            /// TRIGGER_CREATE_OUTCOME_UNKNOWN.
+            /// OcoIntent.client_list_id: other IDs are rejected with INVALID_ARGUMENT and
+            /// ERROR_CODE_CLIENT_LIST_ID_INVALID. Use it to find an OCO whose create
+            /// failed with TRIGGER_CREATE_OUTCOME_UNKNOWN.
             ///
             /// Field 7: `client_list_id`
             #[must_use]
@@ -30453,8 +30774,10 @@ pub mod __buffa {
             /// trigger's own pair. When set, it must be the trigger's pair: another
             /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
             /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-            /// trigger unchanged. An API key limited to specific markets must name the
-            /// trigger's pair.
+            /// trigger unchanged. An API key limited to specific markets may act only
+            /// on a trigger whose pair is one of its markets, whether or not the
+            /// request names it: any other trigger, or a named pair outside those
+            /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -31031,8 +31354,10 @@ pub mod __buffa {
             /// trigger's own pair. When set, it must be the trigger's pair: another
             /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
             /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-            /// trigger unchanged. An API key limited to specific markets must name the
-            /// trigger's pair.
+            /// trigger unchanged. An API key limited to specific markets may act only
+            /// on a trigger whose pair is one of its markets, whether or not the
+            /// request names it: any other trigger, or a named pair outside those
+            /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -32285,8 +32610,10 @@ pub mod __buffa {
             /// trigger's own pair. When set, it must be the trigger's pair: another
             /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
             /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-            /// trigger unchanged. An API key limited to specific markets must name the
-            /// trigger's pair.
+            /// trigger unchanged. An API key limited to specific markets may act only
+            /// on a trigger whose pair is one of its markets, whether or not the
+            /// request names it: any other trigger, or a named pair outside those
+            /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -32581,8 +32908,10 @@ pub mod __buffa {
             /// trigger's own pair. When set, it must be the trigger's pair: another
             /// listed pair is rejected with ERROR_CODE_TRIGGER_SYMBOL_MISMATCH, and a
             /// pair that is not listed with ERROR_CODE_UNKNOWN_SYMBOL; either leaves the
-            /// trigger unchanged. An API key limited to specific markets must name the
-            /// trigger's pair.
+            /// trigger unchanged. An API key limited to specific markets may act only
+            /// on a trigger whose pair is one of its markets, whether or not the
+            /// request names it: any other trigger, or a named pair outside those
+            /// markets, is rejected with ERROR_CODE_API_KEY_MARKET_DENY.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -33432,8 +33761,9 @@ pub mod __buffa {
             ///
             /// Field 5: `trailing_distance_bps`
             pub trailing_distance_bps: i32,
-            /// Non-negative maximum absolute price delta in Q9 execution-price ticks
-            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+            /// Non-negative maximum absolute price delta in quote units scaled by 1e9
+            /// (1e-9 quote units, not the pair's tick size), as set. Zero means no
+            /// absolute cap is configured.
             ///
             /// Field 6: `max_slippage_ticks`
             pub max_slippage_ticks: i64,
@@ -33991,8 +34321,9 @@ pub mod __buffa {
             pub fn trailing_distance_bps(&self) -> i32 {
                 self.0.reborrow().trailing_distance_bps
             }
-            /// Non-negative maximum absolute price delta in Q9 execution-price ticks
-            /// (1 tick = 1e-9 quote units). Zero means no absolute cap is configured.
+            /// Non-negative maximum absolute price delta in quote units scaled by 1e9
+            /// (1e-9 quote units, not the pair's tick size), as set. Zero means no
+            /// absolute cap is configured.
             ///
             /// Field 6: `max_slippage_ticks`
             #[must_use]
@@ -34530,6 +34861,34 @@ pub mod __buffa {
             ///
             /// Field 6: `executed_levels`
             pub executed_levels: i32,
+            /// Number of child orders the ladder requested, one per level.
+            ///
+            /// Field 7: `requested_levels`
+            pub requested_levels: i32,
+            /// Number of child orders placed on the book, including those still open.
+            ///
+            /// Field 8: `placed_levels`
+            pub placed_levels: i32,
+            /// Number of child orders rejected before they were placed on the book.
+            /// Each child order's own status states why.
+            ///
+            /// Field 9: `rejected_levels`
+            pub rejected_levels: i32,
+            /// Number of placed child orders that were canceled or expired, whether
+            /// partly filled or not. When the ladder itself ends, its open child orders
+            /// are canceled with it and are counted here. A placed child order rejected
+            /// after a partial fill counts as neither rejected nor canceled.
+            ///
+            /// Field 10: `canceled_levels`
+            pub canceled_levels: i32,
+            /// How the ended ladder's child orders were placed; unspecified while it
+            /// runs, and for a ladder rejected at its creation, before any child order
+            /// (its failure reason states why). A completed ladder with MIXED_REJECTIONS
+            /// completed with some levels rejected: placed_levels of requested_levels
+            /// were placed.
+            ///
+            /// Field 11: `outcome`
+            pub outcome: ::buffa::EnumValue<super::super::LadderOutcome>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for LadderDetailsView<'a> {
@@ -34613,6 +34972,43 @@ pub mod __buffa {
                         )?;
                         view.executed_levels = ::buffa::types::decode_int32(&mut cur)?;
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.requested_levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.placed_levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.rejected_levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.canceled_levels = ::buffa::types::decode_int32(&mut cur)?;
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.outcome = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -34648,6 +35044,11 @@ pub mod __buffa {
                     ladder_distribution: self.ladder_distribution,
                     executed_qty_scaled: self.executed_qty_scaled,
                     executed_levels: self.executed_levels,
+                    requested_levels: self.requested_levels,
+                    placed_levels: self.placed_levels,
+                    rejected_levels: self.rejected_levels,
+                    canceled_levels: self.canceled_levels,
+                    outcome: self.outcome,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -34700,6 +35101,36 @@ pub mod __buffa {
                             + ::buffa::types::int32_encoded_len(self.executed_levels)
                                 as u32;
                 }
+                if self.requested_levels != 0i32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int32_encoded_len(self.requested_levels)
+                                as u32;
+                }
+                if self.placed_levels != 0i32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int32_encoded_len(self.placed_levels)
+                                as u32;
+                }
+                if self.rejected_levels != 0i32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int32_encoded_len(self.rejected_levels)
+                                as u32;
+                }
+                if self.canceled_levels != 0i32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::int32_encoded_len(self.canceled_levels)
+                                as u32;
+                }
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -34739,6 +35170,24 @@ pub mod __buffa {
                 }
                 if self.executed_levels != 0i32 {
                     ::buffa::types::put_int32_field(6u32, self.executed_levels, buf);
+                }
+                if self.requested_levels != 0i32 {
+                    ::buffa::types::put_int32_field(7u32, self.requested_levels, buf);
+                }
+                if self.placed_levels != 0i32 {
+                    ::buffa::types::put_int32_field(8u32, self.placed_levels, buf);
+                }
+                if self.rejected_levels != 0i32 {
+                    ::buffa::types::put_int32_field(9u32, self.rejected_levels, buf);
+                }
+                if self.canceled_levels != 0i32 {
+                    ::buffa::types::put_int32_field(10u32, self.canceled_levels, buf);
+                }
+                {
+                    let val = self.outcome.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(11u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -34814,6 +35263,39 @@ pub mod __buffa {
                             "executedLevels",
                             &::buffa::json_helpers::ProtoJson(&self.executed_levels),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.requested_levels) {
+                    __map
+                        .serialize_entry(
+                            "requestedLevels",
+                            &::buffa::json_helpers::ProtoJson(&self.requested_levels),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.placed_levels) {
+                    __map
+                        .serialize_entry(
+                            "placedLevels",
+                            &::buffa::json_helpers::ProtoJson(&self.placed_levels),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.rejected_levels) {
+                    __map
+                        .serialize_entry(
+                            "rejectedLevels",
+                            &::buffa::json_helpers::ProtoJson(&self.rejected_levels),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_i32(&self.canceled_levels) {
+                    __map
+                        .serialize_entry(
+                            "canceledLevels",
+                            &::buffa::json_helpers::ProtoJson(&self.canceled_levels),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.outcome,
+                ) {
+                    __map.serialize_entry("outcome", &self.outcome)?;
                 }
                 __map.end()
             }
@@ -34959,6 +35441,49 @@ pub mod __buffa {
             #[must_use]
             pub fn executed_levels(&self) -> i32 {
                 self.0.reborrow().executed_levels
+            }
+            /// Number of child orders the ladder requested, one per level.
+            ///
+            /// Field 7: `requested_levels`
+            #[must_use]
+            pub fn requested_levels(&self) -> i32 {
+                self.0.reborrow().requested_levels
+            }
+            /// Number of child orders placed on the book, including those still open.
+            ///
+            /// Field 8: `placed_levels`
+            #[must_use]
+            pub fn placed_levels(&self) -> i32 {
+                self.0.reborrow().placed_levels
+            }
+            /// Number of child orders rejected before they were placed on the book.
+            /// Each child order's own status states why.
+            ///
+            /// Field 9: `rejected_levels`
+            #[must_use]
+            pub fn rejected_levels(&self) -> i32 {
+                self.0.reborrow().rejected_levels
+            }
+            /// Number of placed child orders that were canceled or expired, whether
+            /// partly filled or not. When the ladder itself ends, its open child orders
+            /// are canceled with it and are counted here. A placed child order rejected
+            /// after a partial fill counts as neither rejected nor canceled.
+            ///
+            /// Field 10: `canceled_levels`
+            #[must_use]
+            pub fn canceled_levels(&self) -> i32 {
+                self.0.reborrow().canceled_levels
+            }
+            /// How the ended ladder's child orders were placed; unspecified while it
+            /// runs, and for a ladder rejected at its creation, before any child order
+            /// (its failure reason states why). A completed ladder with MIXED_REJECTIONS
+            /// completed with some levels rejected: placed_levels of requested_levels
+            /// were placed.
+            ///
+            /// Field 11: `outcome`
+            #[must_use]
+            pub fn outcome(&self) -> ::buffa::EnumValue<super::super::LadderOutcome> {
+                self.0.reborrow().outcome
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<LadderDetailsView<'static>>>

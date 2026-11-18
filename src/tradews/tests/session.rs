@@ -672,6 +672,147 @@ async fn a_refused_upgrade_reports_its_status_and_code() {
     );
 }
 
+/// A refusal whose body arrives in a later write than its headers is read
+/// whole before it is classified: the skew refusal keeps its type, window
+/// and Retry-After, and a credential refusal its code.
+#[tokio::test]
+async fn a_refusal_body_sent_after_its_headers_is_read_whole() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    async fn split_refusal(body: &'static str) -> Error {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("ws://{}/ws/trade.sbe", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut tcp, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0u8; 4096];
+            while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = tcp.read(&mut buf).await.unwrap();
+                if n == 0 {
+                    return;
+                }
+                request.extend_from_slice(&buf[..n]);
+            }
+            let head = format!(
+                "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/problem+json\r\nContent-Length: {}\r\nRetry-After: 2\r\n\r\n",
+                body.len()
+            );
+            tcp.write_all(head.as_bytes()).await.unwrap();
+            tcp.flush().await.unwrap();
+            tokio::time::sleep(Duration::from_millis(150)).await;
+            tcp.write_all(body.as_bytes()).await.unwrap();
+            tcp.flush().await.unwrap();
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        });
+        connect(config(url)).await.err().expect("refused")
+    }
+
+    let err = split_refusal(
+        r#"{"type":"https://polyester.dev/problems/timestamp-skew","status":401,"code":"TIMESTAMP_SKEW","timestampWindow":{"serverTimeMs":"1763337600000","recvWindowMs":5000,"maxFutureMs":1000}}"#,
+    )
+    .await;
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401, .. }),
+        "{err:?}"
+    );
+    assert_eq!(
+        err.timestamp_window().map(|w| w.server_time_ms),
+        Some(1_763_337_600_000)
+    );
+    assert_eq!(err.retry_after(), Some(2.0));
+
+    let err = split_refusal(r#"{"code":"SIGNATURE_INVALID","status":401}"#).await;
+    assert!(
+        matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == "SIGNATURE_INVALID"),
+        "{err:?}"
+    );
+}
+
+/// A refusal sent with `Transfer-Encoding: chunked`, its chunks in later
+/// writes than its headers, is decoded whole before it is classified.
+#[tokio::test]
+async fn a_chunked_refusal_body_is_decoded_whole() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let body = r#"{"type":"https://polyester.dev/problems/timestamp-skew","status":401,"code":"TIMESTAMP_SKEW","timestampWindow":{"serverTimeMs":"1763337600000","recvWindowMs":5000,"maxFutureMs":1000}}"#;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/ws/trade.sbe", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let (mut tcp, _) = listener.accept().await.unwrap();
+        let mut request = Vec::new();
+        let mut buf = [0u8; 4096];
+        while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+            let n = tcp.read(&mut buf).await.unwrap();
+            if n == 0 {
+                return;
+            }
+            request.extend_from_slice(&buf[..n]);
+        }
+        tcp.write_all(
+            b"HTTP/1.1 401 Unauthorized\r\nContent-Type: application/problem+json\r\nTransfer-Encoding: chunked\r\nRetry-After: 2\r\n\r\n",
+        )
+        .await
+        .unwrap();
+        tcp.flush().await.unwrap();
+        let (first, second) = body.split_at(40);
+        for chunk in [first, second] {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            tcp.write_all(format!("{:x}\r\n{chunk}\r\n", chunk.len()).as_bytes())
+                .await
+                .unwrap();
+            tcp.flush().await.unwrap();
+        }
+        tcp.write_all(b"0\r\n\r\n").await.unwrap();
+        tcp.flush().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    });
+    let err = connect(config(url)).await.err().expect("refused");
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401, .. }),
+        "{err:?}"
+    );
+    assert_eq!(err.timestamp_window().map(|w| w.max_future_ms), Some(1000));
+    assert_eq!(err.retry_after(), Some(2.0));
+}
+
+/// A refusal without `Content-Length` or chunked framing ends with its
+/// connection: its body is read to the end before it is classified.
+#[tokio::test]
+async fn a_connection_delimited_refusal_body_is_read_to_its_end() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}/ws/trade.sbe", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let (mut tcp, _) = listener.accept().await.unwrap();
+        let mut request = Vec::new();
+        let mut buf = [0u8; 4096];
+        while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+            let n = tcp.read(&mut buf).await.unwrap();
+            if n == 0 {
+                return;
+            }
+            request.extend_from_slice(&buf[..n]);
+        }
+        tcp.write_all(
+            b"HTTP/1.1 401 Unauthorized\r\nContent-Type: application/problem+json\r\nConnection: close\r\n\r\n",
+        )
+        .await
+        .unwrap();
+        tcp.flush().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        tcp.write_all(br#"{"code":"SIGNATURE_INVALID","status":401}"#)
+            .await
+            .unwrap();
+        let _ = tcp.shutdown().await;
+    });
+    let err = connect(config(url)).await.err().expect("refused");
+    assert!(
+        matches!(&err, Error::ApiKeyRejected { status: 401, code, .. } if code == "SIGNATURE_INVALID"),
+        "{err:?}"
+    );
+}
+
 #[tokio::test]
 async fn a_lost_connection_reconnects_with_the_same_opt_in_through_a_504() {
     let close_after_arm = Script {

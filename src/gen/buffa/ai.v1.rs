@@ -38,6 +38,32 @@ pub enum ErrorCode {
     /// keys: they were not submitted yet, or their registration was refused.
     /// Nothing changed.
     KEY_SETUP_NOT_REGISTERED = 12i32,
+    /// The conversation's latest run is no longer the one the request expected
+    /// (SendMessageRequest.expected_latest_run_id): another message was sent in
+    /// it since. Nothing is recorded.
+    CONVERSATION_ADVANCED = 13i32,
+    /// OpenAI refused the OpenAI API key: it is mistyped, revoked or disabled.
+    /// Nothing was saved. Check the key, or create a new one in the OpenAI
+    /// dashboard.
+    MODEL_KEY_REJECTED = 14i32,
+    /// The OpenAI API key's OpenAI account has no quota left: no credit, or a
+    /// spending limit reached. Nothing was saved. Add credit or raise the limit
+    /// in the OpenAI dashboard, then try again.
+    MODEL_KEY_NO_QUOTA = 15i32,
+    /// The OpenAI API key cannot use the model the assistant runs on, for
+    /// example a project key whose project does not allow that model. Nothing
+    /// was saved. Allow the model for the key's project, or use another key.
+    MODEL_KEY_MODEL_UNAVAILABLE = 16i32,
+    /// An attached image is larger than the assistant reads: over 10 MiB, or
+    /// over 8000 pixels on a side or 32 megapixels in all. Nothing is recorded.
+    IMAGE_TOO_LARGE = 17i32,
+    /// An attached image is not a PNG, JPEG or WebP image, does not match its
+    /// mime_type, or cannot be decoded. Nothing is recorded.
+    IMAGE_TYPE_UNSUPPORTED = 18i32,
+    /// The message has more than 4 images. Nothing is recorded.
+    TOO_MANY_IMAGES = 19i32,
+    /// No image of the caller's messages has this ID.
+    IMAGE_NOT_FOUND = 20i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -79,6 +105,30 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::KEY_SETUP_NOT_REGISTERED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const KeySetupNotRegistered: Self = Self::KEY_SETUP_NOT_REGISTERED;
+    ///Idiomatic alias for [`Self::CONVERSATION_ADVANCED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConversationAdvanced: Self = Self::CONVERSATION_ADVANCED;
+    ///Idiomatic alias for [`Self::MODEL_KEY_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelKeyRejected: Self = Self::MODEL_KEY_REJECTED;
+    ///Idiomatic alias for [`Self::MODEL_KEY_NO_QUOTA`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelKeyNoQuota: Self = Self::MODEL_KEY_NO_QUOTA;
+    ///Idiomatic alias for [`Self::MODEL_KEY_MODEL_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelKeyModelUnavailable: Self = Self::MODEL_KEY_MODEL_UNAVAILABLE;
+    ///Idiomatic alias for [`Self::IMAGE_TOO_LARGE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ImageTooLarge: Self = Self::IMAGE_TOO_LARGE;
+    ///Idiomatic alias for [`Self::IMAGE_TYPE_UNSUPPORTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ImageTypeUnsupported: Self = Self::IMAGE_TYPE_UNSUPPORTED;
+    ///Idiomatic alias for [`Self::TOO_MANY_IMAGES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TooManyImages: Self = Self::TOO_MANY_IMAGES;
+    ///Idiomatic alias for [`Self::IMAGE_NOT_FOUND`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ImageNotFound: Self = Self::IMAGE_NOT_FOUND;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -187,6 +237,14 @@ impl ::buffa::Enumeration for ErrorCode {
             10i32 => ::core::option::Option::Some(Self::SERVICE_UNAVAILABLE),
             11i32 => ::core::option::Option::Some(Self::KEY_SETUP_NOT_FOUND),
             12i32 => ::core::option::Option::Some(Self::KEY_SETUP_NOT_REGISTERED),
+            13i32 => ::core::option::Option::Some(Self::CONVERSATION_ADVANCED),
+            14i32 => ::core::option::Option::Some(Self::MODEL_KEY_REJECTED),
+            15i32 => ::core::option::Option::Some(Self::MODEL_KEY_NO_QUOTA),
+            16i32 => ::core::option::Option::Some(Self::MODEL_KEY_MODEL_UNAVAILABLE),
+            17i32 => ::core::option::Option::Some(Self::IMAGE_TOO_LARGE),
+            18i32 => ::core::option::Option::Some(Self::IMAGE_TYPE_UNSUPPORTED),
+            19i32 => ::core::option::Option::Some(Self::TOO_MANY_IMAGES),
+            20i32 => ::core::option::Option::Some(Self::IMAGE_NOT_FOUND),
             _ => ::core::option::Option::None,
         }
     }
@@ -208,6 +266,14 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SERVICE_UNAVAILABLE => "SERVICE_UNAVAILABLE",
             Self::KEY_SETUP_NOT_FOUND => "KEY_SETUP_NOT_FOUND",
             Self::KEY_SETUP_NOT_REGISTERED => "KEY_SETUP_NOT_REGISTERED",
+            Self::CONVERSATION_ADVANCED => "CONVERSATION_ADVANCED",
+            Self::MODEL_KEY_REJECTED => "MODEL_KEY_REJECTED",
+            Self::MODEL_KEY_NO_QUOTA => "MODEL_KEY_NO_QUOTA",
+            Self::MODEL_KEY_MODEL_UNAVAILABLE => "MODEL_KEY_MODEL_UNAVAILABLE",
+            Self::IMAGE_TOO_LARGE => "IMAGE_TOO_LARGE",
+            Self::IMAGE_TYPE_UNSUPPORTED => "IMAGE_TYPE_UNSUPPORTED",
+            Self::TOO_MANY_IMAGES => "TOO_MANY_IMAGES",
+            Self::IMAGE_NOT_FOUND => "IMAGE_NOT_FOUND",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -241,6 +307,24 @@ impl ::buffa::Enumeration for ErrorCode {
             "KEY_SETUP_NOT_REGISTERED" => {
                 ::core::option::Option::Some(Self::KEY_SETUP_NOT_REGISTERED)
             }
+            "CONVERSATION_ADVANCED" => {
+                ::core::option::Option::Some(Self::CONVERSATION_ADVANCED)
+            }
+            "MODEL_KEY_REJECTED" => {
+                ::core::option::Option::Some(Self::MODEL_KEY_REJECTED)
+            }
+            "MODEL_KEY_NO_QUOTA" => {
+                ::core::option::Option::Some(Self::MODEL_KEY_NO_QUOTA)
+            }
+            "MODEL_KEY_MODEL_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::MODEL_KEY_MODEL_UNAVAILABLE)
+            }
+            "IMAGE_TOO_LARGE" => ::core::option::Option::Some(Self::IMAGE_TOO_LARGE),
+            "IMAGE_TYPE_UNSUPPORTED" => {
+                ::core::option::Option::Some(Self::IMAGE_TYPE_UNSUPPORTED)
+            }
+            "TOO_MANY_IMAGES" => ::core::option::Option::Some(Self::TOO_MANY_IMAGES),
+            "IMAGE_NOT_FOUND" => ::core::option::Option::Some(Self::IMAGE_NOT_FOUND),
             _ => ::core::option::Option::None,
         }
     }
@@ -259,6 +343,14 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SERVICE_UNAVAILABLE,
             Self::KEY_SETUP_NOT_FOUND,
             Self::KEY_SETUP_NOT_REGISTERED,
+            Self::CONVERSATION_ADVANCED,
+            Self::MODEL_KEY_REJECTED,
+            Self::MODEL_KEY_NO_QUOTA,
+            Self::MODEL_KEY_MODEL_UNAVAILABLE,
+            Self::IMAGE_TOO_LARGE,
+            Self::IMAGE_TYPE_UNSUPPORTED,
+            Self::TOO_MANY_IMAGES,
+            Self::IMAGE_NOT_FOUND,
         ]
     }
 }
@@ -423,6 +515,29 @@ pub enum FailureCategory {
     MODEL_UNAVAILABLE = 4i32,
     /// The run could not continue because of an unexpected error.
     UNEXPECTED_ERROR = 5i32,
+    /// The run used the caller's own OpenAI API key, and OpenAI refused it for
+    /// one of the run's requests (its answer, a check it makes, or a web
+    /// search): the key was revoked, its account has no quota left, or it
+    /// cannot use a model the assistant needs. The run never falls back to the
+    /// assistant's own allowance or to another key. GetModelKey says why in
+    /// ModelKey.last_check; fix the key in the OpenAI dashboard, save a new one
+    /// with SetModelKey, or delete it with DeleteModelKey, then send the message
+    /// again. Also returned when the run's key was deleted or replaced before
+    /// the run could finish with it.
+    MODEL_KEY_REFUSED = 6i32,
+    /// The caller's main account used up today's free assistant credits, so the
+    /// message was not answered. The daily free credits follow the account's
+    /// VIP tier, every subaccount shares its main account's, and they reset at
+    /// 00:00 UTC without carrying over. RunFailed.message says how many there
+    /// were, when they reset and how to get more: a higher VIP tier, or the
+    /// caller's own OpenAI API key. GetUsage returns the same figures as
+    /// fields.
+    DAILY_LIMIT_REACHED = 7i32,
+    /// The assistant paused new answers for every account until 00:00 UTC
+    /// because its daily capacity is used up, so the message was not answered.
+    /// RunFailed.message says when it resumes. A caller's own OpenAI API key
+    /// still answers.
+    ASSISTANT_PAUSED = 8i32,
 }
 impl FailureCategory {
     ///Idiomatic alias for [`Self::FAILURE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -443,6 +558,15 @@ impl FailureCategory {
     ///Idiomatic alias for [`Self::UNEXPECTED_ERROR`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const UnexpectedError: Self = Self::UNEXPECTED_ERROR;
+    ///Idiomatic alias for [`Self::MODEL_KEY_REFUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModelKeyRefused: Self = Self::MODEL_KEY_REFUSED;
+    ///Idiomatic alias for [`Self::DAILY_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DailyLimitReached: Self = Self::DAILY_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::ASSISTANT_PAUSED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AssistantPaused: Self = Self::ASSISTANT_PAUSED;
 }
 impl ::core::default::Default for FailureCategory {
     fn default() -> Self {
@@ -546,6 +670,9 @@ impl ::buffa::Enumeration for FailureCategory {
             3i32 => ::core::option::Option::Some(Self::PERMISSION_DENIED),
             4i32 => ::core::option::Option::Some(Self::MODEL_UNAVAILABLE),
             5i32 => ::core::option::Option::Some(Self::UNEXPECTED_ERROR),
+            6i32 => ::core::option::Option::Some(Self::MODEL_KEY_REFUSED),
+            7i32 => ::core::option::Option::Some(Self::DAILY_LIMIT_REACHED),
+            8i32 => ::core::option::Option::Some(Self::ASSISTANT_PAUSED),
             _ => ::core::option::Option::None,
         }
     }
@@ -560,6 +687,9 @@ impl ::buffa::Enumeration for FailureCategory {
             Self::PERMISSION_DENIED => "PERMISSION_DENIED",
             Self::MODEL_UNAVAILABLE => "MODEL_UNAVAILABLE",
             Self::UNEXPECTED_ERROR => "UNEXPECTED_ERROR",
+            Self::MODEL_KEY_REFUSED => "MODEL_KEY_REFUSED",
+            Self::DAILY_LIMIT_REACHED => "DAILY_LIMIT_REACHED",
+            Self::ASSISTANT_PAUSED => "ASSISTANT_PAUSED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -572,6 +702,11 @@ impl ::buffa::Enumeration for FailureCategory {
             "PERMISSION_DENIED" => ::core::option::Option::Some(Self::PERMISSION_DENIED),
             "MODEL_UNAVAILABLE" => ::core::option::Option::Some(Self::MODEL_UNAVAILABLE),
             "UNEXPECTED_ERROR" => ::core::option::Option::Some(Self::UNEXPECTED_ERROR),
+            "MODEL_KEY_REFUSED" => ::core::option::Option::Some(Self::MODEL_KEY_REFUSED),
+            "DAILY_LIMIT_REACHED" => {
+                ::core::option::Option::Some(Self::DAILY_LIMIT_REACHED)
+            }
+            "ASSISTANT_PAUSED" => ::core::option::Option::Some(Self::ASSISTANT_PAUSED),
             _ => ::core::option::Option::None,
         }
     }
@@ -583,6 +718,9 @@ impl ::buffa::Enumeration for FailureCategory {
             Self::PERMISSION_DENIED,
             Self::MODEL_UNAVAILABLE,
             Self::UNEXPECTED_ERROR,
+            Self::MODEL_KEY_REFUSED,
+            Self::DAILY_LIMIT_REACHED,
+            Self::ASSISTANT_PAUSED,
         ]
     }
 }
@@ -1362,7 +1500,9 @@ pub enum AssistantKeyView {
     /// The default: each key's account, ID, public key and state, without its
     /// account's name.
     ASSISTANT_KEY_VIEW_UNSPECIFIED = 0i32,
-    /// Everything in the default view, plus each key's account name (label).
+    /// Everything in the default view, plus each key's account name (label),
+    /// with the keys ordered by account: the main account first, then the
+    /// subaccounts by equity, highest first.
     ASSISTANT_KEY_VIEW_FULL = 1i32,
 }
 impl AssistantKeyView {
@@ -1496,6 +1636,325 @@ impl ::buffa::Enumeration for AssistantKeyView {
     }
     fn values() -> &'static [Self] {
         &[Self::ASSISTANT_KEY_VIEW_UNSPECIFIED, Self::ASSISTANT_KEY_VIEW_FULL]
+    }
+}
+/// ModelKeyCheck is the result of the last check of the caller's own OpenAI
+/// API key with OpenAI.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum ModelKeyCheck {
+    /// Not set. Never returned.
+    KEY_CHECK_UNSPECIFIED = 0i32,
+    /// OpenAI accepted the key for the assistant's model.
+    KEY_VALID = 1i32,
+    /// OpenAI refused the key: it is revoked or disabled.
+    KEY_REJECTED = 2i32,
+    /// The key's OpenAI account has no quota left: no credit, or a spending
+    /// limit reached.
+    KEY_NO_QUOTA = 3i32,
+    /// The key cannot use the model the assistant runs on.
+    KEY_MODEL_UNAVAILABLE = 4i32,
+}
+impl ModelKeyCheck {
+    ///Idiomatic alias for [`Self::KEY_CHECK_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const KeyCheckUnspecified: Self = Self::KEY_CHECK_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::KEY_VALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const KeyValid: Self = Self::KEY_VALID;
+    ///Idiomatic alias for [`Self::KEY_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const KeyRejected: Self = Self::KEY_REJECTED;
+    ///Idiomatic alias for [`Self::KEY_NO_QUOTA`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const KeyNoQuota: Self = Self::KEY_NO_QUOTA;
+    ///Idiomatic alias for [`Self::KEY_MODEL_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const KeyModelUnavailable: Self = Self::KEY_MODEL_UNAVAILABLE;
+}
+impl ::core::default::Default for ModelKeyCheck {
+    fn default() -> Self {
+        Self::KEY_CHECK_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for ModelKeyCheck {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for ModelKeyCheck {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = ModelKeyCheck;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(ModelKeyCheck)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<ModelKeyCheck, E> {
+                <ModelKeyCheck as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<ModelKeyCheck, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ModelKeyCheck as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<ModelKeyCheck, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <ModelKeyCheck as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<ModelKeyCheck, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ModelKeyCheck {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for ModelKeyCheck {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::KEY_CHECK_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::KEY_VALID),
+            2i32 => ::core::option::Option::Some(Self::KEY_REJECTED),
+            3i32 => ::core::option::Option::Some(Self::KEY_NO_QUOTA),
+            4i32 => ::core::option::Option::Some(Self::KEY_MODEL_UNAVAILABLE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::KEY_CHECK_UNSPECIFIED => "KEY_CHECK_UNSPECIFIED",
+            Self::KEY_VALID => "KEY_VALID",
+            Self::KEY_REJECTED => "KEY_REJECTED",
+            Self::KEY_NO_QUOTA => "KEY_NO_QUOTA",
+            Self::KEY_MODEL_UNAVAILABLE => "KEY_MODEL_UNAVAILABLE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "KEY_CHECK_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::KEY_CHECK_UNSPECIFIED)
+            }
+            "KEY_VALID" => ::core::option::Option::Some(Self::KEY_VALID),
+            "KEY_REJECTED" => ::core::option::Option::Some(Self::KEY_REJECTED),
+            "KEY_NO_QUOTA" => ::core::option::Option::Some(Self::KEY_NO_QUOTA),
+            "KEY_MODEL_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::KEY_MODEL_UNAVAILABLE)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::KEY_CHECK_UNSPECIFIED,
+            Self::KEY_VALID,
+            Self::KEY_REJECTED,
+            Self::KEY_NO_QUOTA,
+            Self::KEY_MODEL_UNAVAILABLE,
+        ]
+    }
+}
+/// FundingMode is what pays for the caller's next messages to the assistant.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum FundingMode {
+    /// Not set. Never returned.
+    FUNDING_UNSPECIFIED = 0i32,
+    /// The assistant's credits: the caller's free daily credits.
+    CREDITS = 1i32,
+    /// The caller's own OpenAI API key (SetModelKey): the messages use no
+    /// credits.
+    OWN_KEY = 2i32,
+}
+impl FundingMode {
+    ///Idiomatic alias for [`Self::FUNDING_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const FundingUnspecified: Self = Self::FUNDING_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::CREDITS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Credits: Self = Self::CREDITS;
+    ///Idiomatic alias for [`Self::OWN_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OwnKey: Self = Self::OWN_KEY;
+}
+impl ::core::default::Default for FundingMode {
+    fn default() -> Self {
+        Self::FUNDING_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for FundingMode {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FundingMode {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = FundingMode;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(FundingMode)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<FundingMode, E> {
+                <FundingMode as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<FundingMode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <FundingMode as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<FundingMode, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <FundingMode as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<FundingMode, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for FundingMode {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for FundingMode {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::FUNDING_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::CREDITS),
+            2i32 => ::core::option::Option::Some(Self::OWN_KEY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::FUNDING_UNSPECIFIED => "FUNDING_UNSPECIFIED",
+            Self::CREDITS => "CREDITS",
+            Self::OWN_KEY => "OWN_KEY",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "FUNDING_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::FUNDING_UNSPECIFIED)
+            }
+            "CREDITS" => ::core::option::Option::Some(Self::CREDITS),
+            "OWN_KEY" => ::core::option::Option::Some(Self::OWN_KEY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::FUNDING_UNSPECIFIED, Self::CREDITS, Self::OWN_KEY]
     }
 }
 /// DisplaySetting is one of the client's display preferences the assistant may
@@ -3286,6 +3745,17 @@ pub struct Message {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub run_id: u64,
+    /// The images of a user message, in the order they were sent; empty for an
+    /// assistant message and for a message sent without images. Read each one
+    /// with GetMessageImage.
+    ///
+    /// Field 6: `images`
+    #[serde(
+        rename = "images",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub images: ::buffa::alloc::vec::Vec<MessageImage>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -3298,6 +3768,7 @@ impl ::core::fmt::Debug for Message {
             .field("text", &self.text)
             .field("created_at", &self.created_at)
             .field("run_id", &self.run_id)
+            .field("images", &self.images)
             .finish()
     }
 }
@@ -3349,6 +3820,14 @@ impl ::buffa::Message for Message {
         if self.run_id != 0u64 {
             size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
         }
+        for v in &self.images {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -3377,6 +3856,10 @@ impl ::buffa::Message for Message {
         }
         if self.run_id != 0u64 {
             ::buffa::types::put_fixed64_field(5u32, self.run_id, buf);
+        }
+        for v in &self.images {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -3430,6 +3913,15 @@ impl ::buffa::Message for Message {
                 )?;
                 self.run_id = ::buffa::types::decode_fixed64(buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.images.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -3443,6 +3935,7 @@ impl ::buffa::Message for Message {
         self.text.clear();
         self.created_at = ::buffa::MessageField::none();
         self.run_id = 0u64;
+        self.images.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -3473,6 +3966,390 @@ pub const __MESSAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
     type_url: "type.googleapis.com/ai.v1.Message",
     to_json: ::buffa::type_registry::any_to_json::<Message>,
     from_json: ::buffa::type_registry::any_from_json::<Message>,
+    is_wkt: false,
+};
+/// MessageImage describes one image of a user message, as the assistant read
+/// it: an image larger than 2000 pixels on a side is scaled down to fit, and
+/// may be stored in another of the three formats.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct MessageImage {
+    /// Public image ID, for GetMessageImage.
+    ///
+    /// Field 1: `image_id`
+    #[serde(
+        rename = "imageId",
+        alias = "image_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub image_id: u64,
+    /// Media type of the stored image: image/png, image/jpeg or image/webp.
+    ///
+    /// Field 2: `mime_type`
+    #[serde(
+        rename = "mimeType",
+        alias = "mime_type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub mime_type: ::buffa::alloc::string::String,
+    /// Width of the stored image, in pixels.
+    ///
+    /// Field 3: `width`
+    #[serde(
+        rename = "width",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub width: u32,
+    /// Height of the stored image, in pixels.
+    ///
+    /// Field 4: `height`
+    #[serde(
+        rename = "height",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub height: u32,
+    /// Size of the stored image, in bytes.
+    ///
+    /// Field 5: `size_bytes`
+    #[serde(
+        rename = "sizeBytes",
+        alias = "size_bytes",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub size_bytes: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for MessageImage {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("MessageImage")
+            .field("image_id", &self.image_id)
+            .field("mime_type", &self.mime_type)
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("size_bytes", &self.size_bytes)
+            .finish()
+    }
+}
+impl MessageImage {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.MessageImage";
+}
+::buffa::impl_default_instance!(MessageImage);
+impl ::buffa::MessageName for MessageImage {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "MessageImage";
+    const FULL_NAME: &'static str = "ai.v1.MessageImage";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.MessageImage";
+}
+impl ::buffa::Message for MessageImage {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.image_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.mime_type.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+        }
+        if self.width != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.width) as u32;
+        }
+        if self.height != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.height) as u32;
+        }
+        if self.size_bytes != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.size_bytes) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.image_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.image_id, buf);
+        }
+        if !self.mime_type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+        }
+        if self.width != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.width, buf);
+        }
+        if self.height != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.height, buf);
+        }
+        if self.size_bytes != 0u32 {
+            ::buffa::types::put_uint32_field(5u32, self.size_bytes, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.image_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.mime_type, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.width = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.height = ::buffa::types::decode_uint32(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.size_bytes = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.image_id = 0u64;
+        self.mime_type.clear();
+        self.width = 0u32;
+        self.height = 0u32;
+        self.size_bytes = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for MessageImage {
+    const PROTO_FQN: &'static str = "ai.v1.MessageImage";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for MessageImage {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MESSAGE_IMAGE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.MessageImage",
+    to_json: ::buffa::type_registry::any_to_json::<MessageImage>,
+    from_json: ::buffa::type_registry::any_from_json::<MessageImage>,
+    is_wkt: false,
+};
+/// ImageAttachment is an image the caller attaches to a message, such as a
+/// screenshot of an order, an error or a chart.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ImageAttachment {
+    /// The image file: a PNG, JPEG or WebP image, at most 10 MiB, 8000 pixels on
+    /// a side and 32 megapixels in all. Larger is IMAGE_TOO_LARGE; another format,
+    /// or a file that cannot be decoded, is IMAGE_TYPE_UNSUPPORTED.
+    ///
+    /// Field 1: `data`
+    #[serde(
+        rename = "data",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub data: ::buffa::alloc::vec::Vec<u8>,
+    /// Media type of data: image/png, image/jpeg or image/webp. It must match the
+    /// file's own format (IMAGE_TYPE_UNSUPPORTED otherwise).
+    ///
+    /// Field 2: `mime_type`
+    #[serde(
+        rename = "mimeType",
+        alias = "mime_type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub mime_type: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ImageAttachment {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ImageAttachment")
+            .field("data", &self.data)
+            .field("mime_type", &self.mime_type)
+            .finish()
+    }
+}
+impl ImageAttachment {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ImageAttachment";
+}
+::buffa::impl_default_instance!(ImageAttachment);
+impl ::buffa::MessageName for ImageAttachment {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "ImageAttachment";
+    const FULL_NAME: &'static str = "ai.v1.ImageAttachment";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ImageAttachment";
+}
+impl ::buffa::Message for ImageAttachment {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.data.is_empty() {
+            size += 1u32 + ::buffa::types::bytes_encoded_len(&self.data) as u32;
+        }
+        if !self.mime_type.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.data.is_empty() {
+            ::buffa::types::put_bytes_field(1u32, &self.data, buf);
+        }
+        if !self.mime_type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.data, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.mime_type, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.data.clear();
+        self.mime_type.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ImageAttachment {
+    const PROTO_FQN: &'static str = "ai.v1.ImageAttachment";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ImageAttachment {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __IMAGE_ATTACHMENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.ImageAttachment",
+    to_json: ::buffa::type_registry::any_to_json::<ImageAttachment>,
+    from_json: ::buffa::type_registry::any_from_json::<ImageAttachment>,
     is_wkt: false,
 };
 /// Memory is one fact the assistant remembers about the caller across
@@ -20150,6 +21027,237 @@ pub const __ASSISTANT_KEY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buf
     from_json: ::buffa::type_registry::any_from_json::<AssistantKey>,
     is_wkt: false,
 };
+/// ModelKey is the caller's own OpenAI API key as the assistant shows it. The
+/// key itself is never returned.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ModelKey {
+    /// The key's last four characters, to tell it apart, for example "x7Qa".
+    ///
+    /// Field 1: `suffix`
+    #[serde(
+        rename = "suffix",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub suffix: ::buffa::alloc::string::String,
+    /// When the key was saved.
+    ///
+    /// Field 2: `added_at`
+    #[serde(
+        rename = "addedAt",
+        alias = "added_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub added_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// The result of the key's last check with OpenAI: when it was saved, when
+    /// OpenAI refused it during a run, and when a run used it successfully after
+    /// a refusal.
+    ///
+    /// Field 3: `last_check`
+    #[serde(
+        rename = "lastCheck",
+        alias = "last_check",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub last_check: ::buffa::EnumValue<ModelKeyCheck>,
+    /// When last_check was recorded.
+    ///
+    /// Field 4: `checked_at`
+    #[serde(
+        rename = "checkedAt",
+        alias = "checked_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub checked_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ModelKey {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ModelKey")
+            .field("suffix", &self.suffix)
+            .field("added_at", &self.added_at)
+            .field("last_check", &self.last_check)
+            .field("checked_at", &self.checked_at)
+            .finish()
+    }
+}
+impl ModelKey {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ModelKey";
+}
+::buffa::impl_default_instance!(ModelKey);
+impl ::buffa::MessageName for ModelKey {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "ModelKey";
+    const FULL_NAME: &'static str = "ai.v1.ModelKey";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ModelKey";
+}
+impl ::buffa::Message for ModelKey {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.suffix.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.suffix) as u32;
+        }
+        if self.added_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.added_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        {
+            let val = self.last_check.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.checked_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.checked_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.suffix.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.suffix, buf);
+        }
+        if self.added_at.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.added_at.write_to(__cache, buf);
+        }
+        {
+            let val = self.last_check.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.checked_at.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.checked_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.suffix, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.added_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.last_check = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.checked_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.suffix.clear();
+        self.added_at = ::buffa::MessageField::none();
+        self.last_check = ::buffa::EnumValue::from(0);
+        self.checked_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ModelKey {
+    const PROTO_FQN: &'static str = "ai.v1.ModelKey";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ModelKey {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __MODEL_KEY_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.ModelKey",
+    to_json: ::buffa::type_registry::any_to_json::<ModelKey>,
+    from_json: ::buffa::type_registry::any_from_json::<ModelKey>,
+    is_wkt: false,
+};
 /// AssistantKeyAccount names one account to give the assistant a key for.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -20922,7 +22030,8 @@ pub struct SendMessageRequest {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub conversation_id: ::core::option::Option<u64>,
-    /// Message text, plain text or Markdown, 1 to 16000 characters.
+    /// Message text, plain text or Markdown, at most 16000 characters. Required
+    /// unless images are attached; with images, it is the question about them.
     ///
     /// Field 2: `text`
     #[serde(
@@ -21014,6 +22123,38 @@ pub struct SendMessageRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub account_selection: ::buffa::EnumValue<AccountSelection>,
+    /// Send the message only while this run is still the conversation's latest
+    /// run: a client that continues a request it showed the user, such as a
+    /// button under an answer, sets it to that answer's run, so the message never
+    /// lands after a newer one. Checked as the message is recorded; when another
+    /// run is the latest, nothing is recorded and the call is
+    /// FAILED_PRECONDITION with CONVERSATION_ADVANCED. Requires conversation_id.
+    /// Omit it to send whatever the conversation's latest run. It is part of the
+    /// request the idempotency key covers: a repeat of a request already
+    /// recorded returns its run, whatever ran since.
+    ///
+    /// Field 9: `expected_latest_run_id`
+    #[serde(
+        rename = "expectedLatestRunId",
+        alias = "expected_latest_run_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub expected_latest_run_id: ::core::option::Option<u64>,
+    /// Images the message shows the assistant, at most 4, in the order the user
+    /// attached them; more is TOO_MANY_IMAGES. The assistant reads them with the
+    /// text, and they stay with the message: later answers in the conversation
+    /// can refer to them, and ListMessages lists them. Text in an image is read
+    /// as part of the picture, never as instructions to the assistant. They are
+    /// part of the request the idempotency key covers.
+    ///
+    /// Field 10: `images`
+    #[serde(
+        rename = "images",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub images: ::buffa::alloc::vec::Vec<ImageAttachment>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -21029,6 +22170,8 @@ impl ::core::fmt::Debug for SendMessageRequest {
             .field("page", &self.page)
             .field("display_settings", &self.display_settings)
             .field("account_selection", &self.account_selection)
+            .field("expected_latest_run_id", &self.expected_latest_run_id)
+            .field("images", &self.images)
             .finish()
     }
 }
@@ -21052,6 +22195,13 @@ impl SendMessageRequest {
     ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
     pub fn with_subaccount_id(mut self, value: u64) -> Self {
         self.subaccount_id = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::expected_latest_run_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_expected_latest_run_id(mut self, value: u64) -> Self {
+        self.expected_latest_run_id = Some(value);
         self
     }
 }
@@ -21118,6 +22268,17 @@ impl ::buffa::Message for SendMessageRequest {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.expected_latest_run_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        for v in &self.images {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -21164,6 +22325,13 @@ impl ::buffa::Message for SendMessageRequest {
             if val != 0 {
                 ::buffa::types::put_int32_field(8u32, val, buf);
             }
+        }
+        if let Some(v) = self.expected_latest_run_id {
+            ::buffa::types::put_fixed64_field(9u32, v, buf);
+        }
+        for v in &self.images {
+            ::buffa::types::put_len_delimited_header(10u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -21277,6 +22445,24 @@ impl ::buffa::Message for SendMessageRequest {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.expected_latest_run_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.images.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -21293,6 +22479,8 @@ impl ::buffa::Message for SendMessageRequest {
         self.page = ::buffa::MessageField::none();
         self.display_settings.clear();
         self.account_selection = ::buffa::EnumValue::from(0);
+        self.expected_latest_run_id = ::core::option::Option::None;
+        self.images.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -22945,6 +24133,286 @@ pub const __LIST_MESSAGES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<ListMessagesResponse>,
     is_wkt: false,
 };
+/// GetMessageImageRequest selects one image of the caller's messages.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetMessageImageRequest {
+    /// Image to read, from Message.images.
+    ///
+    /// Field 1: `image_id`
+    #[serde(
+        rename = "imageId",
+        alias = "image_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub image_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMessageImageRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMessageImageRequest")
+            .field("image_id", &self.image_id)
+            .finish()
+    }
+}
+impl GetMessageImageRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageRequest";
+}
+::buffa::impl_default_instance!(GetMessageImageRequest);
+impl ::buffa::MessageName for GetMessageImageRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetMessageImageRequest";
+    const FULL_NAME: &'static str = "ai.v1.GetMessageImageRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageRequest";
+}
+impl ::buffa::Message for GetMessageImageRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.image_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.image_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.image_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.image_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.image_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMessageImageRequest {
+    const PROTO_FQN: &'static str = "ai.v1.GetMessageImageRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMessageImageRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MESSAGE_IMAGE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetMessageImageRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetMessageImageRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMessageImageRequest>,
+    is_wkt: false,
+};
+/// GetMessageImageResponse returns the image file.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetMessageImageResponse {
+    /// The image file, as MessageImage describes it.
+    ///
+    /// Field 1: `data`
+    #[serde(
+        rename = "data",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub data: ::buffa::alloc::vec::Vec<u8>,
+    /// Media type of data: image/png, image/jpeg or image/webp.
+    ///
+    /// Field 2: `mime_type`
+    #[serde(
+        rename = "mimeType",
+        alias = "mime_type",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub mime_type: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetMessageImageResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetMessageImageResponse")
+            .field("data", &self.data)
+            .field("mime_type", &self.mime_type)
+            .finish()
+    }
+}
+impl GetMessageImageResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageResponse";
+}
+::buffa::impl_default_instance!(GetMessageImageResponse);
+impl ::buffa::MessageName for GetMessageImageResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetMessageImageResponse";
+    const FULL_NAME: &'static str = "ai.v1.GetMessageImageResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageResponse";
+}
+impl ::buffa::Message for GetMessageImageResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.data.is_empty() {
+            size += 1u32 + ::buffa::types::bytes_encoded_len(&self.data) as u32;
+        }
+        if !self.mime_type.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.data.is_empty() {
+            ::buffa::types::put_bytes_field(1u32, &self.data, buf);
+        }
+        if !self.mime_type.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.data, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.mime_type, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.data.clear();
+        self.mime_type.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetMessageImageResponse {
+    const PROTO_FQN: &'static str = "ai.v1.GetMessageImageResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetMessageImageResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MESSAGE_IMAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetMessageImageResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetMessageImageResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetMessageImageResponse>,
+    is_wkt: false,
+};
 /// ListMemoriesRequest pages through the caller's memories, newest first.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -24090,7 +25558,8 @@ pub const __COMPLETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::J
 #[serde(default)]
 pub struct ListAssistantKeysRequest {
     /// How much of each key to return. Omit it for the default view, without
-    /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name.
+    /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name and
+    /// orders the keys by account (see ListAssistantKeysResponse.keys).
     ///
     /// Field 1: `view`
     #[serde(
@@ -24221,8 +25690,12 @@ pub const __LIST_ASSISTANT_KEYS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAn
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ListAssistantKeysResponse {
-    /// The caller's assistant keys the assistant holds, oldest first, at most
-    /// one per account.
+    /// The caller's assistant keys the assistant holds, at most one per account.
+    /// The default view lists them oldest first. ASSISTANT_KEY_VIEW_FULL lists
+    /// them as an account picker shows them: the main account's key first, then
+    /// the subaccounts' keys by the subaccount's equity, highest first. Keys
+    /// with equal equity, and those whose equity could not be read, which come
+    /// last, are listed by account name.
     ///
     /// Field 1: `keys`
     #[serde(
@@ -25088,6 +26561,1293 @@ pub const __SET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY: ::buffa::type_regist
     >,
     is_wkt: false,
 };
+/// SetModelKeyRequest saves the caller's own OpenAI API key.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetModelKeyRequest {
+    /// An OpenAI secret API key: "sk-" followed by 20 to 300 letters, digits,
+    /// "-" or "_". It is checked with OpenAI before it is saved.
+    ///
+    /// Field 1: `api_key`
+    #[serde(
+        rename = "apiKey",
+        alias = "api_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub api_key: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetModelKeyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetModelKeyRequest").field("api_key", &self.api_key).finish()
+    }
+}
+impl SetModelKeyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyRequest";
+}
+::buffa::impl_default_instance!(SetModelKeyRequest);
+impl ::buffa::MessageName for SetModelKeyRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "SetModelKeyRequest";
+    const FULL_NAME: &'static str = "ai.v1.SetModelKeyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyRequest";
+}
+impl ::buffa::Message for SetModelKeyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.api_key.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.api_key) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.api_key.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.api_key, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.api_key, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.api_key.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetModelKeyRequest {
+    const PROTO_FQN: &'static str = "ai.v1.SetModelKeyRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetModelKeyRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MODEL_KEY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.SetModelKeyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<SetModelKeyRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<SetModelKeyRequest>,
+    is_wkt: false,
+};
+/// SetModelKeyResponse returns the saved key's status.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct SetModelKeyResponse {
+    /// The key as saved; last_check is KEY_VALID.
+    ///
+    /// Field 1: `key`
+    #[serde(
+        rename = "key",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub key: ::buffa::MessageField<ModelKey>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for SetModelKeyResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("SetModelKeyResponse").field("key", &self.key).finish()
+    }
+}
+impl SetModelKeyResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyResponse";
+}
+::buffa::impl_default_instance!(SetModelKeyResponse);
+impl ::buffa::MessageName for SetModelKeyResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "SetModelKeyResponse";
+    const FULL_NAME: &'static str = "ai.v1.SetModelKeyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyResponse";
+}
+impl ::buffa::Message for SetModelKeyResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.key.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.key.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.key.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.key.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.key.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.key = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for SetModelKeyResponse {
+    const PROTO_FQN: &'static str = "ai.v1.SetModelKeyResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SetModelKeyResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __SET_MODEL_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.SetModelKeyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<SetModelKeyResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<SetModelKeyResponse>,
+    is_wkt: false,
+};
+/// GetModelKeyRequest reads the status of the caller's own OpenAI API key.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetModelKeyRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetModelKeyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetModelKeyRequest").finish()
+    }
+}
+impl GetModelKeyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyRequest";
+}
+::buffa::impl_default_instance!(GetModelKeyRequest);
+impl ::buffa::MessageName for GetModelKeyRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetModelKeyRequest";
+    const FULL_NAME: &'static str = "ai.v1.GetModelKeyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyRequest";
+}
+impl ::buffa::Message for GetModelKeyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetModelKeyRequest {
+    const PROTO_FQN: &'static str = "ai.v1.GetModelKeyRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetModelKeyRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MODEL_KEY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetModelKeyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetModelKeyRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetModelKeyRequest>,
+    is_wkt: false,
+};
+/// GetModelKeyResponse returns the status of the caller's own OpenAI API key.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetModelKeyResponse {
+    /// The caller's key; unset when the caller has none.
+    ///
+    /// Field 1: `key`
+    #[serde(
+        rename = "key",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub key: ::buffa::MessageField<ModelKey>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetModelKeyResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetModelKeyResponse").field("key", &self.key).finish()
+    }
+}
+impl GetModelKeyResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyResponse";
+}
+::buffa::impl_default_instance!(GetModelKeyResponse);
+impl ::buffa::MessageName for GetModelKeyResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetModelKeyResponse";
+    const FULL_NAME: &'static str = "ai.v1.GetModelKeyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyResponse";
+}
+impl ::buffa::Message for GetModelKeyResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.key.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.key.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.key.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.key.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.key.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.key = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetModelKeyResponse {
+    const PROTO_FQN: &'static str = "ai.v1.GetModelKeyResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetModelKeyResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_MODEL_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetModelKeyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetModelKeyResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetModelKeyResponse>,
+    is_wkt: false,
+};
+/// DeleteModelKeyRequest deletes the caller's own OpenAI API key.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteModelKeyRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteModelKeyRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteModelKeyRequest").finish()
+    }
+}
+impl DeleteModelKeyRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyRequest";
+}
+::buffa::impl_default_instance!(DeleteModelKeyRequest);
+impl ::buffa::MessageName for DeleteModelKeyRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "DeleteModelKeyRequest";
+    const FULL_NAME: &'static str = "ai.v1.DeleteModelKeyRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyRequest";
+}
+impl ::buffa::Message for DeleteModelKeyRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteModelKeyRequest {
+    const PROTO_FQN: &'static str = "ai.v1.DeleteModelKeyRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteModelKeyRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_MODEL_KEY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.DeleteModelKeyRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteModelKeyRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteModelKeyRequest>,
+    is_wkt: false,
+};
+/// DeleteModelKeyResponse confirms the deletion.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DeleteModelKeyResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DeleteModelKeyResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DeleteModelKeyResponse").finish()
+    }
+}
+impl DeleteModelKeyResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyResponse";
+}
+::buffa::impl_default_instance!(DeleteModelKeyResponse);
+impl ::buffa::MessageName for DeleteModelKeyResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "DeleteModelKeyResponse";
+    const FULL_NAME: &'static str = "ai.v1.DeleteModelKeyResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyResponse";
+}
+impl ::buffa::Message for DeleteModelKeyResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DeleteModelKeyResponse {
+    const PROTO_FQN: &'static str = "ai.v1.DeleteModelKeyResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DeleteModelKeyResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DELETE_MODEL_KEY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.DeleteModelKeyResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DeleteModelKeyResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DeleteModelKeyResponse>,
+    is_wkt: false,
+};
+/// GetUsageRequest reads the caller's assistant credits today.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetUsageRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetUsageRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetUsageRequest").finish()
+    }
+}
+impl GetUsageRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageRequest";
+}
+::buffa::impl_default_instance!(GetUsageRequest);
+impl ::buffa::MessageName for GetUsageRequest {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetUsageRequest";
+    const FULL_NAME: &'static str = "ai.v1.GetUsageRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageRequest";
+}
+impl ::buffa::Message for GetUsageRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetUsageRequest {
+    const PROTO_FQN: &'static str = "ai.v1.GetUsageRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetUsageRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_USAGE_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetUsageRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetUsageRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetUsageRequest>,
+    is_wkt: false,
+};
+/// TierCredits is the free daily credits of one VIP tier.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TierCredits {
+    /// The VIP tier, from 0 to 10.
+    ///
+    /// Field 1: `vip_tier`
+    #[serde(
+        rename = "vipTier",
+        alias = "vip_tier",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub vip_tier: u32,
+    /// Free credits per UTC day at this tier.
+    ///
+    /// Field 2: `daily_free_credits`
+    #[serde(
+        rename = "dailyFreeCredits",
+        alias = "daily_free_credits",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub daily_free_credits: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TierCredits {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TierCredits")
+            .field("vip_tier", &self.vip_tier)
+            .field("daily_free_credits", &self.daily_free_credits)
+            .finish()
+    }
+}
+impl TierCredits {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TierCredits";
+}
+::buffa::impl_default_instance!(TierCredits);
+impl ::buffa::MessageName for TierCredits {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "TierCredits";
+    const FULL_NAME: &'static str = "ai.v1.TierCredits";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TierCredits";
+}
+impl ::buffa::Message for TierCredits {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.vip_tier != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.vip_tier) as u32;
+        }
+        if self.daily_free_credits != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.daily_free_credits) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.vip_tier != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.vip_tier, buf);
+        }
+        if self.daily_free_credits != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.daily_free_credits, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.vip_tier = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.daily_free_credits = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.vip_tier = 0u32;
+        self.daily_free_credits = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TierCredits {
+    const PROTO_FQN: &'static str = "ai.v1.TierCredits";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TierCredits {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TIER_CREDITS_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.TierCredits",
+    to_json: ::buffa::type_registry::any_to_json::<TierCredits>,
+    from_json: ::buffa::type_registry::any_from_json::<TierCredits>,
+    is_wkt: false,
+};
+/// GetUsageResponse is the caller's assistant credits today. A credit is a
+/// fixed amount of AI usage: a longer answer, or one that uses more tools,
+/// uses more credits. The figures are the main account's, which every
+/// subaccount shares, and are the ones a new message is admitted against.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetUsageResponse {
+    /// What pays for the caller's next messages. With OWN_KEY they use no
+    /// credits, and the free credits below stay unused.
+    ///
+    /// Field 1: `funding_mode`
+    #[serde(
+        rename = "fundingMode",
+        alias = "funding_mode",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub funding_mode: ::buffa::EnumValue<FundingMode>,
+    /// The caller's VIP tier, whose free credits apply today. Unset when the
+    /// tier could not be read: VIP 0's free credits then apply.
+    ///
+    /// Field 2: `vip_tier`
+    #[serde(
+        rename = "vipTier",
+        alias = "vip_tier",
+        with = "::buffa::json_helpers::opt_uint32",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub vip_tier: ::core::option::Option<u32>,
+    /// Today's free credits: the VIP tier's daily free credits.
+    ///
+    /// Field 3: `free_credits`
+    #[serde(
+        rename = "freeCredits",
+        alias = "free_credits",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub free_credits: u64,
+    /// Free credits used today, rounded down to a whole credit. May exceed
+    /// free_credits: an answer started with credits left always finishes.
+    ///
+    /// Field 4: `free_credits_used`
+    #[serde(
+        rename = "freeCreditsUsed",
+        alias = "free_credits_used",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub free_credits_used: u64,
+    /// Free credits left today: free_credits minus free_credits_used, and 0
+    /// when none are left. With none left and CREDITS funding, a message is
+    /// answered with RunFailed DAILY_LIMIT_REACHED.
+    ///
+    /// Field 5: `free_credits_left`
+    #[serde(
+        rename = "freeCreditsLeft",
+        alias = "free_credits_left",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub free_credits_left: u64,
+    /// When the free credits reset: the next 00:00 UTC. Credits left unused do
+    /// not carry over to the next day.
+    ///
+    /// Field 6: `resets_at`
+    #[serde(
+        rename = "resetsAt",
+        alias = "resets_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub resets_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// The next VIP tier and its daily free credits. Unset at the highest tier,
+    /// and when the caller's tier could not be read.
+    ///
+    /// Field 7: `next_tier`
+    #[serde(
+        rename = "nextTier",
+        alias = "next_tier",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub next_tier: ::buffa::MessageField<TierCredits>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetUsageResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetUsageResponse")
+            .field("funding_mode", &self.funding_mode)
+            .field("vip_tier", &self.vip_tier)
+            .field("free_credits", &self.free_credits)
+            .field("free_credits_used", &self.free_credits_used)
+            .field("free_credits_left", &self.free_credits_left)
+            .field("resets_at", &self.resets_at)
+            .field("next_tier", &self.next_tier)
+            .finish()
+    }
+}
+impl GetUsageResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageResponse";
+}
+impl GetUsageResponse {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::vip_tier`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_vip_tier(mut self, value: u32) -> Self {
+        self.vip_tier = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(GetUsageResponse);
+impl ::buffa::MessageName for GetUsageResponse {
+    const PACKAGE: &'static str = "ai.v1";
+    const NAME: &'static str = "GetUsageResponse";
+    const FULL_NAME: &'static str = "ai.v1.GetUsageResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageResponse";
+}
+impl ::buffa::Message for GetUsageResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.funding_mode.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(v) = self.vip_tier {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+        }
+        if self.free_credits != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.free_credits) as u32;
+        }
+        if self.free_credits_used != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.free_credits_used) as u32;
+        }
+        if self.free_credits_left != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.free_credits_left) as u32;
+        }
+        if self.resets_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.resets_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.next_tier.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.next_tier.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.funding_mode.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if let Some(v) = self.vip_tier {
+            ::buffa::types::put_uint32_field(2u32, v, buf);
+        }
+        if self.free_credits != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.free_credits, buf);
+        }
+        if self.free_credits_used != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.free_credits_used, buf);
+        }
+        if self.free_credits_left != 0u64 {
+            ::buffa::types::put_uint64_field(5u32, self.free_credits_left, buf);
+        }
+        if self.resets_at.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.resets_at.write_to(__cache, buf);
+        }
+        if self.next_tier.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.next_tier.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.funding_mode = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.vip_tier = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.free_credits = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.free_credits_used = ::buffa::types::decode_uint64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.free_credits_left = ::buffa::types::decode_uint64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.resets_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.next_tier.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.funding_mode = ::buffa::EnumValue::from(0);
+        self.vip_tier = ::core::option::Option::None;
+        self.free_credits = 0u64;
+        self.free_credits_used = 0u64;
+        self.free_credits_left = 0u64;
+        self.resets_at = ::buffa::MessageField::none();
+        self.next_tier = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetUsageResponse {
+    const PROTO_FQN: &'static str = "ai.v1.GetUsageResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetUsageResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_USAGE_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ai.v1.GetUsageResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetUsageResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetUsageResponse>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -25853,6 +28613,15 @@ pub mod __buffa {
             ///
             /// Field 5: `run_id`
             pub run_id: u64,
+            /// The images of a user message, in the order they were sent; empty for an
+            /// assistant message and for a message sent without images. Read each one
+            /// with GetMessageImage.
+            ///
+            /// Field 6: `images`
+            pub images: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::MessageImageView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for MessageView<'a> {
@@ -25941,6 +28710,21 @@ pub mod __buffa {
                         )?;
                         view.run_id = ::buffa::types::decode_fixed64(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.images
+                            .push(
+                                <super::super::__buffa::view::MessageImageView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -25976,6 +28760,11 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     run_id: self.run_id,
+                    images: self
+                        .images
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -26013,6 +28802,14 @@ pub mod __buffa {
                 if self.run_id != 0u64 {
                     size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
                 }
+                for v in &self.images {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -26046,6 +28843,14 @@ pub mod __buffa {
                 }
                 if self.run_id != 0u64 {
                     ::buffa::types::put_fixed64_field(5u32, self.run_id, buf);
+                }
+                for v in &self.images {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -26095,6 +28900,9 @@ pub mod __buffa {
                             "runId",
                             &::buffa::json_helpers::ProtoJson(&self.run_id),
                         )?;
+                }
+                if !self.images.is_empty() {
+                    __map.serialize_entry("images", &*self.images)?;
                 }
                 __map.end()
             }
@@ -26229,6 +29037,20 @@ pub mod __buffa {
             pub fn run_id(&self) -> u64 {
                 self.0.reborrow().run_id
             }
+            /// The images of a user message, in the order they were sent; empty for an
+            /// assistant message and for a message sent without images. Read each one
+            /// with GetMessageImage.
+            ///
+            /// Field 6: `images`
+            #[must_use]
+            pub fn images(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::MessageImageView<'_>,
+            > {
+                &self.0.reborrow().images
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<MessageView<'static>>>
         for MessageOwnedView {
@@ -26253,6 +29075,712 @@ pub mod __buffa {
             type ViewHandle = MessageOwnedView;
         }
         impl ::serde::Serialize for MessageOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// MessageImage describes one image of a user message, as the assistant read
+        /// it: an image larger than 2000 pixels on a side is scaled down to fit, and
+        /// may be stored in another of the three formats.
+        #[derive(Clone, Debug, Default)]
+        pub struct MessageImageView<'a> {
+            /// Public image ID, for GetMessageImage.
+            ///
+            /// Field 1: `image_id`
+            pub image_id: u64,
+            /// Media type of the stored image: image/png, image/jpeg or image/webp.
+            ///
+            /// Field 2: `mime_type`
+            pub mime_type: &'a str,
+            /// Width of the stored image, in pixels.
+            ///
+            /// Field 3: `width`
+            pub width: u32,
+            /// Height of the stored image, in pixels.
+            ///
+            /// Field 4: `height`
+            pub height: u32,
+            /// Size of the stored image, in bytes.
+            ///
+            /// Field 5: `size_bytes`
+            pub size_bytes: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for MessageImageView<'a> {
+            type Owned = super::super::MessageImage;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.image_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.mime_type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.width = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.height = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.size_bytes = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MessageImage,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::MessageImage,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::MessageImage {
+                    image_id: self.image_id,
+                    mime_type: self.mime_type.to_string(),
+                    width: self.width,
+                    height: self.height,
+                    size_bytes: self.size_bytes,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for MessageImageView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.image_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.mime_type.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+                }
+                if self.width != 0u32 {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.width) as u32;
+                }
+                if self.height != 0u32 {
+                    size
+                        += 1u32 + ::buffa::types::uint32_encoded_len(self.height) as u32;
+                }
+                if self.size_bytes != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.size_bytes) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.image_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.image_id, buf);
+                }
+                if !self.mime_type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+                }
+                if self.width != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.width, buf);
+                }
+                if self.height != 0u32 {
+                    ::buffa::types::put_uint32_field(4u32, self.height, buf);
+                }
+                if self.size_bytes != 0u32 {
+                    ::buffa::types::put_uint32_field(5u32, self.size_bytes, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for MessageImageView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.image_id) {
+                    __map
+                        .serialize_entry(
+                            "imageId",
+                            &::buffa::json_helpers::ProtoJson(&self.image_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.mime_type) {
+                    __map.serialize_entry("mimeType", self.mime_type)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.width) {
+                    __map
+                        .serialize_entry(
+                            "width",
+                            &::buffa::json_helpers::ProtoJson(&self.width),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.height) {
+                    __map
+                        .serialize_entry(
+                            "height",
+                            &::buffa::json_helpers::ProtoJson(&self.height),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.size_bytes) {
+                    __map
+                        .serialize_entry(
+                            "sizeBytes",
+                            &::buffa::json_helpers::ProtoJson(&self.size_bytes),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for MessageImageView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "MessageImage";
+            const FULL_NAME: &'static str = "ai.v1.MessageImage";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.MessageImage";
+        }
+        ::buffa::impl_default_view_instance!(MessageImageView);
+        ::buffa::impl_view_reborrow!(MessageImageView);
+        /** Self-contained, `'static` owned view of a `MessageImage` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`MessageImageView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`MessageImageView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct MessageImageOwnedView(::buffa::OwnedView<MessageImageView<'static>>);
+        impl MessageImageOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MessageImageOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MessageImageOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::MessageImage,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    MessageImageOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`MessageImageView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &MessageImageView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::MessageImage,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public image ID, for GetMessageImage.
+            ///
+            /// Field 1: `image_id`
+            #[must_use]
+            pub fn image_id(&self) -> u64 {
+                self.0.reborrow().image_id
+            }
+            /// Media type of the stored image: image/png, image/jpeg or image/webp.
+            ///
+            /// Field 2: `mime_type`
+            #[must_use]
+            pub fn mime_type(&self) -> &'_ str {
+                self.0.reborrow().mime_type
+            }
+            /// Width of the stored image, in pixels.
+            ///
+            /// Field 3: `width`
+            #[must_use]
+            pub fn width(&self) -> u32 {
+                self.0.reborrow().width
+            }
+            /// Height of the stored image, in pixels.
+            ///
+            /// Field 4: `height`
+            #[must_use]
+            pub fn height(&self) -> u32 {
+                self.0.reborrow().height
+            }
+            /// Size of the stored image, in bytes.
+            ///
+            /// Field 5: `size_bytes`
+            #[must_use]
+            pub fn size_bytes(&self) -> u32 {
+                self.0.reborrow().size_bytes
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<MessageImageView<'static>>>
+        for MessageImageOwnedView {
+            fn from(inner: ::buffa::OwnedView<MessageImageView<'static>>) -> Self {
+                MessageImageOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<MessageImageOwnedView>
+        for ::buffa::OwnedView<MessageImageView<'static>> {
+            fn from(wrapper: MessageImageOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<MessageImageView<'static>>>
+        for MessageImageOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<MessageImageView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::MessageImage {
+            type View<'a> = MessageImageView<'a>;
+            type ViewHandle = MessageImageOwnedView;
+        }
+        impl ::serde::Serialize for MessageImageOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// ImageAttachment is an image the caller attaches to a message, such as a
+        /// screenshot of an order, an error or a chart.
+        #[derive(Clone, Debug, Default)]
+        pub struct ImageAttachmentView<'a> {
+            /// The image file: a PNG, JPEG or WebP image, at most 10 MiB, 8000 pixels on
+            /// a side and 32 megapixels in all. Larger is IMAGE_TOO_LARGE; another format,
+            /// or a file that cannot be decoded, is IMAGE_TYPE_UNSUPPORTED.
+            ///
+            /// Field 1: `data`
+            pub data: &'a [u8],
+            /// Media type of data: image/png, image/jpeg or image/webp. It must match the
+            /// file's own format (IMAGE_TYPE_UNSUPPORTED otherwise).
+            ///
+            /// Field 2: `mime_type`
+            pub mime_type: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ImageAttachmentView<'a> {
+            type Owned = super::super::ImageAttachment;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.data = ::buffa::types::borrow_bytes(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.mime_type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ImageAttachment,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ImageAttachment,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ImageAttachment {
+                    data: (self.data).to_vec(),
+                    mime_type: self.mime_type.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ImageAttachmentView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.data.is_empty() {
+                    size += 1u32 + ::buffa::types::bytes_encoded_len(&self.data) as u32;
+                }
+                if !self.mime_type.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.data.is_empty() {
+                    ::buffa::types::put_bytes_field(1u32, &self.data, buf);
+                }
+                if !self.mime_type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ImageAttachmentView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(self.data) {
+                    __map
+                        .serialize_entry(
+                            "data",
+                            &::buffa::json_helpers::BytesJson(self.data),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.mime_type) {
+                    __map.serialize_entry("mimeType", self.mime_type)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ImageAttachmentView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "ImageAttachment";
+            const FULL_NAME: &'static str = "ai.v1.ImageAttachment";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ImageAttachment";
+        }
+        ::buffa::impl_default_view_instance!(ImageAttachmentView);
+        ::buffa::impl_view_reborrow!(ImageAttachmentView);
+        /** Self-contained, `'static` owned view of a `ImageAttachment` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ImageAttachmentView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ImageAttachmentView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ImageAttachmentOwnedView(
+            ::buffa::OwnedView<ImageAttachmentView<'static>>,
+        );
+        impl ImageAttachmentOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ImageAttachmentOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ImageAttachmentOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ImageAttachment,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ImageAttachmentOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ImageAttachmentView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ImageAttachmentView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ImageAttachment,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The image file: a PNG, JPEG or WebP image, at most 10 MiB, 8000 pixels on
+            /// a side and 32 megapixels in all. Larger is IMAGE_TOO_LARGE; another format,
+            /// or a file that cannot be decoded, is IMAGE_TYPE_UNSUPPORTED.
+            ///
+            /// Field 1: `data`
+            #[must_use]
+            pub fn data(&self) -> &'_ [u8] {
+                self.0.reborrow().data
+            }
+            /// Media type of data: image/png, image/jpeg or image/webp. It must match the
+            /// file's own format (IMAGE_TYPE_UNSUPPORTED otherwise).
+            ///
+            /// Field 2: `mime_type`
+            #[must_use]
+            pub fn mime_type(&self) -> &'_ str {
+                self.0.reborrow().mime_type
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ImageAttachmentView<'static>>>
+        for ImageAttachmentOwnedView {
+            fn from(inner: ::buffa::OwnedView<ImageAttachmentView<'static>>) -> Self {
+                ImageAttachmentOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ImageAttachmentOwnedView>
+        for ::buffa::OwnedView<ImageAttachmentView<'static>> {
+            fn from(wrapper: ImageAttachmentOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ImageAttachmentView<'static>>>
+        for ImageAttachmentOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ImageAttachmentView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ImageAttachment {
+            type View<'a> = ImageAttachmentView<'a>;
+            type ViewHandle = ImageAttachmentOwnedView;
+        }
+        impl ::serde::Serialize for ImageAttachmentOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -51306,6 +54834,452 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// ModelKey is the caller's own OpenAI API key as the assistant shows it. The
+        /// key itself is never returned.
+        #[derive(Clone, Debug, Default)]
+        pub struct ModelKeyView<'a> {
+            /// The key's last four characters, to tell it apart, for example "x7Qa".
+            ///
+            /// Field 1: `suffix`
+            pub suffix: &'a str,
+            /// When the key was saved.
+            ///
+            /// Field 2: `added_at`
+            pub added_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The result of the key's last check with OpenAI: when it was saved, when
+            /// OpenAI refused it during a run, and when a run used it successfully after
+            /// a refusal.
+            ///
+            /// Field 3: `last_check`
+            pub last_check: ::buffa::EnumValue<super::super::ModelKeyCheck>,
+            /// When last_check was recorded.
+            ///
+            /// Field 4: `checked_at`
+            pub checked_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ModelKeyView<'a> {
+            type Owned = super::super::ModelKey;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.suffix = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.added_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.added_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.last_check = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.checked_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.checked_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::ModelKey, ::buffa::DecodeError> {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<super::super::ModelKey, ::buffa::DecodeError> {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ModelKey {
+                    suffix: self.suffix.to_string(),
+                    added_at: match self.added_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    last_check: self.last_check,
+                    checked_at: match self.checked_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ModelKeyView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.suffix.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.suffix) as u32;
+                }
+                if self.added_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.added_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                {
+                    let val = self.last_check.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.checked_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.checked_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.suffix.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.suffix, buf);
+                }
+                if self.added_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.added_at.write_to(__cache, buf);
+                }
+                {
+                    let val = self.last_check.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if self.checked_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.checked_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ModelKeyView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.suffix) {
+                    __map.serialize_entry("suffix", self.suffix)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.added_at.as_option()
+                    {
+                        __map.serialize_entry("addedAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.last_check,
+                ) {
+                    __map.serialize_entry("lastCheck", &self.last_check)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .checked_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("checkedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ModelKeyView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "ModelKey";
+            const FULL_NAME: &'static str = "ai.v1.ModelKey";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ModelKey";
+        }
+        ::buffa::impl_default_view_instance!(ModelKeyView);
+        ::buffa::impl_view_reborrow!(ModelKeyView);
+        /** Self-contained, `'static` owned view of a `ModelKey` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ModelKeyView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ModelKeyView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ModelKeyOwnedView(::buffa::OwnedView<ModelKeyView<'static>>);
+        impl ModelKeyOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ModelKeyOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ModelKeyOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ModelKey,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ModelKeyOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ModelKeyView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ModelKeyView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<super::super::ModelKey, ::buffa::DecodeError> {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The key's last four characters, to tell it apart, for example "x7Qa".
+            ///
+            /// Field 1: `suffix`
+            #[must_use]
+            pub fn suffix(&self) -> &'_ str {
+                self.0.reborrow().suffix
+            }
+            /// When the key was saved.
+            ///
+            /// Field 2: `added_at`
+            #[must_use]
+            pub fn added_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().added_at
+            }
+            /// The result of the key's last check with OpenAI: when it was saved, when
+            /// OpenAI refused it during a run, and when a run used it successfully after
+            /// a refusal.
+            ///
+            /// Field 3: `last_check`
+            #[must_use]
+            pub fn last_check(&self) -> ::buffa::EnumValue<super::super::ModelKeyCheck> {
+                self.0.reborrow().last_check
+            }
+            /// When last_check was recorded.
+            ///
+            /// Field 4: `checked_at`
+            #[must_use]
+            pub fn checked_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().checked_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ModelKeyView<'static>>>
+        for ModelKeyOwnedView {
+            fn from(inner: ::buffa::OwnedView<ModelKeyView<'static>>) -> Self {
+                ModelKeyOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ModelKeyOwnedView>
+        for ::buffa::OwnedView<ModelKeyView<'static>> {
+            fn from(wrapper: ModelKeyOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ModelKeyView<'static>>>
+        for ModelKeyOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ModelKeyView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ModelKey {
+            type View<'a> = ModelKeyView<'a>;
+            type ViewHandle = ModelKeyOwnedView;
+        }
+        impl ::serde::Serialize for ModelKeyOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// AssistantKeyAccount names one account to give the assistant a key for.
         #[derive(Clone, Debug, Default)]
         pub struct AssistantKeyAccountView<'a> {
@@ -52699,7 +56673,8 @@ pub mod __buffa {
             ///
             /// Field 1: `conversation_id`
             pub conversation_id: ::core::option::Option<u64>,
-            /// Message text, plain text or Markdown, 1 to 16000 characters.
+            /// Message text, plain text or Markdown, at most 16000 characters. Required
+            /// unless images are attached; with images, it is the question about them.
             ///
             /// Field 2: `text`
             pub text: &'a str,
@@ -52761,6 +56736,30 @@ pub mod __buffa {
             ///
             /// Field 8: `account_selection`
             pub account_selection: ::buffa::EnumValue<super::super::AccountSelection>,
+            /// Send the message only while this run is still the conversation's latest
+            /// run: a client that continues a request it showed the user, such as a
+            /// button under an answer, sets it to that answer's run, so the message never
+            /// lands after a newer one. Checked as the message is recorded; when another
+            /// run is the latest, nothing is recorded and the call is
+            /// FAILED_PRECONDITION with CONVERSATION_ADVANCED. Requires conversation_id.
+            /// Omit it to send whatever the conversation's latest run. It is part of the
+            /// request the idempotency key covers: a repeat of a request already
+            /// recorded returns its run, whatever ran since.
+            ///
+            /// Field 9: `expected_latest_run_id`
+            pub expected_latest_run_id: ::core::option::Option<u64>,
+            /// Images the message shows the assistant, at most 4, in the order the user
+            /// attached them; more is TOO_MANY_IMAGES. The assistant reads them with the
+            /// text, and they stay with the message: later answers in the conversation
+            /// can refer to them, and ListMessages lists them. Text in an image is read
+            /// as part of the picture, never as instructions to the assistant. They are
+            /// part of the request the idempotency key covers.
+            ///
+            /// Field 10: `images`
+            pub images: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ImageAttachmentView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SendMessageRequestView<'a> {
@@ -52860,6 +56859,15 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.expected_latest_run_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -52907,6 +56915,21 @@ pub mod __buffa {
                                 ),
                             );
                         }
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.images
+                            .push(
+                                <super::super::__buffa::view::ImageAttachmentView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -52956,6 +56979,12 @@ pub mod __buffa {
                     },
                     display_settings: self.display_settings.to_vec(),
                     account_selection: self.account_selection,
+                    expected_latest_run_id: self.expected_latest_run_id,
+                    images: self
+                        .images
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -53017,6 +57046,17 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.expected_latest_run_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                for v in &self.images {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -53072,6 +57112,17 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(8u32, val, buf);
                     }
+                }
+                if let Some(v) = self.expected_latest_run_id {
+                    ::buffa::types::put_fixed64_field(9u32, v, buf);
+                }
+                for v in &self.images {
+                    ::buffa::types::put_len_delimited_header(
+                        10u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -53133,6 +57184,16 @@ pub mod __buffa {
                     &self.account_selection,
                 ) {
                     __map.serialize_entry("accountSelection", &self.account_selection)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.expected_latest_run_id {
+                    __map
+                        .serialize_entry(
+                            "expectedLatestRunId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !self.images.is_empty() {
+                    __map.serialize_entry("images", &*self.images)?;
                 }
                 __map.end()
             }
@@ -53237,7 +57298,8 @@ pub mod __buffa {
             pub fn conversation_id(&self) -> ::core::option::Option<u64> {
                 self.0.reborrow().conversation_id
             }
-            /// Message text, plain text or Markdown, 1 to 16000 characters.
+            /// Message text, plain text or Markdown, at most 16000 characters. Required
+            /// unless images are attached; with images, it is the question about them.
             ///
             /// Field 2: `text`
             #[must_use]
@@ -53327,6 +57389,38 @@ pub mod __buffa {
                 &self,
             ) -> ::buffa::EnumValue<super::super::AccountSelection> {
                 self.0.reborrow().account_selection
+            }
+            /// Send the message only while this run is still the conversation's latest
+            /// run: a client that continues a request it showed the user, such as a
+            /// button under an answer, sets it to that answer's run, so the message never
+            /// lands after a newer one. Checked as the message is recorded; when another
+            /// run is the latest, nothing is recorded and the call is
+            /// FAILED_PRECONDITION with CONVERSATION_ADVANCED. Requires conversation_id.
+            /// Omit it to send whatever the conversation's latest run. It is part of the
+            /// request the idempotency key covers: a repeat of a request already
+            /// recorded returns its run, whatever ran since.
+            ///
+            /// Field 9: `expected_latest_run_id`
+            #[must_use]
+            pub fn expected_latest_run_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().expected_latest_run_id
+            }
+            /// Images the message shows the assistant, at most 4, in the order the user
+            /// attached them; more is TOO_MANY_IMAGES. The assistant reads them with the
+            /// text, and they stay with the message: later answers in the conversation
+            /// can refer to them, and ListMessages lists them. Text in an image is read
+            /// as part of the picture, never as instructions to the assistant. They are
+            /// part of the request the idempotency key covers.
+            ///
+            /// Field 10: `images`
+            #[must_use]
+            pub fn images(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ImageAttachmentView<'_>,
+            > {
+                &self.0.reborrow().images
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SendMessageRequestView<'static>>>
@@ -56700,6 +60794,590 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetMessageImageRequest selects one image of the caller's messages.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetMessageImageRequestView<'a> {
+            /// Image to read, from Message.images.
+            ///
+            /// Field 1: `image_id`
+            pub image_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetMessageImageRequestView<'a> {
+            type Owned = super::super::GetMessageImageRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.image_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetMessageImageRequest {
+                    image_id: self.image_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetMessageImageRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.image_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.image_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.image_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetMessageImageRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.image_id) {
+                    __map
+                        .serialize_entry(
+                            "imageId",
+                            &::buffa::json_helpers::ProtoJson(&self.image_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetMessageImageRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetMessageImageRequest";
+            const FULL_NAME: &'static str = "ai.v1.GetMessageImageRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetMessageImageRequestView);
+        ::buffa::impl_view_reborrow!(GetMessageImageRequestView);
+        /** Self-contained, `'static` owned view of a `GetMessageImageRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetMessageImageRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetMessageImageRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetMessageImageRequestOwnedView(
+            ::buffa::OwnedView<GetMessageImageRequestView<'static>>,
+        );
+        impl GetMessageImageRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetMessageImageRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetMessageImageRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetMessageImageRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Image to read, from Message.images.
+            ///
+            /// Field 1: `image_id`
+            #[must_use]
+            pub fn image_id(&self) -> u64 {
+                self.0.reborrow().image_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetMessageImageRequestView<'static>>,
+        > for GetMessageImageRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetMessageImageRequestView<'static>>,
+            ) -> Self {
+                GetMessageImageRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetMessageImageRequestOwnedView>
+        for ::buffa::OwnedView<GetMessageImageRequestView<'static>> {
+            fn from(wrapper: GetMessageImageRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetMessageImageRequestView<'static>>,
+        > for GetMessageImageRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetMessageImageRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetMessageImageRequest {
+            type View<'a> = GetMessageImageRequestView<'a>;
+            type ViewHandle = GetMessageImageRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetMessageImageRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetMessageImageResponse returns the image file.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetMessageImageResponseView<'a> {
+            /// The image file, as MessageImage describes it.
+            ///
+            /// Field 1: `data`
+            pub data: &'a [u8],
+            /// Media type of data: image/png, image/jpeg or image/webp.
+            ///
+            /// Field 2: `mime_type`
+            pub mime_type: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetMessageImageResponseView<'a> {
+            type Owned = super::super::GetMessageImageResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.data = ::buffa::types::borrow_bytes(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.mime_type = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetMessageImageResponse {
+                    data: (self.data).to_vec(),
+                    mime_type: self.mime_type.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetMessageImageResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.data.is_empty() {
+                    size += 1u32 + ::buffa::types::bytes_encoded_len(&self.data) as u32;
+                }
+                if !self.mime_type.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.mime_type) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.data.is_empty() {
+                    ::buffa::types::put_bytes_field(1u32, &self.data, buf);
+                }
+                if !self.mime_type.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.mime_type, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetMessageImageResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(self.data) {
+                    __map
+                        .serialize_entry(
+                            "data",
+                            &::buffa::json_helpers::BytesJson(self.data),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.mime_type) {
+                    __map.serialize_entry("mimeType", self.mime_type)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetMessageImageResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetMessageImageResponse";
+            const FULL_NAME: &'static str = "ai.v1.GetMessageImageResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetMessageImageResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetMessageImageResponseView);
+        ::buffa::impl_view_reborrow!(GetMessageImageResponseView);
+        /** Self-contained, `'static` owned view of a `GetMessageImageResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetMessageImageResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetMessageImageResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetMessageImageResponseOwnedView(
+            ::buffa::OwnedView<GetMessageImageResponseView<'static>>,
+        );
+        impl GetMessageImageResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetMessageImageResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetMessageImageResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetMessageImageResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetMessageImageResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetMessageImageResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The image file, as MessageImage describes it.
+            ///
+            /// Field 1: `data`
+            #[must_use]
+            pub fn data(&self) -> &'_ [u8] {
+                self.0.reborrow().data
+            }
+            /// Media type of data: image/png, image/jpeg or image/webp.
+            ///
+            /// Field 2: `mime_type`
+            #[must_use]
+            pub fn mime_type(&self) -> &'_ str {
+                self.0.reborrow().mime_type
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetMessageImageResponseView<'static>>,
+        > for GetMessageImageResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetMessageImageResponseView<'static>>,
+            ) -> Self {
+                GetMessageImageResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetMessageImageResponseOwnedView>
+        for ::buffa::OwnedView<GetMessageImageResponseView<'static>> {
+            fn from(wrapper: GetMessageImageResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetMessageImageResponseView<'static>>,
+        > for GetMessageImageResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetMessageImageResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetMessageImageResponse {
+            type View<'a> = GetMessageImageResponseView<'a>;
+            type ViewHandle = GetMessageImageResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetMessageImageResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ListMemoriesRequest pages through the caller's memories, newest first.
         #[derive(Clone, Debug, Default)]
         pub struct ListMemoriesRequestView<'a> {
@@ -59159,7 +63837,8 @@ pub mod __buffa {
         #[derive(Clone, Debug, Default)]
         pub struct ListAssistantKeysRequestView<'a> {
             /// How much of each key to return. Omit it for the default view, without
-            /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name.
+            /// account names; ASSISTANT_KEY_VIEW_FULL adds each key's account name and
+            /// orders the keys by account (see ListAssistantKeysResponse.keys).
             ///
             /// Field 1: `view`
             pub view: ::buffa::EnumValue<super::super::AssistantKeyView>,
@@ -59434,8 +64113,12 @@ pub mod __buffa {
         /// ListAssistantKeysResponse returns the assistant keys the assistant holds.
         #[derive(Clone, Debug, Default)]
         pub struct ListAssistantKeysResponseView<'a> {
-            /// The caller's assistant keys the assistant holds, oldest first, at most
-            /// one per account.
+            /// The caller's assistant keys the assistant holds, at most one per account.
+            /// The default view lists them oldest first. ASSISTANT_KEY_VIEW_FULL lists
+            /// them as an account picker shows them: the main account's key first, then
+            /// the subaccounts' keys by the subaccount's equity, highest first. Keys
+            /// with equal equity, and those whose equity could not be read, which come
+            /// last, are listed by account name.
             ///
             /// Field 1: `keys`
             pub keys: ::buffa::RepeatedView<
@@ -59689,8 +64372,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// The caller's assistant keys the assistant holds, oldest first, at most
-            /// one per account.
+            /// The caller's assistant keys the assistant holds, at most one per account.
+            /// The default view lists them oldest first. ASSISTANT_KEY_VIEW_FULL lists
+            /// them as an account picker shows them: the main account's key first, then
+            /// the subaccounts' keys by the subaccount's equity, highest first. Keys
+            /// with equal equity, and those whose equity could not be read, which come
+            /// last, are listed by account name.
             ///
             /// Field 1: `keys`
             #[must_use]
@@ -61309,6 +65996,2751 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// SetModelKeyRequest saves the caller's own OpenAI API key.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetModelKeyRequestView<'a> {
+            /// An OpenAI secret API key: "sk-" followed by 20 to 300 letters, digits,
+            /// "-" or "_". It is checked with OpenAI before it is saved.
+            ///
+            /// Field 1: `api_key`
+            pub api_key: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetModelKeyRequestView<'a> {
+            type Owned = super::super::SetModelKeyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.api_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetModelKeyRequest {
+                    api_key: self.api_key.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetModelKeyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.api_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.api_key) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.api_key.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.api_key, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetModelKeyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.api_key) {
+                    __map.serialize_entry("apiKey", self.api_key)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetModelKeyRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "SetModelKeyRequest";
+            const FULL_NAME: &'static str = "ai.v1.SetModelKeyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyRequest";
+        }
+        ::buffa::impl_default_view_instance!(SetModelKeyRequestView);
+        ::buffa::impl_view_reborrow!(SetModelKeyRequestView);
+        /** Self-contained, `'static` owned view of a `SetModelKeyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetModelKeyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetModelKeyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetModelKeyRequestOwnedView(
+            ::buffa::OwnedView<SetModelKeyRequestView<'static>>,
+        );
+        impl SetModelKeyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetModelKeyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`SetModelKeyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetModelKeyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// An OpenAI secret API key: "sk-" followed by 20 to 300 letters, digits,
+            /// "-" or "_". It is checked with OpenAI before it is saved.
+            ///
+            /// Field 1: `api_key`
+            #[must_use]
+            pub fn api_key(&self) -> &'_ str {
+                self.0.reborrow().api_key
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SetModelKeyRequestView<'static>>>
+        for SetModelKeyRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<SetModelKeyRequestView<'static>>) -> Self {
+                SetModelKeyRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetModelKeyRequestOwnedView>
+        for ::buffa::OwnedView<SetModelKeyRequestView<'static>> {
+            fn from(wrapper: SetModelKeyRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<SetModelKeyRequestView<'static>>>
+        for SetModelKeyRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SetModelKeyRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetModelKeyRequest {
+            type View<'a> = SetModelKeyRequestView<'a>;
+            type ViewHandle = SetModelKeyRequestOwnedView;
+        }
+        impl ::serde::Serialize for SetModelKeyRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// SetModelKeyResponse returns the saved key's status.
+        #[derive(Clone, Debug, Default)]
+        pub struct SetModelKeyResponseView<'a> {
+            /// The key as saved; last_check is KEY_VALID.
+            ///
+            /// Field 1: `key`
+            pub key: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ModelKeyView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for SetModelKeyResponseView<'a> {
+            type Owned = super::super::SetModelKeyResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.key.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.key = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ModelKeyView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::SetModelKeyResponse {
+                    key: match self.key.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ModelKey,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for SetModelKeyResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.key.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.key.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.key.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.key.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for SetModelKeyResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.key.as_option() {
+                        __map.serialize_entry("key", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for SetModelKeyResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "SetModelKeyResponse";
+            const FULL_NAME: &'static str = "ai.v1.SetModelKeyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.SetModelKeyResponse";
+        }
+        ::buffa::impl_default_view_instance!(SetModelKeyResponseView);
+        ::buffa::impl_view_reborrow!(SetModelKeyResponseView);
+        /** Self-contained, `'static` owned view of a `SetModelKeyResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`SetModelKeyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`SetModelKeyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct SetModelKeyResponseOwnedView(
+            ::buffa::OwnedView<SetModelKeyResponseView<'static>>,
+        );
+        impl SetModelKeyResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::SetModelKeyResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    SetModelKeyResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`SetModelKeyResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &SetModelKeyResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::SetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The key as saved; last_check is KEY_VALID.
+            ///
+            /// Field 1: `key`
+            #[must_use]
+            pub fn key(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ModelKeyView<'_>,
+            > {
+                &self.0.reborrow().key
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<SetModelKeyResponseView<'static>>>
+        for SetModelKeyResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<SetModelKeyResponseView<'static>>,
+            ) -> Self {
+                SetModelKeyResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<SetModelKeyResponseOwnedView>
+        for ::buffa::OwnedView<SetModelKeyResponseView<'static>> {
+            fn from(wrapper: SetModelKeyResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<SetModelKeyResponseView<'static>>>
+        for SetModelKeyResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<SetModelKeyResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::SetModelKeyResponse {
+            type View<'a> = SetModelKeyResponseView<'a>;
+            type ViewHandle = SetModelKeyResponseOwnedView;
+        }
+        impl ::serde::Serialize for SetModelKeyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetModelKeyRequest reads the status of the caller's own OpenAI API key.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetModelKeyRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetModelKeyRequestView<'a> {
+            type Owned = super::super::GetModelKeyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetModelKeyRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetModelKeyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetModelKeyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetModelKeyRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetModelKeyRequest";
+            const FULL_NAME: &'static str = "ai.v1.GetModelKeyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetModelKeyRequestView);
+        ::buffa::impl_view_reborrow!(GetModelKeyRequestView);
+        /** Self-contained, `'static` owned view of a `GetModelKeyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetModelKeyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetModelKeyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetModelKeyRequestOwnedView(
+            ::buffa::OwnedView<GetModelKeyRequestView<'static>>,
+        );
+        impl GetModelKeyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetModelKeyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetModelKeyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetModelKeyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetModelKeyRequestView<'static>>>
+        for GetModelKeyRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<GetModelKeyRequestView<'static>>) -> Self {
+                GetModelKeyRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetModelKeyRequestOwnedView>
+        for ::buffa::OwnedView<GetModelKeyRequestView<'static>> {
+            fn from(wrapper: GetModelKeyRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<GetModelKeyRequestView<'static>>>
+        for GetModelKeyRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetModelKeyRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetModelKeyRequest {
+            type View<'a> = GetModelKeyRequestView<'a>;
+            type ViewHandle = GetModelKeyRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetModelKeyRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetModelKeyResponse returns the status of the caller's own OpenAI API key.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetModelKeyResponseView<'a> {
+            /// The caller's key; unset when the caller has none.
+            ///
+            /// Field 1: `key`
+            pub key: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ModelKeyView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetModelKeyResponseView<'a> {
+            type Owned = super::super::GetModelKeyResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.key.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.key = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ModelKeyView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetModelKeyResponse {
+                    key: match self.key.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ModelKey,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetModelKeyResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.key.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.key.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.key.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.key.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetModelKeyResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.key.as_option() {
+                        __map.serialize_entry("key", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetModelKeyResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetModelKeyResponse";
+            const FULL_NAME: &'static str = "ai.v1.GetModelKeyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetModelKeyResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetModelKeyResponseView);
+        ::buffa::impl_view_reborrow!(GetModelKeyResponseView);
+        /** Self-contained, `'static` owned view of a `GetModelKeyResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetModelKeyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetModelKeyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetModelKeyResponseOwnedView(
+            ::buffa::OwnedView<GetModelKeyResponseView<'static>>,
+        );
+        impl GetModelKeyResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetModelKeyResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetModelKeyResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetModelKeyResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetModelKeyResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The caller's key; unset when the caller has none.
+            ///
+            /// Field 1: `key`
+            #[must_use]
+            pub fn key(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ModelKeyView<'_>,
+            > {
+                &self.0.reborrow().key
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetModelKeyResponseView<'static>>>
+        for GetModelKeyResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetModelKeyResponseView<'static>>,
+            ) -> Self {
+                GetModelKeyResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetModelKeyResponseOwnedView>
+        for ::buffa::OwnedView<GetModelKeyResponseView<'static>> {
+            fn from(wrapper: GetModelKeyResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<GetModelKeyResponseView<'static>>>
+        for GetModelKeyResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetModelKeyResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetModelKeyResponse {
+            type View<'a> = GetModelKeyResponseView<'a>;
+            type ViewHandle = GetModelKeyResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetModelKeyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeleteModelKeyRequest deletes the caller's own OpenAI API key.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteModelKeyRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeleteModelKeyRequestView<'a> {
+            type Owned = super::super::DeleteModelKeyRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteModelKeyRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteModelKeyRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteModelKeyRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteModelKeyRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "DeleteModelKeyRequest";
+            const FULL_NAME: &'static str = "ai.v1.DeleteModelKeyRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyRequest";
+        }
+        ::buffa::impl_default_view_instance!(DeleteModelKeyRequestView);
+        ::buffa::impl_view_reborrow!(DeleteModelKeyRequestView);
+        /** Self-contained, `'static` owned view of a `DeleteModelKeyRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteModelKeyRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteModelKeyRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteModelKeyRequestOwnedView(
+            ::buffa::OwnedView<DeleteModelKeyRequestView<'static>>,
+        );
+        impl DeleteModelKeyRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteModelKeyRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeleteModelKeyRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteModelKeyRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteModelKeyRequestView<'static>>,
+        > for DeleteModelKeyRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeleteModelKeyRequestView<'static>>,
+            ) -> Self {
+                DeleteModelKeyRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteModelKeyRequestOwnedView>
+        for ::buffa::OwnedView<DeleteModelKeyRequestView<'static>> {
+            fn from(wrapper: DeleteModelKeyRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteModelKeyRequestView<'static>>,
+        > for DeleteModelKeyRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DeleteModelKeyRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeleteModelKeyRequest {
+            type View<'a> = DeleteModelKeyRequestView<'a>;
+            type ViewHandle = DeleteModelKeyRequestOwnedView;
+        }
+        impl ::serde::Serialize for DeleteModelKeyRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DeleteModelKeyResponse confirms the deletion.
+        #[derive(Clone, Debug, Default)]
+        pub struct DeleteModelKeyResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DeleteModelKeyResponseView<'a> {
+            type Owned = super::super::DeleteModelKeyResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DeleteModelKeyResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DeleteModelKeyResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DeleteModelKeyResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DeleteModelKeyResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "DeleteModelKeyResponse";
+            const FULL_NAME: &'static str = "ai.v1.DeleteModelKeyResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.DeleteModelKeyResponse";
+        }
+        ::buffa::impl_default_view_instance!(DeleteModelKeyResponseView);
+        ::buffa::impl_view_reborrow!(DeleteModelKeyResponseView);
+        /** Self-contained, `'static` owned view of a `DeleteModelKeyResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DeleteModelKeyResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DeleteModelKeyResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DeleteModelKeyResponseOwnedView(
+            ::buffa::OwnedView<DeleteModelKeyResponseView<'static>>,
+        );
+        impl DeleteModelKeyResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DeleteModelKeyResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DeleteModelKeyResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DeleteModelKeyResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DeleteModelKeyResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DeleteModelKeyResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DeleteModelKeyResponseView<'static>>,
+        > for DeleteModelKeyResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DeleteModelKeyResponseView<'static>>,
+            ) -> Self {
+                DeleteModelKeyResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DeleteModelKeyResponseOwnedView>
+        for ::buffa::OwnedView<DeleteModelKeyResponseView<'static>> {
+            fn from(wrapper: DeleteModelKeyResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DeleteModelKeyResponseView<'static>>,
+        > for DeleteModelKeyResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DeleteModelKeyResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DeleteModelKeyResponse {
+            type View<'a> = DeleteModelKeyResponseView<'a>;
+            type ViewHandle = DeleteModelKeyResponseOwnedView;
+        }
+        impl ::serde::Serialize for DeleteModelKeyResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetUsageRequest reads the caller's assistant credits today.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetUsageRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetUsageRequestView<'a> {
+            type Owned = super::super::GetUsageRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetUsageRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetUsageRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetUsageRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetUsageRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetUsageRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetUsageRequestView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetUsageRequest";
+            const FULL_NAME: &'static str = "ai.v1.GetUsageRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetUsageRequestView);
+        ::buffa::impl_view_reborrow!(GetUsageRequestView);
+        /** Self-contained, `'static` owned view of a `GetUsageRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetUsageRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetUsageRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetUsageRequestOwnedView(
+            ::buffa::OwnedView<GetUsageRequestView<'static>>,
+        );
+        impl GetUsageRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetUsageRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetUsageRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetUsageRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetUsageRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetUsageRequestView<'static>>>
+        for GetUsageRequestOwnedView {
+            fn from(inner: ::buffa::OwnedView<GetUsageRequestView<'static>>) -> Self {
+                GetUsageRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetUsageRequestOwnedView>
+        for ::buffa::OwnedView<GetUsageRequestView<'static>> {
+            fn from(wrapper: GetUsageRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<GetUsageRequestView<'static>>>
+        for GetUsageRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetUsageRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetUsageRequest {
+            type View<'a> = GetUsageRequestView<'a>;
+            type ViewHandle = GetUsageRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetUsageRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TierCredits is the free daily credits of one VIP tier.
+        #[derive(Clone, Debug, Default)]
+        pub struct TierCreditsView<'a> {
+            /// The VIP tier, from 0 to 10.
+            ///
+            /// Field 1: `vip_tier`
+            pub vip_tier: u32,
+            /// Free credits per UTC day at this tier.
+            ///
+            /// Field 2: `daily_free_credits`
+            pub daily_free_credits: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TierCreditsView<'a> {
+            type Owned = super::super::TierCredits;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.vip_tier = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.daily_free_credits = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TierCredits,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TierCredits,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TierCredits {
+                    vip_tier: self.vip_tier,
+                    daily_free_credits: self.daily_free_credits,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TierCreditsView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.vip_tier != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.vip_tier) as u32;
+                }
+                if self.daily_free_credits != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.daily_free_credits)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.vip_tier != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.vip_tier, buf);
+                }
+                if self.daily_free_credits != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.daily_free_credits, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TierCreditsView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.vip_tier) {
+                    __map
+                        .serialize_entry(
+                            "vipTier",
+                            &::buffa::json_helpers::ProtoJson(&self.vip_tier),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.daily_free_credits,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "dailyFreeCredits",
+                            &::buffa::json_helpers::ProtoJson(&self.daily_free_credits),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TierCreditsView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "TierCredits";
+            const FULL_NAME: &'static str = "ai.v1.TierCredits";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.TierCredits";
+        }
+        ::buffa::impl_default_view_instance!(TierCreditsView);
+        ::buffa::impl_view_reborrow!(TierCreditsView);
+        /** Self-contained, `'static` owned view of a `TierCredits` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TierCreditsView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TierCreditsView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TierCreditsOwnedView(::buffa::OwnedView<TierCreditsView<'static>>);
+        impl TierCreditsOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TierCreditsOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TierCreditsOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TierCredits,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TierCreditsOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TierCreditsView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TierCreditsView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TierCredits,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The VIP tier, from 0 to 10.
+            ///
+            /// Field 1: `vip_tier`
+            #[must_use]
+            pub fn vip_tier(&self) -> u32 {
+                self.0.reborrow().vip_tier
+            }
+            /// Free credits per UTC day at this tier.
+            ///
+            /// Field 2: `daily_free_credits`
+            #[must_use]
+            pub fn daily_free_credits(&self) -> u64 {
+                self.0.reborrow().daily_free_credits
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TierCreditsView<'static>>>
+        for TierCreditsOwnedView {
+            fn from(inner: ::buffa::OwnedView<TierCreditsView<'static>>) -> Self {
+                TierCreditsOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TierCreditsOwnedView>
+        for ::buffa::OwnedView<TierCreditsView<'static>> {
+            fn from(wrapper: TierCreditsOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TierCreditsView<'static>>>
+        for TierCreditsOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TierCreditsView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TierCredits {
+            type View<'a> = TierCreditsView<'a>;
+            type ViewHandle = TierCreditsOwnedView;
+        }
+        impl ::serde::Serialize for TierCreditsOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetUsageResponse is the caller's assistant credits today. A credit is a
+        /// fixed amount of AI usage: a longer answer, or one that uses more tools,
+        /// uses more credits. The figures are the main account's, which every
+        /// subaccount shares, and are the ones a new message is admitted against.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetUsageResponseView<'a> {
+            /// What pays for the caller's next messages. With OWN_KEY they use no
+            /// credits, and the free credits below stay unused.
+            ///
+            /// Field 1: `funding_mode`
+            pub funding_mode: ::buffa::EnumValue<super::super::FundingMode>,
+            /// The caller's VIP tier, whose free credits apply today. Unset when the
+            /// tier could not be read: VIP 0's free credits then apply.
+            ///
+            /// Field 2: `vip_tier`
+            pub vip_tier: ::core::option::Option<u32>,
+            /// Today's free credits: the VIP tier's daily free credits.
+            ///
+            /// Field 3: `free_credits`
+            pub free_credits: u64,
+            /// Free credits used today, rounded down to a whole credit. May exceed
+            /// free_credits: an answer started with credits left always finishes.
+            ///
+            /// Field 4: `free_credits_used`
+            pub free_credits_used: u64,
+            /// Free credits left today: free_credits minus free_credits_used, and 0
+            /// when none are left. With none left and CREDITS funding, a message is
+            /// answered with RunFailed DAILY_LIMIT_REACHED.
+            ///
+            /// Field 5: `free_credits_left`
+            pub free_credits_left: u64,
+            /// When the free credits reset: the next 00:00 UTC. Credits left unused do
+            /// not carry over to the next day.
+            ///
+            /// Field 6: `resets_at`
+            pub resets_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// The next VIP tier and its daily free credits. Unset at the highest tier,
+            /// and when the caller's tier could not be read.
+            ///
+            /// Field 7: `next_tier`
+            pub next_tier: ::buffa::MessageFieldView<
+                super::super::__buffa::view::TierCreditsView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetUsageResponseView<'a> {
+            type Owned = super::super::GetUsageResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.funding_mode = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.vip_tier = Some(::buffa::types::decode_uint32(&mut cur)?);
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.free_credits = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.free_credits_used = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.free_credits_left = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.resets_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.resets_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.next_tier.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.next_tier = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::TierCreditsView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetUsageResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetUsageResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetUsageResponse {
+                    funding_mode: self.funding_mode,
+                    vip_tier: self.vip_tier,
+                    free_credits: self.free_credits,
+                    free_credits_used: self.free_credits_used,
+                    free_credits_left: self.free_credits_left,
+                    resets_at: match self.resets_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    next_tier: match self.next_tier.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::TierCredits,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetUsageResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.funding_mode.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(v) = self.vip_tier {
+                    size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
+                }
+                if self.free_credits != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.free_credits)
+                                as u32;
+                }
+                if self.free_credits_used != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.free_credits_used)
+                                as u32;
+                }
+                if self.free_credits_left != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.free_credits_left)
+                                as u32;
+                }
+                if self.resets_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.resets_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.next_tier.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.next_tier.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.funding_mode.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if let Some(v) = self.vip_tier {
+                    ::buffa::types::put_uint32_field(2u32, v, buf);
+                }
+                if self.free_credits != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.free_credits, buf);
+                }
+                if self.free_credits_used != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.free_credits_used, buf);
+                }
+                if self.free_credits_left != 0u64 {
+                    ::buffa::types::put_uint64_field(5u32, self.free_credits_left, buf);
+                }
+                if self.resets_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.resets_at.write_to(__cache, buf);
+                }
+                if self.next_tier.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.next_tier.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetUsageResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.funding_mode,
+                ) {
+                    __map.serialize_entry("fundingMode", &self.funding_mode)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.vip_tier {
+                    __map
+                        .serialize_entry(
+                            "vipTier",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.free_credits) {
+                    __map
+                        .serialize_entry(
+                            "freeCredits",
+                            &::buffa::json_helpers::ProtoJson(&self.free_credits),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.free_credits_used,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "freeCreditsUsed",
+                            &::buffa::json_helpers::ProtoJson(&self.free_credits_used),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.free_credits_left,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "freeCreditsLeft",
+                            &::buffa::json_helpers::ProtoJson(&self.free_credits_left),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.resets_at.as_option()
+                    {
+                        __map.serialize_entry("resetsAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.next_tier.as_option()
+                    {
+                        __map.serialize_entry("nextTier", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetUsageResponseView<'a> {
+            const PACKAGE: &'static str = "ai.v1";
+            const NAME: &'static str = "GetUsageResponse";
+            const FULL_NAME: &'static str = "ai.v1.GetUsageResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.GetUsageResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetUsageResponseView);
+        ::buffa::impl_view_reborrow!(GetUsageResponseView);
+        /** Self-contained, `'static` owned view of a `GetUsageResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetUsageResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetUsageResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetUsageResponseOwnedView(
+            ::buffa::OwnedView<GetUsageResponseView<'static>>,
+        );
+        impl GetUsageResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetUsageResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetUsageResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetUsageResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetUsageResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetUsageResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// What pays for the caller's next messages. With OWN_KEY they use no
+            /// credits, and the free credits below stay unused.
+            ///
+            /// Field 1: `funding_mode`
+            #[must_use]
+            pub fn funding_mode(&self) -> ::buffa::EnumValue<super::super::FundingMode> {
+                self.0.reborrow().funding_mode
+            }
+            /// The caller's VIP tier, whose free credits apply today. Unset when the
+            /// tier could not be read: VIP 0's free credits then apply.
+            ///
+            /// Field 2: `vip_tier`
+            #[must_use]
+            pub fn vip_tier(&self) -> ::core::option::Option<u32> {
+                self.0.reborrow().vip_tier
+            }
+            /// Today's free credits: the VIP tier's daily free credits.
+            ///
+            /// Field 3: `free_credits`
+            #[must_use]
+            pub fn free_credits(&self) -> u64 {
+                self.0.reborrow().free_credits
+            }
+            /// Free credits used today, rounded down to a whole credit. May exceed
+            /// free_credits: an answer started with credits left always finishes.
+            ///
+            /// Field 4: `free_credits_used`
+            #[must_use]
+            pub fn free_credits_used(&self) -> u64 {
+                self.0.reborrow().free_credits_used
+            }
+            /// Free credits left today: free_credits minus free_credits_used, and 0
+            /// when none are left. With none left and CREDITS funding, a message is
+            /// answered with RunFailed DAILY_LIMIT_REACHED.
+            ///
+            /// Field 5: `free_credits_left`
+            #[must_use]
+            pub fn free_credits_left(&self) -> u64 {
+                self.0.reborrow().free_credits_left
+            }
+            /// When the free credits reset: the next 00:00 UTC. Credits left unused do
+            /// not carry over to the next day.
+            ///
+            /// Field 6: `resets_at`
+            #[must_use]
+            pub fn resets_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().resets_at
+            }
+            /// The next VIP tier and its daily free credits. Unset at the highest tier,
+            /// and when the caller's tier could not be read.
+            ///
+            /// Field 7: `next_tier`
+            #[must_use]
+            pub fn next_tier(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::TierCreditsView<'_>,
+            > {
+                &self.0.reborrow().next_tier
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetUsageResponseView<'static>>>
+        for GetUsageResponseOwnedView {
+            fn from(inner: ::buffa::OwnedView<GetUsageResponseView<'static>>) -> Self {
+                GetUsageResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetUsageResponseOwnedView>
+        for ::buffa::OwnedView<GetUsageResponseView<'static>> {
+            fn from(wrapper: GetUsageResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<GetUsageResponseView<'static>>>
+        for GetUsageResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetUsageResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetUsageResponse {
+            type View<'a> = GetUsageResponseView<'a>;
+            type ViewHandle = GetUsageResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetUsageResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -62593,6 +70025,8 @@ pub mod __buffa {
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__CONVERSATION_JSON_ANY);
         reg.register_json_any(super::__MESSAGE_JSON_ANY);
+        reg.register_json_any(super::__MESSAGE_IMAGE_JSON_ANY);
+        reg.register_json_any(super::__IMAGE_ATTACHMENT_JSON_ANY);
         reg.register_json_any(super::__MEMORY_JSON_ANY);
         reg.register_json_any(super::__USAGE_JSON_ANY);
         reg.register_json_any(super::__ORDERS_TABLE_JSON_ANY);
@@ -62648,6 +70082,7 @@ pub mod __buffa {
         reg.register_json_any(super::__RUN_FAILED_JSON_ANY);
         reg.register_json_any(super::__RUN_EVENT_JSON_ANY);
         reg.register_json_any(super::__ASSISTANT_KEY_JSON_ANY);
+        reg.register_json_any(super::__MODEL_KEY_JSON_ANY);
         reg.register_json_any(super::__ASSISTANT_KEY_ACCOUNT_JSON_ANY);
         reg.register_json_any(super::__PREPARED_ASSISTANT_KEY_JSON_ANY);
         reg.register_json_any(super::__DESTINATION_JSON_ANY);
@@ -62664,6 +70099,8 @@ pub mod __buffa {
         reg.register_json_any(super::__LIST_CONVERSATIONS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_MESSAGES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MESSAGES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_MESSAGE_IMAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MESSAGE_IMAGE_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_MEMORIES_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_MEMORY_REQUEST_JSON_ANY);
@@ -62679,6 +70116,15 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__SET_TELEGRAM_APPROVAL_LIMITS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__SET_TELEGRAM_APPROVAL_LIMITS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__SET_MODEL_KEY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__SET_MODEL_KEY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_MODEL_KEY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_MODEL_KEY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MODEL_KEY_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DELETE_MODEL_KEY_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__GET_USAGE_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__TIER_CREDITS_JSON_ANY);
+        reg.register_json_any(super::__GET_USAGE_RESPONSE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -62693,6 +70139,14 @@ pub use self::__buffa::view::ConversationOwnedView;
 pub use self::__buffa::view::MessageView;
 #[doc(inline)]
 pub use self::__buffa::view::MessageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::MessageImageView;
+#[doc(inline)]
+pub use self::__buffa::view::MessageImageOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ImageAttachmentView;
+#[doc(inline)]
+pub use self::__buffa::view::ImageAttachmentOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::MemoryView;
 #[doc(inline)]
@@ -62912,6 +70366,10 @@ pub use self::__buffa::view::RunEventOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AssistantKeyOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::ModelKeyView;
+#[doc(inline)]
+pub use self::__buffa::view::ModelKeyOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::AssistantKeyAccountView;
 #[doc(inline)]
 pub use self::__buffa::view::AssistantKeyAccountOwnedView;
@@ -62976,6 +70434,14 @@ pub use self::__buffa::view::ListMessagesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMessagesResponseOwnedView;
 #[doc(inline)]
+pub use self::__buffa::view::GetMessageImageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMessageImageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMessageImageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetMessageImageResponseOwnedView;
+#[doc(inline)]
 pub use self::__buffa::view::ListMemoriesRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::ListMemoriesRequestOwnedView;
@@ -63035,5 +70501,41 @@ pub use self::__buffa::view::SetTelegramApprovalLimitsRequestOwnedView;
 pub use self::__buffa::view::SetTelegramApprovalLimitsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::SetTelegramApprovalLimitsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetModelKeyRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::SetModelKeyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::SetModelKeyResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::SetModelKeyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetModelKeyRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetModelKeyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetModelKeyResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetModelKeyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteModelKeyRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteModelKeyRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteModelKeyResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DeleteModelKeyResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetUsageRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetUsageRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TierCreditsView;
+#[doc(inline)]
+pub use self::__buffa::view::TierCreditsOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetUsageResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetUsageResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

@@ -280,6 +280,25 @@ mod tests {
         assert_eq!(PolicyAction::MANAGE_PRICE_ALERTS.to_i32(), 37);
     }
 
+    /// The notification and account activity permissions read by name and
+    /// keep their numbers.
+    #[test]
+    fn notification_and_activity_policy_actions_read_by_name() {
+        use crate::proto::auth::v1::PolicyAction;
+        use buffa::Enumeration;
+
+        let api = api_policy_from_proto(&ApiPolicyView {
+            actions: vec![
+                PolicyAction::READ_NOTIFICATIONS.into(),
+                PolicyAction::READ_ACCOUNT_ACTIVITY.into(),
+            ],
+            ..Default::default()
+        });
+        assert_eq!(api.actions, ["READ_NOTIFICATIONS", "READ_ACCOUNT_ACTIVITY"]);
+        assert_eq!(PolicyAction::READ_NOTIFICATIONS.to_i32(), 41);
+        assert_eq!(PolicyAction::READ_ACCOUNT_ACTIVITY.to_i32(), 42);
+    }
+
     /// The statement export permission reads by name on both policy kinds
     /// and keeps its number.
     #[test]

@@ -555,6 +555,11 @@ pub enum ErrorCode {
     ERROR_CODE_STATEMENT_EXPORT_EXPIRED = 15i32,
     /// The statement export failed and has no file.
     ERROR_CODE_STATEMENT_EXPORT_FAILED = 16i32,
+    /// The statement export already finished, READY, FAILED or EXPIRED, so it
+    /// can no longer be canceled.
+    ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE = 17i32,
+    /// The statement export was canceled and has no file.
+    ERROR_CODE_STATEMENT_EXPORT_CANCELED = 18i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -608,6 +613,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_STATEMENT_EXPORT_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const StatementExportFailed: Self = Self::ERROR_CODE_STATEMENT_EXPORT_FAILED;
+    ///Idiomatic alias for [`Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatementExportNotCancelable: Self = Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const StatementExportCanceled: Self = Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -736,6 +747,14 @@ impl ::buffa::Enumeration for ErrorCode {
             16i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_FAILED)
             }
+            17i32 => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE,
+                )
+            }
+            18i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -772,6 +791,12 @@ impl ::buffa::Enumeration for ErrorCode {
             }
             Self::ERROR_CODE_STATEMENT_EXPORT_FAILED => {
                 "ERROR_CODE_STATEMENT_EXPORT_FAILED"
+            }
+            Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE => {
+                "ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE"
+            }
+            Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED => {
+                "ERROR_CODE_STATEMENT_EXPORT_CANCELED"
             }
         }
     }
@@ -832,6 +857,14 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_STATEMENT_EXPORT_FAILED" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_FAILED)
             }
+            "ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE" => {
+                ::core::option::Option::Some(
+                    Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE,
+                )
+            }
+            "ERROR_CODE_STATEMENT_EXPORT_CANCELED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -854,6 +887,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_STATEMENT_EXPORT_NOT_READY,
             Self::ERROR_CODE_STATEMENT_EXPORT_EXPIRED,
             Self::ERROR_CODE_STATEMENT_EXPORT_FAILED,
+            Self::ERROR_CODE_STATEMENT_EXPORT_NOT_CANCELABLE,
+            Self::ERROR_CODE_STATEMENT_EXPORT_CANCELED,
         ]
     }
 }
@@ -6311,502 +6346,6 @@ pub const __LIST_TRANSFERS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     from_json: ::buffa::type_registry::any_from_json::<ListTransfersResponse>,
     is_wkt: false,
 };
-/// ExportStatementRequest selects the account, period and assets of an account
-/// statement.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ExportStatementRequest {
-    /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
-    /// use their bound subaccount; other callers use their authenticated root
-    /// account. The statement covers that one account only.
-    ///
-    /// Field 1: `subaccount_id`
-    #[serde(
-        rename = "subaccountId",
-        alias = "subaccount_id",
-        with = "::buffa::json_helpers::opt_uint64",
-        skip_serializing_if = "::core::option::Option::is_none"
-    )]
-    pub subaccount_id: ::core::option::Option<u64>,
-    /// Start of the statement period (UTC), inclusive.
-    ///
-    /// Field 2: `start_time`
-    #[serde(
-        rename = "startTime",
-        alias = "start_time",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub start_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// End of the statement period (UTC), exclusive. The statement covers the
-    /// period up to complete_through, which is at most end_time; see
-    /// ExportStatementResponse.complete_through.
-    ///
-    /// Field 3: `end_time`
-    #[serde(
-        rename = "endTime",
-        alias = "end_time",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub end_time: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    /// Optional public unified asset ID. When unset/0, the statement covers every
-    /// asset.
-    ///
-    /// Field 4: `asset_id`
-    #[serde(
-        rename = "assetId",
-        alias = "asset_id",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
-    )]
-    pub asset_id: u32,
-    /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-    /// bound to the authenticated account, sub-account scope, asset filter,
-    /// period and complete_through; reuse it only with the same request fields.
-    ///
-    /// Field 5: `page_token`
-    #[serde(
-        rename = "pageToken",
-        alias = "page_token",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub page_token: ::buffa::alloc::string::String,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ExportStatementRequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ExportStatementRequest")
-            .field("subaccount_id", &self.subaccount_id)
-            .field("start_time", &self.start_time)
-            .field("end_time", &self.end_time)
-            .field("asset_id", &self.asset_id)
-            .field("page_token", &self.page_token)
-            .finish()
-    }
-}
-impl ExportStatementRequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementRequest";
-}
-impl ExportStatementRequest {
-    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
-    #[inline]
-    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
-    pub fn with_subaccount_id(mut self, value: u64) -> Self {
-        self.subaccount_id = Some(value);
-        self
-    }
-}
-::buffa::impl_default_instance!(ExportStatementRequest);
-impl ::buffa::MessageName for ExportStatementRequest {
-    const PACKAGE: &'static str = "ledger.read.v1";
-    const NAME: &'static str = "ExportStatementRequest";
-    const FULL_NAME: &'static str = "ledger.read.v1.ExportStatementRequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementRequest";
-}
-impl ::buffa::Message for ExportStatementRequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        if self.subaccount_id.is_some() {
-            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-        }
-        if self.start_time.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.start_time.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        if self.end_time.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.end_time.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        if self.asset_id != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
-        }
-        if !self.page_token.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.page_token) as u32;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if let Some(v) = self.subaccount_id {
-            ::buffa::types::put_fixed64_field(1u32, v, buf);
-        }
-        if self.start_time.is_set() {
-            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
-            self.start_time.write_to(__cache, buf);
-        }
-        if self.end_time.is_set() {
-            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
-            self.end_time.write_to(__cache, buf);
-        }
-        if self.asset_id != 0u32 {
-            ::buffa::types::put_uint32_field(4u32, self.asset_id, buf);
-        }
-        if !self.page_token.is_empty() {
-            ::buffa::types::put_string_field(5u32, &self.page_token, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Fixed64,
-                )?;
-                self.subaccount_id = ::core::option::Option::Some(
-                    ::buffa::types::decode_fixed64(buf)?,
-                );
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.start_time.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.end_time.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            4u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.asset_id = ::buffa::types::decode_uint32(buf)?;
-            }
-            5u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.page_token, buf)?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.subaccount_id = ::core::option::Option::None;
-        self.start_time = ::buffa::MessageField::none();
-        self.end_time = ::buffa::MessageField::none();
-        self.asset_id = 0u32;
-        self.page_token.clear();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ExportStatementRequest {
-    const PROTO_FQN: &'static str = "ledger.read.v1.ExportStatementRequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ExportStatementRequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __EXPORT_STATEMENT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/ledger.read.v1.ExportStatementRequest",
-    to_json: ::buffa::type_registry::any_to_json::<ExportStatementRequest>,
-    from_json: ::buffa::type_registry::any_from_json::<ExportStatementRequest>,
-    is_wkt: false,
-};
-/// ExportStatementResponse is one page of an account statement in CSV.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct ExportStatementResponse {
-    /// Statement rows as RFC 4180 CSV in UTF-8, with CRLF line endings. The first
-    /// page starts with the header row and later pages carry rows only, so
-    /// concatenating the pages in order yields the complete statement; a period
-    /// without movements yields the header row alone. A page holds at most 2000
-    /// ledger movements, and an entry is never split across pages.
-    ///
-    /// Rows are ordered oldest first. Each row is the effect of one entry on one
-    /// account bucket in one asset. An entry is one ledger operation, such as a
-    /// trade with its fees, a deposit, a withdrawal step or an internal transfer.
-    ///
-    /// Columns, in order:
-    /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
-    ///   `2026-11-12T19:52:07.734123Z`.
-    /// - `entry_id`: stable entry identifier, an unsigned 128-bit integer as a
-    ///   decimal string. It is the `transfer_id` of the entry's first transfer leg
-    ///   on the account, as ListTransfers returns it.
-    /// - `type`: `trade` for a trade's settlement and its fees; otherwise the
-    ///   entry's transfer reason, such as `deposit`, `withdraw`,
-    ///   `internal_transfer`, `funding_to_trading` or `system_adjustment`.
-    /// - `account`: account bucket, `funding` or `trading`.
-    /// - `asset`: asset symbol.
-    /// - `amount`: signed balance change of the entry in whole units of the
-    ///   asset, excluding the fees in `fee`, for example `-5000` or `0.1`. Fees
-    ///   the account receives are included here.
-    /// - `fee`: fees the account paid in the asset for the entry, in whole units
-    ///   of the asset; `0` when none.
-    /// - `balance`: account bucket balance in the asset after the entry, in whole
-    ///   units of the asset. For consecutive rows of the same bucket and asset,
-    ///   each balance equals the previous balance plus `amount` minus `fee`.
-    /// - `link_id`: correlation ID shared by related transfer legs, the trade's
-    ///   match ID for trades; empty when unavailable.
-    /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
-    ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
-    ///   as ListTransfers returns it; empty otherwise.
-    ///
-    /// Amounts are exact decimal strings with up to 18 fractional digits and no
-    /// trailing zeros.
-    ///
-    /// Field 1: `csv`
-    #[serde(
-        rename = "csv",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub csv: ::buffa::alloc::string::String,
-    /// Opaque cursor for the next page. Empty when no more results exist.
-    ///
-    /// Field 2: `next_page_token`
-    #[serde(
-        rename = "nextPageToken",
-        alias = "next_page_token",
-        with = "::buffa::json_helpers::proto_string",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
-    )]
-    pub next_page_token: ::buffa::alloc::string::String,
-    /// The statement covers movements from start_time up to complete_through,
-    /// exclusive: the earliest of end_time, the time of the first page's request
-    /// and the time through which account history is complete when that page was
-    /// requested, and never before start_time. Every page of one statement
-    /// carries the same value. When it is before end_time, the movements from it
-    /// to end_time appear in a statement requested later.
-    ///
-    /// Field 3: `complete_through`
-    #[serde(
-        rename = "completeThrough",
-        alias = "complete_through",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub complete_through: ::buffa::MessageField<
-        ::buffa_types::google::protobuf::Timestamp,
-    >,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for ExportStatementResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("ExportStatementResponse")
-            .field("csv", &self.csv)
-            .field("next_page_token", &self.next_page_token)
-            .field("complete_through", &self.complete_through)
-            .finish()
-    }
-}
-impl ExportStatementResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementResponse";
-}
-::buffa::impl_default_instance!(ExportStatementResponse);
-impl ::buffa::MessageName for ExportStatementResponse {
-    const PACKAGE: &'static str = "ledger.read.v1";
-    const NAME: &'static str = "ExportStatementResponse";
-    const FULL_NAME: &'static str = "ledger.read.v1.ExportStatementResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementResponse";
-}
-impl ::buffa::Message for ExportStatementResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        if !self.csv.is_empty() {
-            size += 1u32 + ::buffa::types::string_encoded_len(&self.csv) as u32;
-        }
-        if !self.next_page_token.is_empty() {
-            size
-                += 1u32
-                    + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
-        }
-        if self.complete_through.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.complete_through.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if !self.csv.is_empty() {
-            ::buffa::types::put_string_field(1u32, &self.csv, buf);
-        }
-        if !self.next_page_token.is_empty() {
-            ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
-        }
-        if self.complete_through.is_set() {
-            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
-            self.complete_through.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.csv, buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
-            }
-            3u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.complete_through.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.csv.clear();
-        self.next_page_token.clear();
-        self.complete_through = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for ExportStatementResponse {
-    const PROTO_FQN: &'static str = "ledger.read.v1.ExportStatementResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for ExportStatementResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __EXPORT_STATEMENT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/ledger.read.v1.ExportStatementResponse",
-    to_json: ::buffa::type_registry::any_to_json::<ExportStatementResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<ExportStatementResponse>,
-    is_wkt: false,
-};
 /// ErrorDetail is attached to ConnectRPC errors for structured error handling.
 /// Clients can inspect this to get a stable machine-readable error code.
 #[derive(Clone, PartialEq, Default)]
@@ -6956,6 +6495,9 @@ pub enum StatementExportStatus {
     STATEMENT_EXPORT_STATUS_FAILED = 4i32,
     /// The file was deleted at expires_at; create a new export for it.
     STATEMENT_EXPORT_STATUS_EXPIRED = 5i32,
+    /// Canceled with CancelStatementExport before it finished. It has no file
+    /// and no longer counts toward the root account's exports in progress.
+    STATEMENT_EXPORT_STATUS_CANCELED = 6i32,
 }
 impl StatementExportStatus {
     ///Idiomatic alias for [`Self::STATEMENT_EXPORT_STATUS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -6976,6 +6518,9 @@ impl StatementExportStatus {
     ///Idiomatic alias for [`Self::STATEMENT_EXPORT_STATUS_EXPIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Expired: Self = Self::STATEMENT_EXPORT_STATUS_EXPIRED;
+    ///Idiomatic alias for [`Self::STATEMENT_EXPORT_STATUS_CANCELED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Canceled: Self = Self::STATEMENT_EXPORT_STATUS_CANCELED;
 }
 impl ::core::default::Default for StatementExportStatus {
     fn default() -> Self {
@@ -7084,6 +6629,7 @@ impl ::buffa::Enumeration for StatementExportStatus {
             3i32 => ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_READY),
             4i32 => ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_FAILED),
             5i32 => ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_EXPIRED),
+            6i32 => ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_CANCELED),
             _ => ::core::option::Option::None,
         }
     }
@@ -7102,6 +6648,7 @@ impl ::buffa::Enumeration for StatementExportStatus {
             Self::STATEMENT_EXPORT_STATUS_READY => "STATEMENT_EXPORT_STATUS_READY",
             Self::STATEMENT_EXPORT_STATUS_FAILED => "STATEMENT_EXPORT_STATUS_FAILED",
             Self::STATEMENT_EXPORT_STATUS_EXPIRED => "STATEMENT_EXPORT_STATUS_EXPIRED",
+            Self::STATEMENT_EXPORT_STATUS_CANCELED => "STATEMENT_EXPORT_STATUS_CANCELED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -7124,6 +6671,9 @@ impl ::buffa::Enumeration for StatementExportStatus {
             "STATEMENT_EXPORT_STATUS_EXPIRED" => {
                 ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_EXPIRED)
             }
+            "STATEMENT_EXPORT_STATUS_CANCELED" => {
+                ::core::option::Option::Some(Self::STATEMENT_EXPORT_STATUS_CANCELED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -7135,6 +6685,7 @@ impl ::buffa::Enumeration for StatementExportStatus {
             Self::STATEMENT_EXPORT_STATUS_READY,
             Self::STATEMENT_EXPORT_STATUS_FAILED,
             Self::STATEMENT_EXPORT_STATUS_EXPIRED,
+            Self::STATEMENT_EXPORT_STATUS_CANCELED,
         ]
     }
 }
@@ -7323,17 +6874,70 @@ impl ::buffa::Enumeration for StatementExportFailureReason {
     }
 }
 /// StatementExport is a whole-period account statement produced in the
-/// background as one CSV file. The file is byte for byte the pages of
-/// ExportStatement for the same account, asset and period up to
-/// complete_through, concatenated: the header row, then every row, oldest
-/// first, in the columns ExportStatementResponse.csv documents.
+/// background as one CSV file.
 ///
-/// Download a READY file with an authenticated
-/// `GET /v1/statements/exports/{exportId}/file`, as the account that created
-/// it or one with the same access: it returns `text/csv` and supports HTTP
-/// `Range` requests. With `?redirect=true` it instead answers
-/// `307 Temporary Redirect` to a URL valid for 60 seconds. An EXPIRED export's
-/// file answers `410 Gone`.
+/// The file is RFC 4180 CSV in UTF-8 with CRLF line endings: the header row,
+/// then every row of the period up to complete_through, oldest first. A period
+/// without movements yields the header row alone. Each row is the effect of
+/// one entry on one account bucket in one asset. An entry is one ledger
+/// operation, such as a trade with its fees, a deposit, a withdrawal step or an
+/// internal transfer.
+///
+/// Columns, in order:
+/// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
+///   `2026-11-12T19:52:07.734123Z`.
+/// - `entry_id`: stable entry identifier, an unsigned 128-bit integer as a
+///   decimal string. It is the `transfer_id` of the entry's first transfer leg
+///   on the account, as LedgerReadService.ListTransfers returns it.
+/// - `type`: `trade` for a trade's settlement and its fees; otherwise the
+///   entry's transfer reason, such as `deposit`, `withdraw`,
+///   `internal_transfer`, `funding_to_trading` or `system_adjustment`.
+/// - `account`: account bucket, `funding` or `trading`.
+/// - `asset`: asset symbol.
+/// - `amount`: signed balance change of the entry in whole units of the
+///   asset, excluding the fees in `fee`, for example `-5000` or `0.1`. Fees
+///   the account receives are included here.
+/// - `fee`: fees the account paid in the asset for the entry, in whole units
+///   of the asset; `0` when none.
+/// - `balance`: account bucket balance in the asset after the entry, in whole
+///   units of the asset. For consecutive rows of the same bucket and asset,
+///   each balance equals the previous balance plus `amount` minus `fee`.
+/// - `link_id`: correlation ID shared by related transfer legs, the trade's
+///   match ID for trades; empty when unavailable.
+/// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
+///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
+///   as LedgerReadService.ListTransfers returns it; empty otherwise.
+///
+/// Amounts are exact decimal strings with up to 18 fractional digits and no
+/// trailing zeros.
+///
+/// A READY file downloads in one of two ways:
+/// - StatementExportService.GetStatementExportDownloadUrl returns a URL valid
+///   for 60 seconds from signing that needs no credentials, so a browser can
+///   save the file straight to disk.
+/// - An authenticated `GET /v1/statements/exports/{exportId}/file` returns the
+///   file as `text/csv` and supports HTTP `Range` requests.
+///
+/// Both save the file as `statement-<exportId>.csv`. Before the file is READY
+/// both answer FAILED_PRECONDITION with STATEMENT_EXPORT_NOT_READY, REST
+/// `409 Conflict`; a FAILED export answers STATEMENT_EXPORT_FAILED, REST `409`;
+/// an EXPIRED export, or a file already deleted, answers
+/// STATEMENT_EXPORT_EXPIRED, REST `410 Gone`, and so does a download URL
+/// request for a file with less than 5 seconds left; a CANCELED export
+/// answers STATEMENT_EXPORT_CANCELED, REST `409`. REST errors are
+/// `application/problem+json` whose `code` is the ErrorCode name, such as
+/// `STATEMENT_EXPORT_NOT_READY`: `401` without valid credentials, `403
+/// PERMISSION_DENIED` for an API key without READ_STATEMENTS, `404 NOT_FOUND`
+/// for an export the caller cannot read, and `503 UPSTREAM_ERROR`, with
+/// `Retry-After`, when the request can be retried.
+///
+/// An export belongs to the root account whose session or API key created it.
+/// Any session or API key of that root that may read the export's account can
+/// read and download it, whichever of them created it. A member of a
+/// subaccount shared from another root sees only the exports its own root
+/// created, and the subaccount's owner does not see those: an export of
+/// another root, or of an account the caller can no longer read, answers
+/// NOT_FOUND, as one that does not exist.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -7873,7 +7477,8 @@ pub const __STATEMENT_EXPORT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::
     is_wkt: false,
 };
 /// CreateStatementExportRequest asks for a whole-period statement file of one
-/// account.
+/// account. The period is at most 366 days long; a longer or empty period is
+/// INVALID_ARGUMENT.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -8541,6 +8146,596 @@ pub const __GET_STATEMENT_EXPORT_RESPONSE_JSON_ANY: ::buffa::type_registry::Json
     from_json: ::buffa::type_registry::any_from_json::<GetStatementExportResponse>,
     is_wkt: false,
 };
+/// GetStatementExportDownloadUrlRequest names the export whose file to
+/// download.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetStatementExportDownloadUrlRequest {
+    /// Public ID of the export.
+    ///
+    /// Field 1: `export_id`
+    #[serde(
+        rename = "exportId",
+        alias = "export_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub export_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetStatementExportDownloadUrlRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetStatementExportDownloadUrlRequest")
+            .field("export_id", &self.export_id)
+            .finish()
+    }
+}
+impl GetStatementExportDownloadUrlRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlRequest";
+}
+::buffa::impl_default_instance!(GetStatementExportDownloadUrlRequest);
+impl ::buffa::MessageName for GetStatementExportDownloadUrlRequest {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetStatementExportDownloadUrlRequest";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlRequest";
+}
+impl ::buffa::Message for GetStatementExportDownloadUrlRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.export_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.export_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.export_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.export_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.export_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetStatementExportDownloadUrlRequest {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetStatementExportDownloadUrlRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_STATEMENT_EXPORT_DOWNLOAD_URL_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetStatementExportDownloadUrlRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetStatementExportDownloadUrlRequest,
+    >,
+    is_wkt: false,
+};
+/// GetStatementExportDownloadUrlResponse is a short-lived link to a READY
+/// export's file.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetStatementExportDownloadUrlResponse {
+    /// URL of the file, valid until expires_at. It carries its own
+    /// authorization and needs no credentials, so a browser can open it to save
+    /// the file. Anyone who holds it can download the file until expires_at:
+    /// do not share, store or log it.
+    ///
+    /// Field 1: `url`
+    #[serde(
+        rename = "url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub url: ::buffa::alloc::string::String,
+    /// When the URL stops working: the exact end of its signature, 60 seconds
+    /// after it was signed for this request, or when the file expires if that
+    /// is sooner. Request a new URL after it.
+    ///
+    /// Field 2: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Name the download saves the file as, `statement-<exportId>.csv`.
+    ///
+    /// Field 3: `filename`
+    #[serde(
+        rename = "filename",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub filename: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetStatementExportDownloadUrlResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetStatementExportDownloadUrlResponse")
+            .field("url", &self.url)
+            .field("expires_at", &self.expires_at)
+            .field("filename", &self.filename)
+            .finish()
+    }
+}
+impl GetStatementExportDownloadUrlResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlResponse";
+}
+::buffa::impl_default_instance!(GetStatementExportDownloadUrlResponse);
+impl ::buffa::MessageName for GetStatementExportDownloadUrlResponse {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "GetStatementExportDownloadUrlResponse";
+    const FULL_NAME: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlResponse";
+}
+impl ::buffa::Message for GetStatementExportDownloadUrlResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.url.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.url) as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.filename.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.filename) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.url, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        if !self.filename.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.filename, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.url, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.filename, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.url.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.filename.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetStatementExportDownloadUrlResponse {
+    const PROTO_FQN: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetStatementExportDownloadUrlResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_STATEMENT_EXPORT_DOWNLOAD_URL_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        GetStatementExportDownloadUrlResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        GetStatementExportDownloadUrlResponse,
+    >,
+    is_wkt: false,
+};
+/// CancelStatementExportRequest names the export to cancel.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelStatementExportRequest {
+    /// Public ID of the export.
+    ///
+    /// Field 1: `export_id`
+    #[serde(
+        rename = "exportId",
+        alias = "export_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub export_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelStatementExportRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelStatementExportRequest")
+            .field("export_id", &self.export_id)
+            .finish()
+    }
+}
+impl CancelStatementExportRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportRequest";
+}
+::buffa::impl_default_instance!(CancelStatementExportRequest);
+impl ::buffa::MessageName for CancelStatementExportRequest {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "CancelStatementExportRequest";
+    const FULL_NAME: &'static str = "ledger.read.v1.CancelStatementExportRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportRequest";
+}
+impl ::buffa::Message for CancelStatementExportRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.export_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.export_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.export_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.export_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.export_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelStatementExportRequest {
+    const PROTO_FQN: &'static str = "ledger.read.v1.CancelStatementExportRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelStatementExportRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_STATEMENT_EXPORT_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.CancelStatementExportRequest",
+    to_json: ::buffa::type_registry::any_to_json::<CancelStatementExportRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelStatementExportRequest>,
+    is_wkt: false,
+};
+/// CancelStatementExportResponse is the canceled export.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CancelStatementExportResponse {
+    /// The export, CANCELED.
+    ///
+    /// Field 1: `export`
+    #[serde(
+        rename = "export",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub export: ::buffa::MessageField<StatementExport>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CancelStatementExportResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CancelStatementExportResponse")
+            .field("export", &self.export)
+            .finish()
+    }
+}
+impl CancelStatementExportResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportResponse";
+}
+::buffa::impl_default_instance!(CancelStatementExportResponse);
+impl ::buffa::MessageName for CancelStatementExportResponse {
+    const PACKAGE: &'static str = "ledger.read.v1";
+    const NAME: &'static str = "CancelStatementExportResponse";
+    const FULL_NAME: &'static str = "ledger.read.v1.CancelStatementExportResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportResponse";
+}
+impl ::buffa::Message for CancelStatementExportResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.export.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.export.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.export.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.export.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.export.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.export = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CancelStatementExportResponse {
+    const PROTO_FQN: &'static str = "ledger.read.v1.CancelStatementExportResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CancelStatementExportResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CANCEL_STATEMENT_EXPORT_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/ledger.read.v1.CancelStatementExportResponse",
+    to_json: ::buffa::type_registry::any_to_json::<CancelStatementExportResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<CancelStatementExportResponse>,
+    is_wkt: false,
+};
 /// ListStatementExportsRequest selects one account's exports.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -8755,6 +8950,30 @@ pub struct ListStatementExportsResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub next_page_token: ::buffa::alloc::string::String,
+    /// Exports QUEUED or PROCESSING across the whole root account, its
+    /// subaccounts included, whichever account the list selects: the number a
+    /// new CreateStatementExport counts against max_in_progress_exports.
+    ///
+    /// Field 3: `in_progress_exports`
+    #[serde(
+        rename = "inProgressExports",
+        alias = "in_progress_exports",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub in_progress_exports: u32,
+    /// Most exports the root account may have QUEUED or PROCESSING at a time.
+    /// While in_progress_exports is at it, CreateStatementExport answers
+    /// RESOURCE_EXHAUSTED with STATEMENT_EXPORT_LIMIT_REACHED.
+    ///
+    /// Field 4: `max_in_progress_exports`
+    #[serde(
+        rename = "maxInProgressExports",
+        alias = "max_in_progress_exports",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub max_in_progress_exports: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8764,6 +8983,8 @@ impl ::core::fmt::Debug for ListStatementExportsResponse {
         f.debug_struct("ListStatementExportsResponse")
             .field("exports", &self.exports)
             .field("next_page_token", &self.next_page_token)
+            .field("in_progress_exports", &self.in_progress_exports)
+            .field("max_in_progress_exports", &self.max_in_progress_exports)
             .finish()
     }
 }
@@ -8805,6 +9026,18 @@ impl ::buffa::Message for ListStatementExportsResponse {
                 += 1u32
                     + ::buffa::types::string_encoded_len(&self.next_page_token) as u32;
         }
+        if self.in_progress_exports != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.in_progress_exports)
+                        as u32;
+        }
+        if self.max_in_progress_exports != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.max_in_progress_exports)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8821,6 +9054,12 @@ impl ::buffa::Message for ListStatementExportsResponse {
         }
         if !self.next_page_token.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+        }
+        if self.in_progress_exports != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.in_progress_exports, buf);
+        }
+        if self.max_in_progress_exports != 0u32 {
+            ::buffa::types::put_uint32_field(4u32, self.max_in_progress_exports, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8851,6 +9090,20 @@ impl ::buffa::Message for ListStatementExportsResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.next_page_token, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.in_progress_exports = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_in_progress_exports = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8861,6 +9114,8 @@ impl ::buffa::Message for ListStatementExportsResponse {
     fn clear(&mut self) {
         self.exports.clear();
         self.next_page_token.clear();
+        self.in_progress_exports = 0u32;
+        self.max_in_progress_exports = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -18602,971 +18857,6 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ExportStatementRequest selects the account, period and assets of an account
-        /// statement.
-        #[derive(Clone, Debug, Default)]
-        pub struct ExportStatementRequestView<'a> {
-            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
-            /// use their bound subaccount; other callers use their authenticated root
-            /// account. The statement covers that one account only.
-            ///
-            /// Field 1: `subaccount_id`
-            pub subaccount_id: ::core::option::Option<u64>,
-            /// Start of the statement period (UTC), inclusive.
-            ///
-            /// Field 2: `start_time`
-            pub start_time: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            /// End of the statement period (UTC), exclusive. The statement covers the
-            /// period up to complete_through, which is at most end_time; see
-            /// ExportStatementResponse.complete_through.
-            ///
-            /// Field 3: `end_time`
-            pub end_time: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            /// Optional public unified asset ID. When unset/0, the statement covers every
-            /// asset.
-            ///
-            /// Field 4: `asset_id`
-            pub asset_id: u32,
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to the authenticated account, sub-account scope, asset filter,
-            /// period and complete_through; reuse it only with the same request fields.
-            ///
-            /// Field 5: `page_token`
-            pub page_token: &'a str,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for ExportStatementRequestView<'a> {
-            type Owned = super::super::ExportStatementRequest;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Fixed64,
-                        )?;
-                        view.subaccount_id = Some(
-                            ::buffa::types::decode_fixed64(&mut cur)?,
-                        );
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.start_time.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.start_time = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.end_time.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.end_time = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    4u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
-                    }
-                    5u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.page_token = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementRequest,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementRequest,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ExportStatementRequest {
-                    subaccount_id: self.subaccount_id,
-                    start_time: match self.start_time.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    end_time: match self.end_time.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    asset_id: self.asset_id,
-                    page_token: self.page_token.to_string(),
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for ExportStatementRequestView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                if self.subaccount_id.is_some() {
-                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
-                }
-                if self.start_time.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.start_time.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                if self.end_time.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.end_time.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                if self.asset_id != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
-                }
-                if !self.page_token.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.page_token)
-                                as u32;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if let Some(v) = self.subaccount_id {
-                    ::buffa::types::put_fixed64_field(1u32, v, buf);
-                }
-                if self.start_time.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.start_time.write_to(__cache, buf);
-                }
-                if self.end_time.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        3u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.end_time.write_to(__cache, buf);
-                }
-                if self.asset_id != 0u32 {
-                    ::buffa::types::put_uint32_field(4u32, self.asset_id, buf);
-                }
-                if !self.page_token.is_empty() {
-                    ::buffa::types::put_string_field(5u32, &self.page_token, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ExportStatementRequestView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if let ::core::option::Option::Some(__v) = self.subaccount_id {
-                    __map
-                        .serialize_entry(
-                            "subaccountId",
-                            &::buffa::json_helpers::ProtoJson(&__v),
-                        )?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self
-                        .start_time
-                        .as_option()
-                    {
-                        __map.serialize_entry("startTime", __v)?;
-                    }
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self.end_time.as_option()
-                    {
-                        __map.serialize_entry("endTime", __v)?;
-                    }
-                }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
-                    __map
-                        .serialize_entry(
-                            "assetId",
-                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
-                        )?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.page_token) {
-                    __map.serialize_entry("pageToken", self.page_token)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for ExportStatementRequestView<'a> {
-            const PACKAGE: &'static str = "ledger.read.v1";
-            const NAME: &'static str = "ExportStatementRequest";
-            const FULL_NAME: &'static str = "ledger.read.v1.ExportStatementRequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementRequest";
-        }
-        ::buffa::impl_default_view_instance!(ExportStatementRequestView);
-        ::buffa::impl_view_reborrow!(ExportStatementRequestView);
-        /** Self-contained, `'static` owned view of a `ExportStatementRequest` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`ExportStatementRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ExportStatementRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct ExportStatementRequestOwnedView(
-            ::buffa::OwnedView<ExportStatementRequestView<'static>>,
-        );
-        impl ExportStatementRequestOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementRequestOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::ExportStatementRequest,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`ExportStatementRequestView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &ExportStatementRequestView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementRequest,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
-            /// use their bound subaccount; other callers use their authenticated root
-            /// account. The statement covers that one account only.
-            ///
-            /// Field 1: `subaccount_id`
-            #[must_use]
-            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
-                self.0.reborrow().subaccount_id
-            }
-            /// Start of the statement period (UTC), inclusive.
-            ///
-            /// Field 2: `start_time`
-            #[must_use]
-            pub fn start_time(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().start_time
-            }
-            /// End of the statement period (UTC), exclusive. The statement covers the
-            /// period up to complete_through, which is at most end_time; see
-            /// ExportStatementResponse.complete_through.
-            ///
-            /// Field 3: `end_time`
-            #[must_use]
-            pub fn end_time(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().end_time
-            }
-            /// Optional public unified asset ID. When unset/0, the statement covers every
-            /// asset.
-            ///
-            /// Field 4: `asset_id`
-            #[must_use]
-            pub fn asset_id(&self) -> u32 {
-                self.0.reborrow().asset_id
-            }
-            /// Opaque keyset cursor from a previous response. The cursor is exclusive and
-            /// bound to the authenticated account, sub-account scope, asset filter,
-            /// period and complete_through; reuse it only with the same request fields.
-            ///
-            /// Field 5: `page_token`
-            #[must_use]
-            pub fn page_token(&self) -> &'_ str {
-                self.0.reborrow().page_token
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<ExportStatementRequestView<'static>>,
-        > for ExportStatementRequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ExportStatementRequestView<'static>>,
-            ) -> Self {
-                ExportStatementRequestOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<ExportStatementRequestOwnedView>
-        for ::buffa::OwnedView<ExportStatementRequestView<'static>> {
-            fn from(wrapper: ExportStatementRequestOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ExportStatementRequestView<'static>>,
-        > for ExportStatementRequestOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<ExportStatementRequestView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::ExportStatementRequest {
-            type View<'a> = ExportStatementRequestView<'a>;
-            type ViewHandle = ExportStatementRequestOwnedView;
-        }
-        impl ::serde::Serialize for ExportStatementRequestOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        /// ExportStatementResponse is one page of an account statement in CSV.
-        #[derive(Clone, Debug, Default)]
-        pub struct ExportStatementResponseView<'a> {
-            /// Statement rows as RFC 4180 CSV in UTF-8, with CRLF line endings. The first
-            /// page starts with the header row and later pages carry rows only, so
-            /// concatenating the pages in order yields the complete statement; a period
-            /// without movements yields the header row alone. A page holds at most 2000
-            /// ledger movements, and an entry is never split across pages.
-            ///
-            /// Rows are ordered oldest first. Each row is the effect of one entry on one
-            /// account bucket in one asset. An entry is one ledger operation, such as a
-            /// trade with its fees, a deposit, a withdrawal step or an internal transfer.
-            ///
-            /// Columns, in order:
-            /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
-            ///   `2026-11-12T19:52:07.734123Z`.
-            /// - `entry_id`: stable entry identifier, an unsigned 128-bit integer as a
-            ///   decimal string. It is the `transfer_id` of the entry's first transfer leg
-            ///   on the account, as ListTransfers returns it.
-            /// - `type`: `trade` for a trade's settlement and its fees; otherwise the
-            ///   entry's transfer reason, such as `deposit`, `withdraw`,
-            ///   `internal_transfer`, `funding_to_trading` or `system_adjustment`.
-            /// - `account`: account bucket, `funding` or `trading`.
-            /// - `asset`: asset symbol.
-            /// - `amount`: signed balance change of the entry in whole units of the
-            ///   asset, excluding the fees in `fee`, for example `-5000` or `0.1`. Fees
-            ///   the account receives are included here.
-            /// - `fee`: fees the account paid in the asset for the entry, in whole units
-            ///   of the asset; `0` when none.
-            /// - `balance`: account bucket balance in the asset after the entry, in whole
-            ///   units of the asset. For consecutive rows of the same bucket and asset,
-            ///   each balance equals the previous balance plus `amount` minus `fee`.
-            /// - `link_id`: correlation ID shared by related transfer legs, the trade's
-            ///   match ID for trades; empty when unavailable.
-            /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
-            ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
-            ///   as ListTransfers returns it; empty otherwise.
-            ///
-            /// Amounts are exact decimal strings with up to 18 fractional digits and no
-            /// trailing zeros.
-            ///
-            /// Field 1: `csv`
-            pub csv: &'a str,
-            /// Opaque cursor for the next page. Empty when no more results exist.
-            ///
-            /// Field 2: `next_page_token`
-            pub next_page_token: &'a str,
-            /// The statement covers movements from start_time up to complete_through,
-            /// exclusive: the earliest of end_time, the time of the first page's request
-            /// and the time through which account history is complete when that page was
-            /// requested, and never before start_time. Every page of one statement
-            /// carries the same value. When it is before end_time, the movements from it
-            /// to end_time appear in a statement requested later.
-            ///
-            /// Field 3: `complete_through`
-            pub complete_through: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for ExportStatementResponseView<'a> {
-            type Owned = super::super::ExportStatementResponse;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.csv = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
-                    }
-                    3u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.complete_through.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.complete_through = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementResponse,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementResponse,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::ExportStatementResponse {
-                    csv: self.csv.to_string(),
-                    next_page_token: self.next_page_token.to_string(),
-                    complete_through: match self.complete_through.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for ExportStatementResponseView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                if !self.csv.is_empty() {
-                    size += 1u32 + ::buffa::types::string_encoded_len(&self.csv) as u32;
-                }
-                if !self.next_page_token.is_empty() {
-                    size
-                        += 1u32
-                            + ::buffa::types::string_encoded_len(&self.next_page_token)
-                                as u32;
-                }
-                if self.complete_through.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.complete_through.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if !self.csv.is_empty() {
-                    ::buffa::types::put_string_field(1u32, &self.csv, buf);
-                }
-                if !self.next_page_token.is_empty() {
-                    ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
-                }
-                if self.complete_through.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        3u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.complete_through.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for ExportStatementResponseView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.csv) {
-                    __map.serialize_entry("csv", self.csv)?;
-                }
-                if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
-                    __map.serialize_entry("nextPageToken", self.next_page_token)?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self
-                        .complete_through
-                        .as_option()
-                    {
-                        __map.serialize_entry("completeThrough", __v)?;
-                    }
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for ExportStatementResponseView<'a> {
-            const PACKAGE: &'static str = "ledger.read.v1";
-            const NAME: &'static str = "ExportStatementResponse";
-            const FULL_NAME: &'static str = "ledger.read.v1.ExportStatementResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.ExportStatementResponse";
-        }
-        ::buffa::impl_default_view_instance!(ExportStatementResponseView);
-        ::buffa::impl_view_reborrow!(ExportStatementResponseView);
-        /** Self-contained, `'static` owned view of a `ExportStatementResponse` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`ExportStatementResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ExportStatementResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct ExportStatementResponseOwnedView(
-            ::buffa::OwnedView<ExportStatementResponseView<'static>>,
-        );
-        impl ExportStatementResponseOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementResponseOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::ExportStatementResponse,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    ExportStatementResponseOwnedView(
-                        ::buffa::OwnedView::from_owned(msg)?,
-                    ),
-                )
-            }
-            /// Borrow the full [`ExportStatementResponseView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &ExportStatementResponseView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::ExportStatementResponse,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// Statement rows as RFC 4180 CSV in UTF-8, with CRLF line endings. The first
-            /// page starts with the header row and later pages carry rows only, so
-            /// concatenating the pages in order yields the complete statement; a period
-            /// without movements yields the header row alone. A page holds at most 2000
-            /// ledger movements, and an entry is never split across pages.
-            ///
-            /// Rows are ordered oldest first. Each row is the effect of one entry on one
-            /// account bucket in one asset. An entry is one ledger operation, such as a
-            /// trade with its fees, a deposit, a withdrawal step or an internal transfer.
-            ///
-            /// Columns, in order:
-            /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
-            ///   `2026-11-12T19:52:07.734123Z`.
-            /// - `entry_id`: stable entry identifier, an unsigned 128-bit integer as a
-            ///   decimal string. It is the `transfer_id` of the entry's first transfer leg
-            ///   on the account, as ListTransfers returns it.
-            /// - `type`: `trade` for a trade's settlement and its fees; otherwise the
-            ///   entry's transfer reason, such as `deposit`, `withdraw`,
-            ///   `internal_transfer`, `funding_to_trading` or `system_adjustment`.
-            /// - `account`: account bucket, `funding` or `trading`.
-            /// - `asset`: asset symbol.
-            /// - `amount`: signed balance change of the entry in whole units of the
-            ///   asset, excluding the fees in `fee`, for example `-5000` or `0.1`. Fees
-            ///   the account receives are included here.
-            /// - `fee`: fees the account paid in the asset for the entry, in whole units
-            ///   of the asset; `0` when none.
-            /// - `balance`: account bucket balance in the asset after the entry, in whole
-            ///   units of the asset. For consecutive rows of the same bucket and asset,
-            ///   each balance equals the previous balance plus `amount` minus `fee`.
-            /// - `link_id`: correlation ID shared by related transfer legs, the trade's
-            ///   match ID for trades; empty when unavailable.
-            /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
-            ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
-            ///   as ListTransfers returns it; empty otherwise.
-            ///
-            /// Amounts are exact decimal strings with up to 18 fractional digits and no
-            /// trailing zeros.
-            ///
-            /// Field 1: `csv`
-            #[must_use]
-            pub fn csv(&self) -> &'_ str {
-                self.0.reborrow().csv
-            }
-            /// Opaque cursor for the next page. Empty when no more results exist.
-            ///
-            /// Field 2: `next_page_token`
-            #[must_use]
-            pub fn next_page_token(&self) -> &'_ str {
-                self.0.reborrow().next_page_token
-            }
-            /// The statement covers movements from start_time up to complete_through,
-            /// exclusive: the earliest of end_time, the time of the first page's request
-            /// and the time through which account history is complete when that page was
-            /// requested, and never before start_time. Every page of one statement
-            /// carries the same value. When it is before end_time, the movements from it
-            /// to end_time appear in a statement requested later.
-            ///
-            /// Field 3: `complete_through`
-            #[must_use]
-            pub fn complete_through(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().complete_through
-            }
-        }
-        impl ::core::convert::From<
-            ::buffa::OwnedView<ExportStatementResponseView<'static>>,
-        > for ExportStatementResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<ExportStatementResponseView<'static>>,
-            ) -> Self {
-                ExportStatementResponseOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<ExportStatementResponseOwnedView>
-        for ::buffa::OwnedView<ExportStatementResponseView<'static>> {
-            fn from(wrapper: ExportStatementResponseOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<ExportStatementResponseView<'static>>,
-        > for ExportStatementResponseOwnedView {
-            fn as_ref(
-                &self,
-            ) -> &::buffa::OwnedView<ExportStatementResponseView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::ExportStatementResponse {
-            type View<'a> = ExportStatementResponseView<'a>;
-            type ViewHandle = ExportStatementResponseOwnedView;
-        }
-        impl ::serde::Serialize for ExportStatementResponseOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
         /// ErrorDetail is attached to ConnectRPC errors for structured error handling.
         /// Clients can inspect this to get a stable machine-readable error code.
         #[derive(Clone, Debug, Default)]
@@ -19841,17 +19131,70 @@ pub mod __buffa {
             }
         }
         /// StatementExport is a whole-period account statement produced in the
-        /// background as one CSV file. The file is byte for byte the pages of
-        /// ExportStatement for the same account, asset and period up to
-        /// complete_through, concatenated: the header row, then every row, oldest
-        /// first, in the columns ExportStatementResponse.csv documents.
+        /// background as one CSV file.
         ///
-        /// Download a READY file with an authenticated
-        /// `GET /v1/statements/exports/{exportId}/file`, as the account that created
-        /// it or one with the same access: it returns `text/csv` and supports HTTP
-        /// `Range` requests. With `?redirect=true` it instead answers
-        /// `307 Temporary Redirect` to a URL valid for 60 seconds. An EXPIRED export's
-        /// file answers `410 Gone`.
+        /// The file is RFC 4180 CSV in UTF-8 with CRLF line endings: the header row,
+        /// then every row of the period up to complete_through, oldest first. A period
+        /// without movements yields the header row alone. Each row is the effect of
+        /// one entry on one account bucket in one asset. An entry is one ledger
+        /// operation, such as a trade with its fees, a deposit, a withdrawal step or an
+        /// internal transfer.
+        ///
+        /// Columns, in order:
+        /// - `time`: entry time, RFC 3339 in UTC with microseconds, for example
+        ///   `2026-11-12T19:52:07.734123Z`.
+        /// - `entry_id`: stable entry identifier, an unsigned 128-bit integer as a
+        ///   decimal string. It is the `transfer_id` of the entry's first transfer leg
+        ///   on the account, as LedgerReadService.ListTransfers returns it.
+        /// - `type`: `trade` for a trade's settlement and its fees; otherwise the
+        ///   entry's transfer reason, such as `deposit`, `withdraw`,
+        ///   `internal_transfer`, `funding_to_trading` or `system_adjustment`.
+        /// - `account`: account bucket, `funding` or `trading`.
+        /// - `asset`: asset symbol.
+        /// - `amount`: signed balance change of the entry in whole units of the
+        ///   asset, excluding the fees in `fee`, for example `-5000` or `0.1`. Fees
+        ///   the account receives are included here.
+        /// - `fee`: fees the account paid in the asset for the entry, in whole units
+        ///   of the asset; `0` when none.
+        /// - `balance`: account bucket balance in the asset after the entry, in whole
+        ///   units of the asset. For consecutive rows of the same bucket and asset,
+        ///   each balance equals the previous balance plus `amount` minus `fee`.
+        /// - `link_id`: correlation ID shared by related transfer legs, the trade's
+        ///   match ID for trades; empty when unavailable.
+        /// - `flow_id`: public lifecycle flow ID when the entry belongs to a chain
+        ///   lifecycle flow, such as a deposit, a withdrawal or an internal transfer,
+        ///   as LedgerReadService.ListTransfers returns it; empty otherwise.
+        ///
+        /// Amounts are exact decimal strings with up to 18 fractional digits and no
+        /// trailing zeros.
+        ///
+        /// A READY file downloads in one of two ways:
+        /// - StatementExportService.GetStatementExportDownloadUrl returns a URL valid
+        ///   for 60 seconds from signing that needs no credentials, so a browser can
+        ///   save the file straight to disk.
+        /// - An authenticated `GET /v1/statements/exports/{exportId}/file` returns the
+        ///   file as `text/csv` and supports HTTP `Range` requests.
+        ///
+        /// Both save the file as `statement-<exportId>.csv`. Before the file is READY
+        /// both answer FAILED_PRECONDITION with STATEMENT_EXPORT_NOT_READY, REST
+        /// `409 Conflict`; a FAILED export answers STATEMENT_EXPORT_FAILED, REST `409`;
+        /// an EXPIRED export, or a file already deleted, answers
+        /// STATEMENT_EXPORT_EXPIRED, REST `410 Gone`, and so does a download URL
+        /// request for a file with less than 5 seconds left; a CANCELED export
+        /// answers STATEMENT_EXPORT_CANCELED, REST `409`. REST errors are
+        /// `application/problem+json` whose `code` is the ErrorCode name, such as
+        /// `STATEMENT_EXPORT_NOT_READY`: `401` without valid credentials, `403
+        /// PERMISSION_DENIED` for an API key without READ_STATEMENTS, `404 NOT_FOUND`
+        /// for an export the caller cannot read, and `503 UPSTREAM_ERROR`, with
+        /// `Retry-After`, when the request can be retried.
+        ///
+        /// An export belongs to the root account whose session or API key created it.
+        /// Any session or API key of that root that may read the export's account can
+        /// read and download it, whichever of them created it. A member of a
+        /// subaccount shared from another root sees only the exports its own root
+        /// created, and the subaccount's owner does not see those: an export of
+        /// another root, or of an account the caller can no longer read, answers
+        /// NOT_FOUND, as one that does not exist.
         #[derive(Clone, Debug, Default)]
         pub struct StatementExportView<'a> {
             /// Public ID of the export.
@@ -20808,7 +20151,8 @@ pub mod __buffa {
             }
         }
         /// CreateStatementExportRequest asks for a whole-period statement file of one
-        /// account.
+        /// account. The period is at most 366 days long; a longer or empty period is
+        /// INVALID_ARGUMENT.
         #[derive(Clone, Debug, Default)]
         pub struct CreateStatementExportRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -22237,6 +21581,1291 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// GetStatementExportDownloadUrlRequest names the export whose file to
+        /// download.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetStatementExportDownloadUrlRequestView<'a> {
+            /// Public ID of the export.
+            ///
+            /// Field 1: `export_id`
+            pub export_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetStatementExportDownloadUrlRequestView<'a> {
+            type Owned = super::super::GetStatementExportDownloadUrlRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.export_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetStatementExportDownloadUrlRequest {
+                    export_id: self.export_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetStatementExportDownloadUrlRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.export_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.export_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.export_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetStatementExportDownloadUrlRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.export_id) {
+                    __map
+                        .serialize_entry(
+                            "exportId",
+                            &::buffa::json_helpers::ProtoJson(&self.export_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetStatementExportDownloadUrlRequestView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetStatementExportDownloadUrlRequest";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetStatementExportDownloadUrlRequestView);
+        ::buffa::impl_view_reborrow!(GetStatementExportDownloadUrlRequestView);
+        /** Self-contained, `'static` owned view of a `GetStatementExportDownloadUrlRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetStatementExportDownloadUrlRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetStatementExportDownloadUrlRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetStatementExportDownloadUrlRequestOwnedView(
+            ::buffa::OwnedView<GetStatementExportDownloadUrlRequestView<'static>>,
+        );
+        impl GetStatementExportDownloadUrlRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetStatementExportDownloadUrlRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetStatementExportDownloadUrlRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetStatementExportDownloadUrlRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public ID of the export.
+            ///
+            /// Field 1: `export_id`
+            #[must_use]
+            pub fn export_id(&self) -> u64 {
+                self.0.reborrow().export_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetStatementExportDownloadUrlRequestView<'static>>,
+        > for GetStatementExportDownloadUrlRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetStatementExportDownloadUrlRequestView<'static>,
+                >,
+            ) -> Self {
+                GetStatementExportDownloadUrlRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetStatementExportDownloadUrlRequestOwnedView>
+        for ::buffa::OwnedView<GetStatementExportDownloadUrlRequestView<'static>> {
+            fn from(wrapper: GetStatementExportDownloadUrlRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetStatementExportDownloadUrlRequestView<'static>>,
+        > for GetStatementExportDownloadUrlRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetStatementExportDownloadUrlRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetStatementExportDownloadUrlRequest {
+            type View<'a> = GetStatementExportDownloadUrlRequestView<'a>;
+            type ViewHandle = GetStatementExportDownloadUrlRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetStatementExportDownloadUrlRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetStatementExportDownloadUrlResponse is a short-lived link to a READY
+        /// export's file.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetStatementExportDownloadUrlResponseView<'a> {
+            /// URL of the file, valid until expires_at. It carries its own
+            /// authorization and needs no credentials, so a browser can open it to save
+            /// the file. Anyone who holds it can download the file until expires_at:
+            /// do not share, store or log it.
+            ///
+            /// Field 1: `url`
+            pub url: &'a str,
+            /// When the URL stops working: the exact end of its signature, 60 seconds
+            /// after it was signed for this request, or when the file expires if that
+            /// is sooner. Request a new URL after it.
+            ///
+            /// Field 2: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Name the download saves the file as, `statement-<exportId>.csv`.
+            ///
+            /// Field 3: `filename`
+            pub filename: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for GetStatementExportDownloadUrlResponseView<'a> {
+            type Owned = super::super::GetStatementExportDownloadUrlResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.filename = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetStatementExportDownloadUrlResponse {
+                    url: self.url.to_string(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    filename: self.filename.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for GetStatementExportDownloadUrlResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.url.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.url) as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.filename.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.filename) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.url.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.url, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                if !self.filename.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.filename, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for GetStatementExportDownloadUrlResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.url) {
+                    __map.serialize_entry("url", self.url)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.filename) {
+                    __map.serialize_entry("filename", self.filename)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetStatementExportDownloadUrlResponseView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "GetStatementExportDownloadUrlResponse";
+            const FULL_NAME: &'static str = "ledger.read.v1.GetStatementExportDownloadUrlResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.GetStatementExportDownloadUrlResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetStatementExportDownloadUrlResponseView);
+        ::buffa::impl_view_reborrow!(GetStatementExportDownloadUrlResponseView);
+        /** Self-contained, `'static` owned view of a `GetStatementExportDownloadUrlResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetStatementExportDownloadUrlResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetStatementExportDownloadUrlResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetStatementExportDownloadUrlResponseOwnedView(
+            ::buffa::OwnedView<GetStatementExportDownloadUrlResponseView<'static>>,
+        );
+        impl GetStatementExportDownloadUrlResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetStatementExportDownloadUrlResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetStatementExportDownloadUrlResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetStatementExportDownloadUrlResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetStatementExportDownloadUrlResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetStatementExportDownloadUrlResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// URL of the file, valid until expires_at. It carries its own
+            /// authorization and needs no credentials, so a browser can open it to save
+            /// the file. Anyone who holds it can download the file until expires_at:
+            /// do not share, store or log it.
+            ///
+            /// Field 1: `url`
+            #[must_use]
+            pub fn url(&self) -> &'_ str {
+                self.0.reborrow().url
+            }
+            /// When the URL stops working: the exact end of its signature, 60 seconds
+            /// after it was signed for this request, or when the file expires if that
+            /// is sooner. Request a new URL after it.
+            ///
+            /// Field 2: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+            /// Name the download saves the file as, `statement-<exportId>.csv`.
+            ///
+            /// Field 3: `filename`
+            #[must_use]
+            pub fn filename(&self) -> &'_ str {
+                self.0.reborrow().filename
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetStatementExportDownloadUrlResponseView<'static>>,
+        > for GetStatementExportDownloadUrlResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    GetStatementExportDownloadUrlResponseView<'static>,
+                >,
+            ) -> Self {
+                GetStatementExportDownloadUrlResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetStatementExportDownloadUrlResponseOwnedView>
+        for ::buffa::OwnedView<GetStatementExportDownloadUrlResponseView<'static>> {
+            fn from(wrapper: GetStatementExportDownloadUrlResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetStatementExportDownloadUrlResponseView<'static>>,
+        > for GetStatementExportDownloadUrlResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                GetStatementExportDownloadUrlResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::GetStatementExportDownloadUrlResponse {
+            type View<'a> = GetStatementExportDownloadUrlResponseView<'a>;
+            type ViewHandle = GetStatementExportDownloadUrlResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetStatementExportDownloadUrlResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CancelStatementExportRequest names the export to cancel.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelStatementExportRequestView<'a> {
+            /// Public ID of the export.
+            ///
+            /// Field 1: `export_id`
+            pub export_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelStatementExportRequestView<'a> {
+            type Owned = super::super::CancelStatementExportRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.export_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelStatementExportRequest {
+                    export_id: self.export_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelStatementExportRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.export_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.export_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.export_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelStatementExportRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.export_id) {
+                    __map
+                        .serialize_entry(
+                            "exportId",
+                            &::buffa::json_helpers::ProtoJson(&self.export_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelStatementExportRequestView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "CancelStatementExportRequest";
+            const FULL_NAME: &'static str = "ledger.read.v1.CancelStatementExportRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportRequest";
+        }
+        ::buffa::impl_default_view_instance!(CancelStatementExportRequestView);
+        ::buffa::impl_view_reborrow!(CancelStatementExportRequestView);
+        /** Self-contained, `'static` owned view of a `CancelStatementExportRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelStatementExportRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelStatementExportRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelStatementExportRequestOwnedView(
+            ::buffa::OwnedView<CancelStatementExportRequestView<'static>>,
+        );
+        impl CancelStatementExportRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelStatementExportRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CancelStatementExportRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelStatementExportRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Public ID of the export.
+            ///
+            /// Field 1: `export_id`
+            #[must_use]
+            pub fn export_id(&self) -> u64 {
+                self.0.reborrow().export_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CancelStatementExportRequestView<'static>>,
+        > for CancelStatementExportRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CancelStatementExportRequestView<'static>>,
+            ) -> Self {
+                CancelStatementExportRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelStatementExportRequestOwnedView>
+        for ::buffa::OwnedView<CancelStatementExportRequestView<'static>> {
+            fn from(wrapper: CancelStatementExportRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CancelStatementExportRequestView<'static>>,
+        > for CancelStatementExportRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CancelStatementExportRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelStatementExportRequest {
+            type View<'a> = CancelStatementExportRequestView<'a>;
+            type ViewHandle = CancelStatementExportRequestOwnedView;
+        }
+        impl ::serde::Serialize for CancelStatementExportRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CancelStatementExportResponse is the canceled export.
+        #[derive(Clone, Debug, Default)]
+        pub struct CancelStatementExportResponseView<'a> {
+            /// The export, CANCELED.
+            ///
+            /// Field 1: `export`
+            pub export: ::buffa::MessageFieldView<
+                super::super::__buffa::view::StatementExportView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for CancelStatementExportResponseView<'a> {
+            type Owned = super::super::CancelStatementExportResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.export.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.export = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::StatementExportView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CancelStatementExportResponse {
+                    export: match self.export.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::StatementExport,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for CancelStatementExportResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.export.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.export.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.export.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.export.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for CancelStatementExportResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.export.as_option() {
+                        __map.serialize_entry("export", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for CancelStatementExportResponseView<'a> {
+            const PACKAGE: &'static str = "ledger.read.v1";
+            const NAME: &'static str = "CancelStatementExportResponse";
+            const FULL_NAME: &'static str = "ledger.read.v1.CancelStatementExportResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/ledger.read.v1.CancelStatementExportResponse";
+        }
+        ::buffa::impl_default_view_instance!(CancelStatementExportResponseView);
+        ::buffa::impl_view_reborrow!(CancelStatementExportResponseView);
+        /** Self-contained, `'static` owned view of a `CancelStatementExportResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CancelStatementExportResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CancelStatementExportResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CancelStatementExportResponseOwnedView(
+            ::buffa::OwnedView<CancelStatementExportResponseView<'static>>,
+        );
+        impl CancelStatementExportResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CancelStatementExportResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CancelStatementExportResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CancelStatementExportResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CancelStatementExportResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CancelStatementExportResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The export, CANCELED.
+            ///
+            /// Field 1: `export`
+            #[must_use]
+            pub fn export(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::StatementExportView<'_>,
+            > {
+                &self.0.reborrow().export
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CancelStatementExportResponseView<'static>>,
+        > for CancelStatementExportResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<CancelStatementExportResponseView<'static>>,
+            ) -> Self {
+                CancelStatementExportResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CancelStatementExportResponseOwnedView>
+        for ::buffa::OwnedView<CancelStatementExportResponseView<'static>> {
+            fn from(wrapper: CancelStatementExportResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CancelStatementExportResponseView<'static>>,
+        > for CancelStatementExportResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<CancelStatementExportResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::CancelStatementExportResponse {
+            type View<'a> = CancelStatementExportResponseView<'a>;
+            type ViewHandle = CancelStatementExportResponseOwnedView;
+        }
+        impl ::serde::Serialize for CancelStatementExportResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ListStatementExportsRequest selects one account's exports.
         #[derive(Clone, Debug, Default)]
         pub struct ListStatementExportsRequestView<'a> {
@@ -22600,6 +23229,18 @@ pub mod __buffa {
             ///
             /// Field 2: `next_page_token`
             pub next_page_token: &'a str,
+            /// Exports QUEUED or PROCESSING across the whole root account, its
+            /// subaccounts included, whichever account the list selects: the number a
+            /// new CreateStatementExport counts against max_in_progress_exports.
+            ///
+            /// Field 3: `in_progress_exports`
+            pub in_progress_exports: u32,
+            /// Most exports the root account may have QUEUED or PROCESSING at a time.
+            /// While in_progress_exports is at it, CreateStatementExport answers
+            /// RESOURCE_EXHAUSTED with STATEMENT_EXPORT_LIMIT_REACHED.
+            ///
+            /// Field 4: `max_in_progress_exports`
+            pub max_in_progress_exports: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ListStatementExportsResponseView<'a> {
@@ -22639,6 +23280,24 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::LengthDelimited,
                         )?;
                         view.next_page_token = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.in_progress_exports = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_in_progress_exports = ::buffa::types::decode_uint32(
+                            &mut cur,
+                        )?;
                     }
                     1u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -22690,6 +23349,8 @@ pub mod __buffa {
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     next_page_token: self.next_page_token.to_string(),
+                    in_progress_exports: self.in_progress_exports,
+                    max_in_progress_exports: self.max_in_progress_exports,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -22718,6 +23379,20 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.next_page_token)
                                 as u32;
                 }
+                if self.in_progress_exports != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.in_progress_exports,
+                            ) as u32;
+                }
+                if self.max_in_progress_exports != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(
+                                self.max_in_progress_exports,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -22739,6 +23414,20 @@ pub mod __buffa {
                 }
                 if !self.next_page_token.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.next_page_token, buf);
+                }
+                if self.in_progress_exports != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        3u32,
+                        self.in_progress_exports,
+                        buf,
+                    );
+                }
+                if self.max_in_progress_exports != 0u32 {
+                    ::buffa::types::put_uint32_field(
+                        4u32,
+                        self.max_in_progress_exports,
+                        buf,
+                    );
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -22766,6 +23455,26 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.next_page_token) {
                     __map.serialize_entry("nextPageToken", self.next_page_token)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.in_progress_exports,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "inProgressExports",
+                            &::buffa::json_helpers::ProtoJson(&self.in_progress_exports),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(
+                    &self.max_in_progress_exports,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "maxInProgressExports",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.max_in_progress_exports,
+                            ),
+                        )?;
                 }
                 __map.end()
             }
@@ -22885,6 +23594,24 @@ pub mod __buffa {
             #[must_use]
             pub fn next_page_token(&self) -> &'_ str {
                 self.0.reborrow().next_page_token
+            }
+            /// Exports QUEUED or PROCESSING across the whole root account, its
+            /// subaccounts included, whichever account the list selects: the number a
+            /// new CreateStatementExport counts against max_in_progress_exports.
+            ///
+            /// Field 3: `in_progress_exports`
+            #[must_use]
+            pub fn in_progress_exports(&self) -> u32 {
+                self.0.reborrow().in_progress_exports
+            }
+            /// Most exports the root account may have QUEUED or PROCESSING at a time.
+            /// While in_progress_exports is at it, CreateStatementExport answers
+            /// RESOURCE_EXHAUSTED with STATEMENT_EXPORT_LIMIT_REACHED.
+            ///
+            /// Field 4: `max_in_progress_exports`
+            #[must_use]
+            pub fn max_in_progress_exports(&self) -> u32 {
+                self.0.reborrow().max_in_progress_exports
             }
         }
         impl ::core::convert::From<
@@ -23061,14 +23788,20 @@ pub mod __buffa {
         reg.register_json_any(super::__TRANSFER_ROW_JSON_ANY);
         reg.register_json_any(super::__TRANSFER_ROW_BATCH_JSON_ANY);
         reg.register_json_any(super::__LIST_TRANSFERS_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__EXPORT_STATEMENT_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__EXPORT_STATEMENT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ERROR_DETAIL_JSON_ANY);
         reg.register_json_any(super::__STATEMENT_EXPORT_JSON_ANY);
         reg.register_json_any(super::__CREATE_STATEMENT_EXPORT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_STATEMENT_EXPORT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_STATEMENT_EXPORT_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_STATEMENT_EXPORT_RESPONSE_JSON_ANY);
+        reg.register_json_any(
+            super::__GET_STATEMENT_EXPORT_DOWNLOAD_URL_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(
+            super::__GET_STATEMENT_EXPORT_DOWNLOAD_URL_RESPONSE_JSON_ANY,
+        );
+        reg.register_json_any(super::__CANCEL_STATEMENT_EXPORT_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__CANCEL_STATEMENT_EXPORT_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__LIST_STATEMENT_EXPORTS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_STATEMENT_EXPORTS_RESPONSE_JSON_ANY);
     }
@@ -23166,14 +23899,6 @@ pub use self::__buffa::view::ListTransfersResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ListTransfersResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::ExportStatementRequestView;
-#[doc(inline)]
-pub use self::__buffa::view::ExportStatementRequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::ExportStatementResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::ExportStatementResponseOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::ErrorDetailView;
 #[doc(inline)]
 pub use self::__buffa::view::ErrorDetailOwnedView;
@@ -23197,6 +23922,22 @@ pub use self::__buffa::view::GetStatementExportRequestOwnedView;
 pub use self::__buffa::view::GetStatementExportResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetStatementExportResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetStatementExportDownloadUrlRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetStatementExportDownloadUrlRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetStatementExportDownloadUrlResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetStatementExportDownloadUrlResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelStatementExportRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelStatementExportRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelStatementExportResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CancelStatementExportResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListStatementExportsRequestView;
 #[doc(inline)]

@@ -47,6 +47,7 @@ pub(crate) mod sbe;
 mod session;
 #[cfg(test)]
 mod tests;
+mod upgrade;
 
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -400,6 +401,11 @@ impl RejectCode {
     pub const BAD_REQUEST: Self = Self(1);
     pub const CONFLICT_DUPLICATE_CLIENT_ORDER_ID: Self = Self(9);
     pub const UNAVAILABLE: Self = Self(10);
+    /// The order is not one the exchange can confirm. It does not prove the
+    /// order never existed: an ended order answers it too, by client order ID
+    /// once that ID's window has passed and by order ID after exchange
+    /// maintenance. For an order you know ended, a cancel answered with it is
+    /// done; otherwise read the order. See [`crate::Error::is_order_unknown`].
     pub const ORDER_UNKNOWN: Self = Self(17);
     pub const CONFLICT_IDEMPOTENCY_KEY_REUSE: Self = Self(36);
     pub const POST_ONLY_CROSS: Self = Self(58);

@@ -4725,7 +4725,9 @@ pub struct Unit {
     /// equal `version` is the identical order, also across the Orders API's
     /// reads; version 0 is an order accepted but not yet on the book. The reads
     /// omit attached risk unless asked for it: an omission on request, never a
-    /// removal.
+    /// removal. The stream never carries an order's fee_total, which the reads
+    /// add once its fills are settled; orders.v1.Order.fee_total says how to
+    /// read an ended order's fee.
     ///
     /// Field 3: `orders`
     #[serde(
@@ -6834,7 +6836,10 @@ pub mod unit_event {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::unit_event::Kind as KindView;
 }
-/// OrderEvent is something that happened to an order.
+/// OrderEvent is something that happened to an order. No event carries a
+/// fee: a fill's fee is recorded once the fill is settled, after its FILLED
+/// event and often after the order's last event. orders.v1.Order.fee_total
+/// says how to read it.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -6849,7 +6854,12 @@ pub struct OrderEvent {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub order_id: u64,
-    /// The order's version after the event.
+    /// The order's version after the event: the same counter as the version of the
+    /// order's reads, orders.v1.Order.version, which says how a client orders
+    /// events and reads by it. It is an unsigned 32-bit counter that increases on
+    /// every change of the order: it would wrap to 0 only after 4,294,967,295
+    /// changes to one order ID. Ignore an event whose version is below the highest
+    /// one applied for the order.
     ///
     /// Field 2: `version`
     #[serde(
@@ -14902,7 +14912,9 @@ pub mod __buffa {
             /// equal `version` is the identical order, also across the Orders API's
             /// reads; version 0 is an order accepted but not yet on the book. The reads
             /// omit attached risk unless asked for it: an omission on request, never a
-            /// removal.
+            /// removal. The stream never carries an order's fee_total, which the reads
+            /// add once its fills are settled; orders.v1.Order.fee_total says how to
+            /// read an ended order's fee.
             ///
             /// Field 3: `orders`
             pub orders: ::buffa::RepeatedView<
@@ -15298,7 +15310,9 @@ pub mod __buffa {
             /// equal `version` is the identical order, also across the Orders API's
             /// reads; version 0 is an order accepted but not yet on the book. The reads
             /// omit attached risk unless asked for it: an omission on request, never a
-            /// removal.
+            /// removal. The stream never carries an order's fee_total, which the reads
+            /// add once its fills are settled; orders.v1.Order.fee_total says how to
+            /// read an ended order's fee.
             ///
             /// Field 3: `orders`
             #[must_use]
@@ -18185,14 +18199,22 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// OrderEvent is something that happened to an order.
+        /// OrderEvent is something that happened to an order. No event carries a
+        /// fee: a fill's fee is recorded once the fill is settled, after its FILLED
+        /// event and often after the order's last event. orders.v1.Order.fee_total
+        /// says how to read it.
         #[derive(Clone, Debug, Default)]
         pub struct OrderEventView<'a> {
             /// The order's public ID.
             ///
             /// Field 1: `order_id`
             pub order_id: u64,
-            /// The order's version after the event.
+            /// The order's version after the event: the same counter as the version of the
+            /// order's reads, orders.v1.Order.version, which says how a client orders
+            /// events and reads by it. It is an unsigned 32-bit counter that increases on
+            /// every change of the order: it would wrap to 0 only after 4,294,967,295
+            /// changes to one order ID. Ignore an event whose version is below the highest
+            /// one applied for the order.
             ///
             /// Field 2: `version`
             pub version: u32,
@@ -18632,7 +18654,12 @@ pub mod __buffa {
             pub fn order_id(&self) -> u64 {
                 self.0.reborrow().order_id
             }
-            /// The order's version after the event.
+            /// The order's version after the event: the same counter as the version of the
+            /// order's reads, orders.v1.Order.version, which says how a client orders
+            /// events and reads by it. It is an unsigned 32-bit counter that increases on
+            /// every change of the order: it would wrap to 0 only after 4,294,967,295
+            /// changes to one order ID. Ignore an event whose version is below the highest
+            /// one applied for the order.
             ///
             /// Field 2: `version`
             #[must_use]

@@ -173,6 +173,10 @@ pub enum NotificationType {
     /// member of the broker requested it, act before the address becomes
     /// payable: an added address is payable 24 hours after it is listed.
     BROKER_ALLOWLIST_CHANGE = 3i32,
+    /// A Telegram account was linked to the caller's account. Category SECURITY;
+    /// detail telegram_link. The linked Telegram account also receives it. If the
+    /// caller did not link it, unlink it and review the account's sessions.
+    TELEGRAM_LINKED = 4i32,
 }
 impl NotificationType {
     ///Idiomatic alias for [`Self::TYPE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -187,6 +191,9 @@ impl NotificationType {
     ///Idiomatic alias for [`Self::BROKER_ALLOWLIST_CHANGE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const BrokerAllowlistChange: Self = Self::BROKER_ALLOWLIST_CHANGE;
+    ///Idiomatic alias for [`Self::TELEGRAM_LINKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TelegramLinked: Self = Self::TELEGRAM_LINKED;
 }
 impl ::core::default::Default for NotificationType {
     fn default() -> Self {
@@ -288,6 +295,7 @@ impl ::buffa::Enumeration for NotificationType {
             1i32 => ::core::option::Option::Some(Self::PRICE_ALERT),
             2i32 => ::core::option::Option::Some(Self::TELEGRAM_APPROVAL),
             3i32 => ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE),
+            4i32 => ::core::option::Option::Some(Self::TELEGRAM_LINKED),
             _ => ::core::option::Option::None,
         }
     }
@@ -300,6 +308,7 @@ impl ::buffa::Enumeration for NotificationType {
             Self::PRICE_ALERT => "PRICE_ALERT",
             Self::TELEGRAM_APPROVAL => "TELEGRAM_APPROVAL",
             Self::BROKER_ALLOWLIST_CHANGE => "BROKER_ALLOWLIST_CHANGE",
+            Self::TELEGRAM_LINKED => "TELEGRAM_LINKED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -310,6 +319,7 @@ impl ::buffa::Enumeration for NotificationType {
             "BROKER_ALLOWLIST_CHANGE" => {
                 ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE)
             }
+            "TELEGRAM_LINKED" => ::core::option::Option::Some(Self::TELEGRAM_LINKED),
             _ => ::core::option::Option::None,
         }
     }
@@ -319,6 +329,7 @@ impl ::buffa::Enumeration for NotificationType {
             Self::PRICE_ALERT,
             Self::TELEGRAM_APPROVAL,
             Self::BROKER_ALLOWLIST_CHANGE,
+            Self::TELEGRAM_LINKED,
         ]
     }
 }
@@ -1473,6 +1484,14 @@ impl ::buffa::Message for Notification {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::notification::Detail::TelegramLink(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1535,6 +1554,14 @@ impl ::buffa::Message for Notification {
                 __buffa::oneof::notification::Detail::BrokerAllowlist(x) => {
                     ::buffa::types::put_len_delimited_header(
                         12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::notification::Detail::TelegramLink(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        13u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -1675,6 +1702,26 @@ impl ::buffa::Message for Notification {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.detail = ::core::option::Option::Some(
                         __buffa::oneof::notification::Detail::BrokerAllowlist(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::notification::Detail::TelegramLink(ref mut existing),
+                ) = self.detail
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.detail = ::core::option::Option::Some(
+                        __buffa::oneof::notification::Detail::TelegramLink(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -1921,6 +1968,30 @@ impl<'de> serde::Deserialize<'de> for Notification {
                                 }
                                 __oneof_detail = Some(
                                     __buffa::oneof::notification::Detail::BrokerAllowlist(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "telegramLink" | "telegram_link" => {
+                            let v: ::core::option::Option<TelegramLinkNotice> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            TelegramLinkNotice,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_detail.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'detail'",
+                                        ),
+                                    );
+                                }
+                                __oneof_detail = Some(
+                                    __buffa::oneof::notification::Detail::TelegramLink(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -5231,6 +5302,142 @@ pub const __MARK_ALL_NOTIFICATIONS_READ_RESPONSE_JSON_ANY: ::buffa::type_registr
     from_json: ::buffa::type_registry::any_from_json::<MarkAllNotificationsReadResponse>,
     is_wkt: false,
 };
+/// TelegramLinkNotice is a Telegram account linked to the caller's account, as
+/// the link was confirmed.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TelegramLinkNotice {
+    /// When the caller confirmed the link.
+    ///
+    /// Field 1: `linked_at`
+    #[serde(
+        rename = "linkedAt",
+        alias = "linked_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub linked_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TelegramLinkNotice {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TelegramLinkNotice").field("linked_at", &self.linked_at).finish()
+    }
+}
+impl TelegramLinkNotice {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.TelegramLinkNotice";
+}
+::buffa::impl_default_instance!(TelegramLinkNotice);
+impl ::buffa::MessageName for TelegramLinkNotice {
+    const PACKAGE: &'static str = "notifications.v1";
+    const NAME: &'static str = "TelegramLinkNotice";
+    const FULL_NAME: &'static str = "notifications.v1.TelegramLinkNotice";
+    const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.TelegramLinkNotice";
+}
+impl ::buffa::Message for TelegramLinkNotice {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.linked_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.linked_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.linked_at.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.linked_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.linked_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.linked_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TelegramLinkNotice {
+    const PROTO_FQN: &'static str = "notifications.v1.TelegramLinkNotice";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TelegramLinkNotice {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TELEGRAM_LINK_NOTICE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/notifications.v1.TelegramLinkNotice",
+    to_json: ::buffa::type_registry::any_to_json::<TelegramLinkNotice>,
+    from_json: ::buffa::type_registry::any_from_json::<TelegramLinkNotice>,
+    is_wkt: false,
+};
 #[allow(
     non_camel_case_types,
     dead_code,
@@ -5776,6 +5983,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                                ref mut existing,
+                            ),
+                        ) = view.detail
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.detail = Some(
+                                super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::TelegramLinkNoticeView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5852,6 +6090,15 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::notification::Detail::BrokerAllowlist(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::notification::Detail::TelegramLink(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -5946,6 +6193,16 @@ pub mod __buffa {
                                 += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -6028,6 +6285,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                13u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -6101,6 +6368,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("brokerAllowlist", v)?;
+                        }
+                        super::super::__buffa::view::oneof::notification::Detail::TelegramLink(
+                            v,
+                        ) => {
+                            __map.serialize_entry("telegramLink", v)?;
                         }
                     }
                 }
@@ -12573,6 +12845,317 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// TelegramLinkNotice is a Telegram account linked to the caller's account, as
+        /// the link was confirmed.
+        #[derive(Clone, Debug, Default)]
+        pub struct TelegramLinkNoticeView<'a> {
+            /// When the caller confirmed the link.
+            ///
+            /// Field 1: `linked_at`
+            pub linked_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TelegramLinkNoticeView<'a> {
+            type Owned = super::super::TelegramLinkNotice;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.linked_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.linked_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TelegramLinkNotice,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TelegramLinkNotice,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TelegramLinkNotice {
+                    linked_at: match self.linked_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TelegramLinkNoticeView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.linked_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.linked_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.linked_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.linked_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TelegramLinkNoticeView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.linked_at.as_option()
+                    {
+                        __map.serialize_entry("linkedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TelegramLinkNoticeView<'a> {
+            const PACKAGE: &'static str = "notifications.v1";
+            const NAME: &'static str = "TelegramLinkNotice";
+            const FULL_NAME: &'static str = "notifications.v1.TelegramLinkNotice";
+            const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.TelegramLinkNotice";
+        }
+        ::buffa::impl_default_view_instance!(TelegramLinkNoticeView);
+        ::buffa::impl_view_reborrow!(TelegramLinkNoticeView);
+        /** Self-contained, `'static` owned view of a `TelegramLinkNotice` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TelegramLinkNoticeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TelegramLinkNoticeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TelegramLinkNoticeOwnedView(
+            ::buffa::OwnedView<TelegramLinkNoticeView<'static>>,
+        );
+        impl TelegramLinkNoticeOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramLinkNoticeOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramLinkNoticeOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TelegramLinkNotice,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TelegramLinkNoticeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`TelegramLinkNoticeView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TelegramLinkNoticeView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TelegramLinkNotice,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// When the caller confirmed the link.
+            ///
+            /// Field 1: `linked_at`
+            #[must_use]
+            pub fn linked_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().linked_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<TelegramLinkNoticeView<'static>>>
+        for TelegramLinkNoticeOwnedView {
+            fn from(inner: ::buffa::OwnedView<TelegramLinkNoticeView<'static>>) -> Self {
+                TelegramLinkNoticeOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TelegramLinkNoticeOwnedView>
+        for ::buffa::OwnedView<TelegramLinkNoticeView<'static>> {
+            fn from(wrapper: TelegramLinkNoticeOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<TelegramLinkNoticeView<'static>>>
+        for TelegramLinkNoticeOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<TelegramLinkNoticeView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TelegramLinkNotice {
+            type View<'a> = TelegramLinkNoticeView<'a>;
+            type ViewHandle = TelegramLinkNoticeOwnedView;
+        }
+        impl ::serde::Serialize for TelegramLinkNoticeOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         pub mod oneof {
             #[allow(unused_imports)]
             use super::*;
@@ -12598,6 +13181,13 @@ pub mod __buffa {
                     BrokerAllowlist(
                         ::buffa::alloc::boxed::Box<
                             super::super::super::super::__buffa::view::BrokerAllowlistNoticeView<
+                                'a,
+                            >,
+                        >,
+                    ),
+                    TelegramLink(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::TelegramLinkNoticeView<
                                 'a,
                             >,
                         >,
@@ -12629,6 +13219,9 @@ pub mod __buffa {
                     ::buffa::alloc::boxed::Box<
                         super::super::super::BrokerAllowlistNotice,
                     >,
+                ),
+                TelegramLink(
+                    ::buffa::alloc::boxed::Box<super::super::super::TelegramLinkNotice>,
                 ),
             }
             impl ::buffa::Oneof for Detail {}
@@ -12665,6 +13258,17 @@ pub mod __buffa {
                     Self::Some(Detail::from(v))
                 }
             }
+            impl From<super::super::super::TelegramLinkNotice> for Detail {
+                fn from(v: super::super::super::TelegramLinkNotice) -> Self {
+                    Self::TelegramLink(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::TelegramLinkNotice>
+            for ::core::option::Option<Detail> {
+                fn from(v: super::super::super::TelegramLinkNotice) -> Self {
+                    Self::Some(Detail::from(v))
+                }
+            }
             impl serde::Serialize for Detail {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -12681,6 +13285,9 @@ pub mod __buffa {
                         }
                         Self::BrokerAllowlist(v) => {
                             map.serialize_entry("brokerAllowlist", v)?;
+                        }
+                        Self::TelegramLink(v) => {
+                            map.serialize_entry("telegramLink", v)?;
                         }
                     }
                     map.end()
@@ -12709,6 +13316,7 @@ pub mod __buffa {
         reg.register_json_any(super::__MARK_NOTIFICATIONS_UNREAD_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__MARK_ALL_NOTIFICATIONS_READ_REQUEST_JSON_ANY);
         reg.register_json_any(super::__MARK_ALL_NOTIFICATIONS_READ_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__TELEGRAM_LINK_NOTICE_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -12787,5 +13395,9 @@ pub use self::__buffa::view::MarkAllNotificationsReadRequestOwnedView;
 pub use self::__buffa::view::MarkAllNotificationsReadResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::MarkAllNotificationsReadResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TelegramLinkNoticeView;
+#[doc(inline)]
+pub use self::__buffa::view::TelegramLinkNoticeOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

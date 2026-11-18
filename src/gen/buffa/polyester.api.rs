@@ -404,6 +404,18 @@ Proto enum type: `.polyester.api.AuthenticationMethod`. Cast via `EnumValue::fro
                 super::super::AuthenticationMethod,
             >,
         };
+        ///Extension `error_codes` on `.google.protobuf.MethodOptions` (field 50005).
+        pub const ERROR_CODES: ::buffa::Extension<
+            ::buffa::extension::codecs::Repeated<::buffa::extension::codecs::StringCodec>,
+        > = ::buffa::Extension::new(50005u32, "google.protobuf.MethodOptions");
+        #[doc(hidden)]
+        pub const __ERROR_CODES_JSON_EXT: ::buffa::type_registry::JsonExtEntry = ::buffa::type_registry::JsonExtEntry {
+            number: 50005u32,
+            full_name: "polyester.api.error_codes",
+            extendee: "google.protobuf.MethodOptions",
+            to_json: ::buffa::extension_registry::helpers::repeated_string_to_json,
+            from_json: ::buffa::extension_registry::helpers::repeated_string_from_json,
+        };
         ///Extension `docs_group` on `.google.protobuf.ServiceOptions` (field 50001).
         pub const DOCS_GROUP: ::buffa::Extension<
             ::buffa::extension::codecs::StringCodec,
@@ -423,6 +435,7 @@ Proto enum type: `.polyester.api.AuthenticationMethod`. Cast via `EnumValue::fro
         reg.register_json_ext(super::__buffa::ext::__HIDDEN_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__MFA_REQUIREMENT_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__AUTHENTICATION_METHODS_JSON_EXT);
+        reg.register_json_ext(super::__buffa::ext::__ERROR_CODES_JSON_EXT);
         reg.register_json_ext(super::__buffa::ext::__DOCS_GROUP_JSON_EXT);
     }
 }
@@ -434,6 +447,8 @@ pub use self::__buffa::ext::HIDDEN;
 pub use self::__buffa::ext::MFA_REQUIREMENT;
 #[doc(inline)]
 pub use self::__buffa::ext::AUTHENTICATION_METHODS;
+#[doc(inline)]
+pub use self::__buffa::ext::ERROR_CODES;
 #[doc(inline)]
 pub use self::__buffa::ext::DOCS_GROUP;
 #[doc(inline)]

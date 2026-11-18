@@ -474,9 +474,13 @@ pub trait ApiKeyService: Send + Sync + 'static {
     > + Send;
     /// Create or replace the caller's Polyester AI assistant key set: one
     /// ASSISTANT key per enabled account, each bounded by its API policy or by a
-    /// permission preset. One fresh step-up proof covers the whole set,
-    /// including the policies its presets create, and the change is all or
-    /// nothing. An entry whose account already has an assistant key with the same
+    /// permission preset. One step-up covers the whole set, including the
+    /// policies its presets create, and the change is all or nothing. Send a
+    /// fresh step-up proof in the X-Auth-Step-Up header, which the change
+    /// consumes, or no proof while the session's recent-MFA window is open for
+    /// RECENT_MFA_ACTION_ASSISTANT_ACCESS (GetRecentMFA). Without either,
+    /// PermissionDenied with AUTH_STEP_UP_REQUIRED, or AUTH_RECENT_MFA_EXPIRED
+    /// when the window has closed. An entry whose account already has an assistant key with the same
     /// public key keeps that key, with its status, and takes the requested
     /// policy; any other entry replaces the account's key. Accounts left out of
     /// the set have their assistant key revoked. A sub-account entry needs the
@@ -6975,6 +6979,432 @@ where
     }
 }
 
+///Shorthand for `OwnedView<ListAccountActivityRequestView<'static>>`.
+pub type OwnedListAccountActivityRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAccountActivityRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListAccountActivityResponseView<'static>>`.
+pub type OwnedListAccountActivityResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAccountActivityResponseView<'static>,
+>;
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListAccountActivityResponse>
+for crate::proto::auth::v1::__buffa::view::ListAccountActivityResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListAccountActivityResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListAccountActivityResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+/// Full service name for this service.
+pub const ACCOUNT_ACTIVITY_SERVICE_SERVICE_NAME: &str = "auth.v1.AccountActivityService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListAccountActivity` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ACCOUNT_ACTIVITY_SERVICE_LIST_ACCOUNT_ACTIVITY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.AccountActivityService/ListAccountActivity",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Read service for the activity of a whole account.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait AccountActivityService: Send + Sync + 'static {
+    /// List the security and activity events of the caller's main account and
+    /// all its sub-accounts in one feed, newest first: sign-ins, API key, MFA,
+    /// policy, member, invite and saved-destination changes. Only the main
+    /// account's own session, or an API key with READ_ACCOUNT_ACTIVITY, may call
+    /// it. A key scoped to a sub-account reads only that sub-account's events.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_account_activity<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ListAccountActivityRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ListAccountActivityResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait AccountActivityServiceExt: AccountActivityService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: AccountActivityService> AccountActivityServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view(
+                ACCOUNT_ACTIVITY_SERVICE_SERVICE_NAME,
+                "ListAccountActivity",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ListAccountActivityRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ListAccountActivityRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_account_activity(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ListAccountActivityResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ACCOUNT_ACTIVITY_SERVICE_LIST_ACCOUNT_ACTIVITY_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct AccountActivityServiceRegisterMarker;
+impl<
+    S: AccountActivityService,
+> ::connectrpc::ServiceRegister<AccountActivityServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as AccountActivityServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `AccountActivityService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = AccountActivityServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct AccountActivityServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: AccountActivityService> AccountActivityServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for AccountActivityServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: AccountActivityService> ::connectrpc::Dispatcher
+for AccountActivityServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("auth.v1.AccountActivityService/")?;
+        match method {
+            "ListAccountActivity" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ACCOUNT_ACTIVITY_SERVICE_LIST_ACCOUNT_ACTIVITY_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.AccountActivityService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "ListAccountActivity" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ListAccountActivityRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ListAccountActivityRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ListAccountActivityRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_account_activity(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ListAccountActivityResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.AccountActivityService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.AccountActivityService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.AccountActivityService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.list_account_activity(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.list_account_activity(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[derive(Clone)]
+pub struct AccountActivityServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+impl<T> AccountActivityServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the ListAccountActivity RPC. Sends a request to /auth.v1.AccountActivityService/ListAccountActivity.
+    pub async fn list_account_activity(
+        &self,
+        request: crate::proto::auth::v1::ListAccountActivityRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListAccountActivityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_account_activity_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListAccountActivity RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_account_activity_with_options(
+        &self,
+        request: crate::proto::auth::v1::ListAccountActivityRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListAccountActivityResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ACCOUNT_ACTIVITY_SERVICE_SERVICE_NAME,
+                "ListAccountActivity",
+                request,
+                options,
+            )
+            .await
+    }
+}
+
 ///Shorthand for `OwnedView<ListAddressBooksRequestView<'static>>`.
 pub type OwnedListAddressBooksRequestView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::ListAddressBooksRequestView<'static>,
@@ -9629,6 +10059,22 @@ pub type OwnedReleaseFreshStepUpRequestView = ::buffa::view::OwnedView<
 pub type OwnedReleaseFreshStepUpResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetRecentMfaRequestView<'static>>`.
+pub type OwnedGetRecentMfaRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetRecentMfaResponseView<'static>>`.
+pub type OwnedGetRecentMfaResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
+>;
+///Shorthand for `OwnedView<EndRecentMfaRequestView<'static>>`.
+pub type OwnedEndRecentMfaRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<'static>,
+>;
+///Shorthand for `OwnedView<EndRecentMfaResponseView<'static>>`.
+pub type OwnedEndRecentMfaResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
 for crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'_> {
     fn encode(
@@ -9889,6 +10335,46 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetRecentMFAResponse>
+for crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetRecentMFAResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::EndRecentMFAResponse>
+for crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::EndRecentMFAResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const MFA_SERVICE_SERVICE_NAME: &str = "auth.v1.MFAService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMFAFactors` RPC.
@@ -10026,6 +10512,24 @@ pub const MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetRecentMFA` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_GET_RECENT_MFA_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/GetRecentMFA",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `EndRecentMFA` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MFA_SERVICE_END_RECENT_MFA_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.MFAService/EndRecentMFA",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// MFA management service for enrollment, challenges, fresh step-up proofs, and recovery codes.
 ///
 /// # Implementing handlers
@@ -10419,6 +10923,58 @@ pub trait MfaService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::ReleaseFreshStepUpResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Read whether the session's recent-MFA window is open for an action, and
+    /// until when, so the client can skip the MFA prompt while it is.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_recent_mfa<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::GetRecentMFARequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::GetRecentMFAResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// End the session's recent-MFA window at sign-out. It also cancels the
+    /// session's pending MFA challenges and revokes its unused step-up proofs,
+    /// including one an MFA challenge completing at the same time issues: it
+    /// answers once that completion has finished. A step-up completed later,
+    /// with a new challenge, opens a new window. Ending a window that is not
+    /// open succeeds.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn end_recent_mfa<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::EndRecentMFARequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::EndRecentMFAResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -10889,6 +11445,64 @@ impl<S: MfaService> MfaServiceExt for S {
                 },
             )
             .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC)
+            .route_view_idempotent(
+                MFA_SERVICE_SERVICE_NAME,
+                "GetRecentMFA",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::GetRecentMFARequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_recent_mfa(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::GetRecentMFAResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_GET_RECENT_MFA_SPEC)
+            .route_view(
+                MFA_SERVICE_SERVICE_NAME,
+                "EndRecentMFA",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::EndRecentMFARequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.end_recent_mfa(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::EndRecentMFAResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MFA_SERVICE_END_RECENT_MFA_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -11031,6 +11645,18 @@ impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC),
+                )
+            }
+            "GetRecentMFA" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(MFA_SERVICE_GET_RECENT_MFA_SPEC),
+                )
+            }
+            "EndRecentMFA" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MFA_SERVICE_END_RECENT_MFA_SPEC),
                 )
             }
             _ => None,
@@ -11359,6 +11985,44 @@ impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
                         .encode::<
                             crate::proto::auth::v1::ReleaseFreshStepUpResponse,
                         >(format)
+                })
+            }
+            "GetRecentMFA" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::GetRecentMFARequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::GetRecentMFARequest,
+                    >::from_parts(&req, &body);
+                    svc.get_recent_mfa(ctx, req)
+                        .await?
+                        .encode::<crate::proto::auth::v1::GetRecentMFAResponse>(format)
+                })
+            }
+            "EndRecentMFA" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::EndRecentMFARequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::EndRecentMFARequest,
+                    >::from_parts(&req, &body);
+                    svc.end_recent_mfa(ctx, req)
+                        .await?
+                        .encode::<crate::proto::auth::v1::EndRecentMFAResponse>(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -12133,6 +12797,88 @@ where
                 &self.config,
                 MFA_SERVICE_SERVICE_NAME,
                 "ReleaseFreshStepUp",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetRecentMFA RPC. Sends a request to /auth.v1.MFAService/GetRecentMFA.
+    pub async fn get_recent_mfa(
+        &self,
+        request: crate::proto::auth::v1::GetRecentMFARequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_recent_mfa_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetRecentMFA RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_recent_mfa_with_options(
+        &self,
+        request: crate::proto::auth::v1::GetRecentMFARequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "GetRecentMFA",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the EndRecentMFA RPC. Sends a request to /auth.v1.MFAService/EndRecentMFA.
+    pub async fn end_recent_mfa(
+        &self,
+        request: crate::proto::auth::v1::EndRecentMFARequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.end_recent_mfa_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the EndRecentMFA RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn end_recent_mfa_with_options(
+        &self,
+        request: crate::proto::auth::v1::EndRecentMFARequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MFA_SERVICE_SERVICE_NAME,
+                "EndRecentMFA",
                 request,
                 options,
             )
@@ -14681,12 +15427,14 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// confirm the account with ConfirmSocialVerification.
     /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE for Telegram means a Telegram account is already linked; unlink it first.
     /// While an X/Twitter or Discord account is linked, starting again can change
-    /// it, so the caller needs enrolled MFA and a fresh, single-use step-up proof
-    /// in the X-Auth-Step-Up header: AUTH_MFA_NOT_ENROLLED means enroll MFA first;
-    /// AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new
-    /// fresh step-up and retry. AUTH_SOCIAL_CHANGE_LIMIT_REACHED means the account
-    /// changed or unlinked that provider's account less than 30 days ago; the
-    /// detail's retry_after says when it may again.
+    /// it. AUTH_SOCIAL_CHANGE_LIMIT_REACHED means the account changed or unlinked
+    /// that provider's account less than 30 days ago; the detail's retry_after
+    /// says when it may again, as change_available_at from GetSocialVerification
+    /// does beforehand. That limit is checked before any step-up is asked for.
+    /// Otherwise the caller needs enrolled MFA and a fresh, single-use step-up
+    /// proof in the X-Auth-Step-Up header: AUTH_MFA_NOT_ENROLLED means enroll MFA
+    /// first; AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean
+    /// complete a new fresh step-up and retry.
     /// The new verification fails with error_code AUTH_SOCIAL_ACCOUNT_COOLDOWN when
     /// the verified account was unlinked from another Polyester account less than
     /// 30 days ago, and AUTH_SOCIAL_CHANGE_LIMIT_REACHED when it would replace a
@@ -14744,13 +15492,14 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// linked Telegram account becomes a channel to the account, so the caller
     /// needs enrolled MFA and a fresh, single-use step-up proof in the
     /// X-Auth-Step-Up header, obtained by completing an MFA challenge for fresh
-    /// step-up. The link consumes the proof; a retried confirmation of an existing
-    /// link needs no new proof.
+    /// step-up, which the link consumes. While the session's recent-MFA window
+    /// is open for RECENT_MFA_ACTION_TELEGRAM_LINK (GetRecentMFA), no proof is
+    /// needed. A retried confirmation of an existing link needs no new proof.
     /// AUTH_RESOURCE_NOT_FOUND means no verification exists; start one first.
     /// AUTH_SOCIAL_VERIFICATION_EXPIRED means the challenge window passed; start a new verification.
     /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE means no submitted account awaits confirmation, or provider_user_id is not the account that submitted the code.
     /// AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED means that Telegram account is linked to another Polyester account; the verification fails.
-    /// AUTH_MFA_NOT_ENROLLED means enroll MFA first; AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new fresh step-up and retry.
+    /// AUTH_MFA_NOT_ENROLLED means enroll MFA first; AUTH_STEP_UP_REQUIRED, AUTH_RECENT_MFA_EXPIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new fresh step-up and retry.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -14776,13 +15525,15 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// Unlink the caller's X/Twitter, Discord or Telegram account, or cancel a link
     /// in progress. Unlinking again succeeds and changes nothing. To link again,
     /// start a new verification.
-    /// Unlinking a linked X/Twitter or Discord account needs enrolled MFA and a
-    /// fresh, single-use step-up proof in the X-Auth-Step-Up header
+    /// Unlinking a linked X/Twitter or Discord account counts as the provider's
+    /// one change per 30 days: AUTH_SOCIAL_CHANGE_LIMIT_REACHED means the account
+    /// changed or unlinked that provider's account less than 30 days ago, and the
+    /// detail's retry_after says when it may again, as change_available_at from
+    /// GetSocialVerification does beforehand. That limit is checked before any
+    /// step-up is asked for. Otherwise the unlink needs enrolled MFA and a fresh,
+    /// single-use step-up proof in the X-Auth-Step-Up header
     /// (AUTH_MFA_NOT_ENROLLED, AUTH_STEP_UP_REQUIRED, AUTH_STEP_UP_PROOF_UNAVAILABLE
-    /// as for StartSocialVerification), and counts as the provider's one change per
-    /// 30 days: AUTH_SOCIAL_CHANGE_LIMIT_REACHED means the account changed or
-    /// unlinked that provider's account less than 30 days ago, and the detail's
-    /// retry_after says when it may again. For 30 days after it is unlinked, the
+    /// as for StartSocialVerification). For 30 days after it is unlinked, the
     /// account can be linked again only to this Polyester account.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -14808,6 +15559,9 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     > + Send;
     /// Get current verification status for the caller.
     /// A failed verification uses error_code for its machine-readable outcome.
+    /// change_available_at says, before the caller starts, whether the linked
+    /// X/Twitter or Discord account can be changed or unlinked now, and if not,
+    /// when.
     /// An API key needs READ_SOCIAL_VERIFICATION and must be scoped to the main
     /// account. It reads the status only: provider, method, handle, status, and
     /// verification time, with every other field left empty.

@@ -1266,6 +1266,165 @@ impl ::buffa::Enumeration for RouteStatus {
         &[Self::STATUS_UNSPECIFIED, Self::NORMAL, Self::SUSPENDED]
     }
 }
+/// SupplyStatus says whether a route's zToken supply is known and current.
+/// Read it before using a supply value: only AVAILABLE and STALE routes carry
+/// one, and a missing supply is never reported as zero.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum SupplyStatus {
+    /// Never sent. Treat the supply as MISSING.
+    SUPPLY_UNSPECIFIED = 0i32,
+    /// The supply was read from Polyester chain recently and is current.
+    AVAILABLE = 1i32,
+    /// The supply value is the last one read, but it has not been refreshed for
+    /// longer than expected and may no longer be accurate. Do not size a
+    /// withdrawal against it as if it were current.
+    STALE = 2i32,
+    /// No supply is known for the route yet. No supply value or observation
+    /// time is sent; do not treat the route's supply as zero.
+    MISSING = 3i32,
+}
+impl SupplyStatus {
+    ///Idiomatic alias for [`Self::SUPPLY_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SupplyUnspecified: Self = Self::SUPPLY_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::AVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Available: Self = Self::AVAILABLE;
+    ///Idiomatic alias for [`Self::STALE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Stale: Self = Self::STALE;
+    ///Idiomatic alias for [`Self::MISSING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Missing: Self = Self::MISSING;
+}
+impl ::core::default::Default for SupplyStatus {
+    fn default() -> Self {
+        Self::SUPPLY_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for SupplyStatus {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for SupplyStatus {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = SupplyStatus;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(SupplyStatus)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<SupplyStatus, E> {
+                <SupplyStatus as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<SupplyStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SupplyStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<SupplyStatus, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <SupplyStatus as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<SupplyStatus, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for SupplyStatus {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for SupplyStatus {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::SUPPLY_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::AVAILABLE),
+            2i32 => ::core::option::Option::Some(Self::STALE),
+            3i32 => ::core::option::Option::Some(Self::MISSING),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::SUPPLY_UNSPECIFIED => "SUPPLY_UNSPECIFIED",
+            Self::AVAILABLE => "AVAILABLE",
+            Self::STALE => "STALE",
+            Self::MISSING => "MISSING",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "SUPPLY_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::SUPPLY_UNSPECIFIED)
+            }
+            "AVAILABLE" => ::core::option::Option::Some(Self::AVAILABLE),
+            "STALE" => ::core::option::Option::Some(Self::STALE),
+            "MISSING" => ::core::option::Option::Some(Self::MISSING),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[Self::SUPPLY_UNSPECIFIED, Self::AVAILABLE, Self::STALE, Self::MISSING]
+    }
+}
 /// ChainConfig describes one supported external chain for deposit and withdraw.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -1878,6 +2037,8 @@ pub struct AssetChainVariant {
     pub withdraw_min_amount: ::buffa::alloc::string::String,
     /// Latest zToken supply for this chain asset variant, scaled by the parent
     /// unified asset's quantity_scale. Decode: supply_q / 10^quantity_scale.
+    /// Set only when supply_status is AVAILABLE or STALE; a value of zero then
+    /// is a real supply of zero.
     ///
     /// Field 12: `supply_q`
     #[serde(
@@ -1913,6 +2074,28 @@ pub struct AssetChainVariant {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub withdrawal_status: ::buffa::EnumValue<RouteStatus>,
+    /// Whether supply_q is known and current for this route.
+    ///
+    /// Field 15: `supply_status`
+    #[serde(
+        rename = "supplyStatus",
+        alias = "supply_status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub supply_status: ::buffa::EnumValue<SupplyStatus>,
+    /// When supply_q was read from Polyester chain. Set only when supply_status
+    /// is AVAILABLE or STALE.
+    ///
+    /// Field 16: `supply_observed_at`
+    #[serde(
+        rename = "supplyObservedAt",
+        alias = "supply_observed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub supply_observed_at: ::buffa::MessageField<
+        ::buffa_types::google::protobuf::Timestamp,
+    >,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1933,6 +2116,8 @@ impl ::core::fmt::Debug for AssetChainVariant {
             .field("supply_q", &self.supply_q)
             .field("deposit_status", &self.deposit_status)
             .field("withdrawal_status", &self.withdrawal_status)
+            .field("supply_status", &self.supply_status)
+            .field("supply_observed_at", &self.supply_observed_at)
             .finish()
     }
 }
@@ -1957,7 +2142,7 @@ impl ::buffa::Message for AssetChainVariant {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -2022,12 +2207,26 @@ impl ::buffa::Message for AssetChainVariant {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        {
+            let val = self.supply_status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.supply_observed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.supply_observed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -2076,6 +2275,16 @@ impl ::buffa::Message for AssetChainVariant {
             if val != 0 {
                 ::buffa::types::put_int32_field(14u32, val, buf);
             }
+        }
+        {
+            let val = self.supply_status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(15u32, val, buf);
+            }
+        }
+        if self.supply_observed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(16u32, __cache.consume_next(), buf);
+            self.supply_observed_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2185,6 +2394,26 @@ impl ::buffa::Message for AssetChainVariant {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.supply_status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.supply_observed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2206,6 +2435,8 @@ impl ::buffa::Message for AssetChainVariant {
         self.supply_q = 0u64;
         self.deposit_status = ::buffa::EnumValue::from(0);
         self.withdrawal_status = ::buffa::EnumValue::from(0);
+        self.supply_status = ::buffa::EnumValue::from(0);
+        self.supply_observed_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2255,7 +2486,9 @@ pub struct ZippedAssetSupplyUpdate {
     )]
     pub zipped_asset_id: u32,
     /// Latest zToken supply for this route, scaled by the parent asset's
-    /// quantity_scale. Decode: supply_q / 10^quantity_scale.
+    /// quantity_scale. Decode: supply_q / 10^quantity_scale. Set only when
+    /// status is AVAILABLE or STALE; a value of zero then is a real supply of
+    /// zero.
     ///
     /// Field 2: `supply_q`
     #[serde(
@@ -2265,6 +2498,27 @@ pub struct ZippedAssetSupplyUpdate {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub supply_q: u64,
+    /// Whether supply_q is current: AVAILABLE or STALE. A route whose supply
+    /// stops being refreshed gets one STALE update repeating its last value and
+    /// observation time; it returns to AVAILABLE with the next reading.
+    ///
+    /// Field 3: `status`
+    #[serde(
+        rename = "status",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub status: ::buffa::EnumValue<SupplyStatus>,
+    /// When supply_q was read from Polyester chain. Set only when status is
+    /// AVAILABLE or STALE.
+    ///
+    /// Field 4: `observed_at`
+    #[serde(
+        rename = "observedAt",
+        alias = "observed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub observed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2274,6 +2528,8 @@ impl ::core::fmt::Debug for ZippedAssetSupplyUpdate {
         f.debug_struct("ZippedAssetSupplyUpdate")
             .field("zipped_asset_id", &self.zipped_asset_id)
             .field("supply_q", &self.supply_q)
+            .field("status", &self.status)
+            .field("observed_at", &self.observed_at)
             .finish()
     }
 }
@@ -2298,7 +2554,7 @@ impl ::buffa::Message for ZippedAssetSupplyUpdate {
     /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
     /// compliant message will never overflow this type.
     #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
@@ -2310,12 +2566,26 @@ impl ::buffa::Message for ZippedAssetSupplyUpdate {
         if self.supply_q != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.supply_q) as u32;
         }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.observed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.observed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
     fn write_to(
         &self,
-        _cache: &mut ::buffa::SizeCache,
+        __cache: &mut ::buffa::SizeCache,
         buf: &mut impl ::buffa::bytes::BufMut,
     ) {
         #[allow(unused_imports)]
@@ -2325,6 +2595,16 @@ impl ::buffa::Message for ZippedAssetSupplyUpdate {
         }
         if self.supply_q != 0u64 {
             ::buffa::types::put_uint64_field(2u32, self.supply_q, buf);
+        }
+        {
+            let val = self.status.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.observed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.observed_at.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2353,6 +2633,26 @@ impl ::buffa::Message for ZippedAssetSupplyUpdate {
                 )?;
                 self.supply_q = ::buffa::types::decode_uint64(buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.status = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.observed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2363,6 +2663,8 @@ impl ::buffa::Message for ZippedAssetSupplyUpdate {
     fn clear(&mut self) {
         self.zipped_asset_id = 0u32;
         self.supply_q = 0u64;
+        self.status = ::buffa::EnumValue::from(0);
+        self.observed_at = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -4573,6 +4875,8 @@ pub mod __buffa {
             pub withdraw_min_amount: &'a str,
             /// Latest zToken supply for this chain asset variant, scaled by the parent
             /// unified asset's quantity_scale. Decode: supply_q / 10^quantity_scale.
+            /// Set only when supply_status is AVAILABLE or STALE; a value of zero then
+            /// is a real supply of zero.
             ///
             /// Field 12: `supply_q`
             pub supply_q: u64,
@@ -4590,6 +4894,17 @@ pub mod __buffa {
             ///
             /// Field 14: `withdrawal_status`
             pub withdrawal_status: ::buffa::EnumValue<super::super::RouteStatus>,
+            /// Whether supply_q is known and current for this route.
+            ///
+            /// Field 15: `supply_status`
+            pub supply_status: ::buffa::EnumValue<super::super::SupplyStatus>,
+            /// When supply_q was read from Polyester chain. Set only when supply_status
+            /// is AVAILABLE or STALE.
+            ///
+            /// Field 16: `supply_observed_at`
+            pub supply_observed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for AssetChainVariantView<'a> {
@@ -4718,6 +5033,40 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.supply_status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.supply_observed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.supply_observed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -4760,6 +5109,15 @@ pub mod __buffa {
                     supply_q: self.supply_q,
                     deposit_status: self.deposit_status,
                     withdrawal_status: self.withdrawal_status,
+                    supply_status: self.supply_status,
+                    supply_observed_at: match self.supply_observed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -4770,7 +5128,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for AssetChainVariantView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -4849,13 +5207,27 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                {
+                    let val = self.supply_status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.supply_observed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.supply_observed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -4912,6 +5284,20 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(14u32, val, buf);
                     }
+                }
+                {
+                    let val = self.supply_status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(15u32, val, buf);
+                    }
+                }
+                if self.supply_observed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        16u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.supply_observed_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5001,6 +5387,19 @@ pub mod __buffa {
                     &self.withdrawal_status,
                 ) {
                     __map.serialize_entry("withdrawalStatus", &self.withdrawal_status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.supply_status,
+                ) {
+                    __map.serialize_entry("supplyStatus", &self.supply_status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .supply_observed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("supplyObservedAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -5171,6 +5570,8 @@ pub mod __buffa {
             }
             /// Latest zToken supply for this chain asset variant, scaled by the parent
             /// unified asset's quantity_scale. Decode: supply_q / 10^quantity_scale.
+            /// Set only when supply_status is AVAILABLE or STALE; a value of zero then
+            /// is a real supply of zero.
             ///
             /// Field 12: `supply_q`
             #[must_use]
@@ -5200,6 +5601,27 @@ pub mod __buffa {
                 &self,
             ) -> ::buffa::EnumValue<super::super::RouteStatus> {
                 self.0.reborrow().withdrawal_status
+            }
+            /// Whether supply_q is known and current for this route.
+            ///
+            /// Field 15: `supply_status`
+            #[must_use]
+            pub fn supply_status(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::SupplyStatus> {
+                self.0.reborrow().supply_status
+            }
+            /// When supply_q was read from Polyester chain. Set only when supply_status
+            /// is AVAILABLE or STALE.
+            ///
+            /// Field 16: `supply_observed_at`
+            #[must_use]
+            pub fn supply_observed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().supply_observed_at
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<AssetChainVariantView<'static>>>
@@ -5241,10 +5663,25 @@ pub mod __buffa {
             /// Field 1: `zipped_asset_id`
             pub zipped_asset_id: u32,
             /// Latest zToken supply for this route, scaled by the parent asset's
-            /// quantity_scale. Decode: supply_q / 10^quantity_scale.
+            /// quantity_scale. Decode: supply_q / 10^quantity_scale. Set only when
+            /// status is AVAILABLE or STALE; a value of zero then is a real supply of
+            /// zero.
             ///
             /// Field 2: `supply_q`
             pub supply_q: u64,
+            /// Whether supply_q is current: AVAILABLE or STALE. A route whose supply
+            /// stops being refreshed gets one STALE update repeating its last value and
+            /// observation time; it returns to AVAILABLE with the next reading.
+            ///
+            /// Field 3: `status`
+            pub status: ::buffa::EnumValue<super::super::SupplyStatus>,
+            /// When supply_q was read from Polyester chain. Set only when status is
+            /// AVAILABLE or STALE.
+            ///
+            /// Field 4: `observed_at`
+            pub observed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ZippedAssetSupplyUpdateView<'a> {
@@ -5292,6 +5729,40 @@ pub mod __buffa {
                         )?;
                         view.supply_q = ::buffa::types::decode_uint64(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.status = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.observed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.observed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -5323,6 +5794,15 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::ZippedAssetSupplyUpdate {
                     zipped_asset_id: self.zipped_asset_id,
                     supply_q: self.supply_q,
+                    status: self.status,
+                    observed_at: match self.observed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -5333,7 +5813,7 @@ pub mod __buffa {
         }
         impl<'a> ::buffa::ViewEncode<'a> for ZippedAssetSupplyUpdateView<'a> {
             #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
@@ -5348,13 +5828,27 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint64_encoded_len(self.supply_q) as u32;
                 }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.observed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.observed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
             #[allow(clippy::needless_borrow)]
             fn write_to(
                 &self,
-                _cache: &mut ::buffa::SizeCache,
+                __cache: &mut ::buffa::SizeCache,
                 buf: &mut impl ::buffa::bytes::BufMut,
             ) {
                 #[allow(unused_imports)]
@@ -5364,6 +5858,20 @@ pub mod __buffa {
                 }
                 if self.supply_q != 0u64 {
                     ::buffa::types::put_uint64_field(2u32, self.supply_q, buf);
+                }
+                {
+                    let val = self.status.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if self.observed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.observed_at.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -5399,6 +5907,17 @@ pub mod __buffa {
                             "supplyQ",
                             &::buffa::json_helpers::ProtoJson(&self.supply_q),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.status) {
+                    __map.serialize_entry("status", &self.status)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .observed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("observedAt", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -5506,12 +6025,35 @@ pub mod __buffa {
                 self.0.reborrow().zipped_asset_id
             }
             /// Latest zToken supply for this route, scaled by the parent asset's
-            /// quantity_scale. Decode: supply_q / 10^quantity_scale.
+            /// quantity_scale. Decode: supply_q / 10^quantity_scale. Set only when
+            /// status is AVAILABLE or STALE; a value of zero then is a real supply of
+            /// zero.
             ///
             /// Field 2: `supply_q`
             #[must_use]
             pub fn supply_q(&self) -> u64 {
                 self.0.reborrow().supply_q
+            }
+            /// Whether supply_q is current: AVAILABLE or STALE. A route whose supply
+            /// stops being refreshed gets one STALE update repeating its last value and
+            /// observation time; it returns to AVAILABLE with the next reading.
+            ///
+            /// Field 3: `status`
+            #[must_use]
+            pub fn status(&self) -> ::buffa::EnumValue<super::super::SupplyStatus> {
+                self.0.reborrow().status
+            }
+            /// When supply_q was read from Polyester chain. Set only when status is
+            /// AVAILABLE or STALE.
+            ///
+            /// Field 4: `observed_at`
+            #[must_use]
+            pub fn observed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().observed_at
             }
         }
         impl ::core::convert::From<

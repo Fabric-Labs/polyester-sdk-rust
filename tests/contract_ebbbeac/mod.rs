@@ -1,12 +1,16 @@
 //! Public contract ebbbeac (exchange release 0.93.2), through the public
 //! services against a local server: account statement exports, asset
-//! information and status events.
+//! information and status events. The statement export calls follow the
+//! 0.93.5 contract, which removed `LedgerReadService.ExportStatement`.
 
 use super::hardening_support::{MockHttpServer, connect_proto_ok};
 use buffa::Message as _;
 use futures_util::TryStreamExt;
-use polyester::models::SubAccountScope;
-use polyester::proto::ledger::read::v1::{ExportStatementRequest, ExportStatementResponse};
+use polyester::proto::ledger::read::v1::{
+    CancelStatementExportRequest, CancelStatementExportResponse,
+    GetStatementExportDownloadUrlRequest, GetStatementExportDownloadUrlResponse, StatementExport,
+    StatementExportStatus,
+};
 use polyester::proto::marketdata::v1::{
     AssetEditorialInfo, AssetInfo, ListAssetInfoRequest, ListAssetInfoResponse,
 };
@@ -14,123 +18,122 @@ use polyester::proto::system::v1::{
     ListStatusEventsRequest, ListStatusEventsResponse, StatusEvent, StatusEventKind,
     StatusEventState,
 };
-use polyester::services::{ExportStatementOptions, ListStatusEventsOptions};
+use polyester::services::ListStatusEventsOptions;
 use polyester::{Client, Config, Error};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, UNIX_EPOCH};
 
-const EXPORT: &str = "/ledger.read.v1.LedgerReadService/ExportStatement";
+const DOWNLOAD_URL: &str = "/ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl";
+const CANCEL: &str = "/ledger.read.v1.StatementExportService/CancelStatementExport";
 const ASSET_INFO: &str = "/marketdata.v1.MarketDataService/ListAssetInfo";
 const STATUS_EVENTS: &str = "/system.v1.SystemService/ListStatusEvents";
 const TEST_KEY: &str = "0101010101010101010101010101010101010101010101010101010101010101";
 const SIGNED_HEADER: &str = "X-API-KEY-ID";
-
-const PAGE_1: &str = "time,entry_id,type,account,asset,amount,fee,balance,link_id,flow_id\r\n\
-    2026-10-02T14:03:11.000000Z,27419385013475392777,deposit,funding,USDT,100,0,100,,flow_8d1f2c\r\n";
-const PAGE_2: &str =
-    "2026-10-03T08:12:45.123456Z,27419385013475392811,trade,trading,USDT,-5000,2.5,4997.5,77,\r\n";
+/// A stand-in for the signed URL the API returns; it must never be printed.
+const FILE_URL: &str = "https://files.example/statement-export?signature=fake-signature-marker";
 
 /// Each request a server saw: whether it was signed, and its decoded body.
 type Seen<T> = Arc<Mutex<Vec<(bool, T)>>>;
 
-async fn statement_server() -> (MockHttpServer, Seen<ExportStatementRequest>) {
-    let seen: Seen<ExportStatementRequest> = Arc::default();
+/// Each statement export request a server saw: its path, whether it was
+/// signed, and the export ID it named.
+type SeenExports = Arc<Mutex<Vec<(String, bool, u64)>>>;
+
+async fn statement_export_server() -> (MockHttpServer, SeenExports) {
+    let seen: SeenExports = Arc::default();
     let log = seen.clone();
     let server = MockHttpServer::spawn(move |request| {
-        assert_eq!(request.path, EXPORT);
-        let req = ExportStatementRequest::decode_from_slice(&request.body).unwrap();
-        let (csv, next) = if req.page_token.is_empty() {
-            (PAGE_1, "s2")
-        } else {
-            (PAGE_2, "")
-        };
-        log.lock()
-            .unwrap()
-            .push((request.has_header(SIGNED_HEADER), req));
-        connect_proto_ok(&ExportStatementResponse {
-            csv: csv.into(),
-            next_page_token: next.into(),
-            ..Default::default()
-        })
+        let signed = request.has_header(SIGNED_HEADER);
+        match request.path.as_str() {
+            DOWNLOAD_URL => {
+                let req =
+                    GetStatementExportDownloadUrlRequest::decode_from_slice(&request.body).unwrap();
+                log.lock()
+                    .unwrap()
+                    .push((request.path.clone(), signed, req.export_id));
+                connect_proto_ok(&GetStatementExportDownloadUrlResponse {
+                    url: FILE_URL.into(),
+                    expires_at: buffa_types::google::protobuf::Timestamp {
+                        seconds: 1_763_337_660,
+                        ..Default::default()
+                    }
+                    .into(),
+                    filename: format!("statement-{}.csv", req.export_id),
+                    ..Default::default()
+                })
+            }
+            CANCEL => {
+                let req = CancelStatementExportRequest::decode_from_slice(&request.body).unwrap();
+                log.lock()
+                    .unwrap()
+                    .push((request.path.clone(), signed, req.export_id));
+                connect_proto_ok(&CancelStatementExportResponse {
+                    export: StatementExport {
+                        export_id: req.export_id,
+                        status: StatementExportStatus::STATEMENT_EXPORT_STATUS_CANCELED.into(),
+                        idempotency_key: "statement-2026".into(),
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                })
+            }
+            other => panic!("unexpected request {other}"),
+        }
     })
     .await;
     (server, seen)
 }
 
-fn statement_options() -> ExportStatementOptions {
-    ExportStatementOptions {
-        start_time: Some(UNIX_EPOCH + Duration::new(1_790_812_800, 0)),
-        end_time: Some(UNIX_EPOCH + Duration::new(1_793_491_200, 250_000_000)),
-        asset_id: Some(2),
-        ..Default::default()
-    }
-}
-
-/// A statement export is a signed ledger read: the configured default
-/// sub-account applies when the request names none, every page is sent with
-/// the same fields, and the pages concatenate into one CSV whose rows read
-/// by header name.
+/// The download URL and the cancel are signed statement reads of one export
+/// named by its base58 ID. The URL is returned as sent, but the result's
+/// `Debug` never prints it; the canceled export reads `canceled`.
 #[tokio::test]
-async fn statement_export_is_signed_and_concatenates_its_pages() {
-    let (server, seen) = statement_server().await;
+async fn statement_export_download_url_and_cancel_are_signed() {
+    let (server, seen) = statement_export_server().await;
     let client = Client::new(Config {
         api_url: server.base_url(),
         api_key_id: Some("ak_test".into()),
         api_private_key: Some(TEST_KEY.into()),
-        default_sub_account_id: Some("Bht3tfQZv8E".into()),
         hydrate_catalogs: false,
         ..Default::default()
     })
     .unwrap();
-    let default_sub = polyester::codecs::scalars::parse_account_id("Bht3tfQZv8E", "s").unwrap();
+    let export_id = polyester::codecs::scalars::format_uint64_id(7);
+    let id = polyester::codecs::scalars::parse_account_id(&export_id, "export_id").unwrap();
 
-    let statement = client.statements.export(statement_options()).await.unwrap();
-    assert_eq!(statement.csv, format!("{PAGE_1}{PAGE_2}"));
-    let rows = statement.rows().unwrap();
-    assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0].flow_id, "flow_8d1f2c");
+    let url = client
+        .statements
+        .get_export_download_url(&export_id)
+        .await
+        .unwrap();
+    assert_eq!(url.url, FILE_URL);
+    assert_eq!(url.filename, format!("statement-{id}.csv"));
+    assert_eq!(url.expires_at.seconds, 1_763_337_660);
+    let rendered = format!("{url:?}");
+    assert!(!rendered.contains("fake-signature-marker"), "{rendered}");
+    assert!(!rendered.contains("files.example"), "{rendered}");
+
+    let canceled = client.statements.cancel_export(&export_id).await.unwrap();
     assert_eq!(
-        (rows[1].kind.as_str(), rows[1].fee.as_str()),
-        ("trade", "2.5")
+        (canceled.export_id.as_str(), canceled.status.as_str()),
+        (export_id.as_str(), "canceled")
     );
 
     let requests = std::mem::take(&mut *seen.lock().unwrap());
-    assert_eq!(requests.len(), 2);
-    for (index, (signed, req)) in requests.iter().enumerate() {
-        assert!(signed, "page {index} was not signed");
-        assert_eq!(req.subaccount_id, Some(default_sub), "page {index}");
-        assert_eq!(req.asset_id, 2);
-        let start = req.start_time.as_option().unwrap();
-        let end = req.end_time.as_option().unwrap();
-        assert_eq!((start.seconds, start.nanos), (1_790_812_800, 0));
-        assert_eq!((end.seconds, end.nanos), (1_793_491_200, 250_000_000));
-    }
-    assert_eq!(requests[0].1.page_token, "");
-    assert_eq!(requests[1].1.page_token, "s2");
-
-    // One page; an explicit sub-account overrides the default.
-    let page = client
-        .statements
-        .export_page(ExportStatementOptions {
-            subaccount_id: SubAccountScope::Id(77),
-            asset_id: None,
-            ..statement_options()
-        })
-        .await
-        .unwrap();
     assert_eq!(
-        (page.csv.as_str(), page.next_page_token.as_str()),
-        (PAGE_1, "s2")
+        requests,
+        [
+            (DOWNLOAD_URL.to_owned(), true, id),
+            (CANCEL.to_owned(), true, id)
+        ]
     );
-    let (_, req) = seen.lock().unwrap().pop().unwrap();
-    assert_eq!((req.subaccount_id, req.asset_id), (Some(77), 0));
 }
 
-/// The period is required and a statement needs credentials: both are
-/// refused before anything is sent.
+/// An export ID that is not a base58 public ID, and a call without an API
+/// key, are refused before anything is sent.
 #[tokio::test]
-async fn statement_export_refuses_a_missing_period_or_key_without_sending() {
-    let (server, seen) = statement_server().await;
+async fn statement_export_download_url_and_cancel_refuse_before_sending() {
+    let (server, seen) = statement_export_server().await;
     let signed = Client::new(Config {
         api_url: server.base_url(),
         api_key_id: Some("ak_test".into()),
@@ -139,22 +142,25 @@ async fn statement_export_refuses_a_missing_period_or_key_without_sending() {
         ..Default::default()
     })
     .unwrap();
-    for opts in [
-        ExportStatementOptions {
-            start_time: None,
-            ..statement_options()
-        },
-        ExportStatementOptions {
-            end_time: None,
-            ..statement_options()
-        },
-        ExportStatementOptions {
-            subaccount_id: SubAccountScope::Id(0),
-            ..statement_options()
-        },
-    ] {
-        let err = signed.statements.export_page(opts).await.unwrap_err();
-        assert!(matches!(err, Error::Validation(_)), "{err:?}");
+    for export_id in ["", " ", "0", "1", "100"] {
+        let err = signed
+            .statements
+            .get_export_download_url(export_id)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Validation(_)),
+            "{export_id:?}: {err:?}"
+        );
+        let err = signed
+            .statements
+            .cancel_export(export_id)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, Error::Validation(_)),
+            "{export_id:?}: {err:?}"
+        );
     }
 
     let anonymous = Client::new(Config {
@@ -163,9 +169,16 @@ async fn statement_export_refuses_a_missing_period_or_key_without_sending() {
         ..Default::default()
     })
     .unwrap();
+    let export_id = polyester::codecs::scalars::format_uint64_id(7);
     let err = anonymous
         .statements
-        .export(statement_options())
+        .get_export_download_url(&export_id)
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::Auth { .. }), "{err:?}");
+    let err = anonymous
+        .statements
+        .cancel_export(&export_id)
         .await
         .unwrap_err();
     assert!(matches!(err, Error::Auth { .. }), "{err:?}");

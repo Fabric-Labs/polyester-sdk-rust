@@ -60,14 +60,6 @@ pub type OwnedGetBalancesRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetBalancesResponseView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::GetBalancesResponseView<'static>,
 >;
-///Shorthand for `OwnedView<ExportStatementRequestView<'static>>`.
-pub type OwnedExportStatementRequestView = ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<'static>,
->;
-///Shorthand for `OwnedView<ExportStatementResponseView<'static>>`.
-pub type OwnedExportStatementResponseView = ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'static>,
->;
 impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::GetBalanceHistoryResponse>
 for crate::proto::ledger::read::v1::__buffa::view::GetBalanceHistoryResponseView<'_> {
     fn encode(
@@ -212,26 +204,6 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ExportStatementResponse>
-for crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::ledger::read::v1::ExportStatementResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
 /// Full service name for this service.
 pub const LEDGER_READ_SERVICE_SERVICE_NAME: &str = "ledger.read.v1.LedgerReadService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetBalanceHistory` RPC.
@@ -285,15 +257,6 @@ pub const LEDGER_READ_SERVICE_LIST_TRANSFERS_SPEC: ::connectrpc::Spec = ::connec
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const LEDGER_READ_SERVICE_GET_BALANCES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/ledger.read.v1.LedgerReadService/GetBalances",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ExportStatement` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/ledger.read.v1.LedgerReadService/ExportStatement",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -422,8 +385,11 @@ pub trait LedgerReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// Retrieve current root portfolio equity grouped by logical account and
-    /// asset. Requires an interactive root-account session; API keys are not
-    /// supported.
+    /// asset. Accepts a root-account session, or a root-scoped API key whose
+    /// policy grants READ_BALANCES. An API key covers the master account and
+    /// only the subaccounts that master account owns, each within its subaccount
+    /// policy; the request fails when the key may not read one of them.
+    /// Subaccount-scoped API keys are not supported.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -491,31 +457,6 @@ pub trait LedgerReadService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ledger::read::v1::GetBalancesResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Export an account statement for a period as CSV, one page at a time.
-    /// Covers one account, optionally one asset, for a period of at most 366
-    /// days. API keys need the READ_STATEMENTS policy action.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn export_statement<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::ledger::read::v1::ExportStatementRequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::ledger::read::v1::ExportStatementResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -725,35 +666,6 @@ impl<S: LedgerReadService> LedgerReadServiceExt for S {
                 },
             )
             .with_spec(LEDGER_READ_SERVICE_GET_BALANCES_SPEC)
-            .route_view(
-                LEDGER_READ_SERVICE_SERVICE_NAME,
-                "ExportStatement",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::ledger::read::v1::ExportStatementRequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.export_statement(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::ledger::read::v1::ExportStatementResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -846,12 +758,6 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(LEDGER_READ_SERVICE_GET_BALANCES_SPEC),
-                )
-            }
-            "ExportStatement" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(LEDGER_READ_SERVICE_EXPORT_STATEMENT_SPEC),
                 )
             }
             _ => None,
@@ -992,27 +898,6 @@ impl<T: LedgerReadService> ::connectrpc::Dispatcher for LedgerReadServiceServer<
                         .await?
                         .encode::<
                             crate::proto::ledger::read::v1::GetBalancesResponse,
-                        >(format)
-                })
-            }
-            "ExportStatement" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::ledger::read::v1::ExportStatementRequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::ledger::read::v1::__buffa::view::ExportStatementRequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::ledger::read::v1::ExportStatementRequest,
-                    >::from_parts(&req, &body);
-                    svc.export_statement(ctx, req)
-                        .await?
-                        .encode::<
-                            crate::proto::ledger::read::v1::ExportStatementResponse,
                         >(format)
                 })
             }
@@ -1388,51 +1273,6 @@ where
             )
             .await
     }
-    /// Call the ExportStatement RPC. Sends a request to /ledger.read.v1.LedgerReadService/ExportStatement.
-    pub async fn export_statement(
-        &self,
-        request: crate::proto::ledger::read::v1::ExportStatementRequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.export_statement_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the ExportStatement RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn export_statement_with_options(
-        &self,
-        request: crate::proto::ledger::read::v1::ExportStatementRequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::ledger::read::v1::__buffa::view::ExportStatementResponseView<
-                    'static,
-                >,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                LEDGER_READ_SERVICE_SERVICE_NAME,
-                "ExportStatement",
-                request,
-                options,
-            )
-            .await
-    }
 }
 
 ///Shorthand for `OwnedView<CreateStatementExportRequestView<'static>>`.
@@ -1454,6 +1294,30 @@ pub type OwnedGetStatementExportRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<GetStatementExportResponseView<'static>>`.
 pub type OwnedGetStatementExportResponseView = ::buffa::view::OwnedView<
     crate::proto::ledger::read::v1::__buffa::view::GetStatementExportResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetStatementExportDownloadUrlRequestView<'static>>`.
+pub type OwnedGetStatementExportDownloadUrlRequestView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetStatementExportDownloadUrlResponseView<'static>>`.
+pub type OwnedGetStatementExportDownloadUrlResponseView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CancelStatementExportRequestView<'static>>`.
+pub type OwnedCancelStatementExportRequestView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CancelStatementExportResponseView<'static>>`.
+pub type OwnedCancelStatementExportResponseView = ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportResponseView<
         'static,
     >,
 >;
@@ -1520,6 +1384,62 @@ for ::buffa::view::OwnedView<
     }
 }
 impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetStatementExportDownloadUrlResponse,
+>
+for crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::GetStatementExportDownloadUrlResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::CancelStatementExportResponse,
+>
+for crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::ledger::read::v1::CancelStatementExportResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
     crate::proto::ledger::read::v1::ListStatementExportsResponse,
 >
 for crate::proto::ledger::read::v1::__buffa::view::ListStatementExportsResponseView<'_> {
@@ -1565,6 +1485,24 @@ pub const STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_SPEC: ::connectrpc::Spec
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetStatementExportDownloadUrl` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_DOWNLOAD_URL_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CancelStatementExport` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const STATEMENT_EXPORT_SERVICE_CANCEL_STATEMENT_EXPORT_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ledger.read.v1.StatementExportService/CancelStatementExport",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListStatementExports` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -1574,12 +1512,15 @@ pub const STATEMENT_EXPORT_SERVICE_LIST_STATEMENT_EXPORTS_SPEC: ::connectrpc::Sp
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
-/// StatementExportService produces whole-period account statements in the
-/// background as one CSV file each. It covers the same account, asset and
-/// period choices as LedgerReadService.ExportStatement, with the same access
-/// rules: API keys need the READ_STATEMENTS policy action. A root account has
-/// at most 5 exports QUEUED or PROCESSING at a time, one account produces one
-/// export at a time, and a READY file can be downloaded for 7 days.
+/// StatementExportService is the account statement API. A statement covers
+/// one account, optionally one asset, for a period of at most 366 days, and is
+/// produced in the background as one CSV file: create an export, poll it with
+/// GetStatementExport until it is READY, then download its file (see
+/// StatementExport). API keys need the READ_STATEMENTS policy action. A root
+/// account has at most 5 exports QUEUED or PROCESSING at a time, one account
+/// produces one export at a time, and a READY file can be downloaded for 7
+/// days. CancelStatementExport stops a QUEUED or PROCESSING export, which
+/// frees its place for the account's next export and under the root's 5.
 ///
 /// # Implementing handlers
 ///
@@ -1685,6 +1626,75 @@ pub trait StatementExportService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ledger::read::v1::GetStatementExportResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Get a URL valid for 60 seconds from signing that downloads a READY
+    /// export's file without credentials, for a browser to save straight to
+    /// disk. Each call returns a new URL.
+    /// Errors:
+    /// - NOT_FOUND: no such export for the authenticated account.
+    /// - PERMISSION_DENIED: the caller may not read statements.
+    /// - FAILED_PRECONDITION (STATEMENT_EXPORT_NOT_READY): the file is not ready
+    /// yet; poll GetStatementExport until it is READY.
+    /// - FAILED_PRECONDITION (STATEMENT_EXPORT_FAILED): the export failed and has
+    /// no file.
+    /// - FAILED_PRECONDITION (STATEMENT_EXPORT_CANCELED): the export was
+    /// canceled and has no file.
+    /// - FAILED_PRECONDITION (STATEMENT_EXPORT_EXPIRED): the file expired, or
+    /// has less than 5 seconds left; create a new export.
+    /// - UNAVAILABLE: retry the same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_statement_export_download_url<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ledger::read::v1::GetStatementExportDownloadUrlResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Cancel a QUEUED or PROCESSING statement export. It ends CANCELED at
+    /// once: it no longer counts toward the root account's 5 exports in
+    /// progress, the account's next queued export can start, and any partial
+    /// file is deleted. Canceling a CANCELED export returns it as it is.
+    /// Errors:
+    /// - NOT_FOUND: no such export for the authenticated account.
+    /// - PERMISSION_DENIED: the caller may not read statements.
+    /// - FAILED_PRECONDITION (STATEMENT_EXPORT_NOT_CANCELABLE): the export
+    /// already finished, READY, FAILED or EXPIRED.
+    /// - UNAVAILABLE: retry the same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn cancel_statement_export<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ledger::read::v1::CancelStatementExportRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ledger::read::v1::CancelStatementExportResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1806,6 +1816,64 @@ impl<S: StatementExportService> StatementExportServiceExt for S {
             .with_spec(STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_SPEC)
             .route_view_idempotent(
                 STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
+                "GetStatementExportDownloadUrl",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_statement_export_download_url(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ledger::read::v1::GetStatementExportDownloadUrlResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_DOWNLOAD_URL_SPEC)
+            .route_view(
+                STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
+                "CancelStatementExport",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ledger::read::v1::CancelStatementExportRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.cancel_statement_export(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ledger::read::v1::CancelStatementExportResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(STATEMENT_EXPORT_SERVICE_CANCEL_STATEMENT_EXPORT_SPEC)
+            .route_view_idempotent(
+                STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
                 "ListStatementExports",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -1902,6 +1970,20 @@ for StatementExportServiceServer<T> {
                         .with_spec(STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_SPEC),
                 )
             }
+            "GetStatementExportDownloadUrl" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(
+                            STATEMENT_EXPORT_SERVICE_GET_STATEMENT_EXPORT_DOWNLOAD_URL_SPEC,
+                        ),
+                )
+            }
+            "CancelStatementExport" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(STATEMENT_EXPORT_SERVICE_CANCEL_STATEMENT_EXPORT_SPEC),
+                )
+            }
             "ListStatementExports" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -1963,6 +2045,48 @@ for StatementExportServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::ledger::read::v1::GetStatementExportResponse,
+                        >(format)
+                })
+            }
+            "GetStatementExportDownloadUrl" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_statement_export_download_url(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ledger::read::v1::GetStatementExportDownloadUrlResponse,
+                        >(format)
+                })
+            }
+            "CancelStatementExport" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ledger::read::v1::CancelStatementExportRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ledger::read::v1::CancelStatementExportRequest,
+                    >::from_parts(&req, &body);
+                    svc.cancel_statement_export(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::ledger::read::v1::CancelStatementExportResponse,
                         >(format)
                 })
             }
@@ -2177,6 +2301,96 @@ where
                 &self.config,
                 STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
                 "GetStatementExport",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetStatementExportDownloadUrl RPC. Sends a request to /ledger.read.v1.StatementExportService/GetStatementExportDownloadUrl.
+    pub async fn get_statement_export_download_url(
+        &self,
+        request: crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_statement_export_download_url_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetStatementExportDownloadUrl RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_statement_export_download_url_with_options(
+        &self,
+        request: crate::proto::ledger::read::v1::GetStatementExportDownloadUrlRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::GetStatementExportDownloadUrlResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
+                "GetStatementExportDownloadUrl",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CancelStatementExport RPC. Sends a request to /ledger.read.v1.StatementExportService/CancelStatementExport.
+    pub async fn cancel_statement_export(
+        &self,
+        request: crate::proto::ledger::read::v1::CancelStatementExportRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.cancel_statement_export_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CancelStatementExport RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn cancel_statement_export_with_options(
+        &self,
+        request: crate::proto::ledger::read::v1::CancelStatementExportRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ledger::read::v1::__buffa::view::CancelStatementExportResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                STATEMENT_EXPORT_SERVICE_SERVICE_NAME,
+                "CancelStatementExport",
                 request,
                 options,
             )

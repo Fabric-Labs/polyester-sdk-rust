@@ -39,15 +39,30 @@ pub(crate) fn optional_client_order_id(value: Option<&str>) -> Result<Option<Str
     Ok(Some(trimmed.to_owned()))
 }
 
+/// The code the Triggers API answers for a client OCO ID that breaks its
+/// rule, on `CreateOco` and the `ListTriggers` filter alike.
+pub(crate) const CLIENT_LIST_ID_INVALID: &str = "ERROR_CODE_CLIENT_LIST_ID_INVALID";
+
 /// Validate a client OCO ID (`OcoIntent.client_list_id` and the
 /// `ListTriggersRequest.client_list_id` filter) as the contract does: the
 /// client order ID rule, 1 to 36 ASCII letters, digits, `.`, `_`, `:`, `/` or
-/// `-` (`^[A-Za-z0-9._:/-]{1,36}$`), with the same error text. It is sent as
-/// given, never trimmed, so the create and the recovery listing send the
-/// same ID; outer spaces are refused like any other space.
+/// `-` (`^[A-Za-z0-9._:/-]{1,36}$`). One that breaks it is refused as
+/// [`Error::Api`] with [`CLIENT_LIST_ID_INVALID`], the server's code for the
+/// same mistake, and no violation. It is sent as given, never trimmed, so the
+/// create and the recovery listing send the same ID; outer spaces are refused
+/// like any other space.
 pub(crate) fn require_client_list_id(value: &str, field: &str) -> Result<String> {
-    validate_correlation_id(value, field, CLIENT_ORDER_ID_MAX_LEN)?;
-    Ok(value.to_owned())
+    match validate_correlation_id(value, field, CLIENT_ORDER_ID_MAX_LEN) {
+        Ok(()) => Ok(value.to_owned()),
+        Err(Error::Validation(message)) => Err(Error::Api {
+            message,
+            code: CLIENT_LIST_ID_INVALID.to_owned(),
+            metadata: Vec::new(),
+            violations: Vec::new(),
+            answer: None,
+        }),
+        Err(other) => Err(other),
+    }
 }
 
 /// Trim and validate a required client-style id (client order / trigger id).
@@ -141,7 +156,12 @@ mod tests {
             ),
         ] {
             let err = require_client_list_id(bad, "client_list_id").unwrap_err();
-            assert!(matches!(err, Error::Validation(_)), "{bad:?}: {err:?}");
+            assert_eq!(
+                err.auth_error_code(),
+                Some(CLIENT_LIST_ID_INVALID),
+                "{bad:?}: {err:?}"
+            );
+            assert!(matches!(&err, Error::Api { violations, .. } if violations.is_empty()));
             assert!(err.to_string().contains(want), "{bad:?}: {err}");
         }
     }

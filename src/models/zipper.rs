@@ -1,12 +1,14 @@
 //! Zipper deposit/withdraw config models (Go `models/zipper.go` parity).
 
+use buffa_types::google::protobuf::Timestamp;
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ZipperTokenConfig {
     pub address: String,
     pub decimals: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ZipperAssetChainVariant {
     pub zipped_asset_id: u32,
     pub chain_id: u32,
@@ -15,9 +17,21 @@ pub struct ZipperAssetChainVariant {
     pub deposit_min_amount: String,
     pub withdraw_min_amount: String,
     /// Latest zToken supply of this variant: `supply_q` at the asset's
-    /// `quantity_scale`, such as `97.08173223`, and `0` for none. Empty when
-    /// the asset's scale is not one a quantity can be formatted at.
-    pub supply: String,
+    /// `quantity_scale`, such as `97.08173223`. Set only while
+    /// `supply_status` is [`SUPPLY_STATUS_AVAILABLE`] or
+    /// [`SUPPLY_STATUS_STALE`]; `Some("0")` then is a real supply of zero.
+    /// `None` when no supply is known (missing, unspecified or a status this
+    /// SDK version does not know), and when the asset's scale is not one a
+    /// quantity can be formatted at. `None` never means zero.
+    pub supply: Option<String>,
+    /// Whether `supply` is known and current: [`SUPPLY_STATUS_AVAILABLE`],
+    /// [`SUPPLY_STATUS_STALE`] (the last value read, not refreshed for longer
+    /// than expected) or [`SUPPLY_STATUS_MISSING`]. Empty when unspecified,
+    /// and `"unknown(n)"` for a status this SDK version does not know; read
+    /// both as missing. Use [`Self::supply_is_current`].
+    pub supply_status: String,
+    /// When `supply` was read from Polyester chain. Set only with `supply`.
+    pub supply_observed_at: Option<Timestamp>,
     pub source_token: ZipperTokenConfig,
     pub z_token: ZipperTokenConfig,
     /// Whether this route accepts new deposits: [`ROUTE_STATUS_NORMAL`] or
@@ -46,7 +60,31 @@ pub const ROUTE_STATUS_NORMAL: &str = "normal";
 /// published.
 pub const ROUTE_STATUS_SUSPENDED: &str = "suspended";
 
+/// Supply status label: the route's supply was read recently and is
+/// current.
+pub const SUPPLY_STATUS_AVAILABLE: &str = "available";
+/// Supply status label: the route's supply is the last one read, but it has
+/// not been refreshed for longer than expected and may no longer be accurate.
+/// Do not size a withdrawal against it as if it were current.
+pub const SUPPLY_STATUS_STALE: &str = "stale";
+/// Supply status label: no supply is known for the route yet. It is not a
+/// supply of zero.
+pub const SUPPLY_STATUS_MISSING: &str = "missing";
+
+/// Whether a supply status label carries a supply value: available or stale.
+pub(crate) fn supply_status_carries_supply(status: &str) -> bool {
+    status == SUPPLY_STATUS_AVAILABLE || status == SUPPLY_STATUS_STALE
+}
+
 impl ZipperAssetChainVariant {
+    /// True only while the route's supply is known and current
+    /// ([`SUPPLY_STATUS_AVAILABLE`]). Size a withdrawal against `supply`
+    /// only then: stale and missing supplies refuse withdrawals on the route
+    /// with `ERROR_CODE_SUPPLY_UNAVAILABLE`.
+    pub fn supply_is_current(&self) -> bool {
+        self.supply_status == SUPPLY_STATUS_AVAILABLE
+    }
+
     /// True only when the route accepts new deposits
     /// ([`ROUTE_STATUS_NORMAL`]); false while suspended or not known.
     pub fn accepts_deposits(&self) -> bool {
@@ -89,7 +127,7 @@ pub struct ZipperChainConfig {
     pub memo_format_hint: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct ZipperAssetConfig {
     pub asset: String,
     pub ledger_id: u32,
@@ -111,7 +149,7 @@ pub struct ZipperChainContractConfig {
     pub version: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct DepositWithdrawConfig {
     pub chains: Vec<ZipperChainConfig>,
     pub assets: Vec<ZipperAssetConfig>,
@@ -119,13 +157,33 @@ pub struct DepositWithdrawConfig {
     pub ts_ms: i64,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+/// One route's supply from the supply stream, or as the catalogs hold it.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
 pub struct ZippedAssetSupplyUpdate {
     pub zipped_asset_id: u32,
-    pub supply: String,
+    /// The route's zToken supply at the asset's `quantity_scale`, set only
+    /// while `status` is [`SUPPLY_STATUS_AVAILABLE`] or
+    /// [`SUPPLY_STATUS_STALE`]. `None` means not known, never zero.
+    pub supply: Option<String>,
+    /// [`SUPPLY_STATUS_AVAILABLE`] or [`SUPPLY_STATUS_STALE`] on the stream:
+    /// a route whose supply stops being refreshed gets one stale update
+    /// repeating its last value and observation time, and turns available
+    /// with its next reading. Labels as
+    /// [`ZipperAssetChainVariant::supply_status`].
+    pub status: String,
+    /// When `supply` was read from Polyester chain. Set only with `supply`.
+    pub observed_at: Option<Timestamp>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+impl ZippedAssetSupplyUpdate {
+    /// True only while the supply is known and current
+    /// ([`SUPPLY_STATUS_AVAILABLE`]).
+    pub fn supply_is_current(&self) -> bool {
+        self.status == SUPPLY_STATUS_AVAILABLE
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, Default)]
 pub struct ZippedAssetSupplyBatch {
     pub updates: Vec<ZippedAssetSupplyUpdate>,
 }

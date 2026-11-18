@@ -3881,6 +3881,72 @@ async fn l2_gateway_timestamp_skew_json_is_retryable() {
     }
 }
 
+/// A REST timestamp-skew refusal names the server time and window it checked
+/// against (`timestampWindow`), so the caller can resync from the refusal
+/// alone. Malformed metadata, a 100,000-digit time included, leaves no
+/// window but keeps the typed refusal, its status and its Retry-After.
+#[tokio::test]
+async fn l2_rest_timestamp_skew_exposes_its_window() {
+    fn skew(window: &str) -> hardening_support::HttpScript {
+        let body = format!(
+            r#"{{"type":"https://polyester.dev/problems/timestamp-skew","title":"API Key Timestamp Skew","status":401,"detail":"outside the window","code":"TIMESTAMP_SKEW","timestampWindow":{window}}}"#
+        );
+        hardening_support::HttpScript::Raw {
+            status: 401,
+            headers: vec![
+                ("Content-Type".into(), "application/problem+json".into()),
+                ("Content-Length".into(), body.len().to_string()),
+                ("Retry-After".into(), "5".into()),
+            ],
+            body: body.into_bytes(),
+        }
+    }
+    let read = |window: &'static str| async move {
+        let http = MockHttpServer::spawn(move |_| skew(window)).await;
+        api_key_client(&http).auth.me().await.unwrap_err()
+    };
+
+    let err =
+        read(r#"{"serverTimeMs":"1763337600000","recvWindowMs":5000,"maxFutureMs":1000}"#).await;
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401, .. }),
+        "{err:?}"
+    );
+    assert_eq!(
+        err.timestamp_window(),
+        Some(polyester::TimestampWindow {
+            server_time_ms: 1_763_337_600_000,
+            recv_window_ms: 5000,
+            max_future_ms: 1000,
+        })
+    );
+    assert_eq!(err.retry_after(), Some(5.0));
+
+    let huge: &'static str = Box::leak(
+        format!(
+            r#"{{"serverTimeMs":"{}","recvWindowMs":5000,"maxFutureMs":1000}}"#,
+            "9".repeat(100_000)
+        )
+        .into_boxed_str(),
+    );
+    for window in [
+        huge,
+        r#"{"serverTimeMs":"1763337600000","recvWindowMs":-1,"maxFutureMs":1000}"#,
+        r#"{"serverTimeMs":"+1763337600000","recvWindowMs":5000,"maxFutureMs":1000}"#,
+        r#"{"recvWindowMs":5000,"maxFutureMs":1000}"#,
+        r#""not an object""#,
+    ] {
+        let err = read(window).await;
+        assert!(
+            matches!(err, Error::TimestampSkew { status: 401, .. }),
+            "{err:?}"
+        );
+        assert_eq!(err.timestamp_window(), None, "{err:?}");
+        assert_eq!(err.retry_after(), Some(5.0), "{err:?}");
+        assert!(err.is_retryable());
+    }
+}
+
 #[tokio::test]
 async fn l2_gateway_api_key_rejections_carry_their_code_and_are_not_retryable() {
     let err =
@@ -10168,7 +10234,8 @@ fn zero_scale_zipped_supply_reads_whole_units() {
     };
     use polyester::codecs::format_ledger_u64;
     use polyester::proto::chain::zipper::v1::{
-        GetDepositWithdrawConfigResponse, ZippedAssetSupplyBatch, ZippedAssetSupplyUpdate,
+        GetDepositWithdrawConfigResponse, SupplyStatus, ZippedAssetSupplyBatch,
+        ZippedAssetSupplyUpdate,
     };
 
     let config: GetDepositWithdrawConfigResponse = serde_json::from_value(json!({
@@ -10187,10 +10254,14 @@ fn zero_scale_zipped_supply_reads_whole_units() {
     .unwrap();
     let catalogs = Manager::new();
     catalogs
-        .hydrate_zipper_config(&deposit_withdraw_config_from_proto(&config))
+        .hydrate_zipper_config(&deposit_withdraw_config_from_proto(&config).unwrap())
         .unwrap();
     assert_eq!(catalogs.quantity_scale_for_zipped_asset_id(245), Some(0));
 
+    let observed = buffa_types::google::protobuf::Timestamp {
+        seconds: 1_794_744_000,
+        ..Default::default()
+    };
     let updates = [
         (245, 3_582_802, "3582802"),
         (247, 2_232_802, "2232802"),
@@ -10204,6 +10275,8 @@ fn zero_scale_zipped_supply_reads_whole_units() {
             .map(|(id, q, _)| ZippedAssetSupplyUpdate {
                 zipped_asset_id: *id,
                 supply_q: *q,
+                status: SupplyStatus::AVAILABLE.into(),
+                observed_at: observed.clone().into(),
                 ..Default::default()
             })
             .collect(),
@@ -10213,14 +10286,14 @@ fn zero_scale_zipped_supply_reads_whole_units() {
         catalogs.quantity_scale_for_zipped_asset_id(id)
     })
     .unwrap();
-    let got: Vec<(u32, String)> = decoded
+    let got: Vec<(u32, Option<String>)> = decoded
         .updates
         .into_iter()
         .map(|u| (u.zipped_asset_id, u.supply))
         .collect();
-    let want: Vec<(u32, String)> = updates
+    let want: Vec<(u32, Option<String>)> = updates
         .iter()
-        .map(|(id, _, s)| (*id, (*s).to_owned()))
+        .map(|(id, _, s)| (*id, Some((*s).to_owned())))
         .collect();
     assert_eq!(got, want);
 
@@ -10228,10 +10301,33 @@ fn zero_scale_zipped_supply_reads_whole_units() {
         updates: vec![ZippedAssetSupplyUpdate {
             zipped_asset_id: 999,
             supply_q: 3_582_802,
+            status: SupplyStatus::AVAILABLE.into(),
+            observed_at: observed.clone().into(),
             ..Default::default()
         }],
         ..Default::default()
     };
+    // An available or stale update without its observation time is refused
+    // before anything reads or caches it.
+    for status in [SupplyStatus::AVAILABLE, SupplyStatus::STALE] {
+        let untimed = ZippedAssetSupplyBatch {
+            updates: vec![ZippedAssetSupplyUpdate {
+                zipped_asset_id: 3,
+                supply_q: 1_500_000,
+                status: status.into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let err = zipped_asset_supply_batch_from_bytes(&untimed.encode_to_vec(), |id| {
+            catalogs.quantity_scale_for_zipped_asset_id(id)
+        })
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{status:?}: {err:?}"
+        );
+    }
     assert!(
         zipped_asset_supply_batch_from_bytes(&unknown.encode_to_vec(), |id| {
             catalogs.quantity_scale_for_zipped_asset_id(id)
