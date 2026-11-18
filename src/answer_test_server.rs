@@ -104,14 +104,17 @@ async fn request_head(stream: &tokio::net::TcpStream) -> Option<Vec<u8>> {
 const TARGET_PATH: &str = "/redirect-target";
 
 /// Whether `head` is a request for the redirect's [`TARGET_PATH`], by any
-/// method and with any query, parsed as HTTP/1.x.
+/// method and with any query, parsed as HTTP/1.x. The path is read from the
+/// parsed request target, so an absolute-form target
+/// (`GET http://host/redirect-target`) counts as an origin-form one does.
 fn is_for_target(head: &[u8]) -> bool {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut request = httparse::Request::new(&mut headers);
     matches!(request.parse(head), Ok(httparse::Status::Complete(_)))
         && request
             .path
-            .is_some_and(|path| path.split('?').next() == Some(TARGET_PATH))
+            .and_then(|target| target.parse::<hyper::Uri>().ok())
+            .is_some_and(|target| target.path() == TARGET_PATH)
 }
 
 /// Whether `head` is the `expected` request, parsed as HTTP/1.1.
@@ -291,7 +294,8 @@ mod tests {
     }
 
     /// Any request for the target's path counts, whatever its method,
-    /// query or headers; a port probe or another path does not.
+    /// query, headers or target form; a port probe or another path does
+    /// not.
     #[test]
     fn every_request_for_the_target_counts() {
         for followed in [
@@ -299,6 +303,8 @@ mod tests {
                 [..],
             b"GET /redirect-target HTTP/1.1\r\nHost: x\r\n\r\n",
             b"GET /redirect-target?q=1 HTTP/1.1\r\n\r\n",
+            b"GET http://127.0.0.1:1/redirect-target HTTP/1.1\r\n\r\n",
+            b"POST http://x/redirect-target?q=1 HTTP/1.1\r\n\r\n",
             b"PUT /redirect-target HTTP/1.0\r\n\r\n",
         ] {
             assert!(
@@ -311,6 +317,9 @@ mod tests {
             &b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n"[..],
             b"GET / HTTP/1.1\r\nHost: x\r\n\r\n",
             b"POST /redirect-target/more HTTP/1.1\r\n\r\n",
+            b"GET http://x/ HTTP/1.1\r\n\r\n",
+            b"GET http://x/redirect-target/more HTTP/1.1\r\n\r\n",
+            b"CONNECT x:443 HTTP/1.1\r\n\r\n",
             b"GET /redirect-target HTTP/9.9\r\n\r\n",
             b"not http\r\n\r\n",
         ] {
