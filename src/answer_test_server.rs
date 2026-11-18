@@ -2,10 +2,12 @@
 //! and of a redirect: the answer's metadata is in its headers, so every error
 //! made from the answer carries it.
 //!
-//! Each server counts only the request it expects, by method, path and one
-//! header, read from the whole request head. Other processes probe local
-//! ports on a shared machine (with a `HEAD /`, for example): such a request
-//! is dropped and counts for nothing.
+//! The answering server counts only the request it expects, by method, path
+//! and one header; a redirect's target counts every request for its own
+//! path, whatever the method, as a followed redirect may change it. Both
+//! read the whole request head first. Other processes probe local ports on a
+//! shared machine (with a `HEAD /`, for example): such a request is dropped
+//! and counts for nothing.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -95,6 +97,21 @@ async fn request_head(stream: &tokio::net::TcpStream) -> Option<Vec<u8>> {
     .await
     .ok()
     .flatten()
+}
+
+/// The path of a redirect's target. No request but a followed redirect
+/// asks for it: not the request redirected, nor a port probe.
+const TARGET_PATH: &str = "/redirect-target";
+
+/// Whether `head` is a request for the redirect's [`TARGET_PATH`], by any
+/// method and with any query, parsed as HTTP/1.x.
+fn is_for_target(head: &[u8]) -> bool {
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut request = httparse::Request::new(&mut headers);
+    matches!(request.parse(head), Ok(httparse::Status::Complete(_)))
+        && request
+            .path
+            .is_some_and(|path| path.split('?').next() == Some(TARGET_PATH))
 }
 
 /// Whether `head` is the `expected` request, parsed as HTTP/1.1.
@@ -212,12 +229,13 @@ pub(crate) async fn answering(
     (addr, answered)
 }
 
-/// The address of a server that only counts the `expected` requests it
-/// gets: a redirect's target, which must get none. Any other request, such
-/// as a port probe, is not counted.
-pub(crate) async fn counting_target(expected: Expected) -> (String, Arc<AtomicUsize>) {
+/// A redirect's target, which must get no request: the URL to redirect to
+/// and the number of requests for it. Whatever a followed redirect sends
+/// there counts (the request redirected, or a `GET` in its place, with or
+/// without its headers); any other request, such as a port probe, does not.
+pub(crate) async fn counting_target() -> (String, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap().to_string();
+    let url = format!("http://{}{TARGET_PATH}", listener.local_addr().unwrap());
     let requests = Arc::new(AtomicUsize::new(0));
     let count = requests.clone();
     tokio::spawn(async move {
@@ -225,14 +243,14 @@ pub(crate) async fn counting_target(expected: Expected) -> (String, Arc<AtomicUs
             let count = count.clone();
             tokio::spawn(async move {
                 if let Some(head) = request_head(&stream).await
-                    && is_expected(&head, &expected)
+                    && is_for_target(&head)
                 {
                     count.fetch_add(1, Ordering::SeqCst);
                 }
             });
         }
     });
-    (addr, requests)
+    (url, requests)
 }
 
 /// A redirect's `Location` that does not parse as a URL.
@@ -269,6 +287,34 @@ mod tests {
                 "{}",
                 String::from_utf8_lossy(other)
             );
+        }
+    }
+
+    /// Any request for the target's path counts, whatever its method,
+    /// query or headers; a port probe or another path does not.
+    #[test]
+    fn every_request_for_the_target_counts() {
+        for followed in [
+            &b"POST /redirect-target HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n\r\n"
+                [..],
+            b"GET /redirect-target HTTP/1.1\r\nHost: x\r\n\r\n",
+            b"GET /redirect-target?q=1 HTTP/1.1\r\n\r\n",
+            b"PUT /redirect-target HTTP/1.0\r\n\r\n",
+        ] {
+            assert!(
+                is_for_target(followed),
+                "{}",
+                String::from_utf8_lossy(followed)
+            );
+        }
+        for other in [
+            &b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n"[..],
+            b"GET / HTTP/1.1\r\nHost: x\r\n\r\n",
+            b"POST /redirect-target/more HTTP/1.1\r\n\r\n",
+            b"GET /redirect-target HTTP/9.9\r\n\r\n",
+            b"not http\r\n\r\n",
+        ] {
+            assert!(!is_for_target(other), "{}", String::from_utf8_lossy(other));
         }
     }
 }

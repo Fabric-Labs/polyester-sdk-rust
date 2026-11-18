@@ -279,14 +279,8 @@ mod tests {
             header: "content-type",
             value: Some("application/json"),
         };
-        // A followed redirect would repeat the call on the target, with or
-        // without its headers: count any POST of its path there.
-        let (target, target_hits) = counting_target(Expected {
-            header: "host",
-            value: None,
-            ..call
-        })
-        .await;
+        // Any request a followed redirect makes counts there.
+        let (target, target_hits) = counting_target().await;
         let too_large = MAX_JSONRPC_RESPONSE_BYTES + 1;
         let cases = [
             ("truncated", Answer::unavailable(AnswerBody::Truncated)),
@@ -299,7 +293,7 @@ mod tests {
                 Answer::unavailable(AnswerBody::Chunked(too_large)),
             ),
             ("body-deadline", Answer::unavailable(AnswerBody::Stalled)),
-            ("redirect", Answer::redirect(format!("http://{target}/"))),
+            ("redirect", Answer::redirect(target)),
             (
                 "redirect-malformed",
                 Answer::redirect(MALFORMED_LOCATION.to_owned()),

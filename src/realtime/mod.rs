@@ -1353,14 +1353,8 @@ mod tests {
             header: crate::auth::HEADER_KEY_ID,
             value: None,
         };
-        // A followed redirect would repeat the request on the target, signed
-        // or not: count any GET of the token path there.
-        let (target, target_hits) = counting_target(Expected {
-            header: "host",
-            value: None,
-            ..token
-        })
-        .await;
+        // Any request a followed redirect makes counts there.
+        let (target, target_hits) = counting_target().await;
         let too_large = auth::MAX_TOKEN_RESPONSE_BYTES + 1;
         let cases = [
             ("truncated", Answer::unavailable(AnswerBody::Truncated)),
@@ -1373,10 +1367,7 @@ mod tests {
                 Answer::unavailable(AnswerBody::Chunked(too_large)),
             ),
             ("body-deadline", Answer::unavailable(AnswerBody::Stalled)),
-            (
-                "redirect",
-                Answer::redirect(format!("http://{target}/v1/rt/token")),
-            ),
+            ("redirect", Answer::redirect(target)),
             (
                 "redirect-malformed",
                 Answer::redirect(MALFORMED_LOCATION.to_owned()),
