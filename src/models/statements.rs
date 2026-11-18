@@ -125,9 +125,11 @@ pub struct StatementExportDownloadUrl {
     pub url: String,
     /// When the URL stops working: 60 seconds after it was signed for this
     /// call, or when the file expires if that is sooner. Request a new URL
-    /// after it. `None` when the server sent none.
-    pub expires_at: Option<Timestamp>,
+    /// after it. Always set: a reply without it is an
+    /// [`crate::Error::ResponseContract`].
+    pub expires_at: Timestamp,
     /// Name the download saves the file as, `statement-<export_id>.csv`.
+    /// Never empty.
     pub filename: String,
 }
 
@@ -150,10 +152,10 @@ mod tests {
     fn download_url_debug_redacts_the_url() {
         let url = StatementExportDownloadUrl {
             url: "https://files.example/statement?signature=fake-signature-marker".into(),
-            expires_at: Some(Timestamp {
+            expires_at: Timestamp {
                 seconds: 1_763_337_660,
                 ..Default::default()
-            }),
+            },
             filename: "statement-7.csv".into(),
         };
         for rendered in [format!("{url:?}"), format!("{url:#?}")] {

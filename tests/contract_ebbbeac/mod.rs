@@ -108,10 +108,7 @@ async fn statement_export_download_url_and_cancel_are_signed() {
         .unwrap();
     assert_eq!(url.url, FILE_URL);
     assert_eq!(url.filename, format!("statement-{id}.csv"));
-    assert_eq!(
-        url.expires_at.as_ref().map(|t| t.seconds),
-        Some(1_763_337_660)
-    );
+    assert_eq!(url.expires_at.seconds, 1_763_337_660);
     let rendered = format!("{url:?}");
     assert!(!rendered.contains("fake-signature-marker"), "{rendered}");
     assert!(!rendered.contains("files.example"), "{rendered}");

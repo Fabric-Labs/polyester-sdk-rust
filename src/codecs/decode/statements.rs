@@ -180,9 +180,18 @@ pub fn statement_export_download_url_from_proto(
             "missing url",
         ));
     }
+    let expires_at = msg.expires_at.as_option().cloned().ok_or_else(|| {
+        Error::response_contract("GetStatementExportDownloadUrl", "missing expires_at")
+    })?;
+    if msg.filename.is_empty() {
+        return Err(Error::response_contract(
+            "GetStatementExportDownloadUrl",
+            "missing filename",
+        ));
+    }
     Ok(StatementExportDownloadUrl {
         url: msg.url.clone(),
-        expires_at: msg.expires_at.as_option().cloned(),
+        expires_at,
         filename: msg.filename.clone(),
     })
 }
@@ -501,7 +510,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(got.url, "https://files.example/s?sig=x");
-        assert_eq!(got.expires_at, Some(expires_at));
+        assert_eq!(got.expires_at, expires_at);
         assert_eq!(got.filename, "statement-7.csv");
         let err =
             statement_export_download_url_from_proto(&GetStatementExportDownloadUrlResponse {
@@ -510,6 +519,23 @@ mod tests {
             })
             .unwrap_err();
         assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+        // The expiry and the file name are part of every URL the contract
+        // returns: a reply without either is refused, not read as unknown.
+        for reply in [
+            GetStatementExportDownloadUrlResponse {
+                url: "https://files.example/s?sig=x".into(),
+                filename: "statement-7.csv".into(),
+                ..Default::default()
+            },
+            GetStatementExportDownloadUrlResponse {
+                url: "https://files.example/s?sig=x".into(),
+                expires_at: expires_at.clone().into(),
+                ..Default::default()
+            },
+        ] {
+            let err = statement_export_download_url_from_proto(&reply).unwrap_err();
+            assert!(matches!(err, Error::ResponseContract { .. }), "{err:?}");
+        }
     }
 
     /// An export reply must carry the export and its ID.
