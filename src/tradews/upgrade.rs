@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 use tokio::sync::oneshot;
 use tokio_tungstenite::MaybeTlsStream;
@@ -148,38 +148,146 @@ pub(super) async fn open(url: &str) -> Result<(Recoverable, oneshot::Receiver<St
     ))
 }
 
-/// The refused upgrade `response` with the rest of its body, read from the
-/// connection the handshake returned: up to its `Content-Length`, or to the
-/// end of the connection without one, at most [`MAX_REFUSAL_BODY`] bytes and
-/// [`REFUSAL_BODY_WAIT`]. Whatever arrived by then is kept.
+/// The refused upgrade `response` with its whole body, read from the
+/// connection the handshake returned. The handshake has parsed the head and
+/// kept only the body bytes that arrived with it; the head is written back in
+/// front of them and of the connection, and hyper's HTTP/1 client reads the
+/// response from that, so a `Content-Length`, a chunked or a
+/// connection-delimited body is decoded by the library. At most
+/// [`MAX_REFUSAL_BODY`] bytes and [`REFUSAL_BODY_WAIT`]: whatever arrived
+/// by then is kept, and a response hyper cannot read keeps what the
+/// handshake read.
 pub(super) async fn complete_refusal(
     mut response: Response<Option<Vec<u8>>>,
     returned: oneshot::Receiver<Stream>,
 ) -> Response<Option<Vec<u8>>> {
-    let Ok(mut stream) = returned.await else {
+    let Ok(stream) = returned.await else {
         return response;
     };
-    let mut body = response.body_mut().take().unwrap_or_default();
-    let want = response
-        .headers()
-        .get(tokio_tungstenite::tungstenite::http::header::CONTENT_LENGTH)
-        .and_then(|value| value.to_str().ok()?.trim().parse::<usize>().ok())
-        .map(|length| length.min(MAX_REFUSAL_BODY));
-    let _ = tokio::time::timeout(REFUSAL_BODY_WAIT, async {
-        let mut buf = [0u8; 4096];
-        loop {
-            let limit = want.unwrap_or(MAX_REFUSAL_BODY);
-            if body.len() >= limit {
-                body.truncate(limit);
-                break;
-            }
-            match stream.read(&mut buf).await {
-                Ok(0) | Err(_) => break,
-                Ok(n) => body.extend_from_slice(&buf[..n]),
-            }
-        }
-    })
-    .await;
+    let mut head = format!(
+        "HTTP/1.1 {} {}\r\n",
+        response.status().as_u16(),
+        response.status().canonical_reason().unwrap_or("")
+    )
+    .into_bytes();
+    for (name, value) in response.headers() {
+        head.extend_from_slice(name.as_str().as_bytes());
+        head.extend_from_slice(b": ");
+        head.extend_from_slice(value.as_bytes());
+        head.extend_from_slice(b"\r\n");
+    }
+    head.extend_from_slice(b"\r\n");
+    if let Some(received) = response.body() {
+        head.extend_from_slice(received);
+    }
+    let replay = Replay {
+        prefix: head,
+        at: 0,
+        stream,
+        requested: false,
+        reader: None,
+    };
+    let read = tokio::time::timeout(REFUSAL_BODY_WAIT, read_body(replay)).await;
+    let body = match read {
+        Ok(Some(body)) => body,
+        // hyper could not read the response, or nothing arrived in time:
+        // keep what the handshake read.
+        Ok(None) | Err(_) => return response,
+    };
     *response.body_mut() = (!body.is_empty()).then_some(body);
     response
+}
+
+/// The response's body as hyper's HTTP/1 client decodes it from `replay`,
+/// up to [`MAX_REFUSAL_BODY`] bytes; what arrived before an error is kept.
+/// `None` when hyper cannot read a response at all.
+async fn read_body(replay: Replay) -> Option<Vec<u8>> {
+    use http_body_util::BodyExt;
+
+    let (mut sender, connection) =
+        hyper::client::conn::http1::handshake(hyper_util::rt::TokioIo::new(replay))
+            .await
+            .ok()?;
+    let driver = tokio::spawn(async move {
+        let _ = connection.await;
+    });
+    // The request is never sent anywhere: `Replay` discards writes, and the
+    // response it reads is the refusal already received.
+    let request = tokio_tungstenite::tungstenite::http::Request::get("/")
+        .body(http_body_util::Empty::<hyper::body::Bytes>::new())
+        .ok()?;
+    let result = async {
+        let mut incoming = sender.send_request(request).await.ok()?.into_body();
+        let mut body = Vec::new();
+        while body.len() < MAX_REFUSAL_BODY {
+            match incoming.frame().await {
+                Some(Ok(frame)) => {
+                    if let Ok(data) = frame.into_data() {
+                        body.extend_from_slice(&data);
+                    }
+                }
+                Some(Err(_)) | None => break,
+            }
+        }
+        body.truncate(MAX_REFUSAL_BODY);
+        Some(body)
+    }
+    .await;
+    driver.abort();
+    result
+}
+
+/// The refusal's head and the body bytes already received, then the
+/// connection; writes go nowhere. Nothing is read before hyper has written
+/// its request: hyper refuses a response that comes before it.
+struct Replay {
+    prefix: Vec<u8>,
+    at: usize,
+    stream: Stream,
+    requested: bool,
+    reader: Option<std::task::Waker>,
+}
+
+impl AsyncRead for Replay {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let this = self.get_mut();
+        if !this.requested {
+            this.reader = Some(cx.waker().clone());
+            return Poll::Pending;
+        }
+        if this.at < this.prefix.len() {
+            let n = buf.remaining().min(this.prefix.len() - this.at);
+            buf.put_slice(&this.prefix[this.at..this.at + n]);
+            this.at += n;
+            return Poll::Ready(Ok(()));
+        }
+        Pin::new(&mut this.stream).poll_read(cx, buf)
+    }
+}
+
+impl AsyncWrite for Replay {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let this = self.get_mut();
+        this.requested = true;
+        if let Some(reader) = this.reader.take() {
+            reader.wake();
+        }
+        Poll::Ready(Ok(buf.len()))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
 }
