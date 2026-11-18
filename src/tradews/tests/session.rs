@@ -24,7 +24,7 @@ use crate::tradews::sbe::{
 };
 use crate::tradews::{
     BatchCancelOrders, BatchCreateOrders, CancelAllOrders, CancelItem, CancelReason, Command,
-    Config, Deadline, Event, NotSent, OrderRef, OrderStatus, PostOnlyOrder, RejectCode, Side,
+    Config, Deadline, Event, NotSent, OrderRef, OrderStatus, PATH, PostOnlyOrder, RejectCode, Side,
     TradeError, TradeSession, connect,
 };
 use crate::types::{Price, Quantity, QuantityDomain};
@@ -116,15 +116,56 @@ struct Hold {
 }
 
 /// Whether the client's whole upgrade request has reached `tcp`, read
-/// without taking it off the socket; false once the peer goes away.
+/// without taking it off the socket: a `GET` of the trading path that asks
+/// to upgrade to a WebSocket. False once the peer goes away, and for any
+/// other request: other processes probe local ports on a shared machine
+/// (with a `HEAD /`, for example), and a probe must not take the script.
 async fn upgrade_arrived(tcp: &tokio::net::TcpStream) -> bool {
     let mut buf = vec![0u8; 16 * 1024];
     loop {
         match tcp.peek(&mut buf).await {
             Ok(0) | Err(_) => return false,
-            Ok(n) if buf[..n].windows(4).any(|w| w == b"\r\n\r\n") => return true,
+            Ok(n) if buf[..n].windows(4).any(|w| w == b"\r\n\r\n") => {
+                return is_trading_upgrade(&buf[..n]);
+            }
             Ok(_) => tokio::time::sleep(Duration::from_millis(1)).await,
         }
+    }
+}
+
+/// Whether `head`, a complete request head, is a `GET` of [`PATH`] whose
+/// `Upgrade` header asks for a WebSocket.
+fn is_trading_upgrade(head: &[u8]) -> bool {
+    let head = String::from_utf8_lossy(head);
+    let mut lines = head.split("\r\n");
+    let Some(request_line) = lines.next() else {
+        return false;
+    };
+    let mut parts = request_line.split(' ');
+    if parts.next() != Some("GET") || parts.next() != Some(PATH) {
+        return false;
+    }
+    lines.any(|line| {
+        line.split_once(':').is_some_and(|(name, value)| {
+            name.trim().eq_ignore_ascii_case("upgrade")
+                && value.trim().eq_ignore_ascii_case("websocket")
+        })
+    })
+}
+
+#[test]
+fn the_stand_in_holds_only_a_trading_upgrade() {
+    let upgrade = format!(
+        "GET {PATH} HTTP/1.1\r\nHost: x\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"
+    );
+    assert!(is_trading_upgrade(upgrade.as_bytes()));
+    for probe in [
+        "HEAD / HTTP/1.1\r\nHost: x\r\n\r\n".to_owned(),
+        "GET / HTTP/1.1\r\nHost: x\r\n\r\n".to_owned(),
+        format!("GET {PATH} HTTP/1.1\r\nHost: x\r\n\r\n"),
+        format!("POST {PATH} HTTP/1.1\r\nUpgrade: websocket\r\n\r\n"),
+    ] {
+        assert!(!is_trading_upgrade(probe.as_bytes()), "{probe:?}");
     }
 }
 
