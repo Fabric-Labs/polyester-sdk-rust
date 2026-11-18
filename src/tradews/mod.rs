@@ -47,6 +47,7 @@ pub(crate) mod sbe;
 mod session;
 #[cfg(test)]
 mod tests;
+mod upgrade;
 
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -42,7 +42,7 @@ use tokio_tungstenite::tungstenite::http::header::USER_AGENT;
 use tokio_tungstenite::tungstenite::http::{HeaderMap, HeaderName, HeaderValue};
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::{self, Message};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async_tls_with_config};
+use tokio_tungstenite::{WebSocketStream, client_async_with_config};
 
 use super::codec::{self, Answer, CHANNELS, Msg};
 use super::{
@@ -57,7 +57,7 @@ use crate::errors::{Error, Result};
 use crate::realtime::{ReconnectBackoff, lock_unpoisoned};
 use crate::reconnect::{ReconnectLimiter, upgrade_slot};
 
-type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+type Ws = WebSocketStream<super::upgrade::Recoverable>;
 
 /// Commands that may wait to be written; a full queue refuses the next one
 /// ([`NotSent::QueueFull`]).
@@ -880,14 +880,26 @@ async fn dial(cfg: &Config, cancel_on_disconnect: Option<Duration>) -> Result<Ws
     let config = WebSocketConfig::default()
         .max_message_size(Some(MAX_MESSAGE_BYTES))
         .max_frame_size(Some(MAX_MESSAGE_BYTES));
-    let connector = crate::tls::websocket_connector()?;
-    let (mut ws, response) = tokio::time::timeout(
-        cfg.connect_timeout(),
-        connect_async_tls_with_config(request, Some(config), true, Some(connector)),
-    )
-    .await
-    .map_err(|_| Error::realtime("tradews connect timed out"))?
-    .map_err(upgrade_error)?;
+    // A refused upgrade is read whole, its body included, before it is
+    // classified: see `super::upgrade`.
+    let upgrade = async {
+        let (stream, returned) = super::upgrade::open(&cfg.url).await?;
+        match client_async_with_config(request, stream, Some(config)).await {
+            Ok((mut ws, response)) => {
+                ws.get_mut().keep();
+                Ok((ws, response))
+            }
+            Err(tungstenite::Error::Http(response)) => {
+                Err(upgrade_error(tungstenite::Error::Http(
+                    super::upgrade::complete_refusal(response, returned).await,
+                )))
+            }
+            Err(other) => Err(upgrade_error(other)),
+        }
+    };
+    let (mut ws, response) = tokio::time::timeout(cfg.connect_timeout(), upgrade)
+        .await
+        .map_err(|_| Error::realtime("tradews connect timed out"))??;
     if cancel_on_disconnect.is_some() && !protected(response.headers()) {
         let _ = ws.close(None).await;
         return Err(Error::TradeSession(TradeError::NotProtected));
