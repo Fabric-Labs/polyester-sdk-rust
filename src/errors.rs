@@ -991,12 +991,8 @@ pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
     decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
 }
 
-/// Contract REST codes that no generated error enum names. The ledger reads'
-/// `API_KEY_ACTION_DENY`, `ROLE_ACTION_DENY` and `SUBACCOUNT_POLICY_DENY`
-/// left the contract in 0.93.5 for `PERMISSION_DENIED`; they stay
-/// recognised so an older server's answer still reads as before.
-const REST_ONLY_CODES: [&str; 21] = [
-    "API_KEY_ACTION_DENY",
+/// Contract REST codes that no generated error enum names.
+const REST_ONLY_CODES: [&str; 18] = [
     "API_KEY_POLICY_NOT_FOUND",
     "INVALID_BEFORE_TS_NS",
     "INVALID_DEPTH",
@@ -1011,10 +1007,8 @@ const REST_ONLY_CODES: [&str; 21] = [
     "INVALID_TRIGGER_STATUS",
     "ORDER_ID_REQUIRED",
     "REQUEST_TOO_LARGE",
-    "ROLE_ACTION_DENY",
     "ROLE_SPOT_TRADE_DENY",
     "SERVER_ERROR",
-    "SUBACCOUNT_POLICY_DENY",
     "TRAILING_STOP_ORDER_TYPE_UNSUPPORTED",
     "TRIGGER_ID_REQUIRED",
 ];
@@ -3320,6 +3314,20 @@ mod tests {
             ),
         );
         assert_eq!(without_holder.existing_order_id(), None);
+    }
+
+    /// The ledger reads' retired deny codes left the contract for
+    /// `PERMISSION_DENIED`; the SDK no longer names them as contract codes.
+    #[test]
+    fn retired_deny_codes_are_not_contract_codes() {
+        for retired in [
+            "API_KEY_ACTION_DENY",
+            "ROLE_ACTION_DENY",
+            "SUBACCOUNT_POLICY_DENY",
+        ] {
+            assert!(!is_recognised_rest_code(retired), "{retired}");
+        }
+        assert!(is_recognised_rest_code("PERMISSION_DENIED"));
     }
 
     #[test]
