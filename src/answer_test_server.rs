@@ -235,6 +235,9 @@ pub(crate) async fn counting_target(expected: Expected) -> (String, Arc<AtomicUs
     (addr, requests)
 }
 
+/// A redirect's `Location` that does not parse as a URL.
+pub(crate) const MALFORMED_LOCATION: &str = "http://[::1";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,6 +272,3 @@ mod tests {
         }
     }
 }
-
-/// A redirect's `Location` that does not parse as a URL.
-pub(crate) const MALFORMED_LOCATION: &str = "http://[::1";
