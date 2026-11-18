@@ -83,6 +83,7 @@ k256 = { version = "0.13", default-features = false, features = ["ecdsa", "std"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
+httparse = "1"
 dotenvy = "0.15"
 trybuild = "1.0"
 
