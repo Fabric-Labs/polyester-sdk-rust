@@ -2001,3 +2001,123 @@ async fn round6_refused_redirects_keep_their_answer() {
         "a redirect was followed"
     );
 }
+
+/// The fixture is the published catalog, every catalog but Quick Swap's, as
+/// distinct (code, status, Connect code) tuples: a code the catalogs answer
+/// two ways keeps both, and codes the contract removed are gone.
+#[test]
+fn rest_error_fixture_keeps_every_catalog_variant() {
+    let catalog: Value =
+        serde_json::from_str(include_str!("../fixtures/rest_error_codes.json")).expect("catalog");
+    let entries = catalog["codes"].as_array().expect("codes");
+    let mut seen = std::collections::BTreeSet::new();
+    for entry in entries {
+        let tuple = (
+            entry["code"].as_str().expect("code").to_owned(),
+            entry["status"].as_u64().expect("status"),
+            entry["connect"].as_str().expect("connect").to_owned(),
+        );
+        let catalogs = entry["catalogs"].as_array().expect("catalogs");
+        assert!(!catalogs.is_empty(), "{tuple:?}");
+        assert!(
+            catalogs
+                .iter()
+                .all(|c| !c.as_str().expect("catalog id").starts_with("swap-api:")),
+            "{tuple:?}"
+        );
+        assert!(seen.insert(tuple.clone()), "duplicate {tuple:?}");
+    }
+    let has = |code: &str, status: u64, connect: &str| {
+        seen.contains(&(code.to_owned(), status, connect.to_owned()))
+    };
+    assert!(has("UNKNOWN_SYMBOL", 400, "invalid_argument"));
+    assert!(has("UNKNOWN_SYMBOL", 404, "not_found"));
+    assert!(has("REQUEST_TOO_LARGE", 413, "resource_exhausted"));
+    assert!(has("UPSTREAM_ERROR", 503, "unavailable"));
+    assert!(has("WALLET_RESOLUTION_UNAVAILABLE", 503, "unavailable"));
+    assert!(has("ATTACHED_LEGS_EXCEEDED", 400, "failed_precondition"));
+    assert!(has("INSUFFICIENT_FUNDS", 400, "failed_precondition"));
+    assert!(has("BATCH_TOO_MANY_SOURCES", 400, "invalid_argument"));
+    assert!(has("CLIENT_LIST_ID_INVALID", 400, "invalid_argument"));
+    for removed in [
+        "API_KEY_ACTION_DENY",
+        "ROLE_ACTION_DENY",
+        "SUBACCOUNT_POLICY_DENY",
+    ] {
+        assert!(seen.iter().all(|(code, ..)| code != removed), "{removed}");
+    }
+}
+
+/// Every catalog tuple sent as a REST problem reads as the SDK error its
+/// Connect code means, so a REST refusal and its ConnectRPC form are handled
+/// alike: the refusal keeps its code, a final refusal is never retried, and
+/// only a temporary or unknown outcome asks for a retry or a read-back.
+#[tokio::test(flavor = "multi_thread")]
+async fn every_catalog_tuple_reads_as_its_connect_code() {
+    let catalog: Value =
+        serde_json::from_str(include_str!("../fixtures/rest_error_codes.json")).expect("catalog");
+    for entry in catalog["codes"].as_array().expect("codes") {
+        let code = entry["code"].as_str().expect("code");
+        let status = entry["status"].as_u64().expect("status") as u16;
+        let connect = entry["connect"].as_str().expect("connect");
+        let case = format!("{status}/{code}/{connect}");
+        let body = json!({"code": code, "detail": "d"}).to_string();
+        let (err, _) = call("write", status, PROBLEM, &body, None).await;
+        let err = err.unwrap_or_else(|| panic!("{case}: expected an error"));
+        let keeps_code = err
+            .auth_error_code()
+            .is_some_and(|got| got == code || got == format!("ERROR_CODE_{code}"));
+        match connect {
+            "invalid_argument"
+            | "failed_precondition"
+            | "not_found"
+            | "aborted"
+            | "already_exists" => {
+                assert!(matches!(err, Error::Api { .. }), "{case}: {err:?}");
+                assert!(keeps_code, "{case}: {err:?}");
+                assert!(!err.mutation_outcome_unknown(), "{case}: {err:?}");
+            }
+            "permission_denied" => assert!(
+                matches!(
+                    err,
+                    Error::PermissionDenied { .. } | Error::SessionRequired { .. }
+                ),
+                "{case}: {err:?}"
+            ),
+            "unauthenticated" => assert!(
+                matches!(
+                    err,
+                    Error::ApiKeyRejected { .. } | Error::TimestampSkew { .. }
+                ),
+                "{case}: {err:?}"
+            ),
+            "resource_exhausted" if code == "REQUEST_TOO_LARGE" => {
+                assert!(err.is_request_too_large(), "{case}: {err:?}");
+                assert!(!err.is_retryable(), "{case}: {err:?}");
+            }
+            "resource_exhausted" => {
+                assert!(
+                    matches!(err, Error::RateLimit { .. }) || keeps_code,
+                    "{case}: {err:?}"
+                );
+                assert!(!err.mutation_outcome_unknown(), "{case}: {err:?}");
+            }
+            "unavailable" => assert!(
+                err.is_retryable()
+                    || err.mutation_outcome_unknown()
+                    || code == "ACCOUNT_ROUTING_INVALID",
+                "{case}: {err:?}"
+            ),
+            "deadline_exceeded" | "internal" => {
+                assert!(err.mutation_outcome_unknown(), "{case}: {err:?}")
+            }
+            "unimplemented" => {
+                assert!(
+                    matches!(err, Error::NotImplemented { .. }),
+                    "{case}: {err:?}"
+                )
+            }
+            other => panic!("{case}: unexpected Connect code {other}"),
+        }
+    }
+}
