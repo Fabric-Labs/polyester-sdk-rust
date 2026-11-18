@@ -1,10 +1,11 @@
 //! Auth response decoders.
 
 use crate::codecs::decode::common::{require_id, require_str_id};
+use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
 use crate::errors::Result;
 use crate::models::{
-    AccountIdentity, MeResult, UserProfile, UsernameHistoryEntry, UsernameHistoryList,
+    AccountIdentity, MeResult, MeSession, UserProfile, UsernameHistoryEntry, UsernameHistoryList,
 };
 use crate::proto::auth::v1::{
     AccountIdentity as ProtoAccountIdentity, GetUsernameHistoryResponse, MeResponse,
@@ -40,6 +41,12 @@ pub fn me_from_proto(msg: &MeResponse) -> Result<MeResult> {
         } else {
             Some(msg.root_smart_account_address.clone())
         },
+        session: msg.session.as_option().map(|session| MeSession {
+            session_id: session.session_id.clone(),
+            session_level: enum_proto_name(&session.session_level),
+            authentication_methods: session.authentication_methods.clone(),
+            auth_time_ms: timestamp_ms(session.auth_time.as_option()),
+        }),
     })
 }
 

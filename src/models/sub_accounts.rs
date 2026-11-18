@@ -24,6 +24,19 @@ pub struct SubAccount {
     /// not change `revision` or `updated_at`, so apply each update as it
     /// arrives.
     pub removed: bool,
+    /// The sub-account policy attached to it, as public-ID text; `None` when
+    /// none is attached.
+    pub subaccount_policy_id: Option<String>,
+    /// Members must enroll MFA to act on this sub-account.
+    pub require_member_mfa: bool,
+    /// The salt nonce its smart account was derived with; `None` when the
+    /// server sends none.
+    pub smart_account_salt_nonce: Option<u32>,
+    pub icon: String,
+    pub color: String,
+    pub owner_username: String,
+    pub owner_avatar_url: String,
+    pub owner_root_smart_account_address: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,6 +92,11 @@ pub struct CreateSubaccountResult {
 pub struct SubAccountMember {
     pub grantee_account_id: String,
     pub role: String,
+    /// The member has enrolled MFA.
+    pub mfa_enrolled: bool,
+    pub username: String,
+    pub smart_account_address: String,
+    pub avatar_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -89,9 +107,27 @@ pub struct SubAccountMembersList {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SubAccountInvite {
     pub invite_id: String,
+    /// The sub-account the invite is for, as public-ID text.
+    pub subaccount_id: String,
     pub grantee_account_id: String,
+    /// The account that sent the invite, as public-ID text; `None` when the
+    /// server sends none.
+    pub inviter_account_id: Option<String>,
     pub role: String,
     pub status: String,
+    /// When the invite was sent, in Unix milliseconds; `None` when the server
+    /// sends no time.
+    pub created_at_ms: Option<i64>,
+    /// When the grantee accepted or declined, in Unix milliseconds; `None`
+    /// while pending.
+    pub responded_at_ms: Option<i64>,
+    pub grantee_username: String,
+    pub inviter_username: String,
+    pub subaccount_label: String,
+    pub inviter_root_smart_account_address: String,
+    pub grantee_root_smart_account_address: String,
+    /// The sub-account requires members to enroll MFA.
+    pub require_member_mfa: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

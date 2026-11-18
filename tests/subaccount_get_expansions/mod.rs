@@ -187,10 +187,14 @@ async fn sub_accounts_get_returns_members_invites_and_policy_when_asked() {
             SubAccountMember {
                 grantee_account_id: format_id(7),
                 role: "OWNER".into(),
+                username: "alice".into(),
+                ..Default::default()
             },
             SubAccountMember {
                 grantee_account_id: format_id(9),
                 role: "TRADER".into(),
+                username: "bob".into(),
+                ..Default::default()
             },
         ];
         assert_eq!(got.members, want_members, "{wire:?}: members");
@@ -207,9 +211,12 @@ async fn sub_accounts_get_returns_members_invites_and_policy_when_asked() {
 
         let want_invites = vec![SubAccountInvite {
             invite_id: format_id(11),
+            subaccount_id: format_id(SUBACCOUNT),
             grantee_account_id: format_id(12),
+            inviter_account_id: Some(format_id(7)),
             role: "VIEWER".into(),
             status: "SUBACCOUNT_INVITE_STATUS_PENDING".into(),
+            ..Default::default()
         }];
         assert_eq!(got.invites, want_invites, "{wire:?}: invites");
         let listed_invites = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {

@@ -19,6 +19,9 @@ pub fn guard_signer_status_from_proto(msg: &ProtoStatus) -> GuardSignerStatus {
     GuardSignerStatus {
         signer_wallet: msg.signer_address.clone(),
         status: status.into(),
+        onchain_signer_address: msg.onchain_signer_address.clone(),
+        nonce: msg.nonce.clone(),
+        nonce_space: msg.nonce_space,
     }
 }
 
