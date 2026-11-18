@@ -991,7 +991,10 @@ pub(crate) fn carries_contract_code(detail: &ErrorDetail) -> bool {
     decodes && !is_placeholder_detail(detail) && !has_future_code(detail)
 }
 
-/// Contract REST codes that no generated error enum names.
+/// Contract REST codes that no generated error enum names. The ledger reads'
+/// `API_KEY_ACTION_DENY`, `ROLE_ACTION_DENY` and `SUBACCOUNT_POLICY_DENY`
+/// left the contract in 0.93.5 for `PERMISSION_DENIED`; they stay
+/// recognised so an older server's answer still reads as before.
 const REST_ONLY_CODES: [&str; 21] = [
     "API_KEY_ACTION_DENY",
     "API_KEY_POLICY_NOT_FOUND",

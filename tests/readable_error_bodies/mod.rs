@@ -2121,3 +2121,28 @@ async fn every_catalog_tuple_reads_as_its_connect_code() {
         }
     }
 }
+
+/// A read refused for a missing policy action answers `403`
+/// `PERMISSION_DENIED` naming the action, where ledger reads answered
+/// `API_KEY_ACTION_DENY` and its siblings: it reads as a permission refusal
+/// whose message names the action to grant, and is not retried.
+#[tokio::test(flavor = "multi_thread")]
+async fn permission_denied_names_the_missing_action() {
+    let body = json!({
+        "type": "https://polyester.dev/problems/permission-denied",
+        "title": "Permission Denied",
+        "status": 403,
+        "detail": "api_key_action_deny: API key policy does not grant READ_BALANCES",
+        "code": "PERMISSION_DENIED",
+    })
+    .to_string();
+    let (err, calls) = call("read", 403, PROBLEM, &body, None).await;
+    let err = err.expect("refusal");
+    assert_eq!(calls, 1);
+    assert!(matches!(err, Error::PermissionDenied { .. }), "{err:?}");
+    assert!(err.to_string().contains("READ_BALANCES"), "{err}");
+    assert!(
+        !err.is_retryable() && !err.mutation_outcome_unknown(),
+        "{err:?}"
+    );
+}
