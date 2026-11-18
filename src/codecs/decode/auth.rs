@@ -124,4 +124,47 @@ mod tests {
         assert_eq!(profile.vip_tier, 2);
         assert!(profile.username_unlocked);
     }
+
+    /// `MeResponse.session`: the presented access token's session, read with
+    /// its ID, level, methods and time; `None` when the answer has none.
+    #[test]
+    fn me_keeps_the_session_when_the_server_sends_one() {
+        use crate::models::MeSession;
+        use crate::proto::auth::v1::{SessionInfo, SessionLevel};
+        let msg = MeResponse {
+            account_id: 18,
+            username: "alice".into(),
+            session: SessionInfo {
+                session_id: "sess_1".into(),
+                session_level: SessionLevel::PRIMARY_AUTHENTICATED.into(),
+                authentication_methods: vec!["wallet".into()],
+                auth_time: buffa_types::google::protobuf::Timestamp {
+                    seconds: 3,
+                    nanos: 4_000_000,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let me = me_from_proto(&msg).unwrap();
+        assert_eq!(
+            me.session,
+            Some(MeSession {
+                session_id: "sess_1".into(),
+                session_level: "PRIMARY_AUTHENTICATED".into(),
+                authentication_methods: vec!["wallet".into()],
+                auth_time_ms: Some(3_004),
+            })
+        );
+        assert_eq!(me.username.as_deref(), Some("alice"));
+
+        let without = MeResponse {
+            account_id: 18,
+            ..Default::default()
+        };
+        assert_eq!(me_from_proto(&without).unwrap().session, None);
+    }
 }

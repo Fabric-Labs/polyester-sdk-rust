@@ -401,4 +401,112 @@ mod tests {
         );
         assert!(invite_direction_from_label("sideways").is_err());
     }
+
+    /// Reads keep every field of `SubaccountInvite`, `SubaccountMemberView`
+    /// and `Subaccount`: an invite names its sub-account, inviter and times, a
+    /// member whether it enrolled MFA, a sub-account its policy and MFA rule.
+    #[test]
+    fn reads_keep_every_invite_member_and_subaccount_field() {
+        use crate::proto::auth::v1::SubaccountInviteStatus;
+        let ts = |seconds| -> buffa::MessageField<Timestamp> {
+            Timestamp {
+                seconds,
+                ..Default::default()
+            }
+            .into()
+        };
+        let invites = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {
+            invites: vec![SubaccountInvite {
+                id: 1,
+                subaccount_id: 2,
+                grantee_account_id: 3,
+                inviter_account_id: 4,
+                role: SubaccountRole::TRADER.into(),
+                status: SubaccountInviteStatus::SUBACCOUNT_INVITE_STATUS_PENDING.into(),
+                created_at: ts(10),
+                responded_at: ts(20),
+                grantee_username: "bob".into(),
+                inviter_username: "alice".into(),
+                subaccount_label: "desk".into(),
+                inviter_root_smart_account_address: "0xaaaa".into(),
+                grantee_root_smart_account_address: "0xbbbb".into(),
+                require_member_mfa: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        let invite = &invites.invites[0];
+        assert_eq!(invite.subaccount_id, format_uint64_id(2));
+        assert_eq!(invite.inviter_account_id, Some(format_uint64_id(4)));
+        assert_eq!(invite.created_at.as_ref().map(|t| t.seconds), Some(10));
+        assert_eq!(invite.responded_at.as_ref().map(|t| t.seconds), Some(20));
+        assert_eq!(invite.grantee_username, "bob");
+        assert_eq!(invite.inviter_username, "alice");
+        assert_eq!(invite.subaccount_label, "desk");
+        assert_eq!(invite.inviter_root_smart_account_address, "0xaaaa");
+        assert_eq!(invite.grantee_root_smart_account_address, "0xbbbb");
+        assert!(invite.require_member_mfa);
+
+        // A pending invite has no answer time, and an unset inviter is absent.
+        let pending = subaccount_invites_list_from_proto(&ListSubaccountInvitesResponse {
+            invites: vec![SubaccountInvite {
+                id: 1,
+                subaccount_id: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(pending.invites[0].inviter_account_id, None);
+        assert_eq!(pending.invites[0].created_at, None);
+        assert_eq!(pending.invites[0].responded_at, None);
+
+        let members = subaccount_members_list_from_proto(&ListSubaccountMembersResponse {
+            members: vec![SubaccountMemberView {
+                account_id: 9,
+                role: SubaccountRole::OWNER.into(),
+                username: "carol".into(),
+                smart_account_address: "0xcccc".into(),
+                avatar_url: "https://example.com/a.png".into(),
+                mfa_enrolled: true,
+                ..Default::default()
+            }],
+            ..Default::default()
+        })
+        .unwrap();
+        let member = &members.members[0];
+        assert!(member.mfa_enrolled);
+        assert_eq!(member.username, "carol");
+        assert_eq!(member.smart_account_address, "0xcccc");
+        assert_eq!(member.avatar_url, "https://example.com/a.png");
+
+        let subaccount = subaccount_from_proto(&Subaccount {
+            id: 3,
+            icon: "rocket".into(),
+            color: "#ff0000".into(),
+            owner_username: "alice".into(),
+            owner_avatar_url: "https://example.com/o.png".into(),
+            owner_root_smart_account_address: "0xdddd".into(),
+            subaccount_policy_id: 5,
+            require_member_mfa: true,
+            smart_account_salt_nonce: Some(0),
+            ..Default::default()
+        });
+        assert_eq!(subaccount.subaccount_policy_id, Some(format_uint64_id(5)));
+        assert!(subaccount.require_member_mfa);
+        assert_eq!(subaccount.smart_account_salt_nonce, Some(0));
+        assert_eq!(subaccount.icon, "rocket");
+        assert_eq!(subaccount.color, "#ff0000");
+        assert_eq!(subaccount.owner_username, "alice");
+        assert_eq!(subaccount.owner_avatar_url, "https://example.com/o.png");
+        assert_eq!(subaccount.owner_root_smart_account_address, "0xdddd");
+
+        let bare = subaccount_from_proto(&Subaccount {
+            id: 3,
+            ..Default::default()
+        });
+        assert_eq!(bare.subaccount_policy_id, None);
+        assert_eq!(bare.smart_account_salt_nonce, None);
+    }
 }

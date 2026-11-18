@@ -117,4 +117,33 @@ mod tests {
         .expect("approval");
         assert_eq!(signed.signature, "dead");
     }
+
+    /// `GetGuardSignerStatusResponse.status` carries the live on-chain signer,
+    /// the default nonce space's nonce (base-10 text) and that nonce space.
+    #[test]
+    fn status_keeps_the_onchain_signer_and_nonce() {
+        let msg = GetGuardSignerStatusResponse {
+            status: ProtoStatus {
+                signer_address: "0x5555".into(),
+                onchain_signer_address: "0x6666".into(),
+                initialized: false,
+                nonce: "42".into(),
+                nonce_space: 7,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let status = status_from_proto(&msg).unwrap();
+        assert_eq!(
+            status,
+            GuardSignerStatus {
+                signer_wallet: "0x5555".into(),
+                status: "uninitialized".into(),
+                onchain_signer_address: "0x6666".into(),
+                nonce: "42".into(),
+                nonce_space: 7,
+            }
+        );
+    }
 }
