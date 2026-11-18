@@ -32,6 +32,7 @@ ai.v1.Memory.conversation_id	not_required	reference to another object; 0 or empt
 ai.v1.Memory.memory_id	required	
 ai.v1.Message.message_id	required	
 ai.v1.Message.run_id	not_required	reference to another object; 0 or empty when none
+ai.v1.MessageImage.image_id	required	
 ai.v1.OrderChange.order_id	not_required	reference to another order, trigger or batch; 0 when none
 ai.v1.OrderChangePreview.symbol_id	not_required	reference to a market
 ai.v1.OrderPreview.symbol_id	not_required	reference to a market
