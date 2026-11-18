@@ -270,14 +270,17 @@ fn optional_id(id: u64) -> Option<String> {
     (id != 0).then(|| format_uint64_id(id))
 }
 
-fn account_activity_event_from_proto(e: &ProtoActivityEvent) -> AccountActivityEvent {
-    AccountActivityEvent {
+fn account_activity_event_from_proto(e: &ProtoActivityEvent) -> SdkResult<AccountActivityEvent> {
+    let created_at = e.created_at.as_option().ok_or_else(|| {
+        crate::errors::Error::response_contract("ListAccountActivity", "event has no created_at")
+    })?;
+    Ok(AccountActivityEvent {
         event_type: format!(
             "{}:{}",
             activity_label(&e.entity_kind, "ACTIVITY_ENTITY_"),
             activity_label(&e.event_action, "ACTIVITY_ACTION_")
         ),
-        ts_ms: timestamp_ms(e.created_at.as_option()),
+        ts_ms: timestamp_ms(Some(created_at)),
         source: if e.source.to_i32() == 0 {
             String::new()
         } else {
@@ -289,19 +292,22 @@ fn account_activity_event_from_proto(e: &ProtoActivityEvent) -> AccountActivityE
         ip: e.ip.clone(),
         user_agent: e.user_agent.clone(),
         payload_json: e.payload_json.clone(),
-    }
+    })
 }
 
-/// One page of `ListAccountActivity`, newest first.
-pub fn account_activity_list_from_proto(msg: &ListAccountActivityResponse) -> AccountActivityList {
-    AccountActivityList {
+/// One page of `ListAccountActivity`, newest first. An event without its
+/// creation time is an [`crate::errors::Error::ResponseContract`].
+pub fn account_activity_list_from_proto(
+    msg: &ListAccountActivityResponse,
+) -> SdkResult<AccountActivityList> {
+    Ok(AccountActivityList {
         events: msg
             .events
             .iter()
             .map(account_activity_event_from_proto)
-            .collect(),
+            .collect::<SdkResult<_>>()?,
         next_page_token: msg.next_page_token.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -335,11 +341,19 @@ mod tests {
                     payload_json: "{\"name\":\"bot\"}".into(),
                     ..Default::default()
                 },
-                ActivityEvent::default(),
+                ActivityEvent {
+                    created_at: Timestamp {
+                        seconds: 1_794_700_001,
+                        ..Default::default()
+                    }
+                    .into(),
+                    ..Default::default()
+                },
             ],
             next_page_token: "next".into(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let first = &list.events[0];
         assert_eq!(first.event_type, "api_key:created");
         assert_eq!(first.ts_ms, 1_794_700_000_250);

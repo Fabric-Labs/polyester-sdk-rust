@@ -795,7 +795,7 @@ impl SubAccountsService {
         )
         .await?
         .into_owned();
-        Ok(account_activity_list_from_proto(&resp))
+        account_activity_list_from_proto(&resp)
     }
 }
 

@@ -404,3 +404,32 @@ async fn asset_market_datapoints_refuse_missing_parts() {
     );
     assert!(stats.circulating_supply.is_none() && stats.max_supply_unlimited.is_none());
 }
+
+/// Every account activity event carries its creation time: an event without
+/// it is refused, never dated at the epoch.
+#[tokio::test]
+async fn account_activity_refuses_an_event_without_its_time() {
+    use polyester::proto::auth::v1::{
+        ActivityEntityKind, ActivityEvent, ActivityEventAction, ListAccountActivityRequest,
+        ListAccountActivityResponse,
+    };
+
+    let body = ListAccountActivityResponse {
+        events: vec![ActivityEvent {
+            entity_kind: ActivityEntityKind::ACTIVITY_ENTITY_API_KEY.into(),
+            event_action: ActivityEventAction::ACTIVITY_ACTION_CREATED.into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+    let err = keyed_client(&server)
+        .sub_accounts
+        .list_account_activity(ListAccountActivityRequest::default())
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, polyester::Error::ResponseContract { .. }),
+        "{err:?}"
+    );
+}
