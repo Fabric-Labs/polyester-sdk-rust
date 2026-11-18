@@ -2077,14 +2077,27 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             status,
             retry_after: retry_after_seconds(&err),
         });
-    // A REST timestamp-skew problem's `timestampWindow`, kept by the
-    // transport in an SDK-local detail.
+    // The window a skew refusal states: an `auth.v1.AuthErrorDetail`'s
+    // typed window, whichever path names the refusal (its detail code, or
+    // the code in the message as the gateway answers it), or a REST
+    // problem's `timestampWindow`, kept by the transport in an SDK-local
+    // detail.
     let problem_window = err
         .details
         .iter()
-        .find(|d| d.type_url == crate::transport::TIMESTAMP_WINDOW_PROBLEM_TYPE)
-        .and_then(|d| d.debug.as_ref())
-        .and_then(TimestampWindow::from_problem_json);
+        .find_map(|d| {
+            decode_auth_error_detail(d)?
+                .timestamp_window
+                .as_option()
+                .map(TimestampWindow::from_proto)
+        })
+        .or_else(|| {
+            err.details
+                .iter()
+                .find(|d| d.type_url == crate::transport::TIMESTAMP_WINDOW_PROBLEM_TYPE)
+                .and_then(|d| d.debug.as_ref())
+                .and_then(TimestampWindow::from_problem_json)
+        });
     let mut mapped = map_connect_error_inner(err);
     if let Error::TimestampSkew { window, .. } = &mut mapped
         && window.is_none()
@@ -3390,6 +3403,25 @@ mod tests {
         );
         assert_eq!(bare.timestamp_window(), None);
         assert_eq!(Error::transport("down").timestamp_window(), None);
+
+        // Every ConnectRPC form of the refusal keeps the typed window: the
+        // code in the message, as the gateway answers it, included.
+        for message in [auth_codes::TIMESTAMP_SKEW, "AUTH_TIMESTAMP_SKEW"] {
+            let err = map_connect_error(
+                ConnectError::new(ErrorCode::Unauthenticated, message).with_detail(
+                    ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
+                ),
+            );
+            assert!(
+                matches!(err, Error::TimestampSkew { .. }),
+                "{message}: {err:?}"
+            );
+            assert_eq!(
+                err.timestamp_window().map(|w| w.recv_window_ms),
+                Some(10_000),
+                "{message}"
+            );
+        }
     }
 
     #[test]
