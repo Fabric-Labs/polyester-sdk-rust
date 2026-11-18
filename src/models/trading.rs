@@ -1644,8 +1644,9 @@ pub struct InternalTransferBatchLegResult {
     /// recipient with `LifecycleService::get_account_flow`. Never empty for
     /// a `credited` leg; empty otherwise.
     pub flow_id: String,
-    /// Credit time in nanoseconds since the Unix epoch (server time), set
-    /// once the leg is credited; 0 otherwise.
+    /// Credit time in nanoseconds since the Unix epoch (server time). Never
+    /// 0 for a `credited` leg, which also always carries its asset code and
+    /// destination; 0 otherwise.
     pub credited_at_ts_ns: u64,
     /// The leg's asset, echoed.
     pub asset_id: u32,

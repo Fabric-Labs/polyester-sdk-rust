@@ -25,7 +25,7 @@ use polyester::proto::transfer::v1::{
     GetInternalTransferBatchRequest, GetInternalTransferBatchResponse,
     InternalTransferBatchLegResult, InternalTransferBatchLegStatus, InternalTransferBatchStatus,
     ListDustConversionsRequest, ListDustConversionsResponse, QuoteDustConversionRequest,
-    QuoteDustConversionResponse, internal_transfer_batch_leg,
+    QuoteDustConversionResponse, ResolvedDestination, internal_transfer_batch_leg,
 };
 use polyester::services::CreateStatementExportOptions;
 use polyester::{AssetAmount, Client, Config, Error, QuantityDomain};
@@ -297,10 +297,22 @@ async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
             legs: vec![
                 InternalTransferBatchLegResult {
                     credited_at_ts_ns: 1_763_330_000_000_000_000,
+                    asset_code: "BTC".into(),
+                    destination: ResolvedDestination {
+                        smart_account_address: "0x2222222222222222222222222222222222222222".into(),
+                        ..Default::default()
+                    }
+                    .into(),
                     ..leg_result(0, InternalTransferBatchLegStatus::LEG_CREDITED, "flow_t0")
                 },
                 InternalTransferBatchLegResult {
                     credited_at_ts_ns: 1_763_330_000_000_000_001,
+                    asset_code: "BTC".into(),
+                    destination: ResolvedDestination {
+                        smart_account_address: "0x2222222222222222222222222222222222222222".into(),
+                        ..Default::default()
+                    }
+                    .into(),
                     ..leg_result(1, InternalTransferBatchLegStatus::LEG_CREDITED, "flow_t1")
                 },
             ],

@@ -243,6 +243,28 @@ fn internal_transfer_batch(
                 Some(InternalTransferBatchLegStatus::LEG_CREDITED) => {
                     super::common::require_str_id(op, "transfer_id", &leg.transfer_id)?;
                     super::common::require_str_id(op, "flow_id", &leg.flow_id)?;
+                    // A credited leg has passed its checks and moved: the
+                    // contract sets its credit time, echoes its asset and
+                    // amount, and resolves its asset code and destination.
+                    let missing = if leg.credited_at_ts_ns == 0 {
+                        Some("credited_at_ts_ns")
+                    } else if leg.asset_id == 0 {
+                        Some("asset_id")
+                    } else if leg.amount_e18.as_option().is_none() {
+                        Some("amount_e18")
+                    } else if leg.asset_code.is_empty() {
+                        Some("asset_code")
+                    } else if leg.destination.as_option().is_none() {
+                        Some("destination")
+                    } else {
+                        None
+                    };
+                    if let Some(field) = missing {
+                        return Err(Error::response_contract(
+                            op,
+                            format!("credited leg {index} has no {field}"),
+                        ));
+                    }
                     "credited".to_owned()
                 }
                 Some(InternalTransferBatchLegStatus::LEG_PROCESSING) => {
@@ -556,6 +578,13 @@ mod tests {
             "flow_8d1f2c",
         );
         leg.credited_at_ts_ns = 1_763_330_000_000_000_000 + u64::from(index);
+        leg.asset_code = "BTC".into();
+        leg.destination = crate::proto::transfer::v1::ResolvedDestination {
+            root_account_public_id: "AAo8yKqygTg".into(),
+            smart_account_address: "0x2222222222222222222222222222222222222222".into(),
+            ..Default::default()
+        }
+        .into();
         leg
     }
 
@@ -736,6 +765,66 @@ mod tests {
             (
                 "processing without transfer_id",
                 reply(3, "7", vec![batch_leg(0, LEG_PROCESSING, "", "")]),
+                1,
+            ),
+            (
+                "credited without credited_at_ts_ns",
+                reply(
+                    4,
+                    "7",
+                    vec![ProtoInternalTransferBatchLegResult {
+                        credited_at_ts_ns: 0,
+                        ..credited(0)
+                    }],
+                ),
+                1,
+            ),
+            (
+                "credited without asset_id",
+                reply(
+                    4,
+                    "7",
+                    vec![ProtoInternalTransferBatchLegResult {
+                        asset_id: 0,
+                        ..credited(0)
+                    }],
+                ),
+                1,
+            ),
+            (
+                "credited without amount_e18",
+                reply(
+                    4,
+                    "7",
+                    vec![ProtoInternalTransferBatchLegResult {
+                        amount_e18: Default::default(),
+                        ..credited(0)
+                    }],
+                ),
+                1,
+            ),
+            (
+                "credited without asset_code",
+                reply(
+                    4,
+                    "7",
+                    vec![ProtoInternalTransferBatchLegResult {
+                        asset_code: String::new(),
+                        ..credited(0)
+                    }],
+                ),
+                1,
+            ),
+            (
+                "credited without destination",
+                reply(
+                    4,
+                    "7",
+                    vec![ProtoInternalTransferBatchLegResult {
+                        destination: Default::default(),
+                        ..credited(0)
+                    }],
+                ),
                 1,
             ),
         ];
