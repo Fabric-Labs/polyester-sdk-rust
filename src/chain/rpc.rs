@@ -27,15 +27,7 @@ static HTTP_OR_HTTPS: OnceCell<HyperClient> = OnceCell::const_new();
 async fn http_client(allow_http: bool) -> Result<&'static HyperClient> {
     let cell = if allow_http { &HTTP_OR_HTTPS } else { &HTTPS };
     cell.get_or_try_init(|| async move {
-        static INIT: std::sync::Once = std::sync::Once::new();
-        INIT.call_once(|| {
-            let _ = rustls::crypto::ring::default_provider().install_default();
-        });
-        let mut roots = connectrpc::rustls::RootCertStore::empty();
-        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let tls = connectrpc::rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
+        let tls = (*crate::tls::client_config()?).clone();
         let builder = hyper_rustls::HttpsConnectorBuilder::new().with_tls_config(tls);
         let https = if allow_http {
             builder.https_or_http().enable_http1().build()

@@ -26,7 +26,7 @@ use std::sync::{
 use tokio::sync::{mpsc, oneshot, watch};
 use tokio::time::{Duration, timeout};
 use tokio_tungstenite::{
-    connect_async_with_config,
+    connect_async_tls_with_config,
     tungstenite::{
         self, Message,
         client::IntoClientRequest,
@@ -114,9 +114,15 @@ impl Transport for CentrifugoTransport {
             let websocket_config = WebSocketConfig::default()
                 .max_message_size(Some(MAX_REALTIME_MESSAGE_BYTES))
                 .max_frame_size(Some(MAX_REALTIME_MESSAGE_BYTES));
+            let connector = crate::tls::websocket_connector()?;
             let (ws, response) = timeout(
                 CENTRIFUGO_READ_TIMEOUT,
-                connect_async_with_config(request, Some(websocket_config), false),
+                connect_async_tls_with_config(
+                    request,
+                    Some(websocket_config),
+                    false,
+                    Some(connector),
+                ),
             )
             .await
             .map_err(|_| Error::realtime("websocket connect timed out".to_owned()))?

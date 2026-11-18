@@ -8,7 +8,6 @@ use bytes::Bytes;
 use connectrpc::client::{
     BoxFuture, CallOptions, ClientBody, ClientConfig, ClientTransport, HttpClient,
 };
-use connectrpc::rustls;
 use connectrpc::{CompressionRegistry, ConnectError, ErrorCode, ErrorDetail};
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE, USER_AGENT};
 use http::{HeaderValue, Request, Response, StatusCode, Uri};
@@ -1212,20 +1211,10 @@ impl Factory {
 }
 
 fn build_http_client(api_url: &str) -> Result<GatewayTransport> {
-    static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| {
-        let _ = rustls::crypto::ring::default_provider().install_default();
-    });
-
     if api_url.starts_with("https://") {
-        let mut roots = rustls::RootCertStore::empty();
-        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-        let tls = Arc::new(
-            rustls::ClientConfig::builder()
-                .with_root_certificates(roots)
-                .with_no_client_auth(),
-        );
-        Ok(GatewayTransport::new(HttpClient::with_tls(tls)))
+        Ok(GatewayTransport::new(HttpClient::with_tls(
+            crate::tls::client_config()?,
+        )))
     } else if api_url.starts_with("http://") {
         Ok(GatewayTransport::new(HttpClient::plaintext()))
     } else {
