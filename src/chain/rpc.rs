@@ -270,9 +270,23 @@ mod tests {
     #[tokio::test]
     async fn body_failures_and_redirects_carry_their_answer() {
         use crate::answer_test_server::{
-            Answer, AnswerBody, MALFORMED_LOCATION, answering, counting_target,
+            Answer, AnswerBody, Expected, MALFORMED_LOCATION, answering, counting_target,
         };
-        let (target, target_hits) = counting_target().await;
+        // A JSON-RPC call: a POST of JSON to the URL's path.
+        let call = Expected {
+            method: "POST",
+            path: "/",
+            header: "content-type",
+            value: Some("application/json"),
+        };
+        // A followed redirect would repeat the call on the target, with or
+        // without its headers: count any POST of its path there.
+        let (target, target_hits) = counting_target(Expected {
+            header: "host",
+            value: None,
+            ..call
+        })
+        .await;
         let too_large = MAX_JSONRPC_RESPONSE_BYTES + 1;
         let cases = [
             ("truncated", Answer::unavailable(AnswerBody::Truncated)),
@@ -293,7 +307,7 @@ mod tests {
         ];
         for (name, answer) in cases {
             let status = answer.status;
-            let (host, requests) = answering(answer, false).await;
+            let (host, requests) = answering(answer, false, call).await;
             let client =
                 JsonRpcClient::new_insecure(format!("http://{host}"), Duration::from_millis(400))
                     .unwrap();

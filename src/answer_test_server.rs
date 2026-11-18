@@ -1,6 +1,11 @@
 //! Local servers for the tests of a failed answer whose body cannot be read
 //! and of a redirect: the answer's metadata is in its headers, so every error
 //! made from the answer carries it.
+//!
+//! Each server counts only the request it expects, by method, path and one
+//! header, read from the whole request head. Other processes probe local
+//! ports on a shared machine (with a `HEAD /`, for example): such a request
+//! is dropped and counts for nothing.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -54,10 +59,70 @@ impl Answer {
     }
 }
 
-/// The address of a server that answers every request (but a WebSocket
-/// upgrade, which it accepts when `upgrade`) with `answer`, and the number of
-/// requests it answered.
-pub(crate) async fn answering(answer: Answer, upgrade: bool) -> (String, Arc<AtomicUsize>) {
+/// The request a server counts: its method, its path and one header it
+/// carries, by name (in any case) and, when given, value.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Expected {
+    pub method: &'static str,
+    pub path: &'static str,
+    pub header: &'static str,
+    pub value: Option<&'static str>,
+}
+
+/// Largest request head read; a longer one is not the expected request.
+const MAX_HEAD: usize = 16 * 1024;
+
+/// The request head that reached `stream`, read without taking it off the
+/// socket: up to its blank line, within [`MAX_HEAD`] bytes and 2 s. `None`
+/// when the peer goes away first, or sends no complete head in time.
+async fn request_head(stream: &tokio::net::TcpStream) -> Option<Vec<u8>> {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        let mut buf = vec![0u8; MAX_HEAD];
+        loop {
+            let n = stream.peek(&mut buf).await.ok()?;
+            if n == 0 {
+                return None;
+            }
+            if let Some(end) = buf[..n].windows(4).position(|w| w == b"\r\n\r\n") {
+                return Some(buf[..end + 4].to_vec());
+            }
+            if n == MAX_HEAD {
+                return None;
+            }
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// Whether `head` is the `expected` request, parsed as HTTP/1.1.
+fn is_expected(head: &[u8], expected: &Expected) -> bool {
+    let mut headers = [httparse::EMPTY_HEADER; 64];
+    let mut request = httparse::Request::new(&mut headers);
+    if !matches!(request.parse(head), Ok(httparse::Status::Complete(_))) {
+        return false;
+    }
+    request.method == Some(expected.method)
+        && request.path == Some(expected.path)
+        && request.headers.iter().any(|header| {
+            header.name.eq_ignore_ascii_case(expected.header)
+                && expected
+                    .value
+                    .is_none_or(|value| header.value.eq_ignore_ascii_case(value.as_bytes()))
+        })
+}
+
+/// The address of a server that answers the `expected` request with
+/// `answer` (and accepts a WebSocket upgrade of `/connection/websocket` when
+/// `upgrade`), and the number of requests it answered. Any other request is
+/// dropped unanswered and uncounted.
+pub(crate) async fn answering(
+    answer: Answer,
+    upgrade: bool,
+    expected: Expected,
+) -> (String, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
     let answered = Arc::new(AtomicUsize::new(0));
@@ -67,12 +132,10 @@ pub(crate) async fn answering(answer: Answer, upgrade: bool) -> (String, Arc<Ato
             let answer = answer.clone();
             let count = count.clone();
             tokio::spawn(async move {
-                let mut head = [0u8; 64];
-                let n = stream.peek(&mut head).await.unwrap_or(0);
-                if n == 0 || head[..n].starts_with(b"HEAD / ") {
+                let Some(head) = request_head(&stream).await else {
                     return;
-                }
-                if upgrade && head[..n].starts_with(b"GET /connection/websocket") {
+                };
+                if upgrade && head.starts_with(b"GET /connection/websocket") {
                     // Echo the requested subprotocol, as the server does.
                     let echo = |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
                                 mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
@@ -89,7 +152,10 @@ pub(crate) async fn answering(answer: Answer, upgrade: bool) -> (String, Arc<Ato
                     }
                     return;
                 }
-                let mut buf = vec![0u8; 16 * 1024];
+                if !is_expected(&head, &expected) {
+                    return;
+                }
+                let mut buf = vec![0u8; MAX_HEAD];
                 let _ = stream.read(&mut buf).await;
                 count.fetch_add(1, Ordering::SeqCst);
                 let mut head = format!("HTTP/1.1 {} Answer\r\n", answer.status);
@@ -146,19 +212,62 @@ pub(crate) async fn answering(answer: Answer, upgrade: bool) -> (String, Arc<Ato
     (addr, answered)
 }
 
-/// The address of a server that only counts the connections it gets: a
-/// redirect's target, which must get none.
-pub(crate) async fn counting_target() -> (String, Arc<AtomicUsize>) {
+/// The address of a server that only counts the `expected` requests it
+/// gets: a redirect's target, which must get none. Any other request, such
+/// as a port probe, is not counted.
+pub(crate) async fn counting_target(expected: Expected) -> (String, Arc<AtomicUsize>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
-    let connections = Arc::new(AtomicUsize::new(0));
-    let count = connections.clone();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let count = requests.clone();
     tokio::spawn(async move {
-        while let Ok((_stream, _)) = listener.accept().await {
-            count.fetch_add(1, Ordering::SeqCst);
+        while let Ok((stream, _)) = listener.accept().await {
+            let count = count.clone();
+            tokio::spawn(async move {
+                if let Some(head) = request_head(&stream).await
+                    && is_expected(&head, &expected)
+                {
+                    count.fetch_add(1, Ordering::SeqCst);
+                }
+            });
         }
     });
-    (addr, connections)
+    (addr, requests)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A port probe, another method or path, or a request without the
+    /// expected header is not the expected request.
+    #[test]
+    fn only_the_expected_request_counts() {
+        let expected = Expected {
+            method: "POST",
+            path: "/",
+            header: "content-type",
+            value: Some("application/json"),
+        };
+        assert!(is_expected(
+            b"POST / HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n\r\n",
+            &expected
+        ));
+        for other in [
+            &b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n"[..],
+            b"GET / HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n\r\n",
+            b"POST /other HTTP/1.1\r\nContent-Type: application/json\r\n\r\n",
+            b"POST / HTTP/1.1\r\nHost: x\r\n\r\n",
+            b"POST / HTTP/1.1\r\nContent-Type: text/plain\r\n\r\n",
+            b"not http\r\n\r\n",
+        ] {
+            assert!(
+                !is_expected(other, &expected),
+                "{}",
+                String::from_utf8_lossy(other)
+            );
+        }
+    }
 }
 
 /// A redirect's `Location` that does not parse as a URL.

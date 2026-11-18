@@ -1344,9 +1344,23 @@ mod tests {
     #[tokio::test]
     async fn token_body_failures_and_redirects_carry_their_answer_through_subscribe_raw() {
         use crate::answer_test_server::{
-            Answer, AnswerBody, MALFORMED_LOCATION, answering, counting_target,
+            Answer, AnswerBody, Expected, MALFORMED_LOCATION, answering, counting_target,
         };
-        let (target, target_hits) = counting_target().await;
+        // The token request: a GET of the token path signed with the key.
+        let token = Expected {
+            method: "GET",
+            path: "/v1/rt/token",
+            header: crate::auth::HEADER_KEY_ID,
+            value: None,
+        };
+        // A followed redirect would repeat the request on the target, signed
+        // or not: count any GET of the token path there.
+        let (target, target_hits) = counting_target(Expected {
+            header: "host",
+            value: None,
+            ..token
+        })
+        .await;
         let too_large = auth::MAX_TOKEN_RESPONSE_BYTES + 1;
         let cases = [
             ("truncated", Answer::unavailable(AnswerBody::Truncated)),
@@ -1370,7 +1384,7 @@ mod tests {
         ];
         for (name, answer) in cases {
             let status = answer.status;
-            let (host, requests) = answering(answer, true).await;
+            let (host, requests) = answering(answer, true, token).await;
             let (secret_hex, _) = crate::auth::generate_ed25519_keypair();
             let client = Client::with_timeout(
                 format!("ws://{host}/connection/websocket"),
