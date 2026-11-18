@@ -41,7 +41,7 @@ fn market_as_of(
 }
 
 /// A nonnegative decimal without sign or exponent, at most 64 characters, as
-/// the contract states; a rank is a positive integer.
+/// the contract states; a rank is a positive integer, leading zeros allowed.
 fn valid_market_value(value: &str, integer: bool) -> bool {
     if value.is_empty() || value.len() > 64 {
         return false;
@@ -54,7 +54,7 @@ fn valid_market_value(value: &str, integer: bool) -> bool {
     if !digits(whole) || fraction.is_some_and(|f| !digits(f)) {
         return false;
     }
-    !integer || (fraction.is_none() && !whole.starts_with('0'))
+    !integer || (fraction.is_none() && whole.bytes().any(|b| b != b'0'))
 }
 
 /// A present datapoint must carry its value, source and observation time;
@@ -314,8 +314,11 @@ mod tests {
         ] {
             assert!(!valid_market_value(bad, false), "{bad:?}");
         }
-        assert!(valid_market_value("1", true) && valid_market_value("250", true));
-        for bad in ["0", "01", "1.0"] {
+        // A rank is a positive integer; no canonical form is required.
+        for ok in ["1", "250", "01", "007"] {
+            assert!(valid_market_value(ok, true), "{ok}");
+        }
+        for bad in ["0", "00", "1.0", "-1"] {
             assert!(!valid_market_value(bad, true), "{bad:?}");
         }
     }
