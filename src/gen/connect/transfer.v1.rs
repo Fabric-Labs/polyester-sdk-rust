@@ -30,6 +30,18 @@ pub type OwnedBatchCreateInternalTransfersResponseView = ::buffa::view::OwnedVie
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetInternalTransferBatchRequestView<'static>>`.
+pub type OwnedGetInternalTransferBatchRequestView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetInternalTransferBatchResponseView<'static>>`.
+pub type OwnedGetInternalTransferBatchResponseView = ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<crate::proto::transfer::v1::GetInternalTransferResponse>
 for crate::proto::transfer::v1::__buffa::view::GetInternalTransferResponseView<'_> {
     fn encode(
@@ -100,6 +112,32 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::GetInternalTransferBatchResponse,
+>
+for crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::transfer::v1::GetInternalTransferBatchResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const INTERNAL_TRANSFER_SERVICE_SERVICE_NAME: &str = "transfer.v1.InternalTransferService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetInternalTransfer` RPC.
@@ -126,6 +164,15 @@ pub const INTERNAL_TRANSFER_SERVICE_CREATE_INTERNAL_TRANSFER_SPEC: ::connectrpc:
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetInternalTransferBatch` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/transfer.v1.InternalTransferService/GetInternalTransferBatch",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -210,7 +257,9 @@ pub trait InternalTransferService: Send + Sync + 'static {
     /// Create or return one accepted Trading to Trading transfer.
     /// Root-owner same-owner transfers and root-owner transfers to explicitly
     /// whitelisted destinations accept recent MFA; delegated and other
-    /// interactive transfers require fresh step-up.
+    /// interactive transfers require fresh step-up. Without them the transfer is
+    /// refused PERMISSION_DENIED with auth code AUTH_MFA_ELEVATION_REQUIRED or
+    /// AUTH_STEP_UP_REQUIRED; REST answers HTTP 403 with that auth code.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -233,15 +282,18 @@ pub trait InternalTransferService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Submit up to 10 Trading to Trading transfers authorized by one MFA check.
-    /// Every leg passes the same checks as CreateInternalTransfer before any leg
-    /// runs; if one fails, the whole batch is refused, nothing moves and no
-    /// step-up is used. Legs then run independently, in order, and are not
-    /// atomic: a leg can be refused, for example for insufficient balance, after
-    /// earlier legs were accepted. The batch accepts recent MFA when the root
-    /// owner moves funds between its own accounts or to explicitly whitelisted
-    /// destinations; any other leg requires one fresh step-up for the whole
-    /// batch. Each leg is its own transfer, readable with GetInternalTransfer.
+    /// Move up to 500 Trading to Trading transfers together, authorized by one
+    /// MFA check: every leg is credited, or none moves. Every leg passes the
+    /// same checks as CreateInternalTransfer first; if one fails, the batch is
+    /// refused, nothing moves and no step-up is used. The batch accepts recent
+    /// MFA when the root owner moves funds between its own accounts or to
+    /// explicitly whitelisted destinations; any other leg requires one fresh
+    /// step-up for the whole batch. Without them the batch is refused
+    /// PERMISSION_DENIED with auth code AUTH_MFA_ELEVATION_REQUIRED or
+    /// AUTH_STEP_UP_REQUIRED; REST answers HTTP 403 with that auth code. A batch
+    /// whose outcome is not known within the request answers BATCH_PROCESSING
+    /// and completes on its own; a retry with the same idempotency key returns
+    /// its current state.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -261,6 +313,34 @@ pub trait InternalTransferService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Read a batch's current outcome and the state of every leg, by the
+    /// request ID BatchCreateInternalTransfers returned: for example to follow
+    /// a batch that answered BATCH_PROCESSING. The caller must be allowed to
+    /// read the transfers of every source account of the batch; any other
+    /// batch is not found. This read does not submit or retry the batch and
+    /// requires no fresh MFA.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_internal_transfer_batch<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::transfer::v1::GetInternalTransferBatchResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -383,6 +463,35 @@ impl<S: InternalTransferService> InternalTransferServiceExt for S {
                 },
             )
             .with_spec(INTERNAL_TRANSFER_SERVICE_BATCH_CREATE_INTERNAL_TRANSFERS_SPEC)
+            .route_view(
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "GetInternalTransferBatch",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_internal_transfer_batch(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::transfer::v1::GetInternalTransferBatchResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -462,6 +571,14 @@ for InternalTransferServiceServer<T> {
                         ),
                 )
             }
+            "GetInternalTransferBatch" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            INTERNAL_TRANSFER_SERVICE_GET_INTERNAL_TRANSFER_BATCH_SPEC,
+                        ),
+                )
+            }
             _ => None,
         }
     }
@@ -538,6 +655,27 @@ for InternalTransferServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::transfer::v1::BatchCreateInternalTransfersResponse,
+                        >(format)
+                })
+            }
+            "GetInternalTransferBatch" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_internal_transfer_batch(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::transfer::v1::GetInternalTransferBatchResponse,
                         >(format)
                 })
             }
@@ -776,6 +914,51 @@ where
                 &self.config,
                 INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
                 "BatchCreateInternalTransfers",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetInternalTransferBatch RPC. Sends a request to /transfer.v1.InternalTransferService/GetInternalTransferBatch.
+    pub async fn get_internal_transfer_batch(
+        &self,
+        request: crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_internal_transfer_batch_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetInternalTransferBatch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_internal_transfer_batch_with_options(
+        &self,
+        request: crate::proto::transfer::v1::GetInternalTransferBatchRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::transfer::v1::__buffa::view::GetInternalTransferBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                INTERNAL_TRANSFER_SERVICE_SERVICE_NAME,
+                "GetInternalTransferBatch",
                 request,
                 options,
             )

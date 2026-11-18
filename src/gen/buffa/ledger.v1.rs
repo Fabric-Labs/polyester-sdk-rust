@@ -204,6 +204,10 @@ pub enum TransferCode {
     /// refunded, and Zipper settles it with the user outside Polyester Chain. A withdrawal from the
     /// Trading account uses TRADING_WITHDRAW_REQUEST_FEE instead.
     WITHDRAW_FAILED = 1075i32,
+    /// One leg of an all-or-nothing batch of internal transfers between Trading
+    /// accounts: credited together with the batch's other legs. Legs of one batch
+    /// share its batch reference.
+    INTERNAL_BATCH = 1078i32,
 }
 impl TransferCode {
     ///Idiomatic alias for [`Self::TRANSFER_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -272,6 +276,9 @@ impl TransferCode {
     ///Idiomatic alias for [`Self::WITHDRAW_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const WithdrawFailed: Self = Self::WITHDRAW_FAILED;
+    ///Idiomatic alias for [`Self::INTERNAL_BATCH`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InternalBatch: Self = Self::INTERNAL_BATCH;
 }
 impl ::core::default::Default for TransferCode {
     fn default() -> Self {
@@ -389,6 +396,7 @@ impl ::buffa::Enumeration for TransferCode {
             1073i32 => ::core::option::Option::Some(Self::FEE_REFILL),
             1074i32 => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             1075i32 => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
+            1078i32 => ::core::option::Option::Some(Self::INTERNAL_BATCH),
             _ => ::core::option::Option::None,
         }
     }
@@ -419,6 +427,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_REFILL => "FEE_REFILL",
             Self::SYSTEM_ADJUSTMENT => "SYSTEM_ADJUSTMENT",
             Self::WITHDRAW_FAILED => "WITHDRAW_FAILED",
+            Self::INTERNAL_BATCH => "INTERNAL_BATCH",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -465,6 +474,7 @@ impl ::buffa::Enumeration for TransferCode {
             "FEE_REFILL" => ::core::option::Option::Some(Self::FEE_REFILL),
             "SYSTEM_ADJUSTMENT" => ::core::option::Option::Some(Self::SYSTEM_ADJUSTMENT),
             "WITHDRAW_FAILED" => ::core::option::Option::Some(Self::WITHDRAW_FAILED),
+            "INTERNAL_BATCH" => ::core::option::Option::Some(Self::INTERNAL_BATCH),
             _ => ::core::option::Option::None,
         }
     }
@@ -492,6 +502,7 @@ impl ::buffa::Enumeration for TransferCode {
             Self::FEE_REFILL,
             Self::SYSTEM_ADJUSTMENT,
             Self::WITHDRAW_FAILED,
+            Self::INTERNAL_BATCH,
         ]
     }
 }

@@ -8,6 +8,14 @@ pub type OwnedGetVersionRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetVersionResponseView = ::buffa::view::OwnedView<
     crate::proto::system::v1::__buffa::view::GetVersionResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetTimeRequestView<'static>>`.
+pub type OwnedGetTimeRequestView = ::buffa::view::OwnedView<
+    crate::proto::system::v1::__buffa::view::GetTimeRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetTimeResponseView<'static>>`.
+pub type OwnedGetTimeResponseView = ::buffa::view::OwnedView<
+    crate::proto::system::v1::__buffa::view::GetTimeResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<ListStatusEventsRequestView<'static>>`.
 pub type OwnedListStatusEventsRequestView = ::buffa::view::OwnedView<
     crate::proto::system::v1::__buffa::view::ListStatusEventsRequestView<'static>,
@@ -28,6 +36,26 @@ for crate::proto::system::v1::__buffa::view::GetVersionResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::system::v1::GetVersionResponse>
 for ::buffa::view::OwnedView<
     crate::proto::system::v1::__buffa::view::GetVersionResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::system::v1::GetTimeResponse>
+for crate::proto::system::v1::__buffa::view::GetTimeResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::system::v1::GetTimeResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::system::v1::__buffa::view::GetTimeResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -64,6 +92,15 @@ pub const SYSTEM_SERVICE_SERVICE_NAME: &str = "system.v1.SystemService";
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const SYSTEM_SERVICE_GET_VERSION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/system.v1.SystemService/GetVersion",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetTime` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const SYSTEM_SERVICE_GET_TIME_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/system.v1.SystemService/GetTime",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
@@ -148,6 +185,35 @@ pub trait SystemService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::system::v1::GetVersionResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Get the server time in milliseconds since the Unix epoch. A request signed
+    /// with an API key is accepted only while its X-API-TIMESTAMP is at most 1000
+    /// ms ahead of the server time and at most its receive window behind it: the
+    /// X-API-RECV-WINDOW header, from 1 to 60000 ms, or 5000 ms when omitted.
+    /// Otherwise it is refused unprocessed with TIMESTAMP_SKEW, which carries the
+    /// server time and the window too. Clients measure their clock's offset from
+    /// this time, allowing for half the round trip. Answers are never cached.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_time<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::system::v1::GetTimeRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::system::v1::GetTimeResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -239,6 +305,33 @@ impl<S: SystemService> SystemServiceExt for S {
             .with_spec(SYSTEM_SERVICE_GET_VERSION_SPEC)
             .route_view_idempotent(
                 SYSTEM_SERVICE_SERVICE_NAME,
+                "GetTime",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::system::v1::__buffa::view::GetTimeRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::system::v1::GetTimeRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_time(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::system::v1::GetTimeResponse>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(SYSTEM_SERVICE_GET_TIME_SPEC)
+            .route_view_idempotent(
+                SYSTEM_SERVICE_SERVICE_NAME,
                 "ListStatusEvents",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -326,6 +419,12 @@ impl<T: SystemService> ::connectrpc::Dispatcher for SystemServiceServer<T> {
                         .with_spec(SYSTEM_SERVICE_GET_VERSION_SPEC),
                 )
             }
+            "GetTime" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(SYSTEM_SERVICE_GET_TIME_SPEC),
+                )
+            }
             "ListStatusEvents" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -364,6 +463,25 @@ impl<T: SystemService> ::connectrpc::Dispatcher for SystemServiceServer<T> {
                     svc.get_version(ctx, req)
                         .await?
                         .encode::<crate::proto::system::v1::GetVersionResponse>(format)
+                })
+            }
+            "GetTime" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::system::v1::GetTimeRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::system::v1::__buffa::view::GetTimeRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::system::v1::GetTimeRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_time(ctx, req)
+                        .await?
+                        .encode::<crate::proto::system::v1::GetTimeResponse>(format)
                 })
             }
             "ListStatusEvents" => {
@@ -525,6 +643,44 @@ where
                 &self.config,
                 SYSTEM_SERVICE_SERVICE_NAME,
                 "GetVersion",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetTime RPC. Sends a request to /system.v1.SystemService/GetTime.
+    pub async fn get_time(
+        &self,
+        request: crate::proto::system::v1::GetTimeRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::system::v1::__buffa::view::GetTimeResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_time_with_options(request, ::connectrpc::client::CallOptions::default())
+            .await
+    }
+    /// Call the GetTime RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_time_with_options(
+        &self,
+        request: crate::proto::system::v1::GetTimeRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::system::v1::__buffa::view::GetTimeResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                SYSTEM_SERVICE_SERVICE_NAME,
+                "GetTime",
                 request,
                 options,
             )

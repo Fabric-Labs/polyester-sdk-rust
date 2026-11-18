@@ -1251,7 +1251,9 @@ pub struct AutoWithdrawDestination {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub asset_id: u32,
-    /// External destination chain identifier.
+    /// Polyester chain id of the destination network: ChainConfig.chain_id
+    /// from GetDepositWithdrawConfig, not the network's native chain id
+    /// (ChainConfig.native_chain_id).
     ///
     /// Field 2: `destination_chain_id`
     #[serde(
@@ -3172,7 +3174,9 @@ pub struct AutoWithdrawStep {
     /// less than 24 hours ago; the funds stay for a later run), route_suspended
     /// (withdrawals of the asset to the destination network are suspended, as
     /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
-    /// the funds stay for a later run), authority_revoked,
+    /// the funds stay for a later run), supply_unavailable (the destination
+    /// route's supply_status in the deposit and withdraw config is MISSING or
+    /// STALE; the funds stay for a later run), authority_revoked,
     /// gateway_capacity_insufficient (the funds stay for a later run),
     /// withdrawal_released or withdrawal_failed; empty otherwise.
     ///
@@ -5341,7 +5345,9 @@ pub enum ErrorCode {
     ERROR_CODE_CHAIN_METADATA_UNAVAILABLE = 34i32,
     /// Required network fee data is unavailable.
     ERROR_CODE_FEE_UNAVAILABLE = 35i32,
-    /// Required zipped-asset supply data is unavailable.
+    /// The zToken supply of the destination route is not known, or not
+    /// current: AssetChainVariant.supply_status is MISSING or STALE. Nothing was
+    /// reserved; retry once the status is AVAILABLE again.
     ERROR_CODE_SUPPLY_UNAVAILABLE = 36i32,
     /// Fresh step-up verification is temporarily unavailable.
     ERROR_CODE_STEP_UP_UNAVAILABLE = 37i32,
@@ -6441,6 +6447,170 @@ impl ::buffa::Enumeration for WithdrawDestinationValidationCode {
         ]
     }
 }
+/// WalletAssetUnavailableReason says why a zToken balance could not be read.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum WalletAssetUnavailableReason {
+    /// No reason was given.
+    UNAVAILABLE_UNSPECIFIED = 0i32,
+    /// No zToken contract exists at the listed address on Polyester Chain.
+    NO_CONTRACT = 1i32,
+    /// Polyester Chain answered the balance read with an error.
+    READ_FAILED = 2i32,
+    /// The balance read returned a value that is not a valid balance.
+    INVALID_BALANCE = 3i32,
+}
+impl WalletAssetUnavailableReason {
+    ///Idiomatic alias for [`Self::UNAVAILABLE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UnavailableUnspecified: Self = Self::UNAVAILABLE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::NO_CONTRACT`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const NoContract: Self = Self::NO_CONTRACT;
+    ///Idiomatic alias for [`Self::READ_FAILED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReadFailed: Self = Self::READ_FAILED;
+    ///Idiomatic alias for [`Self::INVALID_BALANCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InvalidBalance: Self = Self::INVALID_BALANCE;
+}
+impl ::core::default::Default for WalletAssetUnavailableReason {
+    fn default() -> Self {
+        Self::UNAVAILABLE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for WalletAssetUnavailableReason {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for WalletAssetUnavailableReason {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = WalletAssetUnavailableReason;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(WalletAssetUnavailableReason)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<WalletAssetUnavailableReason, E> {
+                <WalletAssetUnavailableReason as ::buffa::Enumeration>::from_proto_name(
+                        v,
+                    )
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<WalletAssetUnavailableReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WalletAssetUnavailableReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<WalletAssetUnavailableReason, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <WalletAssetUnavailableReason as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<WalletAssetUnavailableReason, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for WalletAssetUnavailableReason {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for WalletAssetUnavailableReason {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::UNAVAILABLE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::NO_CONTRACT),
+            2i32 => ::core::option::Option::Some(Self::READ_FAILED),
+            3i32 => ::core::option::Option::Some(Self::INVALID_BALANCE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::UNAVAILABLE_UNSPECIFIED => "UNAVAILABLE_UNSPECIFIED",
+            Self::NO_CONTRACT => "NO_CONTRACT",
+            Self::READ_FAILED => "READ_FAILED",
+            Self::INVALID_BALANCE => "INVALID_BALANCE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "UNAVAILABLE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::UNAVAILABLE_UNSPECIFIED)
+            }
+            "NO_CONTRACT" => ::core::option::Option::Some(Self::NO_CONTRACT),
+            "READ_FAILED" => ::core::option::Option::Some(Self::READ_FAILED),
+            "INVALID_BALANCE" => ::core::option::Option::Some(Self::INVALID_BALANCE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::UNAVAILABLE_UNSPECIFIED,
+            Self::NO_CONTRACT,
+            Self::READ_FAILED,
+            Self::INVALID_BALANCE,
+        ]
+    }
+}
 /// CreateTradingWithdrawResponse returns the accepted durable intent identifier
 /// for the withdraw lifecycle.
 #[derive(Clone, PartialEq, Default)]
@@ -6964,7 +7134,11 @@ pub struct TradingWithdrawIntentPayload {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub asset_id: u32,
-    /// External network id for TO_EXTERNAL_CHAIN. Omit for TO_FUNDING.
+    /// Polyester chain id of the destination network for TO_EXTERNAL_CHAIN:
+    /// ChainConfig.chain_id from GetDepositWithdrawConfig, not the network's
+    /// native chain id (ChainConfig.native_chain_id, such as 11155111 for
+    /// Ethereum Sepolia). An unknown id is refused with
+    /// ERROR_CODE_INVALID_DESTINATION_CHAIN. Omit for TO_FUNDING.
     ///
     /// Field 3: `destination_chain_id`
     #[serde(
@@ -7681,7 +7855,10 @@ pub const __CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY: ::buffa::type_regis
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ValidateWithdrawDestinationRequest {
-    /// External destination chain identifier.
+    /// Polyester chain id of the destination network: ChainConfig.chain_id
+    /// from GetDepositWithdrawConfig, not the network's native chain id
+    /// (ChainConfig.native_chain_id, such as 11155111 for Ethereum Sepolia).
+    /// An unknown id answers valid false with UNSUPPORTED_CHAIN.
     ///
     /// Field 1: `destination_chain_id`
     #[serde(
@@ -8451,7 +8628,8 @@ pub struct GetWalletBalancesResponse {
     )]
     pub smart_account_address: ::buffa::alloc::string::String,
     /// Every zToken the wallet holds a nonzero balance of, ordered by
-    /// zipped_asset_id. Empty when it holds none.
+    /// zipped_asset_id. Empty when it holds none. An asset whose balance could
+    /// not be read is in unavailable_assets instead.
     ///
     /// Field 2: `balances`
     #[serde(
@@ -8460,6 +8638,19 @@ pub struct GetWalletBalancesResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub balances: ::buffa::alloc::vec::Vec<WalletBalance>,
+    /// Zipped assets whose zToken balance could not be read, ordered by
+    /// zipped_asset_id. The wallet's balance of each is unknown, not zero: read
+    /// again later. Empty when every balance was read. When no balance can be
+    /// read at all, the request fails as unavailable instead.
+    ///
+    /// Field 3: `unavailable_assets`
+    #[serde(
+        rename = "unavailableAssets",
+        alias = "unavailable_assets",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub unavailable_assets: ::buffa::alloc::vec::Vec<UnavailableWalletAsset>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8469,6 +8660,7 @@ impl ::core::fmt::Debug for GetWalletBalancesResponse {
         f.debug_struct("GetWalletBalancesResponse")
             .field("smart_account_address", &self.smart_account_address)
             .field("balances", &self.balances)
+            .field("unavailable_assets", &self.unavailable_assets)
             .finish()
     }
 }
@@ -8511,6 +8703,14 @@ impl ::buffa::Message for GetWalletBalancesResponse {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        for v in &self.unavailable_assets {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8526,6 +8726,10 @@ impl ::buffa::Message for GetWalletBalancesResponse {
         }
         for v in &self.balances {
             ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        for v in &self.unavailable_assets {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             v.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
@@ -8557,6 +8761,15 @@ impl ::buffa::Message for GetWalletBalancesResponse {
                 ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
                 self.balances.push(elem);
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.unavailable_assets.push(elem);
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8567,6 +8780,7 @@ impl ::buffa::Message for GetWalletBalancesResponse {
     fn clear(&mut self) {
         self.smart_account_address.clear();
         self.balances.clear();
+        self.unavailable_assets.clear();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8597,6 +8811,249 @@ pub const __GET_WALLET_BALANCES_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonA
     type_url: "type.googleapis.com/chain.withdraw.v1.GetWalletBalancesResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetWalletBalancesResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetWalletBalancesResponse>,
+    is_wkt: false,
+};
+/// UnavailableWalletAsset is a zipped asset whose zToken balance could not be
+/// read from Polyester Chain.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct UnavailableWalletAsset {
+    /// Zipped asset of the zToken, as WalletBalance.zipped_asset_id names it.
+    ///
+    /// Field 1: `zipped_asset_id`
+    #[serde(
+        rename = "zippedAssetId",
+        alias = "zipped_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub zipped_asset_id: u32,
+    /// Unified asset the zToken stands for, as WalletBalance.unified_asset_id
+    /// names it.
+    ///
+    /// Field 2: `unified_asset_id`
+    #[serde(
+        rename = "unifiedAssetId",
+        alias = "unified_asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub unified_asset_id: u32,
+    /// External network of the zipped asset, as WalletBalance.chain_id names it.
+    ///
+    /// Field 3: `chain_id`
+    #[serde(
+        rename = "chainId",
+        alias = "chain_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub chain_id: u32,
+    /// zToken contract address on Polyester Chain listed for the zipped asset.
+    ///
+    /// Field 4: `ztoken_address`
+    #[serde(
+        rename = "ztokenAddress",
+        alias = "ztoken_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub ztoken_address: ::buffa::alloc::string::String,
+    /// Why the balance could not be read.
+    ///
+    /// Field 5: `reason`
+    #[serde(
+        rename = "reason",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reason: ::buffa::EnumValue<WalletAssetUnavailableReason>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for UnavailableWalletAsset {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("UnavailableWalletAsset")
+            .field("zipped_asset_id", &self.zipped_asset_id)
+            .field("unified_asset_id", &self.unified_asset_id)
+            .field("chain_id", &self.chain_id)
+            .field("ztoken_address", &self.ztoken_address)
+            .field("reason", &self.reason)
+            .finish()
+    }
+}
+impl UnavailableWalletAsset {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.UnavailableWalletAsset";
+}
+::buffa::impl_default_instance!(UnavailableWalletAsset);
+impl ::buffa::MessageName for UnavailableWalletAsset {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "UnavailableWalletAsset";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.UnavailableWalletAsset";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.UnavailableWalletAsset";
+}
+impl ::buffa::Message for UnavailableWalletAsset {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.zipped_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.zipped_asset_id) as u32;
+        }
+        if self.unified_asset_id != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.unified_asset_id) as u32;
+        }
+        if self.chain_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.chain_id) as u32;
+        }
+        if !self.ztoken_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.ztoken_address) as u32;
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.zipped_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.zipped_asset_id, buf);
+        }
+        if self.unified_asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(2u32, self.unified_asset_id, buf);
+        }
+        if self.chain_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.chain_id, buf);
+        }
+        if !self.ztoken_address.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.ztoken_address, buf);
+        }
+        {
+            let val = self.reason.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(5u32, val, buf);
+            }
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.zipped_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.unified_asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.chain_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.ztoken_address, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reason = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.zipped_asset_id = 0u32;
+        self.unified_asset_id = 0u32;
+        self.chain_id = 0u32;
+        self.ztoken_address.clear();
+        self.reason = ::buffa::EnumValue::from(0);
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for UnavailableWalletAsset {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.UnavailableWalletAsset";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for UnavailableWalletAsset {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __UNAVAILABLE_WALLET_ASSET_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.UnavailableWalletAsset",
+    to_json: ::buffa::type_registry::any_to_json::<UnavailableWalletAsset>,
+    from_json: ::buffa::type_registry::any_from_json::<UnavailableWalletAsset>,
     is_wkt: false,
 };
 #[allow(
@@ -9086,7 +9543,9 @@ pub mod __buffa {
             ///
             /// Field 1: `asset_id`
             pub asset_id: u32,
-            /// External destination chain identifier.
+            /// Polyester chain id of the destination network: ChainConfig.chain_id
+            /// from GetDepositWithdrawConfig, not the network's native chain id
+            /// (ChainConfig.native_chain_id).
             ///
             /// Field 2: `destination_chain_id`
             pub destination_chain_id: u64,
@@ -9603,7 +10062,9 @@ pub mod __buffa {
             pub fn asset_id(&self) -> u32 {
                 self.0.reborrow().asset_id
             }
-            /// External destination chain identifier.
+            /// Polyester chain id of the destination network: ChainConfig.chain_id
+            /// from GetDepositWithdrawConfig, not the network's native chain id
+            /// (ChainConfig.native_chain_id).
             ///
             /// Field 2: `destination_chain_id`
             #[must_use]
@@ -13011,7 +13472,9 @@ pub mod __buffa {
             /// less than 24 hours ago; the funds stay for a later run), route_suspended
             /// (withdrawals of the asset to the destination network are suspended, as
             /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
-            /// the funds stay for a later run), authority_revoked,
+            /// the funds stay for a later run), supply_unavailable (the destination
+            /// route's supply_status in the deposit and withdraw config is MISSING or
+            /// STALE; the funds stay for a later run), authority_revoked,
             /// gateway_capacity_insufficient (the funds stay for a later run),
             /// withdrawal_released or withdrawal_failed; empty otherwise.
             ///
@@ -13722,7 +14185,9 @@ pub mod __buffa {
             /// less than 24 hours ago; the funds stay for a later run), route_suspended
             /// (withdrawals of the asset to the destination network are suspended, as
             /// its withdrawal_status SUSPENDED in the deposit and withdraw config shows;
-            /// the funds stay for a later run), authority_revoked,
+            /// the funds stay for a later run), supply_unavailable (the destination
+            /// route's supply_status in the deposit and withdraw config is MISSING or
+            /// STALE; the funds stay for a later run), authority_revoked,
             /// gateway_capacity_insufficient (the funds stay for a later run),
             /// withdrawal_released or withdrawal_failed; empty otherwise.
             ///
@@ -18319,7 +18784,11 @@ pub mod __buffa {
             ///
             /// Field 2: `asset_id`
             pub asset_id: u32,
-            /// External network id for TO_EXTERNAL_CHAIN. Omit for TO_FUNDING.
+            /// Polyester chain id of the destination network for TO_EXTERNAL_CHAIN:
+            /// ChainConfig.chain_id from GetDepositWithdrawConfig, not the network's
+            /// native chain id (ChainConfig.native_chain_id, such as 11155111 for
+            /// Ethereum Sepolia). An unknown id is refused with
+            /// ERROR_CODE_INVALID_DESTINATION_CHAIN. Omit for TO_FUNDING.
             ///
             /// Field 3: `destination_chain_id`
             pub destination_chain_id: u64,
@@ -18856,7 +19325,11 @@ pub mod __buffa {
             pub fn asset_id(&self) -> u32 {
                 self.0.reborrow().asset_id
             }
-            /// External network id for TO_EXTERNAL_CHAIN. Omit for TO_FUNDING.
+            /// Polyester chain id of the destination network for TO_EXTERNAL_CHAIN:
+            /// ChainConfig.chain_id from GetDepositWithdrawConfig, not the network's
+            /// native chain id (ChainConfig.native_chain_id, such as 11155111 for
+            /// Ethereum Sepolia). An unknown id is refused with
+            /// ERROR_CODE_INVALID_DESTINATION_CHAIN. Omit for TO_FUNDING.
             ///
             /// Field 3: `destination_chain_id`
             #[must_use]
@@ -19752,7 +20225,10 @@ pub mod __buffa {
         /// destination for an authenticated caller without creating a withdraw.
         #[derive(Clone, Debug, Default)]
         pub struct ValidateWithdrawDestinationRequestView<'a> {
-            /// External destination chain identifier.
+            /// Polyester chain id of the destination network: ChainConfig.chain_id
+            /// from GetDepositWithdrawConfig, not the network's native chain id
+            /// (ChainConfig.native_chain_id, such as 11155111 for Ethereum Sepolia).
+            /// An unknown id answers valid false with UNSUPPORTED_CHAIN.
             ///
             /// Field 1: `destination_chain_id`
             pub destination_chain_id: u64,
@@ -20033,7 +20509,10 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// External destination chain identifier.
+            /// Polyester chain id of the destination network: ChainConfig.chain_id
+            /// from GetDepositWithdrawConfig, not the network's native chain id
+            /// (ChainConfig.native_chain_id, such as 11155111 for Ethereum Sepolia).
+            /// An unknown id answers valid false with UNSUPPORTED_CHAIN.
             ///
             /// Field 1: `destination_chain_id`
             #[must_use]
@@ -21230,12 +21709,23 @@ pub mod __buffa {
             /// Field 1: `smart_account_address`
             pub smart_account_address: &'a str,
             /// Every zToken the wallet holds a nonzero balance of, ordered by
-            /// zipped_asset_id. Empty when it holds none.
+            /// zipped_asset_id. Empty when it holds none. An asset whose balance could
+            /// not be read is in unavailable_assets instead.
             ///
             /// Field 2: `balances`
             pub balances: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::WalletBalanceView<'a>,
+            >,
+            /// Zipped assets whose zToken balance could not be read, ordered by
+            /// zipped_asset_id. The wallet's balance of each is unknown, not zero: read
+            /// again later. Empty when every balance was read. When no balance can be
+            /// read at all, the request fails as unavailable instead.
+            ///
+            /// Field 3: `unavailable_assets`
+            pub unavailable_assets: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::UnavailableWalletAssetView<'a>,
             >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
@@ -21294,6 +21784,21 @@ pub mod __buffa {
                                 )?,
                             );
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.unavailable_assets
+                            .push(
+                                <super::super::__buffa::view::UnavailableWalletAssetView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -21329,6 +21834,11 @@ pub mod __buffa {
                         .iter()
                         .map(|v| v.to_owned_from_source(__buffa_src))
                         .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    unavailable_assets: self
+                        .unavailable_assets
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -21358,6 +21868,14 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                for v in &self.unavailable_assets {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -21379,6 +21897,14 @@ pub mod __buffa {
                 for v in &self.balances {
                     ::buffa::types::put_len_delimited_header(
                         2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                for v in &self.unavailable_assets {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -21416,6 +21942,13 @@ pub mod __buffa {
                 }
                 if !self.balances.is_empty() {
                     __map.serialize_entry("balances", &*self.balances)?;
+                }
+                if !self.unavailable_assets.is_empty() {
+                    __map
+                        .serialize_entry(
+                            "unavailableAssets",
+                            &*self.unavailable_assets,
+                        )?;
                 }
                 __map.end()
             }
@@ -21525,7 +22058,8 @@ pub mod __buffa {
                 self.0.reborrow().smart_account_address
             }
             /// Every zToken the wallet holds a nonzero balance of, ordered by
-            /// zipped_asset_id. Empty when it holds none.
+            /// zipped_asset_id. Empty when it holds none. An asset whose balance could
+            /// not be read is in unavailable_assets instead.
             ///
             /// Field 2: `balances`
             #[must_use]
@@ -21536,6 +22070,21 @@ pub mod __buffa {
                 super::super::__buffa::view::WalletBalanceView<'_>,
             > {
                 &self.0.reborrow().balances
+            }
+            /// Zipped assets whose zToken balance could not be read, ordered by
+            /// zipped_asset_id. The wallet's balance of each is unknown, not zero: read
+            /// again later. Empty when every balance was read. When no balance can be
+            /// read at all, the request fails as unavailable instead.
+            ///
+            /// Field 3: `unavailable_assets`
+            #[must_use]
+            pub fn unavailable_assets(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::UnavailableWalletAssetView<'_>,
+            > {
+                &self.0.reborrow().unavailable_assets
             }
         }
         impl ::core::convert::From<
@@ -21574,6 +22123,426 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// UnavailableWalletAsset is a zipped asset whose zToken balance could not be
+        /// read from Polyester Chain.
+        #[derive(Clone, Debug, Default)]
+        pub struct UnavailableWalletAssetView<'a> {
+            /// Zipped asset of the zToken, as WalletBalance.zipped_asset_id names it.
+            ///
+            /// Field 1: `zipped_asset_id`
+            pub zipped_asset_id: u32,
+            /// Unified asset the zToken stands for, as WalletBalance.unified_asset_id
+            /// names it.
+            ///
+            /// Field 2: `unified_asset_id`
+            pub unified_asset_id: u32,
+            /// External network of the zipped asset, as WalletBalance.chain_id names it.
+            ///
+            /// Field 3: `chain_id`
+            pub chain_id: u32,
+            /// zToken contract address on Polyester Chain listed for the zipped asset.
+            ///
+            /// Field 4: `ztoken_address`
+            pub ztoken_address: &'a str,
+            /// Why the balance could not be read.
+            ///
+            /// Field 5: `reason`
+            pub reason: ::buffa::EnumValue<super::super::WalletAssetUnavailableReason>,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for UnavailableWalletAssetView<'a> {
+            type Owned = super::super::UnavailableWalletAsset;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.zipped_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.unified_asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.chain_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.ztoken_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reason = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnavailableWalletAsset,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::UnavailableWalletAsset,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::UnavailableWalletAsset {
+                    zipped_asset_id: self.zipped_asset_id,
+                    unified_asset_id: self.unified_asset_id,
+                    chain_id: self.chain_id,
+                    ztoken_address: self.ztoken_address.to_string(),
+                    reason: self.reason,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for UnavailableWalletAssetView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.zipped_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.zipped_asset_id)
+                                as u32;
+                }
+                if self.unified_asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.unified_asset_id)
+                                as u32;
+                }
+                if self.chain_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.chain_id) as u32;
+                }
+                if !self.ztoken_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.ztoken_address)
+                                as u32;
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.zipped_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.zipped_asset_id, buf);
+                }
+                if self.unified_asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(2u32, self.unified_asset_id, buf);
+                }
+                if self.chain_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.chain_id, buf);
+                }
+                if !self.ztoken_address.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.ztoken_address, buf);
+                }
+                {
+                    let val = self.reason.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(5u32, val, buf);
+                    }
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for UnavailableWalletAssetView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.zipped_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "zippedAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.zipped_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.unified_asset_id) {
+                    __map
+                        .serialize_entry(
+                            "unifiedAssetId",
+                            &::buffa::json_helpers::ProtoJson(&self.unified_asset_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.chain_id) {
+                    __map
+                        .serialize_entry(
+                            "chainId",
+                            &::buffa::json_helpers::ProtoJson(&self.chain_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.ztoken_address) {
+                    __map.serialize_entry("ztokenAddress", self.ztoken_address)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.reason) {
+                    __map.serialize_entry("reason", &self.reason)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for UnavailableWalletAssetView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "UnavailableWalletAsset";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.UnavailableWalletAsset";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.UnavailableWalletAsset";
+        }
+        ::buffa::impl_default_view_instance!(UnavailableWalletAssetView);
+        ::buffa::impl_view_reborrow!(UnavailableWalletAssetView);
+        /** Self-contained, `'static` owned view of a `UnavailableWalletAsset` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`UnavailableWalletAssetView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`UnavailableWalletAssetView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct UnavailableWalletAssetOwnedView(
+            ::buffa::OwnedView<UnavailableWalletAssetView<'static>>,
+        );
+        impl UnavailableWalletAssetOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnavailableWalletAssetOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnavailableWalletAssetOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::UnavailableWalletAsset,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    UnavailableWalletAssetOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`UnavailableWalletAssetView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &UnavailableWalletAssetView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::UnavailableWalletAsset,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Zipped asset of the zToken, as WalletBalance.zipped_asset_id names it.
+            ///
+            /// Field 1: `zipped_asset_id`
+            #[must_use]
+            pub fn zipped_asset_id(&self) -> u32 {
+                self.0.reborrow().zipped_asset_id
+            }
+            /// Unified asset the zToken stands for, as WalletBalance.unified_asset_id
+            /// names it.
+            ///
+            /// Field 2: `unified_asset_id`
+            #[must_use]
+            pub fn unified_asset_id(&self) -> u32 {
+                self.0.reborrow().unified_asset_id
+            }
+            /// External network of the zipped asset, as WalletBalance.chain_id names it.
+            ///
+            /// Field 3: `chain_id`
+            #[must_use]
+            pub fn chain_id(&self) -> u32 {
+                self.0.reborrow().chain_id
+            }
+            /// zToken contract address on Polyester Chain listed for the zipped asset.
+            ///
+            /// Field 4: `ztoken_address`
+            #[must_use]
+            pub fn ztoken_address(&self) -> &'_ str {
+                self.0.reborrow().ztoken_address
+            }
+            /// Why the balance could not be read.
+            ///
+            /// Field 5: `reason`
+            #[must_use]
+            pub fn reason(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::WalletAssetUnavailableReason> {
+                self.0.reborrow().reason
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<UnavailableWalletAssetView<'static>>,
+        > for UnavailableWalletAssetOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<UnavailableWalletAssetView<'static>>,
+            ) -> Self {
+                UnavailableWalletAssetOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<UnavailableWalletAssetOwnedView>
+        for ::buffa::OwnedView<UnavailableWalletAssetView<'static>> {
+            fn from(wrapper: UnavailableWalletAssetOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<UnavailableWalletAssetView<'static>>,
+        > for UnavailableWalletAssetOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<UnavailableWalletAssetView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::UnavailableWalletAsset {
+            type View<'a> = UnavailableWalletAssetView<'a>;
+            type ViewHandle = UnavailableWalletAssetOwnedView;
+        }
+        impl ::serde::Serialize for UnavailableWalletAssetOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
     }
     /// Register this package's `Any` type entries and extension entries.
     pub fn register_types(reg: &mut ::buffa::type_registry::TypeRegistry) {
@@ -21605,6 +22574,7 @@ pub mod __buffa {
         reg.register_json_any(super::__GET_WALLET_BALANCES_REQUEST_JSON_ANY);
         reg.register_json_any(super::__WALLET_BALANCE_JSON_ANY);
         reg.register_json_any(super::__GET_WALLET_BALANCES_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__UNAVAILABLE_WALLET_ASSET_JSON_ANY);
     }
 }
 #[doc(inline)]
@@ -21719,5 +22689,9 @@ pub use self::__buffa::view::WalletBalanceOwnedView;
 pub use self::__buffa::view::GetWalletBalancesResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetWalletBalancesResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::UnavailableWalletAssetView;
+#[doc(inline)]
+pub use self::__buffa::view::UnavailableWalletAssetOwnedView;
 #[doc(inline)]
 pub use self::__buffa::register_types;

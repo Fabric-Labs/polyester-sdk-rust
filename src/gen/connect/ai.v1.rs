@@ -48,6 +48,14 @@ pub type OwnedListMessagesRequestView = ::buffa::view::OwnedView<
 pub type OwnedListMessagesResponseView = ::buffa::view::OwnedView<
     crate::proto::ai::v1::__buffa::view::ListMessagesResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetMessageImageRequestView<'static>>`.
+pub type OwnedGetMessageImageRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetMessageImageRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetMessageImageResponseView<'static>>`.
+pub type OwnedGetMessageImageResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetMessageImageResponseView<'static>,
+>;
 ///Shorthand for `OwnedView<ListMemoriesRequestView<'static>>`.
 pub type OwnedListMemoriesRequestView = ::buffa::view::OwnedView<
     crate::proto::ai::v1::__buffa::view::ListMemoriesRequestView<'static>,
@@ -103,6 +111,38 @@ pub type OwnedSetTelegramApprovalLimitsRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<SetTelegramApprovalLimitsResponseView<'static>>`.
 pub type OwnedSetTelegramApprovalLimitsResponseView = ::buffa::view::OwnedView<
     crate::proto::ai::v1::__buffa::view::SetTelegramApprovalLimitsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<SetModelKeyRequestView<'static>>`.
+pub type OwnedSetModelKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetModelKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<SetModelKeyResponseView<'static>>`.
+pub type OwnedSetModelKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetModelKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetModelKeyRequestView<'static>>`.
+pub type OwnedGetModelKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetModelKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetModelKeyResponseView<'static>>`.
+pub type OwnedGetModelKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetModelKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteModelKeyRequestView<'static>>`.
+pub type OwnedDeleteModelKeyRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::DeleteModelKeyRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DeleteModelKeyResponseView<'static>>`.
+pub type OwnedDeleteModelKeyResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::DeleteModelKeyResponseView<'static>,
+>;
+///Shorthand for `OwnedView<GetUsageRequestView<'static>>`.
+pub type OwnedGetUsageRequestView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetUsageRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetUsageResponseView<'static>>`.
+pub type OwnedGetUsageResponseView = ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetUsageResponseView<'static>,
 >;
 impl ::connectrpc::Encodable<crate::proto::ai::v1::SendMessageResponse>
 for crate::proto::ai::v1::__buffa::view::SendMessageResponseView<'_> {
@@ -216,6 +256,26 @@ for crate::proto::ai::v1::__buffa::view::ListMessagesResponseView<'_> {
 impl ::connectrpc::Encodable<crate::proto::ai::v1::ListMessagesResponse>
 for ::buffa::view::OwnedView<
     crate::proto::ai::v1::__buffa::view::ListMessagesResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetMessageImageResponse>
+for crate::proto::ai::v1::__buffa::view::GetMessageImageResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetMessageImageResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetMessageImageResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -364,6 +424,86 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::ai::v1::SetModelKeyResponse>
+for crate::proto::ai::v1::__buffa::view::SetModelKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::SetModelKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::SetModelKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetModelKeyResponse>
+for crate::proto::ai::v1::__buffa::view::GetModelKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetModelKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetModelKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::DeleteModelKeyResponse>
+for crate::proto::ai::v1::__buffa::view::DeleteModelKeyResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::DeleteModelKeyResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::DeleteModelKeyResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetUsageResponse>
+for crate::proto::ai::v1::__buffa::view::GetUsageResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::ai::v1::GetUsageResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::ai::v1::__buffa::view::GetUsageResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const ASSISTANT_SERVICE_SERVICE_NAME: &str = "ai.v1.AssistantService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `SendMessage` RPC.
@@ -417,6 +557,15 @@ pub const ASSISTANT_SERVICE_LIST_CONVERSATIONS_SPEC: ::connectrpc::Spec = ::conn
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const ASSISTANT_SERVICE_LIST_MESSAGES_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/ai.v1.AssistantService/ListMessages",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetMessageImage` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_GET_MESSAGE_IMAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/GetMessageImage",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
@@ -483,6 +632,42 @@ pub const ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC: ::connectrpc::Spe
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `SetModelKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_SET_MODEL_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/SetModelKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetModelKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_GET_MODEL_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/GetModelKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DeleteModelKey` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_DELETE_MODEL_KEY_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/DeleteModelKey",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetUsage` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const ASSISTANT_SERVICE_GET_USAGE_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/ai.v1.AssistantService/GetUsage",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
 /// AssistantService is the Polyester trading assistant. A user sends a
 /// message, which starts a run: the assistant's answer, with the tools,
 /// skills and subagents it uses. The run continues on the server when no
@@ -547,11 +732,17 @@ pub trait AssistantService: Send + Sync + 'static {
     /// SendMessage records the caller's message and starts a run that answers
     /// it. It returns once the run is recorded; follow the run with WatchRun. A
     /// conversation runs one run at a time. It is idempotent per caller and key:
-    /// repeat the request unchanged to resolve an unknown outcome.
+    /// repeat the request unchanged to resolve an unknown outcome. When the
+    /// caller has saved their own OpenAI API key (SetModelKey), the run's model
+    /// requests use it instead of the assistant's own allowance.
     /// Errors:
-    /// - INVALID_ARGUMENT: malformed request.
+    /// - INVALID_ARGUMENT: malformed request; IMAGE_TOO_LARGE,
+    /// IMAGE_TYPE_UNSUPPORTED or TOO_MANY_IMAGES for the attached images.
+    /// Nothing is recorded.
     /// - NOT_FOUND: CONVERSATION_NOT_FOUND.
-    /// - FAILED_PRECONDITION: RUN_ACTIVE; nothing is recorded.
+    /// - FAILED_PRECONDITION: RUN_ACTIVE, or CONVERSATION_ADVANCED when
+    /// expected_latest_run_id is no longer the conversation's latest run;
+    /// nothing is recorded.
     /// - ALREADY_EXISTS: IDEMPOTENCY_CONFLICT; the original run stands.
     /// - RESOURCE_EXHAUSTED: USAGE_LIMIT_REACHED; retry later.
     /// - UNAVAILABLE, DEADLINE_EXCEEDED: SERVICE_UNAVAILABLE or an unknown
@@ -724,6 +915,35 @@ pub trait AssistantService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ai::v1::ListMessagesResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetMessageImage returns one image of the caller's messages, as the
+    /// message's MessageImage describes it.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request.
+    /// - NOT_FOUND: IMAGE_NOT_FOUND.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_message_image<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::GetMessageImageRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::GetMessageImageResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -913,9 +1133,16 @@ pub trait AssistantService: Send + Sync + 'static {
     /// SetTelegramApprovalLimits replaces the caller's optional limits on what
     /// they may approve from Telegram. A limit left unset is turned off. Only a
     /// signed-in session sets them, never Telegram; they apply to the next
-    /// approval from Telegram.
+    /// approval from Telegram. Raising a limit, or turning one off, allows more
+    /// from Telegram, so it needs the session's recent-MFA window open for
+    /// auth.v1 RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS: complete an MFA
+    /// challenge for fresh step-up first, unless auth.v1 MFAService.GetRecentMFA
+    /// says the window is open. Setting a new limit or lowering one needs no MFA.
     /// Errors:
     /// - INVALID_ARGUMENT: malformed request.
+    /// - PERMISSION_DENIED: auth.v1 AuthErrorDetail AUTH_STEP_UP_REQUIRED or
+    /// AUTH_RECENT_MFA_EXPIRED; complete a fresh step-up and retry.
+    /// - ABORTED: the limits changed at the same time; read them and retry.
     /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the same request.
     /// - UNAUTHENTICATED: missing or invalid credentials.
     ///
@@ -937,6 +1164,140 @@ pub trait AssistantService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::ai::v1::SetTelegramApprovalLimitsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// SetModelKey saves the caller's own OpenAI API key, replacing any earlier
+    /// one. The key is checked with a small request to OpenAI first and saved
+    /// only when OpenAI accepts it for the assistant's model; it is stored
+    /// encrypted and never returned. From then on, every model request of the
+    /// caller's runs, on any channel, uses this key and is billed to its OpenAI
+    /// account instead of the assistant's own allowance; the per-run limits and
+    /// the request rate limits still apply. A run uses only the key saved when
+    /// its message was sent: replacing or deleting that key never moves the run
+    /// to another key or to the assistant's allowance, so the run either
+    /// finishes on its key or ends with MODEL_KEY_REFUSED. When OpenAI refuses
+    /// the key during a run, the run ends with MODEL_KEY_REFUSED. Only a
+    /// signed-in session sets it.
+    /// Errors:
+    /// - INVALID_ARGUMENT: malformed request, including a value that is not an
+    /// OpenAI secret API key.
+    /// - FAILED_PRECONDITION: MODEL_KEY_REJECTED, MODEL_KEY_NO_QUOTA or
+    /// MODEL_KEY_MODEL_UNAVAILABLE; nothing was saved.
+    /// - RESOURCE_EXHAUSTED: USAGE_LIMIT_REACHED; retry later.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE, including when OpenAI could not be
+    /// reached to check the key; nothing was saved. Retry the request.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    /// - PERMISSION_DENIED: the request was made with an API key.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn set_model_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::SetModelKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::SetModelKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetModelKey reads the status of the caller's own OpenAI API key: its
+    /// last four characters, when it was saved, and its last check. The key
+    /// itself is never returned.
+    /// Errors:
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    /// - PERMISSION_DENIED: the request was made with an API key.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_model_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::GetModelKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::GetModelKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// DeleteModelKey deletes the caller's own OpenAI API key. Messages sent
+    /// after it use the assistant's own allowance again. A run of a message sent
+    /// before it never moves to the assistant's allowance: it finishes on the
+    /// deleted key or ends with MODEL_KEY_REFUSED. Deleting when there is no key
+    /// succeeds.
+    /// Errors:
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry the request.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    /// - PERMISSION_DENIED: the request was made with an API key.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn delete_model_key<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::ai::v1::DeleteModelKeyRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::DeleteModelKeyResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetUsage reads the caller's assistant credits today: the free daily
+    /// credits of the caller's VIP tier, how many are used and left, when they
+    /// reset, what pays for the caller's next messages, and the next VIP tier's
+    /// free credits. A message is answered while free credits are left, or on
+    /// the caller's own OpenAI API key, which uses none. Only a signed-in
+    /// session reads it.
+    /// Errors:
+    /// - RESOURCE_EXHAUSTED: USAGE_LIMIT_REACHED; retry later.
+    /// - UNAVAILABLE: SERVICE_UNAVAILABLE; retry later.
+    /// - UNAUTHENTICATED: missing or invalid credentials.
+    /// - PERMISSION_DENIED: the request was made with an API key.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_usage<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<'_, crate::proto::ai::v1::GetUsageRequest>,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::ai::v1::GetUsageResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -1143,6 +1504,35 @@ impl<S: AssistantService> AssistantServiceExt for S {
             .with_spec(ASSISTANT_SERVICE_LIST_MESSAGES_SPEC)
             .route_view_idempotent(
                 ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetMessageImage",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::GetMessageImageRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::GetMessageImageRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_message_image(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ai::v1::GetMessageImageResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_GET_MESSAGE_IMAGE_SPEC)
+            .route_view_idempotent(
+                ASSISTANT_SERVICE_SERVICE_NAME,
                 "ListMemories",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -1344,6 +1734,116 @@ impl<S: AssistantService> AssistantServiceExt for S {
                 },
             )
             .with_spec(ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC)
+            .route_view(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "SetModelKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::SetModelKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::SetModelKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.set_model_key(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::ai::v1::SetModelKeyResponse>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_SET_MODEL_KEY_SPEC)
+            .route_view_idempotent(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetModelKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::GetModelKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::GetModelKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_model_key(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::ai::v1::GetModelKeyResponse>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_GET_MODEL_KEY_SPEC)
+            .route_view(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "DeleteModelKey",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::DeleteModelKeyRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::DeleteModelKeyRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.delete_model_key(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::ai::v1::DeleteModelKeyResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_DELETE_MODEL_KEY_SPEC)
+            .route_view_idempotent(
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetUsage",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::ai::v1::__buffa::view::GetUsageRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::ai::v1::GetUsageRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_usage(ctx, sreq)
+                                .await?
+                                .encode::<crate::proto::ai::v1::GetUsageResponse>(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(ASSISTANT_SERVICE_GET_USAGE_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1434,6 +1934,12 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                         .with_spec(ASSISTANT_SERVICE_LIST_MESSAGES_SPEC),
                 )
             }
+            "GetMessageImage" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(ASSISTANT_SERVICE_GET_MESSAGE_IMAGE_SPEC),
+                )
+            }
             "ListMemories" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
@@ -1474,6 +1980,30 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(ASSISTANT_SERVICE_SET_TELEGRAM_APPROVAL_LIMITS_SPEC),
+                )
+            }
+            "SetModelKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ASSISTANT_SERVICE_SET_MODEL_KEY_SPEC),
+                )
+            }
+            "GetModelKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(ASSISTANT_SERVICE_GET_MODEL_KEY_SPEC),
+                )
+            }
+            "DeleteModelKey" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(ASSISTANT_SERVICE_DELETE_MODEL_KEY_SPEC),
+                )
+            }
+            "GetUsage" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(ASSISTANT_SERVICE_GET_USAGE_SPEC),
                 )
             }
             _ => None,
@@ -1586,6 +2116,25 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                     svc.list_messages(ctx, req)
                         .await?
                         .encode::<crate::proto::ai::v1::ListMessagesResponse>(format)
+                })
+            }
+            "GetMessageImage" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::GetMessageImageRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::GetMessageImageRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::GetMessageImageRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_message_image(ctx, req)
+                        .await?
+                        .encode::<crate::proto::ai::v1::GetMessageImageResponse>(format)
                 })
             }
             "ListMemories" => {
@@ -1729,6 +2278,82 @@ impl<T: AssistantService> ::connectrpc::Dispatcher for AssistantServiceServer<T>
                         .encode::<
                             crate::proto::ai::v1::SetTelegramApprovalLimitsResponse,
                         >(format)
+                })
+            }
+            "SetModelKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::SetModelKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::SetModelKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::SetModelKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.set_model_key(ctx, req)
+                        .await?
+                        .encode::<crate::proto::ai::v1::SetModelKeyResponse>(format)
+                })
+            }
+            "GetModelKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::GetModelKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::GetModelKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::GetModelKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_model_key(ctx, req)
+                        .await?
+                        .encode::<crate::proto::ai::v1::GetModelKeyResponse>(format)
+                })
+            }
+            "DeleteModelKey" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::DeleteModelKeyRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::DeleteModelKeyRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::DeleteModelKeyRequest,
+                    >::from_parts(&req, &body);
+                    svc.delete_model_key(ctx, req)
+                        .await?
+                        .encode::<crate::proto::ai::v1::DeleteModelKeyResponse>(format)
+                })
+            }
+            "GetUsage" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::ai::v1::GetUsageRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::ai::v1::__buffa::view::GetUsageRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::ai::v1::GetUsageRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_usage(ctx, req)
+                        .await?
+                        .encode::<crate::proto::ai::v1::GetUsageResponse>(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -2106,6 +2731,47 @@ where
             )
             .await
     }
+    /// Call the GetMessageImage RPC. Sends a request to /ai.v1.AssistantService/GetMessageImage.
+    pub async fn get_message_image(
+        &self,
+        request: crate::proto::ai::v1::GetMessageImageRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetMessageImageResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_message_image_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetMessageImage RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_message_image_with_options(
+        &self,
+        request: crate::proto::ai::v1::GetMessageImageRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetMessageImageResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetMessageImage",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the ListMemories RPC. Sends a request to /ai.v1.AssistantService/ListMemories.
     pub async fn list_memories(
         &self,
@@ -2408,6 +3074,170 @@ where
                 &self.config,
                 ASSISTANT_SERVICE_SERVICE_NAME,
                 "SetTelegramApprovalLimits",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the SetModelKey RPC. Sends a request to /ai.v1.AssistantService/SetModelKey.
+    pub async fn set_model_key(
+        &self,
+        request: crate::proto::ai::v1::SetModelKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::SetModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.set_model_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the SetModelKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn set_model_key_with_options(
+        &self,
+        request: crate::proto::ai::v1::SetModelKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::SetModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "SetModelKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetModelKey RPC. Sends a request to /ai.v1.AssistantService/GetModelKey.
+    pub async fn get_model_key(
+        &self,
+        request: crate::proto::ai::v1::GetModelKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_model_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetModelKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_model_key_with_options(
+        &self,
+        request: crate::proto::ai::v1::GetModelKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetModelKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DeleteModelKey RPC. Sends a request to /ai.v1.AssistantService/DeleteModelKey.
+    pub async fn delete_model_key(
+        &self,
+        request: crate::proto::ai::v1::DeleteModelKeyRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::DeleteModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.delete_model_key_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DeleteModelKey RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn delete_model_key_with_options(
+        &self,
+        request: crate::proto::ai::v1::DeleteModelKeyRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::DeleteModelKeyResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "DeleteModelKey",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetUsage RPC. Sends a request to /ai.v1.AssistantService/GetUsage.
+    pub async fn get_usage(
+        &self,
+        request: crate::proto::ai::v1::GetUsageRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetUsageResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_usage_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetUsage RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_usage_with_options(
+        &self,
+        request: crate::proto::ai::v1::GetUsageRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::ai::v1::__buffa::view::GetUsageResponseView<'static>,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                ASSISTANT_SERVICE_SERVICE_NAME,
+                "GetUsage",
                 request,
                 options,
             )

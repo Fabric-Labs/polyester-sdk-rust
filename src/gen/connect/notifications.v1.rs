@@ -276,9 +276,13 @@ pub const NOTIFICATION_SERVICE_MARK_ALL_NOTIFICATIONS_READ_SPEC: ::connectrpc::S
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
-/// NotificationService serves the caller's notification center. Every method
-/// takes a session token: notifications of the account are read and marked on
-/// the website and in the app, never with an API key.
+/// NotificationService serves the caller's notification center: the
+/// notifications of the caller's main account. ListNotifications,
+/// GetNotification and GetNotificationCounts also take an API key of the main
+/// account whose policy grants READ_NOTIFICATIONS; a key scoped to a
+/// sub-account is refused with PERMISSION_DENIED (AUTH_API_KEY_ACCESS_DENIED),
+/// since notifications belong to the main account. Marking notifications read
+/// or unread takes a session token only.
 ///
 /// # Implementing handlers
 ///

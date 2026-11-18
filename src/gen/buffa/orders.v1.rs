@@ -988,7 +988,10 @@ pub enum ErrorCode {
     ERROR_CODE_FEE_ASSET_NOT_ALLOWED = 15i32,
     /// Pair is disabled and does not accept orders.
     ERROR_CODE_PAIR_DISABLED = 16i32,
-    /// Referenced order could not be resolved.
+    /// Referenced order could not be resolved: no order of the account has that
+    /// order ID or client order ID, or an ended order can no longer be
+    /// confirmed under it (see OrdersService.CancelOrder). Read the order to
+    /// tell an ended order from one that was never placed.
     ERROR_CODE_ORDER_UNKNOWN = 17i32,
     /// Order processing failed because of an unexpected error.
     ERROR_CODE_INTERNAL_ERROR = 18i32,
@@ -1561,6 +1564,11 @@ pub enum ErrorCode {
     /// remain valid. To wait for a new activation price, cancel the trigger and
     /// create a new one.
     ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE = 315i32,
+    /// The OCO's client list ID is empty, longer than 36 characters, or has a
+    /// character other than a letter, digit, period, underscore, colon, slash or
+    /// hyphen. Answered by CreateOco and by the ListTriggers client_list_id
+    /// filter. Nothing changed.
+    ERROR_CODE_CLIENT_LIST_ID_INVALID = 318i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2181,6 +2189,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TriggerActivationPriceNotModifiable: Self = Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE;
+    ///Idiomatic alias for [`Self::ERROR_CODE_CLIENT_LIST_ID_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ClientListIdInvalid: Self = Self::ERROR_CODE_CLIENT_LIST_ID_INVALID;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2826,6 +2837,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
                 )
             }
+            318i32 => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_LIST_ID_INVALID)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -3263,6 +3277,9 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_INVALID_PEG => "ERROR_CODE_INVALID_PEG",
             Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE => {
                 "ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE"
+            }
+            Self::ERROR_CODE_CLIENT_LIST_ID_INVALID => {
+                "ERROR_CODE_CLIENT_LIST_ID_INVALID"
             }
         }
     }
@@ -3988,6 +4005,9 @@ impl ::buffa::Enumeration for ErrorCode {
                     Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
                 )
             }
+            "ERROR_CODE_CLIENT_LIST_ID_INVALID" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_LIST_ID_INVALID)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4199,6 +4219,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_PEG_REFERENCE_UNAVAILABLE,
             Self::ERROR_CODE_INVALID_PEG,
             Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
+            Self::ERROR_CODE_CLIENT_LIST_ID_INVALID,
         ]
     }
 }
@@ -5223,12 +5244,31 @@ impl ::buffa::Enumeration for BatchReplaceItemAdmissionStatus {
 ///
 /// MarketIoc configures a market order. Market orders always execute as
 /// immediate-or-cancel and therefore cannot rest or be post-only.
+///
+/// The order fills only up to its protection price, a BUY at or below it and
+/// a SELL at or above it. The protection price is the reference price
+/// (client_ref_price_ticks, or the server's reference when it is omitted)
+/// moved by the maximum slippage, up for a BUY and down for a SELL, then put
+/// on the pair's tick grid toward the reference: a BUY's is rounded down and
+/// a SELL's up, so it never allows more than the slippage and can be up to
+/// one tick tighter. Neither client_ref_price_ticks nor max_slippage_ticks
+/// has to be a multiple of the pair's tick size; only the protection price
+/// is. For example, on a pair whose tick size is 0.01, a reference of
+/// 73840.125 and a slippage of 50.12 give a BUY protection price of 73890.24
+/// (73890.245 rounded down) and a SELL protection price of 73790.01
+/// (73790.005 rounded up). The order's price_ticks shows the protection
+/// price; market_client_ref_price_ticks and market_max_slippage_ticks show
+/// the values exactly as given.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
 pub struct MarketIoc {
-    /// Optional positive client reference price in quote units scaled by 1e9.
-    /// When omitted, admission uses server-side reference pricing.
+    /// Optional positive client reference price in quote units scaled by 1e9
+    /// (1e-9 quote units, not the pair's tick size). It need not be on the
+    /// pair's tick grid; only the protection price derived from it is, as
+    /// MarketIoc describes. When omitted, admission uses server-side reference
+    /// pricing. A reference too far from the server's is refused with
+    /// ERROR_CODE_STALE_QUOTE.
     ///
     /// Field 3: `client_ref_price_ticks`
     #[serde(
@@ -8766,7 +8806,7 @@ pub struct CancelOrderResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub status: ::buffa::EnumValue<cancel_order_response::Status>,
-    /// Order ID as fixed64.
+    /// Public order ID.
     ///
     /// Field 2: `order_id`
     #[serde(
@@ -9363,6 +9403,21 @@ pub struct ErrorDetail {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub level_index: ::core::option::Option<u32>,
+    /// The price band limit the order's limit price is past, when a preview is
+    /// not admissible with PRICE_BAND_VIOLATION: the highest admitted buy price
+    /// for a buy, the lowest admitted sell price for a sell, as the market last
+    /// published its band. REST returns priceBandLimit as a decimal string in
+    /// quote asset units per base asset unit, for example "1837.5". Protobuf
+    /// uses quote units scaled by 1e9. Omitted for every other error.
+    ///
+    /// Field 10: `price_band_limit_ticks`
+    #[serde(
+        rename = "priceBandLimitTicks",
+        alias = "price_band_limit_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub price_band_limit_ticks: ::core::option::Option<i64>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9376,6 +9431,7 @@ impl ::core::fmt::Debug for ErrorDetail {
             .field("existing_order_id", &self.existing_order_id)
             .field("cause_code", &self.cause_code)
             .field("level_index", &self.level_index)
+            .field("price_band_limit_ticks", &self.price_band_limit_ticks)
             .finish()
     }
 }
@@ -9399,6 +9455,13 @@ impl ErrorDetail {
     ///Sets [`Self::level_index`] to `Some(value)`, consuming and returning `self`.
     pub fn with_level_index(mut self, value: u32) -> Self {
         self.level_index = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::price_band_limit_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_price_band_limit_ticks(mut self, value: i64) -> Self {
+        self.price_band_limit_ticks = Some(value);
         self
     }
 }
@@ -9454,6 +9517,9 @@ impl ::buffa::Message for ErrorDetail {
         if let Some(v) = self.level_index {
             size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
         }
+        if let Some(v) = self.price_band_limit_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9489,6 +9555,9 @@ impl ::buffa::Message for ErrorDetail {
         }
         if let Some(v) = self.level_index {
             ::buffa::types::put_uint32_field(9u32, v, buf);
+        }
+        if let Some(v) = self.price_band_limit_ticks {
+            ::buffa::types::put_int64_field(10u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9557,6 +9626,15 @@ impl ::buffa::Message for ErrorDetail {
                     ::buffa::types::decode_uint32(buf)?,
                 );
             }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.price_band_limit_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9571,6 +9649,7 @@ impl ::buffa::Message for ErrorDetail {
         self.existing_order_id = ::core::option::Option::None;
         self.cause_code = ::buffa::EnumValue::from(0);
         self.level_index = ::core::option::Option::None;
+        self.price_band_limit_ticks = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10137,10 +10216,10 @@ pub struct TakeProfitPolicy {
     pub child: ::buffa::MessageField<RiskExecution>,
     /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
     /// traded price. INDEX_PRICE watches the market's index price; on a market
-    /// without an index price the order is rejected with terminal reason
-    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// without an index price the order is rejected before any fill with
+    /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+    /// that adds such a leg is refused with the same code, leaving the order and
+    /// its legs unchanged. MARK_PRICE is not supported. A modify naming
     /// another source replaces the leg.
     ///
     /// Field 3: `trigger_price_source`
@@ -10341,10 +10420,10 @@ pub struct StopLossPolicy {
     pub child: ::buffa::MessageField<RiskExecution>,
     /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
     /// traded price. INDEX_PRICE watches the market's index price; on a market
-    /// without an index price the order is rejected with terminal reason
-    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// without an index price the order is rejected before any fill with
+    /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+    /// that adds such a leg is refused with the same code, leaving the order and
+    /// its legs unchanged. MARK_PRICE is not supported. A modify naming
     /// another source replaces the leg.
     ///
     /// Field 3: `trigger_price_source`
@@ -10540,10 +10619,10 @@ pub struct TrailingStopPolicy {
     /// Price the trailing stop watches and trails: its peak or trough, activation
     /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
     /// traded price. INDEX_PRICE watches the market's index price; on a market
-    /// without an index price the order is rejected with terminal reason
-    /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-    /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-    /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+    /// without an index price the order is rejected before any fill with
+    /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+    /// that adds such a leg is refused with the same code, leaving the order and
+    /// its legs unchanged. MARK_PRICE is not supported. A modify naming
     /// another source replaces the leg.
     ///
     /// Field 8: `trigger_price_source`
@@ -17210,7 +17289,7 @@ pub const __BATCH_REPLACE_ORDERS_RESPONSE_JSON_ANY: ::buffa::type_registry::Json
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct BatchCancelItem {
-    /// Order ID as fixed64. Exactly one of order_id or client_order_id.
+    /// Public order ID. Exactly one of order_id or client_order_id.
     ///
     /// Field 1: `order_id`
     #[serde(
@@ -21208,7 +21287,7 @@ pub const __ORDER_FEE_TOTAL_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct Order {
-    /// Public order identifier as fixed64.
+    /// Public order ID.
     ///
     /// Field 1: `order_id`
     #[serde(
@@ -21437,11 +21516,21 @@ pub struct Order {
     )]
     pub cum_notional: ::buffa::MessageField<super::super::polyester::r#type::v1::U128>,
     /// Total fee of the fills across the lineage through this generation, net
-    /// of rebates, in the order's fee asset. Order history reads and
-    /// single-order reads that include execution history (the default) carry
-    /// it. It can trail the order's fills: its quantity shows which fills it
-    /// covers. Open-order reads, single-order reads without execution history
-    /// and private stream order updates leave it unset.
+    /// of rebates, in the order's fee asset. A fill's fee is recorded once the
+    /// fill is settled, which can be seconds after the order ended.
+    ///
+    /// Order history reads and single-order reads that include execution
+    /// history (the default) carry it, over the fills recorded so far: its
+    /// quantity shows which fills it covers, and it is the order's whole fee
+    /// once that quantity equals the order's filled quantity. Open-order reads,
+    /// single-order reads without execution history and private stream order
+    /// updates leave it unset, an ended order's update included.
+    ///
+    /// To show the fee of an order seen on the private stream, or the quote a
+    /// BUY sized by a quote amount used: once an update shows the order ended
+    /// with a filled quantity above zero, read the order by its ID, and read it
+    /// again, a few hundred milliseconds apart, until the fee total's quantity
+    /// equals the order's filled quantity.
     ///
     /// Field 38: `fee_total`
     #[serde(
@@ -21455,7 +21544,10 @@ pub struct Order {
     /// price it may fill at, a BUY at or below it and a SELL at or above it. It
     /// is the order's reference price moved by its maximum slippage, or by the
     /// pair's default market slippage for its side (200 basis points if none is
-    /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+    /// configured), put on the pair's tick grid toward the reference: a BUY's
+    /// rounded down and a SELL's up, so it never allows more than the slippage.
+    /// The reference and the slippage need not be on the tick grid themselves
+    /// (see MarketIoc). A stop-loss's, take-profit's or
     /// trailing stop's market order takes the price that fired it as its
     /// reference; a buy stop's is never above the protection price at its
     /// trigger price.
@@ -21532,8 +21624,9 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub origin: ::buffa::MessageField<OrderOrigin>,
-    /// Optional client-side reference price used for MARKET slippage protection,
-    /// in quote units scaled by 1e9.
+    /// Client reference price the MARKET order set for its slippage protection,
+    /// in quote units scaled by 1e9, exactly as given: it need not be on the
+    /// pair's tick grid (see MarketIoc). Zero when the order set none.
     ///
     /// Field 23: `market_client_ref_price_ticks`
     #[serde(
@@ -21543,10 +21636,11 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub market_client_ref_price_ticks: i64,
-    /// MARKET maximum absolute price delta the order carries, in Q9
-    /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
-    /// set this cap; zero when it did not, for example because it set
-    /// market_max_slippage_bps instead.
+    /// MARKET maximum absolute price delta the order carries, in quote units
+    /// scaled by 1e9 (1e-9 quote units, not the pair's tick size), exactly as
+    /// given: it need not be a multiple of the pair's tick size (see MarketIoc).
+    /// Positive when the order set this cap; zero when it did not, for example
+    /// because it set market_max_slippage_bps instead.
     ///
     /// Field 24: `market_max_slippage_ticks`
     #[serde(
@@ -21566,11 +21660,26 @@ pub struct Order {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i32"
     )]
     pub market_max_slippage_bps: i32,
-    /// Per-order state version: 0 while the order is accepted but not yet on
-    /// the book (status PENDING), then 1 from its first book state and higher
-    /// for every later published execution-state change. Higher values identify
-    /// newer execution state. Fee totals and requested enrichments are not covered
-    /// by this version and may differ between responses with the same version.
+    /// Per-order state version: the same counter as the version of the order's
+    /// events on the private WebSocket and the trade WebSocket. It is 0 while the
+    /// order is accepted but not yet on the book (status PENDING), then 1 from its
+    /// first book state, and it increases with every later published change of the
+    /// order's state, such as an amend in place, a fill, a change of its attached
+    /// risk, a cancel or a replace. It is an unsigned 32-bit counter that
+    /// increases on every change of the order: it would wrap to 0 only after
+    /// 4,294,967,295 changes to one order ID. A replace that gives the order a new
+    /// ID starts that order's own version.
+    ///
+    /// A read can lag behind the order's events. Keep the highest version
+    /// applied for each order ID, from reads and events alike, and drop any read
+    /// whose version is below it: that read shows an older state. A stream need
+    /// not show every version, so a gap is not an error; read the order to
+    /// recover its current state.
+    ///
+    /// fee_total is not covered by this version: a fill's fee is recorded after
+    /// the fill, so responses with the same version can show different fee
+    /// totals. A read includes attached_risk only on request, so its absence
+    /// from a response is no change of the order.
     ///
     /// Field 26: `version`
     #[serde(
@@ -22485,7 +22594,7 @@ pub struct UserTrade {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub match_id: u64,
-    /// Order identifier as fixed64.
+    /// Public order ID of the filled order.
     ///
     /// Field 4: `order_id`
     #[serde(
@@ -27277,10 +27386,29 @@ pub mod __buffa {
         ///
         /// MarketIoc configures a market order. Market orders always execute as
         /// immediate-or-cancel and therefore cannot rest or be post-only.
+        ///
+        /// The order fills only up to its protection price, a BUY at or below it and
+        /// a SELL at or above it. The protection price is the reference price
+        /// (client_ref_price_ticks, or the server's reference when it is omitted)
+        /// moved by the maximum slippage, up for a BUY and down for a SELL, then put
+        /// on the pair's tick grid toward the reference: a BUY's is rounded down and
+        /// a SELL's up, so it never allows more than the slippage and can be up to
+        /// one tick tighter. Neither client_ref_price_ticks nor max_slippage_ticks
+        /// has to be a multiple of the pair's tick size; only the protection price
+        /// is. For example, on a pair whose tick size is 0.01, a reference of
+        /// 73840.125 and a slippage of 50.12 give a BUY protection price of 73890.24
+        /// (73890.245 rounded down) and a SELL protection price of 73790.01
+        /// (73790.005 rounded up). The order's price_ticks shows the protection
+        /// price; market_client_ref_price_ticks and market_max_slippage_ticks show
+        /// the values exactly as given.
         #[derive(Clone, Debug, Default)]
         pub struct MarketIocView<'a> {
-            /// Optional positive client reference price in quote units scaled by 1e9.
-            /// When omitted, admission uses server-side reference pricing.
+            /// Optional positive client reference price in quote units scaled by 1e9
+            /// (1e-9 quote units, not the pair's tick size). It need not be on the
+            /// pair's tick grid; only the protection price derived from it is, as
+            /// MarketIoc describes. When omitted, admission uses server-side reference
+            /// pricing. A reference too far from the server's is refused with
+            /// ERROR_CODE_STALE_QUOTE.
             ///
             /// Field 3: `client_ref_price_ticks`
             pub client_ref_price_ticks: i64,
@@ -27606,8 +27734,12 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Optional positive client reference price in quote units scaled by 1e9.
-            /// When omitted, admission uses server-side reference pricing.
+            /// Optional positive client reference price in quote units scaled by 1e9
+            /// (1e-9 quote units, not the pair's tick size). It need not be on the
+            /// pair's tick grid; only the protection price derived from it is, as
+            /// MarketIoc describes. When omitted, admission uses server-side reference
+            /// pricing. A reference too far from the server's is refused with
+            /// ERROR_CODE_STALE_QUOTE.
             ///
             /// Field 3: `client_ref_price_ticks`
             #[must_use]
@@ -32647,7 +32779,7 @@ pub mod __buffa {
             ///
             /// Field 1: `status`
             pub status: ::buffa::EnumValue<super::super::cancel_order_response::Status>,
-            /// Order ID as fixed64.
+            /// Public order ID.
             ///
             /// Field 2: `order_id`
             pub order_id: u64,
@@ -32995,7 +33127,7 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::cancel_order_response::Status> {
                 self.0.reborrow().status
             }
-            /// Order ID as fixed64.
+            /// Public order ID.
             ///
             /// Field 2: `order_id`
             #[must_use]
@@ -33426,6 +33558,15 @@ pub mod __buffa {
             ///
             /// Field 9: `level_index`
             pub level_index: ::core::option::Option<u32>,
+            /// The price band limit the order's limit price is past, when a preview is
+            /// not admissible with PRICE_BAND_VIOLATION: the highest admitted buy price
+            /// for a buy, the lowest admitted sell price for a sell, as the market last
+            /// published its band. REST returns priceBandLimit as a decimal string in
+            /// quote asset units per base asset unit, for example "1837.5". Protobuf
+            /// uses quote units scaled by 1e9. Omitted for every other error.
+            ///
+            /// Field 10: `price_band_limit_ticks`
+            pub price_band_limit_ticks: ::core::option::Option<i64>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ErrorDetailView<'a> {
@@ -33520,6 +33661,15 @@ pub mod __buffa {
                             ::buffa::types::decode_uint32(&mut cur)?,
                         );
                     }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.price_band_limit_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
                     2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -33581,6 +33731,7 @@ pub mod __buffa {
                     existing_order_id: self.existing_order_id,
                     cause_code: self.cause_code,
                     level_index: self.level_index,
+                    price_band_limit_ticks: self.price_band_limit_ticks,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -33629,6 +33780,9 @@ pub mod __buffa {
                 if let Some(v) = self.level_index {
                     size += 1u32 + ::buffa::types::uint32_encoded_len(v) as u32;
                 }
+                if let Some(v) = self.price_band_limit_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -33673,6 +33827,9 @@ pub mod __buffa {
                 }
                 if let Some(v) = self.level_index {
                     ::buffa::types::put_uint32_field(9u32, v, buf);
+                }
+                if let Some(v) = self.price_band_limit_ticks {
+                    ::buffa::types::put_int64_field(10u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -33725,6 +33882,13 @@ pub mod __buffa {
                     __map
                         .serialize_entry(
                             "levelIndex",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.price_band_limit_ticks {
+                    __map
+                        .serialize_entry(
+                            "priceBandLimitTicks",
                             &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
@@ -33883,6 +34047,18 @@ pub mod __buffa {
             #[must_use]
             pub fn level_index(&self) -> ::core::option::Option<u32> {
                 self.0.reborrow().level_index
+            }
+            /// The price band limit the order's limit price is past, when a preview is
+            /// not admissible with PRICE_BAND_VIOLATION: the highest admitted buy price
+            /// for a buy, the lowest admitted sell price for a sell, as the market last
+            /// published its band. REST returns priceBandLimit as a decimal string in
+            /// quote asset units per base asset unit, for example "1837.5". Protobuf
+            /// uses quote units scaled by 1e9. Omitted for every other error.
+            ///
+            /// Field 10: `price_band_limit_ticks`
+            #[must_use]
+            pub fn price_band_limit_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().price_band_limit_ticks
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ErrorDetailView<'static>>>
@@ -34844,10 +35020,10 @@ pub mod __buffa {
             >,
             /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 3: `trigger_price_source`
@@ -35191,10 +35367,10 @@ pub mod __buffa {
             }
             /// Price the take-profit watches. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 3: `trigger_price_source`
@@ -35252,10 +35428,10 @@ pub mod __buffa {
             >,
             /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 3: `trigger_price_source`
@@ -35599,10 +35775,10 @@ pub mod __buffa {
             }
             /// Price the stop-loss watches. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 3: `trigger_price_source`
@@ -35657,10 +35833,10 @@ pub mod __buffa {
             /// Price the trailing stop watches and trails: its peak or trough, activation
             /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 8: `trigger_price_source`
@@ -36172,10 +36348,10 @@ pub mod __buffa {
             /// Price the trailing stop watches and trails: its peak or trough, activation
             /// and fire all follow this price. Unspecified or LAST_PRICE watches the last
             /// traded price. INDEX_PRICE watches the market's index price; on a market
-            /// without an index price the order is rejected with terminal reason
-            /// INDEX_PRICE_UNAVAILABLE before any fill, and a modify that adds such a leg
-            /// is refused with ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, leaving the
-            /// order and its legs unchanged. MARK_PRICE is not supported. A modify naming
+            /// without an index price the order is rejected before any fill with
+            /// reject_reason ERROR_CODE_TRIGGER_PRICE_SOURCE_UNSUPPORTED, and a modify
+            /// that adds such a leg is refused with the same code, leaving the order and
+            /// its legs unchanged. MARK_PRICE is not supported. A modify naming
             /// another source replaces the leg.
             ///
             /// Field 8: `trigger_price_source`
@@ -45107,7 +45283,7 @@ pub mod __buffa {
         /// BatchCancelItem identifies a single order to cancel within a batch.
         #[derive(Clone, Debug, Default)]
         pub struct BatchCancelItemView<'a> {
-            /// Order ID as fixed64. Exactly one of order_id or client_order_id.
+            /// Public order ID. Exactly one of order_id or client_order_id.
             ///
             /// Field 1: `order_id`
             pub order_id: u64,
@@ -45391,7 +45567,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Order ID as fixed64. Exactly one of order_id or client_order_id.
+            /// Public order ID. Exactly one of order_id or client_order_id.
             ///
             /// Field 1: `order_id`
             #[must_use]
@@ -49942,7 +50118,7 @@ pub mod __buffa {
         /// Order is the Connect-facing order view with compact binary fields.
         #[derive(Clone, Debug, Default)]
         pub struct OrderView<'a> {
-            /// Public order identifier as fixed64.
+            /// Public order ID.
             ///
             /// Field 1: `order_id`
             pub order_id: u64,
@@ -50071,11 +50247,21 @@ pub mod __buffa {
                 >,
             >,
             /// Total fee of the fills across the lineage through this generation, net
-            /// of rebates, in the order's fee asset. Order history reads and
-            /// single-order reads that include execution history (the default) carry
-            /// it. It can trail the order's fills: its quantity shows which fills it
-            /// covers. Open-order reads, single-order reads without execution history
-            /// and private stream order updates leave it unset.
+            /// of rebates, in the order's fee asset. A fill's fee is recorded once the
+            /// fill is settled, which can be seconds after the order ended.
+            ///
+            /// Order history reads and single-order reads that include execution
+            /// history (the default) carry it, over the fills recorded so far: its
+            /// quantity shows which fills it covers, and it is the order's whole fee
+            /// once that quantity equals the order's filled quantity. Open-order reads,
+            /// single-order reads without execution history and private stream order
+            /// updates leave it unset, an ended order's update included.
+            ///
+            /// To show the fee of an order seen on the private stream, or the quote a
+            /// BUY sized by a quote amount used: once an update shows the order ended
+            /// with a filled quantity above zero, read the order by its ID, and read it
+            /// again, a few hundred milliseconds apart, until the fee total's quantity
+            /// equals the order's filled quantity.
             ///
             /// Field 38: `fee_total`
             pub fee_total: ::buffa::MessageFieldView<
@@ -50086,7 +50272,10 @@ pub mod __buffa {
             /// price it may fill at, a BUY at or below it and a SELL at or above it. It
             /// is the order's reference price moved by its maximum slippage, or by the
             /// pair's default market slippage for its side (200 basis points if none is
-            /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+            /// configured), put on the pair's tick grid toward the reference: a BUY's
+            /// rounded down and a SELL's up, so it never allows more than the slippage.
+            /// The reference and the slippage need not be on the tick grid themselves
+            /// (see MarketIoc). A stop-loss's, take-profit's or
             /// trailing stop's market order takes the price that fired it as its
             /// reference; a buy stop's is never above the protection price at its
             /// trigger price.
@@ -50128,15 +50317,17 @@ pub mod __buffa {
             pub origin: ::buffa::MessageFieldView<
                 super::super::__buffa::view::OrderOriginView<'a>,
             >,
-            /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e9.
+            /// Client reference price the MARKET order set for its slippage protection,
+            /// in quote units scaled by 1e9, exactly as given: it need not be on the
+            /// pair's tick grid (see MarketIoc). Zero when the order set none.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             pub market_client_ref_price_ticks: i64,
-            /// MARKET maximum absolute price delta the order carries, in Q9
-            /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
-            /// set this cap; zero when it did not, for example because it set
-            /// market_max_slippage_bps instead.
+            /// MARKET maximum absolute price delta the order carries, in quote units
+            /// scaled by 1e9 (1e-9 quote units, not the pair's tick size), exactly as
+            /// given: it need not be a multiple of the pair's tick size (see MarketIoc).
+            /// Positive when the order set this cap; zero when it did not, for example
+            /// because it set market_max_slippage_bps instead.
             ///
             /// Field 24: `market_max_slippage_ticks`
             pub market_max_slippage_ticks: i64,
@@ -50144,11 +50335,26 @@ pub mod __buffa {
             ///
             /// Field 25: `market_max_slippage_bps`
             pub market_max_slippage_bps: i32,
-            /// Per-order state version: 0 while the order is accepted but not yet on
-            /// the book (status PENDING), then 1 from its first book state and higher
-            /// for every later published execution-state change. Higher values identify
-            /// newer execution state. Fee totals and requested enrichments are not covered
-            /// by this version and may differ between responses with the same version.
+            /// Per-order state version: the same counter as the version of the order's
+            /// events on the private WebSocket and the trade WebSocket. It is 0 while the
+            /// order is accepted but not yet on the book (status PENDING), then 1 from its
+            /// first book state, and it increases with every later published change of the
+            /// order's state, such as an amend in place, a fill, a change of its attached
+            /// risk, a cancel or a replace. It is an unsigned 32-bit counter that
+            /// increases on every change of the order: it would wrap to 0 only after
+            /// 4,294,967,295 changes to one order ID. A replace that gives the order a new
+            /// ID starts that order's own version.
+            ///
+            /// A read can lag behind the order's events. Keep the highest version
+            /// applied for each order ID, from reads and events alike, and drop any read
+            /// whose version is below it: that read shows an older state. A stream need
+            /// not show every version, so a gap is not an error; read the order to
+            /// recover its current state.
+            ///
+            /// fee_total is not covered by this version: a fill's fee is recorded after
+            /// the fill, so responses with the same version can show different fee
+            /// totals. A read includes attached_risk only on request, so its absence
+            /// from a response is no change of the order.
             ///
             /// Field 26: `version`
             pub version: u32,
@@ -51524,7 +51730,7 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Public order identifier as fixed64.
+            /// Public order ID.
             ///
             /// Field 1: `order_id`
             #[must_use]
@@ -51716,11 +51922,21 @@ pub mod __buffa {
                 &self.0.reborrow().cum_notional
             }
             /// Total fee of the fills across the lineage through this generation, net
-            /// of rebates, in the order's fee asset. Order history reads and
-            /// single-order reads that include execution history (the default) carry
-            /// it. It can trail the order's fills: its quantity shows which fills it
-            /// covers. Open-order reads, single-order reads without execution history
-            /// and private stream order updates leave it unset.
+            /// of rebates, in the order's fee asset. A fill's fee is recorded once the
+            /// fill is settled, which can be seconds after the order ended.
+            ///
+            /// Order history reads and single-order reads that include execution
+            /// history (the default) carry it, over the fills recorded so far: its
+            /// quantity shows which fills it covers, and it is the order's whole fee
+            /// once that quantity equals the order's filled quantity. Open-order reads,
+            /// single-order reads without execution history and private stream order
+            /// updates leave it unset, an ended order's update included.
+            ///
+            /// To show the fee of an order seen on the private stream, or the quote a
+            /// BUY sized by a quote amount used: once an update shows the order ended
+            /// with a filled quantity above zero, read the order by its ID, and read it
+            /// again, a few hundred milliseconds apart, until the fee total's quantity
+            /// equals the order's filled quantity.
             ///
             /// Field 38: `fee_total`
             #[must_use]
@@ -51736,7 +51952,10 @@ pub mod __buffa {
             /// price it may fill at, a BUY at or below it and a SELL at or above it. It
             /// is the order's reference price moved by its maximum slippage, or by the
             /// pair's default market slippage for its side (200 basis points if none is
-            /// configured), on the pair's tick grid. A stop-loss's, take-profit's or
+            /// configured), put on the pair's tick grid toward the reference: a BUY's
+            /// rounded down and a SELL's up, so it never allows more than the slippage.
+            /// The reference and the slippage need not be on the tick grid themselves
+            /// (see MarketIoc). A stop-loss's, take-profit's or
             /// trailing stop's market order takes the price that fired it as its
             /// reference; a buy stop's is never above the protection price at its
             /// trigger price.
@@ -51805,18 +52024,20 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().origin
             }
-            /// Optional client-side reference price used for MARKET slippage protection,
-            /// in quote units scaled by 1e9.
+            /// Client reference price the MARKET order set for its slippage protection,
+            /// in quote units scaled by 1e9, exactly as given: it need not be on the
+            /// pair's tick grid (see MarketIoc). Zero when the order set none.
             ///
             /// Field 23: `market_client_ref_price_ticks`
             #[must_use]
             pub fn market_client_ref_price_ticks(&self) -> i64 {
                 self.0.reborrow().market_client_ref_price_ticks
             }
-            /// MARKET maximum absolute price delta the order carries, in Q9
-            /// execution-price ticks (1 tick = 1e-9 quote units). Positive when the order
-            /// set this cap; zero when it did not, for example because it set
-            /// market_max_slippage_bps instead.
+            /// MARKET maximum absolute price delta the order carries, in quote units
+            /// scaled by 1e9 (1e-9 quote units, not the pair's tick size), exactly as
+            /// given: it need not be a multiple of the pair's tick size (see MarketIoc).
+            /// Positive when the order set this cap; zero when it did not, for example
+            /// because it set market_max_slippage_bps instead.
             ///
             /// Field 24: `market_max_slippage_ticks`
             #[must_use]
@@ -51830,11 +52051,26 @@ pub mod __buffa {
             pub fn market_max_slippage_bps(&self) -> i32 {
                 self.0.reborrow().market_max_slippage_bps
             }
-            /// Per-order state version: 0 while the order is accepted but not yet on
-            /// the book (status PENDING), then 1 from its first book state and higher
-            /// for every later published execution-state change. Higher values identify
-            /// newer execution state. Fee totals and requested enrichments are not covered
-            /// by this version and may differ between responses with the same version.
+            /// Per-order state version: the same counter as the version of the order's
+            /// events on the private WebSocket and the trade WebSocket. It is 0 while the
+            /// order is accepted but not yet on the book (status PENDING), then 1 from its
+            /// first book state, and it increases with every later published change of the
+            /// order's state, such as an amend in place, a fill, a change of its attached
+            /// risk, a cancel or a replace. It is an unsigned 32-bit counter that
+            /// increases on every change of the order: it would wrap to 0 only after
+            /// 4,294,967,295 changes to one order ID. A replace that gives the order a new
+            /// ID starts that order's own version.
+            ///
+            /// A read can lag behind the order's events. Keep the highest version
+            /// applied for each order ID, from reads and events alike, and drop any read
+            /// whose version is below it: that read shows an older state. A stream need
+            /// not show every version, so a gap is not an error; read the order to
+            /// recover its current state.
+            ///
+            /// fee_total is not covered by this version: a fill's fee is recorded after
+            /// the fill, so responses with the same version can show different fee
+            /// totals. A read includes attached_risk only on request, so its absence
+            /// from a response is no change of the order.
             ///
             /// Field 26: `version`
             #[must_use]
@@ -51940,7 +52176,7 @@ pub mod __buffa {
             ///
             /// Field 3: `match_id`
             pub match_id: u64,
-            /// Order identifier as fixed64.
+            /// Public order ID of the filled order.
             ///
             /// Field 4: `order_id`
             pub order_id: u64,
@@ -52596,7 +52832,7 @@ pub mod __buffa {
             pub fn match_id(&self) -> u64 {
                 self.0.reborrow().match_id
             }
-            /// Order identifier as fixed64.
+            /// Public order ID of the filled order.
             ///
             /// Field 4: `order_id`
             #[must_use]

@@ -39,6 +39,13 @@ pub enum ErrorCode {
     /// (1,000), so an update with a new key is refused. Updates without a key,
     /// and repeats of a stored key, still work; or create a new alert.
     ALERT_UPDATE_LIMIT_REACHED = 12i32,
+    /// The alert asks for TELEGRAM, but no Telegram account is linked to the
+    /// caller's account. Link Telegram in the account settings first, or choose
+    /// IN_APP only.
+    TELEGRAM_NOT_LINKED = 13i32,
+    /// The alert asks for TELEGRAM, but Telegram delivery is not available in
+    /// this environment. Choose IN_APP only.
+    TELEGRAM_UNAVAILABLE = 14i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -80,6 +87,12 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ALERT_UPDATE_LIMIT_REACHED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AlertUpdateLimitReached: Self = Self::ALERT_UPDATE_LIMIT_REACHED;
+    ///Idiomatic alias for [`Self::TELEGRAM_NOT_LINKED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TelegramNotLinked: Self = Self::TELEGRAM_NOT_LINKED;
+    ///Idiomatic alias for [`Self::TELEGRAM_UNAVAILABLE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TelegramUnavailable: Self = Self::TELEGRAM_UNAVAILABLE;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -188,6 +201,8 @@ impl ::buffa::Enumeration for ErrorCode {
             10i32 => ::core::option::Option::Some(Self::SERVICE_UNAVAILABLE),
             11i32 => ::core::option::Option::Some(Self::SUBACCOUNT_KEY_REFUSED),
             12i32 => ::core::option::Option::Some(Self::ALERT_UPDATE_LIMIT_REACHED),
+            13i32 => ::core::option::Option::Some(Self::TELEGRAM_NOT_LINKED),
+            14i32 => ::core::option::Option::Some(Self::TELEGRAM_UNAVAILABLE),
             _ => ::core::option::Option::None,
         }
     }
@@ -209,6 +224,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SERVICE_UNAVAILABLE => "SERVICE_UNAVAILABLE",
             Self::SUBACCOUNT_KEY_REFUSED => "SUBACCOUNT_KEY_REFUSED",
             Self::ALERT_UPDATE_LIMIT_REACHED => "ALERT_UPDATE_LIMIT_REACHED",
+            Self::TELEGRAM_NOT_LINKED => "TELEGRAM_NOT_LINKED",
+            Self::TELEGRAM_UNAVAILABLE => "TELEGRAM_UNAVAILABLE",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -238,6 +255,12 @@ impl ::buffa::Enumeration for ErrorCode {
             "ALERT_UPDATE_LIMIT_REACHED" => {
                 ::core::option::Option::Some(Self::ALERT_UPDATE_LIMIT_REACHED)
             }
+            "TELEGRAM_NOT_LINKED" => {
+                ::core::option::Option::Some(Self::TELEGRAM_NOT_LINKED)
+            }
+            "TELEGRAM_UNAVAILABLE" => {
+                ::core::option::Option::Some(Self::TELEGRAM_UNAVAILABLE)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -256,6 +279,8 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::SERVICE_UNAVAILABLE,
             Self::SUBACCOUNT_KEY_REFUSED,
             Self::ALERT_UPDATE_LIMIT_REACHED,
+            Self::TELEGRAM_NOT_LINKED,
+            Self::TELEGRAM_UNAVAILABLE,
         ]
     }
 }
@@ -884,7 +909,13 @@ pub enum AlertChannel {
     /// The notification inbox on the website and in the app.
     IN_APP = 1i32,
     /// A direct message from the Polyester Telegram bot to the Telegram account
-    /// linked to the caller's account.
+    /// linked to the caller's account. Creating or changing an alert that asks
+    /// for it needs Telegram delivery to be available in the environment
+    /// (TELEGRAM_UNAVAILABLE otherwise) and a linked Telegram account
+    /// (TELEGRAM_NOT_LINKED otherwise).
+    /// When a Telegram message cannot be delivered, for example because Telegram
+    /// was unlinked after the alert was set, the fired alert is shown in the
+    /// notification inbox instead.
     TELEGRAM = 2i32,
 }
 impl AlertChannel {
