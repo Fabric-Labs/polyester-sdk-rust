@@ -582,6 +582,11 @@ impl OrdersService {
         {
             intent.client_order_id = client_order_id;
         }
+        // A market order is always IOC; a limit order only with IOC.
+        let ioc = match params.order_type {
+            CreateOrderType::Market => true,
+            CreateOrderType::Limit => matches!(params.time_in_force, Some(CreateTimeInForce::Ioc)),
+        };
         intent.sizing = Some(
             match (
                 &params.quantity,
@@ -597,6 +602,13 @@ impl OrdersService {
                     )?)
                 }
                 (None, Some(max_quote_debit), None) => {
+                    // The contract's `order_intent.max_quote_debit_eligibility`
+                    // rule: a BUY market IOC or BUY limit IOC only.
+                    if !matches!(params.side, CreateSide::Buy) || !ioc {
+                        return Err(Error::validation(
+                            "max_quote_debit_scaled is valid only for BUY market IOC or BUY limit IOC orders",
+                        ));
+                    }
                     order_intent::Sizing::MaxQuoteDebitScaled(resolve_quote_qty_scaled(
                         max_quote_debit,
                         Self::require_quote_quantity_scale(pair)?,
@@ -607,12 +619,6 @@ impl OrdersService {
                 (None, None, Some(quote_proceeds)) => {
                     // The contract's `order_intent.quote_proceeds_eligibility`
                     // rule: a SELL market IOC or SELL limit IOC only.
-                    let ioc = match params.order_type {
-                        CreateOrderType::Market => true,
-                        CreateOrderType::Limit => {
-                            matches!(params.time_in_force, Some(CreateTimeInForce::Ioc))
-                        }
-                    };
                     if !matches!(params.side, CreateSide::Sell) || !ioc {
                         return Err(Error::validation(
                             "quote_proceeds_scaled is valid only for SELL market IOC or SELL limit IOC orders",
