@@ -2196,7 +2196,7 @@ mod tests {
     #[test]
     fn lifecycle_helpers_accept_base58_trigger_ids() {
         let client = client();
-        let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
+        let encoded = format_id(42);
         let params = ModifyTriggerParams {
             trigger_id: encoded,
             symbol: Some("BTC-USDT".into()),
@@ -2545,7 +2545,7 @@ mod tests {
 
     #[test]
     fn public_trigger_ids_convert_for_lifecycle_helpers() {
-        let encoded = bs58::encode(42_u64.to_be_bytes()).into_string();
+        let encoded = format_id(42);
         assert_eq!(id_to_u64(&encoded, "trigger_id").unwrap(), 42);
         assert!(id_to_u64("not a trigger id", "trigger_id").is_err());
     }
@@ -3892,7 +3892,7 @@ mod tests {
     #[test]
     fn batch_cancel_sends_each_trigger_id_once_with_a_request_id() {
         let client = client();
-        let base58 = bs58::encode(42_u64.to_be_bytes()).into_string();
+        let base58 = format_id(42);
         let wire = client
             .triggers
             .encode_batch_cancel(
@@ -3946,13 +3946,14 @@ mod tests {
         refused(Vec::new(), None, "at least one trigger_id");
         let fifty_one: Vec<String> = (1..=51).map(|n| format_id(n * 1000)).collect();
         refused(fifty_one, None, "at most 50 trigger_ids; received 51");
-        // The same trigger written twice: a leading `1` is a base58 zero.
-        let base58 = bs58::encode(40_u64.to_be_bytes()).into_string();
+        // The same trigger twice.
         refused(
-            vec![base58, format!("1{}", format_id(40))],
+            vec![format_id(40), format_id(40)],
             None,
             "duplicate trigger_id",
         );
+        // Another spelling of a trigger: a leading `1` is a base58 zero.
+        refused(vec![format!("1{}", format_id(40))], None, "canonical form");
         refused(vec!["1".into()], None, "non-zero ID");
         // A decimal-looking ID is not base58.
         refused(

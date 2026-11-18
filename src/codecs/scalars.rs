@@ -318,10 +318,12 @@ const BASE58_ALPHABET: &[u8; 58] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghij
 /// Parse a string public ID, refusing one that decodes to 0.
 ///
 /// A string public ID is base58 and only base58, read byte by byte as the
-/// server reads it. A digit-only string is base58 too: `"23"` and `"123"`
-/// are both 60 (a leading `1` is a base58 zero), and an ID with a `0`, such
-/// as `"100"`, is refused, never read as decimal. Nothing is trimmed: an ID
-/// with whitespace anywhere, or with any character outside the alphabet, is
+/// server reads it. A digit-only string is base58 too: `"23"` is 60, and an
+/// ID with a `0`, such as `"100"`, is refused, never read as decimal. Only
+/// the canonical spelling, the one [`format_id`] writes, is accepted: a
+/// leading `1` is a base58 zero, so `"123"` would be 60 as well, another
+/// spelling of `"23"`, and is refused. Nothing is trimmed: an ID with
+/// whitespace anywhere, or with any character outside the alphabet, is
 /// refused with [`Error::Validation`] naming `label`. Build string IDs with
 /// [`format_id`], or pass the `u64` where the API takes one.
 ///
@@ -332,6 +334,11 @@ pub fn id_to_u64(value: &str, label: &str) -> Result<u64> {
     if id == 0 {
         return Err(Error::validation(format!(
             "{label} must be a non-zero ID, not 0"
+        )));
+    }
+    if format_id(id) != value {
+        return Err(Error::validation(format!(
+            "{label} must be a public ID in canonical form, as the SDK writes it (no leading 1)"
         )));
     }
     Ok(id)

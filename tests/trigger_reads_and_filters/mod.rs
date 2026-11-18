@@ -326,8 +326,8 @@ async fn poly_9424_trigger_reads_and_stream_name_the_pair() {
 /// before. A parent order ID that is not one is refused before sending.
 #[tokio::test]
 async fn poly_9433_list_sends_the_trigger_type_and_parent_order_filters() {
-    // The ID a trigger read reports, and the same ID with a leading base58
-    // zero (`1`). The decimal spelling is refused below.
+    // The ID a trigger read reports. The same ID with a leading base58 zero
+    // (`1`) and the decimal spelling are refused below.
     let parent = polyester::codecs::format_uint64_id(10_203);
     let padded = format!("1{parent}");
     for wire in WIRES {
@@ -356,7 +356,7 @@ async fn poly_9433_list_sends_the_trigger_type_and_parent_order_filters() {
             assert_eq!(sent.trigger_type, want, "{wire:?} {trigger_type:?}");
             assert_eq!(sent.parent_order_id, None);
         }
-        for id in [parent.as_str(), padded.as_str()] {
+        for id in [parent.as_str()] {
             s.client
                 .triggers
                 .list_with(ListTriggersOpts {
@@ -374,7 +374,7 @@ async fn poly_9433_list_sends_the_trigger_type_and_parent_order_filters() {
         assert_eq!(unfiltered, ListTriggersRequest::default(), "{wire:?}");
 
         let sent_before = s.http.requests.load(std::sync::atomic::Ordering::SeqCst);
-        for bad in ["", "0", "10203", " 2 ", "not an id"] {
+        for bad in ["", "0", "10203", " 2 ", "not an id", padded.as_str()] {
             let err = s
                 .client
                 .triggers
