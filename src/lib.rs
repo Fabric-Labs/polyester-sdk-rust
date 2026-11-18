@@ -84,8 +84,8 @@ pub use environment::{
     environment_from_name,
 };
 pub use errors::{
-    AnswerMeta, CatalogLoadFailure, Error, Result, SubscriptionEndReason, auth_codes, order_codes,
-    problem_codes,
+    AnswerMeta, CatalogLoadFailure, Error, Result, SubscriptionEndReason, TimestampWindow,
+    auth_codes, order_codes, problem_codes,
 };
 pub use reconnect::ReconnectLimiter;
 pub use services::{

@@ -945,7 +945,13 @@ fn upgrade_error(e: tungstenite::Error) -> Error {
                 .unwrap_or_default();
             let answer = crate::errors::answer_from_headers(status, response.headers());
             if status == 401 || status == 403 {
-                return crate::errors::gateway_rejection_error(status, &code).with_answer(answer);
+                let window = response
+                    .body()
+                    .as_deref()
+                    .and_then(crate::errors::TimestampWindow::from_problem_body);
+                return crate::errors::gateway_rejection_error(status, &code)
+                    .with_timestamp_window(window)
+                    .with_answer(answer);
             }
             Error::TradeSession(TradeError::Upgrade {
                 status,

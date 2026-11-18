@@ -315,6 +315,12 @@ pub enum Error {
         answer: Option<Box<AnswerMeta>>,
         status: u16,
         problem: Option<Box<crate::problem::HttpProblem>>,
+        /// The server time and the window the timestamp was checked
+        /// against, as the refusal states it (ConnectRPC
+        /// `AuthErrorDetail.timestamp_window`, REST `timestampWindow`);
+        /// `None` when the refusal carries none or carries one this SDK
+        /// cannot read. See [`Error::timestamp_window`].
+        window: Option<TimestampWindow>,
     },
     /// An API-key request's credentials were refused, for example
     /// `SIGNATURE_INVALID`, `KEY_DISABLED` or `IP_NOT_ALLOWED`: by the API
@@ -789,6 +795,75 @@ fn withdraw_detail_metadata(detail: &WithdrawErrorDetail) -> Vec<(String, String
     metadata
 }
 
+/// The server time and the window a signed request's timestamp must fall
+/// in, as a timestamp-skew refusal states it ([`Error::timestamp_window`]):
+/// enough to resync a clock from the refusal alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimestampWindow {
+    /// Server time when the request was refused, in milliseconds since the
+    /// Unix epoch (UTC).
+    pub server_time_ms: i64,
+    /// Receive window the timestamp was checked against, in milliseconds:
+    /// the request's `X-API-RECV-WINDOW`, or 5000 when it sent none.
+    pub recv_window_ms: u32,
+    /// How far a timestamp may run ahead of the server time, in
+    /// milliseconds.
+    pub max_future_ms: u32,
+}
+
+impl TimestampWindow {
+    fn from_proto(window: &crate::proto::auth::v1::TimestampWindow) -> Self {
+        Self {
+            server_time_ms: window.server_time_ms,
+            recv_window_ms: window.recv_window_ms,
+            max_future_ms: window.max_future_ms,
+        }
+    }
+
+    /// The REST problem's `timestampWindow` member (`serverTimeMs` as a
+    /// decimal string or number, `recvWindowMs` and `maxFutureMs` as
+    /// numbers or decimal strings). Anything else, a missing member or a
+    /// value out of range included, reads as no window: the refusal itself
+    /// is kept whatever its metadata holds.
+    pub(crate) fn from_problem_json(value: &serde_json::Value) -> Option<Self> {
+        let fields = value.as_object()?;
+        let digits = |text: &str, signed: bool| {
+            let unsigned = if signed {
+                text.strip_prefix('-').unwrap_or(text)
+            } else {
+                text
+            };
+            !unsigned.is_empty()
+                && unsigned.len() <= 20
+                && unsigned.bytes().all(|b| b.is_ascii_digit())
+        };
+        let server_time_ms = match fields.get("serverTimeMs")? {
+            serde_json::Value::Number(number) => number.as_i64()?,
+            serde_json::Value::String(text) if digits(text, true) => text.parse().ok()?,
+            _ => return None,
+        };
+        let millis = |name: &str| -> Option<u32> {
+            match fields.get(name)? {
+                serde_json::Value::Number(number) => u32::try_from(number.as_u64()?).ok(),
+                serde_json::Value::String(text) if digits(text, false) => text.parse().ok(),
+                _ => None,
+            }
+        };
+        Some(Self {
+            server_time_ms,
+            recv_window_ms: millis("recvWindowMs")?,
+            max_future_ms: millis("maxFutureMs")?,
+        })
+    }
+
+    /// The `timestampWindow` member of a REST problem body, if it has a
+    /// readable one.
+    pub(crate) fn from_problem_body(body: &[u8]) -> Option<Self> {
+        let value: serde_json::Value = serde_json::from_slice(body).ok()?;
+        Self::from_problem_json(value.get("timestampWindow")?)
+    }
+}
+
 /// Error for an API-gateway rejection of an API-key request: `code` comes
 /// from the gateway's `{"code": ...}` JSON body.
 pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
@@ -797,6 +872,7 @@ pub(crate) fn gateway_rejection_error(status: u16, code: &str) -> Error {
             status,
             problem: None,
             answer: None,
+            window: None,
         }
     } else {
         Error::ApiKeyRejected {
@@ -1157,10 +1233,12 @@ impl Error {
                 status,
                 problem: p,
                 answer,
+                window,
             } => Self::TimestampSkew {
                 status,
                 problem: problem(p),
                 answer,
+                window,
             },
             Self::ApiKeyRejected {
                 status,
@@ -1460,6 +1538,28 @@ impl Error {
     /// the caller knows ended, that is done too.
     pub fn is_order_already_terminal(&self) -> bool {
         self.auth_error_code() == Some(order_codes::ORDER_ALREADY_TERMINAL)
+    }
+
+    /// Sets the window a timestamp-skew refusal states, when it has none yet;
+    /// any other error is returned unchanged.
+    pub(crate) fn with_timestamp_window(mut self, found: Option<TimestampWindow>) -> Self {
+        if let Self::TimestampSkew { window, .. } = &mut self
+            && window.is_none()
+        {
+            *window = found;
+        }
+        self
+    }
+
+    /// The server time and receive window a timestamp-skew refusal states
+    /// ([`Error::TimestampSkew`]), to resync the clock from the refusal
+    /// alone; `None` for every other error, and for a skew refusal that
+    /// carries no readable window.
+    pub fn timestamp_window(&self) -> Option<TimestampWindow> {
+        match self {
+            Self::TimestampSkew { window, .. } => *window,
+            _ => None,
+        }
     }
 
     /// True when a cancel or change named an order the exchange cannot
@@ -1980,7 +2080,20 @@ pub fn map_connect_error(err: ConnectError) -> Error {
             status,
             retry_after: retry_after_seconds(&err),
         });
-    let mapped = map_connect_error_inner(err);
+    // A REST timestamp-skew problem's `timestampWindow`, kept by the
+    // transport in an SDK-local detail.
+    let problem_window = err
+        .details
+        .iter()
+        .find(|d| d.type_url == crate::transport::TIMESTAMP_WINDOW_PROBLEM_TYPE)
+        .and_then(|d| d.debug.as_ref())
+        .and_then(TimestampWindow::from_problem_json);
+    let mut mapped = map_connect_error_inner(err);
+    if let Error::TimestampSkew { window, .. } = &mut mapped
+        && window.is_none()
+    {
+        *window = problem_window;
+    }
     let mapped = match answer {
         Some(answer) => mapped.with_answer(answer),
         None => mapped,
@@ -2108,6 +2221,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             status,
             problem: None,
             answer: None,
+            window: None,
         };
     }
     let mut details: Vec<_> = err.details.iter().collect();
@@ -2182,6 +2296,10 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                         status,
                         problem: None,
                         answer: None,
+                        window: auth_detail
+                            .timestamp_window
+                            .as_option()
+                            .map(TimestampWindow::from_proto),
                     };
                 }
                 Some(AuthErrorCode::AUTH_REPLAY_CAPACITY_EXHAUSTED) => {
@@ -3223,6 +3341,44 @@ mod tests {
         map_connect_error(ConnectError::new(connect_code, message).with_detail(
             ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
         ))
+    }
+
+    /// A ConnectRPC skew refusal keeps every field of its timestamp window;
+    /// one without a window reads none.
+    #[test]
+    fn connect_timestamp_skew_keeps_its_window() {
+        use crate::proto::auth::v1::TimestampWindow as ProtoWindow;
+        let detail = AuthErrorDetail {
+            code: EnumValue::Known(AuthErrorCode::AUTH_TIMESTAMP_SKEW),
+            timestamp_window: ProtoWindow {
+                server_time_ms: 1_763_337_600_000,
+                recv_window_ms: 10_000,
+                max_future_ms: 1000,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        };
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::Unauthenticated, "skew").with_detail(
+                ErrorDetail::from_message("auth.v1.AuthErrorDetail", &detail),
+            ),
+        );
+        assert_eq!(
+            err.timestamp_window(),
+            Some(TimestampWindow {
+                server_time_ms: 1_763_337_600_000,
+                recv_window_ms: 10_000,
+                max_future_ms: 1000,
+            })
+        );
+        let bare = map_auth_with(
+            ErrorCode::Unauthenticated,
+            AuthErrorCode::AUTH_TIMESTAMP_SKEW,
+            "skew",
+        );
+        assert_eq!(bare.timestamp_window(), None);
+        assert_eq!(Error::transport("down").timestamp_window(), None);
     }
 
     #[test]

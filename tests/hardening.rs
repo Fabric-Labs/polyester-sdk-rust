@@ -3881,6 +3881,72 @@ async fn l2_gateway_timestamp_skew_json_is_retryable() {
     }
 }
 
+/// A REST timestamp-skew refusal names the server time and window it checked
+/// against (`timestampWindow`), so the caller can resync from the refusal
+/// alone. Malformed metadata, a 100,000-digit time included, leaves no
+/// window but keeps the typed refusal, its status and its Retry-After.
+#[tokio::test]
+async fn l2_rest_timestamp_skew_exposes_its_window() {
+    fn skew(window: &str) -> hardening_support::HttpScript {
+        let body = format!(
+            r#"{{"type":"https://polyester.dev/problems/timestamp-skew","title":"API Key Timestamp Skew","status":401,"detail":"outside the window","code":"TIMESTAMP_SKEW","timestampWindow":{window}}}"#
+        );
+        hardening_support::HttpScript::Raw {
+            status: 401,
+            headers: vec![
+                ("Content-Type".into(), "application/problem+json".into()),
+                ("Content-Length".into(), body.len().to_string()),
+                ("Retry-After".into(), "5".into()),
+            ],
+            body: body.into_bytes(),
+        }
+    }
+    let read = |window: &'static str| async move {
+        let http = MockHttpServer::spawn(move |_| skew(window)).await;
+        api_key_client(&http).auth.me().await.unwrap_err()
+    };
+
+    let err =
+        read(r#"{"serverTimeMs":"1763337600000","recvWindowMs":5000,"maxFutureMs":1000}"#).await;
+    assert!(
+        matches!(err, Error::TimestampSkew { status: 401, .. }),
+        "{err:?}"
+    );
+    assert_eq!(
+        err.timestamp_window(),
+        Some(polyester::TimestampWindow {
+            server_time_ms: 1_763_337_600_000,
+            recv_window_ms: 5000,
+            max_future_ms: 1000,
+        })
+    );
+    assert_eq!(err.retry_after(), Some(5.0));
+
+    let huge: &'static str = Box::leak(
+        format!(
+            r#"{{"serverTimeMs":"{}","recvWindowMs":5000,"maxFutureMs":1000}}"#,
+            "9".repeat(100_000)
+        )
+        .into_boxed_str(),
+    );
+    for window in [
+        huge,
+        r#"{"serverTimeMs":"1763337600000","recvWindowMs":-1,"maxFutureMs":1000}"#,
+        r#"{"serverTimeMs":"+1763337600000","recvWindowMs":5000,"maxFutureMs":1000}"#,
+        r#"{"recvWindowMs":5000,"maxFutureMs":1000}"#,
+        r#""not an object""#,
+    ] {
+        let err = read(window).await;
+        assert!(
+            matches!(err, Error::TimestampSkew { status: 401, .. }),
+            "{err:?}"
+        );
+        assert_eq!(err.timestamp_window(), None, "{err:?}");
+        assert_eq!(err.retry_after(), Some(5.0), "{err:?}");
+        assert!(err.is_retryable());
+    }
+}
+
 #[tokio::test]
 async fn l2_gateway_api_key_rejections_carry_their_code_and_are_not_retryable() {
     let err =

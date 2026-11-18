@@ -12,7 +12,7 @@
 auth.v1.AuthErrorDetail.code	covered	Error::Api.code / Error::auth_error_code
 auth.v1.AuthErrorDetail.message	covered	Error::Api.message
 auth.v1.AuthErrorDetail.retry_after	covered	Error::retry_at
-auth.v1.AuthErrorDetail.timestamp_window	omitted	not exposed: Error::TimestampSkew has no field for it, and adding one would break matches on the variant; Client::get_time reads the server clock
+auth.v1.AuthErrorDetail.timestamp_window	covered	Error::TimestampSkew.window / Error::timestamp_window
 chain.lifecycle.v1.GetAccountFlowRequest.flow_id	covered	get_account_flow(flow_id)
 chain.lifecycle.v1.GetAccountFlowRequest.subaccount_id	covered	get_account_flow(subaccount_id: SubAccountScope)
 chain.lifecycle.v1.GetAccountFlowResponse.flow	covered	LifecycleFlowSummary (from flow.summary, as get_flow)

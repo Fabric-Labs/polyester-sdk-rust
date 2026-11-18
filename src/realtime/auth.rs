@@ -185,6 +185,7 @@ pub(super) async fn signed_get(
             problem: crate::problem::decode_http_problem(&body, status_code).map(Box::new),
             status: status_code,
             answer: None,
+            window: crate::errors::TimestampWindow::from_problem_body(&body),
         });
     }
     if status_code == 401 {
