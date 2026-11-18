@@ -17,6 +17,7 @@ use crate::proto::ledger::read::v1::{
     ErrorCode as LedgerErrorCode, ErrorDetail as LedgerErrorDetail,
 };
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
+use crate::proto::polyester::api::v1::{RequestErrorCode, RequestErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::proto::transfer::v1::{
     ErrorCode as TransferErrorCode, ErrorDetail as TransferErrorDetail,
@@ -759,6 +760,8 @@ const LEVEL_INDEX_METADATA: &str = "level_index";
 /// [`Error::Api`] metadata key holding [`Error::retry_at`], as
 /// `<unix seconds>.<nanoseconds>`.
 const AUTH_RETRY_AFTER_METADATA: &str = "auth_retry_after";
+/// The size limit, in bytes, a `REQUEST_TOO_LARGE` refusal names.
+const REQUEST_LIMIT_BYTES_METADATA: &str = "request_limit_bytes";
 
 /// A `Timestamp` at or after the epoch as `<unix seconds>.<nanoseconds>`.
 fn timestamp_metadata(at: &buffa_types::google::protobuf::Timestamp) -> Option<String> {
@@ -1620,11 +1623,26 @@ impl Error {
         self.auth_error_code() == Some(order_codes::TRIGGER_STATUS_INVALID)
     }
 
-    /// True when a request body over the endpoint's size limit was refused
-    /// ([`problem_codes::REQUEST_TOO_LARGE`], HTTP 413). Nothing changed;
-    /// reduce the body to fit the limit.
+    /// True when a request over the endpoint's size limit was refused
+    /// ([`problem_codes::REQUEST_TOO_LARGE`]): REST HTTP 413, or ConnectRPC
+    /// `resource_exhausted` with a `polyester.api.v1.RequestErrorDetail`
+    /// naming it. Nothing changed, and the same request is refused again:
+    /// reduce it to fit the limit ([`Self::request_limit_bytes`]). Never
+    /// retried, and never a rate limit.
     pub fn is_request_too_large(&self) -> bool {
         matches!(self, Self::Api { code, .. } if code == problem_codes::REQUEST_TOO_LARGE)
+    }
+
+    /// With [`Self::is_request_too_large`]: the size limit the request is
+    /// over, in bytes, as the ConnectRPC refusal's `limit_bytes` names it;
+    /// `None` when the refusal names none, as a REST 413 does not.
+    pub fn request_limit_bytes(&self) -> Option<u64> {
+        if !self.is_request_too_large() {
+            return None;
+        }
+        self.api_metadata(REQUEST_LIMIT_BYTES_METADATA)?
+            .parse()
+            .ok()
     }
 
     /// True when the request's `X-API-RECV-WINDOW` header was refused
@@ -1869,6 +1887,16 @@ fn is_auth_like_error_code(code: &str) -> bool {
         || code.contains("API_KEY")
         || code.contains("WALLET_BINDING")
         || code.contains("POLICY")
+}
+
+fn decode_request_error_detail(detail: &ErrorDetail) -> Option<RequestErrorDetail> {
+    if !detail
+        .type_url
+        .ends_with("polyester.api.v1.RequestErrorDetail")
+    {
+        return None;
+    }
+    RequestErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
 fn decode_rate_limit_detail(detail: &ErrorDetail) -> Option<ProtoRateLimitDetail> {
@@ -2224,6 +2252,29 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 message: fallback_message,
                 answer: None,
             }
+        };
+    }
+    // A request every API refuses alike for its size, before reading it:
+    // `resource_exhausted` like a rate limit, but only this typed detail
+    // tells them apart, and waiting does not help. Without the detail,
+    // `resource_exhausted` stays a rate limit.
+    if let Some(too_large) = err.details.iter().find_map(|detail| {
+        decode_request_error_detail(detail)
+            .filter(|d| d.code.as_known() == Some(RequestErrorCode::REQUEST_TOO_LARGE))
+    }) {
+        return Error::Api {
+            message: fallback_message,
+            code: problem_codes::REQUEST_TOO_LARGE.to_owned(),
+            metadata: if too_large.limit_bytes == 0 {
+                Vec::new()
+            } else {
+                vec![(
+                    REQUEST_LIMIT_BYTES_METADATA.to_owned(),
+                    too_large.limit_bytes.to_string(),
+                )]
+            },
+            violations: Vec::new(),
+            answer: None,
         };
     }
     if raw_message == auth_codes::TIMESTAMP_SKEW {
@@ -2619,7 +2670,11 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         || (err.code == ErrorCode::ResourceExhausted
             && (OrderErrorCode::from_proto_name(&normalized_code).is_some()
                 || is_service_code_message(named_code))
-            && !retryable_resource_code(&normalized_code))
+            && !retryable_resource_code(&normalized_code)
+            // The size refusal is read from its typed detail (above) or a
+            // REST problem, never from message text alone.
+            && (named_code != problem_codes::REQUEST_TOO_LARGE
+                || has_marker(crate::transport::HTTP_PROBLEM_TYPE)))
     {
         return Error::Api {
             message: fallback_message,

@@ -2141,8 +2141,12 @@ A request body over an endpoint's size limit is refused with HTTP 413 and the pr
 `REQUEST_TOO_LARGE` on every service, before the request is authenticated. It is an `Error::Api`
 with code `problem_codes::REQUEST_TOO_LARGE` and the problem in `http_problem()`;
 `Error::is_request_too_large()` reports it. Nothing changed and the same body is refused again:
-reduce it to fit the limit. A ConnectRPC message over the limit once decoded keeps its Connect
-`resource_exhausted` answer and maps as before.
+reduce it to fit the limit. Over ConnectRPC the same refusal is `resource_exhausted` with a
+`polyester.api.v1.RequestErrorDetail` of code `REQUEST_TOO_LARGE`: the SDK maps it to the same
+`Error::Api`, final and never retried (not a rate limit), and `Error::request_limit_bytes()`
+returns the limit it names (`None` on REST, which names none). Only that typed detail makes a
+`resource_exhausted` a size refusal: without it, one stays an `Error::RateLimit`, whatever its
+message says.
 
 Preview and batch rejections expose the same
 payload on `OrderErrorDetail.rate_limit` / batch item `rate_limit`. That error payload is

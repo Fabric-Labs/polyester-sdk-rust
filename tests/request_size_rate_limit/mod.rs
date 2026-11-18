@@ -6,6 +6,7 @@ use base64::Engine as _;
 use buffa::Message as _;
 use polyester::models::RateLimitDetail;
 use polyester::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
+use polyester::proto::polyester::api::v1::{RequestErrorCode, RequestErrorDetail};
 use polyester::proto::polyester::ratelimit::v1::{
     FailureReason, LimiterScope, PolicyClass, RateLimitDetail as ProtoRateLimitDetail,
 };
@@ -100,6 +101,8 @@ fn assert_request_too_large(err: &Error) {
     // refused again.
     assert!(!err.is_retryable(), "{err:?}");
     assert!(!err.mutation_outcome_unknown(), "{err:?}");
+    // A REST 413 names no limit.
+    assert_eq!(err.request_limit_bytes(), None);
 }
 
 #[tokio::test]
@@ -397,6 +400,74 @@ async fn connect_rate_limit_detail_is_typed_retry_information() {
     assert_eq!(detail.scope, "AUTH_SUBJECT");
     assert_eq!(detail.operation_id, "auth.wallet_challenge");
     assert_eq!(err.retry_after(), Some(1.409));
+}
+
+fn connect_request_error(detail: &RequestErrorDetail) -> String {
+    json!({
+        "code": "resource_exhausted",
+        "message": "request too large",
+        "details": [{
+            "type": "polyester.api.v1.RequestErrorDetail",
+            "value": base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec()),
+        }],
+    })
+    .to_string()
+}
+
+/// A ConnectRPC `resource_exhausted` with `RequestErrorDetail`
+/// `REQUEST_TOO_LARGE` is the final size refusal, never a rate limit: it
+/// names the limit, is sent once, and a Retry-After on it changes nothing.
+#[tokio::test]
+async fn connect_request_too_large_detail_is_the_final_size_refusal() {
+    for (limit_bytes, want) in [(4_194_304, Some(4_194_304)), (0, None)] {
+        let body = connect_request_error(&RequestErrorDetail {
+            code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+            limit_bytes,
+            ..Default::default()
+        });
+        let sent = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = sent.clone();
+        let http = MockHttpServer::spawn(move |_| {
+            seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            response(429, JSON, &body, &[("Retry-After", "1")])
+        })
+        .await;
+        let err = api_key_client(&http).auth.me().await.expect_err("refused");
+        assert!(
+            matches!(&err, Error::Api { code, .. } if code == polyester::problem_codes::REQUEST_TOO_LARGE),
+            "{err:?}"
+        );
+        assert!(err.is_request_too_large());
+        assert_eq!(err.request_limit_bytes(), want);
+        assert!(!err.is_retryable(), "{err:?}");
+        assert!(!err.mutation_outcome_unknown(), "{err:?}");
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+}
+
+/// Only the typed detail makes `resource_exhausted` a size refusal: without
+/// it, or with a code that is not `REQUEST_TOO_LARGE`, it stays a rate limit,
+/// whatever the message says.
+#[tokio::test]
+async fn resource_exhausted_without_the_size_detail_stays_a_rate_limit() {
+    let bodies = [
+        connect_request_error(&RequestErrorDetail {
+            code: RequestErrorCode::CODE_UNSPECIFIED.into(),
+            limit_bytes: 1024,
+            ..Default::default()
+        }),
+        connect_request_error(&RequestErrorDetail {
+            code: buffa::EnumValue::from(99),
+            ..Default::default()
+        }),
+        r#"{"code":"resource_exhausted","message":"REQUEST_TOO_LARGE"}"#.to_owned(),
+    ];
+    for body in bodies {
+        let err = me_error(move || response(429, JSON, &body, &[])).await;
+        assert!(matches!(&err, Error::RateLimit { .. }), "{err:?}");
+        assert!(!err.is_request_too_large());
+        assert_eq!(err.request_limit_bytes(), None);
+    }
 }
 
 const WALLET_LINKED: &str = "this wallet is already linked to another account; log in with the account address it already uses";
