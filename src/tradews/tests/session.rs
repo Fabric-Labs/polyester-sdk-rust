@@ -135,18 +135,21 @@ enum Head {
 /// example), and a probe must not take the script: only an upgrade of
 /// [`PATH`] that the stand-in's own handshake accepts is a
 /// [`Head::Upgrade`]. The head is parsed and checked by that handshake's
-/// code (tungstenite's request parser and response), byte for byte, so the
-/// hold is never signalled for a socket the handshake then refuses. It must
-/// also carry a `Host` and exactly one `Sec-WebSocket-Key` of 16 bytes in
-/// base64, as RFC 6455 requires and the client sends.
+/// code (tungstenite's request parser and response), byte for byte, and,
+/// as the handshake requires, nothing may follow it: the hold is never
+/// signalled for a socket the handshake then refuses. It must also carry a
+/// `Host` and exactly one `Sec-WebSocket-Key` of 16 bytes in base64, as
+/// RFC 6455 requires and the client sends.
 fn parse_head(bytes: &[u8]) -> Head {
     use base64::Engine as _;
     use tokio_tungstenite::tungstenite::handshake::machine::TryParse as _;
     use tokio_tungstenite::tungstenite::handshake::server::create_response;
     let request = match Request::try_parse(bytes) {
-        Ok(Some((_, request))) => request,
+        // Bytes after the head, sent with it, are refused by the handshake
+        // as junk after the request, before it checks the request.
+        Ok(Some((len, request))) if len == bytes.len() => request,
+        Ok(Some(_)) | Err(_) => return Head::Other,
         Ok(None) => return Head::Partial,
-        Err(_) => return Head::Other,
     };
     let headers = request.headers();
     let mut keys = headers.get_all("sec-websocket-key").iter();
@@ -210,6 +213,12 @@ async fn next_upgrade(listener: &tokio::net::TcpListener) -> tokio::net::TcpStre
     }
 }
 
+/// `head` with a `Content-Length` body of `body`, sent with it.
+fn with_body(head: &str, body: &str) -> String {
+    let head = head.strip_suffix("\r\n").unwrap();
+    format!("{head}Content-Length: {}\r\n\r\n{body}", body.len())
+}
+
 /// A valid upgrade of the trading path, as the client sends it.
 fn upgrade_request() -> String {
     format!(
@@ -222,7 +231,8 @@ fn upgrade_request() -> String {
 /// Request heads that are not the client's upgrade: probes, other requests
 /// and upgrades the handshake refuses or the stand-in does not hold. Some
 /// differ from the upgrade only in bytes a lenient reading would drop:
-/// Unicode whitespace, invalid UTF-8, a second header or token.
+/// Unicode whitespace, invalid UTF-8, a second header or token, or bytes
+/// after the head in the same write.
 fn not_upgrades() -> Vec<Vec<u8>> {
     let upgrade = upgrade_request();
     let without = |line: &str| upgrade.replace(line, "").into_bytes();
@@ -232,6 +242,8 @@ fn not_upgrades() -> Vec<Vec<u8>> {
     let at = upgrade.find("websocket").unwrap() + "websocket".len();
     invalid_utf8.insert(at, 0xff);
     vec![
+        format!("{upgrade}x").into_bytes(),
+        with_body(&upgrade, "x").into_bytes(),
         b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n".to_vec(),
         b"\x16\x03\x01 not http\r\n\r\n".to_vec(),
         with("GET ", "POST "),
@@ -2188,9 +2200,9 @@ async fn an_upgrade_in_flight_at_a_switch_must_confirm_its_opt_in() {
 /// Other processes probe local ports on a shared machine. Probes that reach
 /// the stand-in before the client's upgrade (part of a head, left open or
 /// cut off by a shutdown; garbage; another request; an upgrade over HTTP/1.0,
-/// without its key, or whose `Upgrade` ends in a Unicode space or lists
-/// `h2c` first, all refused by the handshake) neither take the held script
-/// nor keep the upgrade from it.
+/// without its key, whose `Upgrade` ends in a Unicode space or lists `h2c`
+/// first, or followed by a body in the same write, all refused by the
+/// handshake) neither take the held script nor keep the upgrade from it.
 #[tokio::test]
 async fn probes_before_the_upgrade_neither_take_nor_block_the_hold() {
     use tokio::io::AsyncWriteExt;
@@ -2211,6 +2223,7 @@ async fn probes_before_the_upgrade_neither_take_nor_block_the_hold() {
     let keyless = upgrade.replace("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n", "");
     let unicode_space = upgrade.replace("Upgrade: websocket", "Upgrade: websocket\u{a0}");
     let h2c_first = upgrade.replace("Upgrade: websocket", "Upgrade: h2c, websocket");
+    let with_a_body = with_body(&upgrade, "x");
     let mut probes = Vec::new();
     for (bytes, shutdown) in [
         (part, false),
@@ -2221,6 +2234,7 @@ async fn probes_before_the_upgrade_neither_take_nor_block_the_hold() {
         (keyless.as_str(), false),
         (unicode_space.as_str(), false),
         (h2c_first.as_str(), false),
+        (with_a_body.as_str(), false),
     ] {
         let mut probe = tokio::net::TcpStream::connect(&addr).await.unwrap();
         probe.write_all(bytes.as_bytes()).await.unwrap();
