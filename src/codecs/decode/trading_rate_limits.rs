@@ -114,6 +114,26 @@ mod tests {
     }
 
     #[test]
+    fn the_read_class_is_named() {
+        let msg = GetTradingRateLimitsResponse {
+            rules: vec![ProtoTradingRateLimitRule {
+                policy_class: TradingRateLimitClass::TRADING_RATE_LIMIT_CLASS_READ.into(),
+                quota_weight: 100,
+                period_ms: 1000,
+                burst_weight: 200,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let result = trading_rate_limits_from_proto(&msg);
+        assert_eq!(
+            result.rules[0].policy_class,
+            "TRADING_RATE_LIMIT_CLASS_READ"
+        );
+        assert_eq!(result.rules[0].burst_weight, 200);
+    }
+
+    #[test]
     fn trading_rate_limits_decode_account_and_api_key_rules() {
         let rule = ProtoTradingRateLimitRule {
             policy_class: TradingRateLimitClass::TRADING_RATE_LIMIT_CLASS_CANCEL.into(),

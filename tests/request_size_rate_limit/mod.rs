@@ -470,6 +470,139 @@ async fn resource_exhausted_without_the_size_detail_stays_a_rate_limit() {
     }
 }
 
+/// Trading reads share the root account's `TRADING_READ` limit: a refusal is
+/// the same `Error::RateLimit` an order placement raises, with its detail and
+/// delay, and the SDK sends the read once, leaving the wait to the caller.
+#[tokio::test]
+async fn trading_reads_over_the_read_limit_are_rate_limits() {
+    use polyester::models::SubAccountScope;
+    use polyester::proto::triggers::v1::GetTriggerRequest;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let detail = ProtoRateLimitDetail {
+        reason: FailureReason::QUOTA_EXCEEDED.into(),
+        limit: Some(200),
+        remaining: Some(0),
+        retry_after_ms: Some(250),
+        policy_version: Some(7),
+        operation_id: "orders.read".into(),
+        policy_class: PolicyClass::TRADING_READ.into(),
+        scope: LimiterScope::ACCOUNT.into(),
+        ..Default::default()
+    };
+    let body = json!({
+        "code": "resource_exhausted",
+        "message": "rate limit exceeded",
+        "details": [{
+            "type": "polyester.ratelimit.v1.RateLimitDetail",
+            "value": base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec()),
+        }],
+    })
+    .to_string();
+    let sent = std::sync::Arc::new(AtomicUsize::new(0));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |_| {
+        seen.fetch_add(1, Ordering::SeqCst);
+        response(429, JSON, &body, &[("Retry-After", "1")])
+    })
+    .await;
+    let client = api_key_client(&http);
+
+    let refusals: Vec<(&str, Error)> = vec![
+        (
+            "GetOpenOrders",
+            client
+                .orders
+                .list_open(SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetOrderHistory",
+            client
+                .orders
+                .list_history_with(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetUserTrades",
+            client
+                .trades
+                .list_with(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetBatchReplaceStatus",
+            client
+                .orders
+                .get_batch_replace_status("23", SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetTrigger",
+            client
+                .triggers
+                .get(GetTriggerRequest {
+                    trigger_id: 7,
+                    ..Default::default()
+                })
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "ListTriggers",
+            client
+                .triggers
+                .list(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetTradingRateLimits",
+            client
+                .rate_limits
+                .get_trading_rate_limits(SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetSpotFeeRates",
+            client
+                .fees
+                .get_spot_fee_rates(SubAccountScope::Default, Vec::new())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+    ];
+    for (read, err) in &refusals {
+        let Error::RateLimit {
+            detail: Some(detail),
+            ..
+        } = err
+        else {
+            panic!("{read}: {err:?}");
+        };
+        assert_eq!(detail.policy_class, "TRADING_READ", "{read}");
+        assert_eq!(detail.scope, "ACCOUNT", "{read}");
+        assert_eq!(detail.policy_version, Some(7), "{read}");
+        assert_eq!(err.retry_after(), Some(0.25), "{read}");
+        assert!(err.is_retryable(), "{read}");
+        assert!(!err.is_request_too_large(), "{read}");
+    }
+    assert_eq!(sent.load(Ordering::SeqCst), refusals.len());
+}
+
 const WALLET_LINKED: &str = "this wallet is already linked to another account; log in with the account address it already uses";
 
 /// AUTH_WALLET_ALREADY_LINKED is a terminal login refusal on both protocols.

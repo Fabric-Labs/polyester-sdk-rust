@@ -1046,11 +1046,24 @@ omitted when unset. `settled_volume_quality` and `average_aop_quality` say how c
 rolling 30-day metric is (`complete`, `price_unavailable` or `incomplete_history`, with
 `incomplete_hours`); when the volume's status is `price_unavailable`, `settled_volume_30d_usd`
 is a lower bound. `policy_class` uses full protobuf enum names
-(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Trading limits apply per account: the main
-account and each sub-account have their own, and every API key and session that trades for an
-account shares them. Budget against `TradingRateLimits::rules` (placement first, cancellation
-second); `api_key_rules` are informational only, since trading requests are not limited per API
-key, so adding a key does not add capacity.
+(`TRADING_RATE_LIMIT_CLASS_PLACE`, `_CANCEL` and `_READ`). Placement and cancellation limits
+apply per account: the main account and each sub-account have their own, and every API key and
+session that trades for an account shares them. The read limit belongs to the root account: the
+root account, all of its sub-accounts and every API key and session share one, also when a
+sub-account is selected. Budget against `TradingRateLimits::rules` (placement, cancellation and
+read), and select a rule by `policy_class`, not by its position or the number of rules;
+`api_key_rules` are informational only, since trading requests are not limited per API key, so
+adding a key does not add capacity.
+
+Trading reads draw on the read limit (`TRADING_READ`) shared with `orders.preview`, at a cost
+fixed by what they ask for: `orders.get_with`, `orders.get_batch_replace_status`, `triggers.get`
+and `rate_limits.get_trading_rate_limits` cost 1; `orders.list_open_with` and `triggers.list`
+1 per 100 rows of `limit`, `orders.list_history_with`, `trades.list_with` and
+`triggers.list_events` 2 per 100, rounded up, with no `limit` read as 100; `fees.get_spot_fee_rates`
+1 per 100 symbols returned. A read over the limit is the same `Error::RateLimit` an order
+placement raises, with `detail.policy_class` `TRADING_READ` and `retry_after()`; the SDK does
+not retry it, so wait before the next read. Follow orders with the private order stream rather
+than polling.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {

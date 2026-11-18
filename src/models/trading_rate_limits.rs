@@ -5,7 +5,7 @@
 
 use buffa_types::google::protobuf::Timestamp;
 
-/// Weighted placement or cancellation quota for one VIP tier.
+/// Weighted placement, cancellation or read quota for one VIP tier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TradingRateLimitRule {
     /// Full protobuf enum name, for example `TRADING_RATE_LIMIT_CLASS_PLACE`.
@@ -32,12 +32,14 @@ pub struct RateLimitConfig {
 pub struct TradingRateLimits {
     pub policy_version: u64,
     pub effective_from: Option<Timestamp>,
-    /// The placement and cancellation rules enforced for the selected
-    /// account, placement first and cancellation second. All of the
-    /// account's API keys and sessions draw on these together: budget
-    /// against them.
+    /// The rules enforced for the selected account: placement, cancellation
+    /// and read (`TRADING_RATE_LIMIT_CLASS_READ`). All of the account's API
+    /// keys and sessions draw on these together: budget against them. The
+    /// read rule is the root account's, shared by all of its sub-accounts,
+    /// also when a sub-account is selected. Select a rule by `policy_class`,
+    /// not by its position or the number of rules.
     pub rules: Vec<TradingRateLimitRule>,
-    /// The rules resolved for the calling API key, placement first; empty
+    /// The rules resolved for the calling API key, in the same order; empty
     /// for a session. Informational only: trading requests are not limited
     /// per API key, and only `rules` are enforced.
     pub api_key_rules: Vec<TradingRateLimitRule>,
