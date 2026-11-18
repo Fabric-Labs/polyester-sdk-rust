@@ -283,3 +283,124 @@ async fn deposit_withdraw_config_refuses_supply_without_observation_time() {
         .unwrap();
     assert_eq!(cfg.assets[0].variants[0].supply, None);
 }
+
+/// A present market datapoint carries its value, source and observation
+/// time, and a present unlimited-supply flag its source and time: one that
+/// lacks any of them is refused. An absent datapoint stays unknown, and a
+/// value of "0" is valid.
+#[tokio::test]
+async fn asset_market_datapoints_refuse_missing_parts() {
+    use buffa_types::google::protobuf::Timestamp;
+    use polyester::proto::marketdata::v1::{
+        AssetDataSource, AssetInfo, AssetMarketFlag, AssetMarketStats, AssetMarketValue,
+        ListAssetInfoResponse,
+    };
+
+    let at = || -> buffa::MessageField<Timestamp> {
+        Timestamp {
+            seconds: 1_794_700_000,
+            ..Default::default()
+        }
+        .into()
+    };
+    let value = |v: &str| AssetMarketValue {
+        value: v.into(),
+        source: AssetDataSource::COINMARKETCAP.into(),
+        as_of: at(),
+        ..Default::default()
+    };
+    let reply = |stats: AssetMarketStats| ListAssetInfoResponse {
+        asset_info: vec![AssetInfo {
+            asset_id: 1,
+            market_stats: stats.into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let read = |body: ListAssetInfoResponse| async move {
+        let server = MockHttpServer::spawn(move |_| connect_proto_ok(&body)).await;
+        public_client(&server)
+            .market_data
+            .list_asset_info(&[1])
+            .await
+    };
+
+    let bad = [
+        (
+            "no value",
+            AssetMarketValue {
+                value: String::new(),
+                ..value("1")
+            },
+        ),
+        (
+            "no source",
+            AssetMarketValue {
+                source: AssetDataSource::SOURCE_UNSPECIFIED.into(),
+                ..value("1")
+            },
+        ),
+        (
+            "no as_of",
+            AssetMarketValue {
+                as_of: Default::default(),
+                ..value("1")
+            },
+        ),
+        ("signed", value("-1")),
+        ("exponent", value("1e9")),
+    ];
+    for (label, datapoint) in bad {
+        let err = read(reply(AssetMarketStats {
+            circulating_supply: datapoint.into(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{label}: {err:?}"
+        );
+    }
+    for (label, flag) in [
+        (
+            "flag without source",
+            AssetMarketFlag {
+                as_of: at(),
+                ..Default::default()
+            },
+        ),
+        (
+            "flag without as_of",
+            AssetMarketFlag {
+                source: AssetDataSource::POLYESTER.into(),
+                ..Default::default()
+            },
+        ),
+    ] {
+        let err = read(reply(AssetMarketStats {
+            max_supply_unlimited: flag.into(),
+            ..Default::default()
+        }))
+        .await
+        .unwrap_err();
+        assert!(
+            matches!(err, polyester::Error::ResponseContract { .. }),
+            "{label}: {err:?}"
+        );
+    }
+
+    // Absent datapoints stay unknown; "0" is a valid value.
+    let infos = read(reply(AssetMarketStats {
+        total_supply: value("0").into(),
+        ..Default::default()
+    }))
+    .await
+    .unwrap();
+    let stats = infos[0].market_stats.as_ref().expect("stats");
+    assert_eq!(
+        stats.total_supply.as_ref().map(|v| v.value.as_str()),
+        Some("0")
+    );
+    assert!(stats.circulating_supply.is_none() && stats.max_supply_unlimited.is_none());
+}

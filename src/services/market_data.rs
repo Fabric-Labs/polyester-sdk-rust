@@ -147,7 +147,7 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().list_asset_info(req))
             .await?
             .into_owned();
-        Ok(asset_info_list_from_proto(&resp))
+        asset_info_list_from_proto(&resp)
     }
 
     /// Recent public trades for a symbol (resolves `symbol_id` via catalogs after hydrate).

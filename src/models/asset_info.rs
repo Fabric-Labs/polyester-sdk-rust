@@ -94,8 +94,9 @@ pub struct AssetMarketValue {
     /// `polyester` (set by the Polyester team); `unknown(<n>)` for a source
     /// this SDK does not name.
     pub source: String,
-    /// When the source last observed or set the value, in UTC.
-    pub as_of: Option<Timestamp>,
+    /// When the source last observed or set the value, in UTC. Always set:
+    /// a datapoint without it is an [`crate::Error::ResponseContract`].
+    pub as_of: Timestamp,
 }
 
 /// A market fact that holds when present, with its source and observation
@@ -105,5 +106,5 @@ pub struct AssetMarketFlag {
     /// Who reported it, as [`AssetMarketValue::source`].
     pub source: String,
     /// When the source last observed it, in UTC.
-    pub as_of: Option<Timestamp>,
+    pub as_of: Timestamp,
 }
