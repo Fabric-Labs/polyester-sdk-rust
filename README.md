@@ -2540,6 +2540,14 @@ good-till-cancelled limit orders.
   a disarm closes the gate at once and writing a refresh bounds it by its own
   timeout, before their answers arrive. A new connection starts with the gate
   closed, so arm again after every `Event::Ready`.
+- **Stopping triggers too.** `CancelAllOrders::with_triggers()` (or
+  `include_triggers: true`) also stops the account's waiting stop-loss,
+  take-profit, trailing-stop, TWAP, ladder and attached legs in the request's
+  scope; each ends canceled with reason `cancel_all`, and the acknowledgement's
+  `matched_triggers` counts them. `TradeSession::cancel_all_after_with` with
+  `CancelAllAfterOptions::with_triggers()` does the same when the timer
+  expires: set it on every arm and refresh. Without it, only orders are
+  canceled and triggers keep running, as before.
 - **Commands.** `create_order`, `cancel_order`, `modify_order` (amend or
   replace, `ModifyBehavior`), `cancel_all_orders`, `batch_create_orders` (up to
   20), `batch_replace_orders` (up to 50 on one pair) and `batch_cancel_orders`

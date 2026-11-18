@@ -20,11 +20,11 @@ use super::sbe::{
 };
 use super::{
     BatchCancelAck, BatchCancelOrders, BatchCreateAck, BatchCreateOrders, BatchItem,
-    BatchReplaceAck, BatchReplaceOrders, BatchStatus, CancelAllAck, CancelAllListing,
-    CancelAllOrders, CancelReason, CancelledOrder, Deadline, Execution, FeeAsset, MarketResync,
-    ModifyBehavior, ModifyOrder, OrderAck, OrderRef, OrderStatus, OrderUpdate, PostOnlyOrder,
-    RejectCode, ReplaceAction, ReplaceItemResult, ResyncReason, Side, TimerAck, TradeError,
-    from_unix_ns,
+    BatchReplaceAck, BatchReplaceOrders, BatchStatus, CancelAllAck, CancelAllAfterOptions,
+    CancelAllListing, CancelAllOrders, CancelReason, CancelledOrder, Deadline, Execution, FeeAsset,
+    MarketResync, ModifyBehavior, ModifyOrder, OrderAck, OrderRef, OrderStatus, OrderUpdate,
+    PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItemResult, ResyncReason, Side, TimerAck,
+    TradeError, from_unix_ns,
 };
 use crate::errors::{Error, Result};
 use crate::types::{Price, Quantity, QuantityDomain};
@@ -354,6 +354,7 @@ pub(crate) fn encode_cancel_all(cancel: &CancelAllOrders, deadline: &Deadline) -
         e.side(wire_side(s));
     }
     e.dry_run(0);
+    e.include_triggers(u8::from(cancel.include_triggers));
     e.timestamp_ms(deadline.timestamp_ms);
     e.recv_window_ms(deadline.window_ms);
     let mut g = e.symbols_encoder(count(cancel.symbol_ids.len()), Default::default());
@@ -372,6 +373,7 @@ pub(crate) fn encode_cancel_all(cancel: &CancelAllOrders, deadline: &Deadline) -
 pub(crate) fn encode_cancel_all_after(
     timeout: Duration,
     correlation_id: u64,
+    options: CancelAllAfterOptions,
     deadline: &Deadline,
 ) -> Result<Vec<u8>> {
     let timeout_sec = super::timer_seconds(timeout)?;
@@ -381,6 +383,7 @@ pub(crate) fn encode_cancel_all_after(
     e.correlation_id(correlation_id);
     e.timeout_sec(timeout_sec);
     e.symbol_id(0);
+    e.include_triggers(u8::from(options.include_triggers));
     // Every pair and both sides: symbolId 0 and side left at the schema's
     // null, 0 (the buffer starts zeroed).
     e.timestamp_ms(deadline.timestamp_ms);
@@ -633,6 +636,7 @@ pub(crate) fn decode(frame: &[u8]) -> Result<Msg> {
             let symbol_id = d.symbol_id();
             let acked_at = from_unix_ns(d.ts_ns());
             let matched_orders = d.matched_orders().unwrap_or(0);
+            let matched_triggers = d.matched_triggers().unwrap_or(0);
             let submitted_cancels = d.submitted_cancels().unwrap_or(0);
             let failed_cancels = d.failed_cancels().unwrap_or(0);
             let truncated = d.cancelled_orders_truncated() != 0;
@@ -653,6 +657,7 @@ pub(crate) fn decode(frame: &[u8]) -> Result<Msg> {
                     Answer::CancelAll(CancelAllAck {
                         correlation_id,
                         matched_orders,
+                        matched_triggers,
                         submitted_cancels,
                         failed_cancels,
                         cancelled,

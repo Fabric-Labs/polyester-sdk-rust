@@ -9,4 +9,5 @@
 
 include!("../../../gen/buffa/polyester.api.rs");
 
+pub mod v1;
 pub mod validation;

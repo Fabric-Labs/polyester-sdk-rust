@@ -7,7 +7,7 @@ pub use super::SBE_SCHEMA_ID;
 pub use super::SBE_SCHEMA_VERSION;
 pub use super::SBE_SEMANTIC_VERSION;
 
-pub const SBE_BLOCK_LENGTH: u16 = 37;
+pub const SBE_BLOCK_LENGTH: u16 = 38;
 pub const SBE_TEMPLATE_ID: u16 = 10;
 
 pub mod encoder {
@@ -161,6 +161,21 @@ pub mod encoder {
             let offset = self.offset + 33;
             self.get_buf_mut().put_u32_at(offset, value);
         }
+
+        /// primitive field 'includeTriggers'
+        /// - min value: 0
+        /// - max value: 254
+        /// - null value: 0xff_u8
+        /// - characterEncoding: null
+        /// - semanticType: null
+        /// - encodedOffset: 37
+        /// - encodedLength: 1
+        /// - version: 50
+        #[inline]
+        pub fn include_triggers(&mut self, value: u8) {
+            let offset = self.offset + 37;
+            self.get_buf_mut().put_u8_at(offset, value);
+        }
     }
 } // end encoder
 
@@ -291,6 +306,16 @@ pub mod decoder {
 
             let value = self.get_buf().get_u32_at(self.offset + 33);
             if value == 0x0_u32 { None } else { Some(value) }
+        }
+
+        /// primitive field - 'REQUIRED'
+        #[inline]
+        pub fn include_triggers(&self) -> u8 {
+            if self.acting_version() < 50 {
+                return 0xff_u8;
+            }
+
+            self.get_buf().get_u8_at(self.offset + 37)
         }
     }
 } // end decoder
