@@ -1681,15 +1681,13 @@ SDK notes:
   same key and legs). `refused` is final for its key in every case, a leg that
   failed its checks included: a retry with the same key and legs answers
   `refused` again even once the leg would pass, and one with other legs is
-  refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key. A
-  check that cannot be decided right now fails the whole call `unavailable`
-  instead (HTTP 503 with `ERROR_CODE_SERVICE_UNAVAILABLE` or
-  `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`, the retryable
-  `Error::AdmissionUnavailable` with the answer's status and `Retry-After`):
-  nothing is recorded under the key, so retry with the same key and legs after
-  `retry_after()`. Any other failure of the call, a 502 or 504 included, has an
-  unknown outcome: the batch may have moved funds, so send it again only under
-  the same key and legs, which answers the original outcome. A batch debits at most 10 distinct source accounts
+  refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key.
+  Every failure of the call itself is an unknown outcome
+  (`mutation_outcome_unknown()`) that the SDK does not retry, whatever the
+  server answered, keeping the answer's status, `Retry-After` and code: send
+  the batch again under the same idempotency key and legs (after
+  `retry_after()` when it is set), which is safe whether or not it was
+  admitted and answers the batch's outcome. A batch debits at most 10 distinct source accounts
   (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
   asset pairs. It counts once against the internal transfer rate limit, with a
   weight of `max(ceil(legs / 50), distinct source accounts)`: a
@@ -1714,13 +1712,22 @@ let leg = |asset_id: u32, amount: &str| -> Result<InternalTransferBatchLeg, poly
         destination_smart_account_address: Some("0x2222222222222222222222222222222222222222".into()),
     })
 };
-let batch = client
-    .internal_transfers
-    .batch_create(BatchCreateInternalTransfersParams {
-        legs: vec![leg(1, "0.5")?, leg(3, "0.001")?],
-        idempotency_key: "rebalance-2026-11-13-1".into(),
-    })
-    .await?;
+let params = BatchCreateInternalTransfersParams {
+    legs: vec![leg(1, "0.5")?, leg(3, "0.001")?],
+    idempotency_key: "rebalance-2026-11-13-1".into(),
+};
+let batch = match client.internal_transfers.batch_create(params.clone()).await {
+    Ok(batch) => batch,
+    // Unknown outcome: the same key and legs are safe to send again,
+    // admitted or not, and answer the batch's outcome.
+    Err(err) if err.mutation_outcome_unknown() => {
+        if let Some(seconds) = err.retry_after() {
+            tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
+        }
+        client.internal_transfers.batch_create(params).await?
+    }
+    Err(err) => return Err(err.into()),
+};
 for leg in &batch.legs {
     println!("leg {} {} {:?}", leg.leg_index, leg.status, leg.error_code);
 }

@@ -377,16 +377,12 @@ impl InternalTransfersService {
     /// funds, so retry it with the same key.
     ///
     /// A `refused` batch is final for its key: fix the cause and submit under
-    /// a new key. A batch whose checks could not be decided yet is refused
-    /// `unavailable` with `ERROR_CODE_SERVICE_UNAVAILABLE` or
-    /// `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE` before anything is recorded
-    /// under its key: that is a retryable
-    /// [`crate::errors::Error::AdmissionUnavailable`] with the answer's status
-    /// and Retry-After; retry with the same key and legs. Every other failure
-    /// of the call, whatever the server answered, is an
-    /// [`crate::errors::Error::Server`] with an unknown outcome
-    /// ([`crate::errors::Error::mutation_outcome_unknown`]) that is not
-    /// retryable: send the batch again only under the same key and legs.
+    /// a new key. Every failure of the call, whatever the server answered, is
+    /// an [`crate::errors::Error::Server`] with an unknown outcome
+    /// ([`crate::errors::Error::mutation_outcome_unknown`]) that this SDK does
+    /// not retry, keeping the answer's status, Retry-After and code: send the
+    /// batch again under the same idempotency key and legs, which is safe
+    /// whether or not it was admitted.
     pub async fn batch_create(
         &self,
         params: crate::models::BatchCreateInternalTransfersParams,
@@ -1991,33 +1987,14 @@ impl RateLimitService {
     }
 }
 
-/// The error of a batch create the server answered with a failure. Only the
-/// documented pre-admission refusal, an HTTP 503 ConnectRPC `unavailable`
-/// whose typed `transfer.v1.ErrorDetail` names `ERROR_CODE_SERVICE_UNAVAILABLE`
-/// or `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`, says nothing was recorded under
-/// the key: it is the retryable `Error::AdmissionUnavailable`, with the
-/// answer's status and Retry-After. Every other failure, a rate limit or a
-/// typed refusal included, ends with an unknown outcome that is not
-/// retryable, keeping its code and answer: the batch is only ever sent again
-/// under the same key and legs.
+/// The error of a batch create the server answered with a failure: always
+/// an unknown outcome that this SDK does not retry, whatever it maps to (a
+/// rate limit, a typed refusal or an `unavailable` included), keeping its
+/// code and the answer's status and Retry-After. The batch is only ever sent
+/// again under the same idempotency key and legs, which the contract makes
+/// safe whether or not it was admitted.
 fn batch_create_failure(err: connectrpc::ConnectError) -> crate::errors::Error {
     use crate::errors::Error;
-    let mapped = crate::transport::Factory::map_error(err.clone());
-    let status = mapped.answer().map(|answer| answer.status);
-    if crate::errors::is_transfer_pre_admission_unavailable(&err, status)
-        && let Error::Server {
-            message,
-            code: Some(code),
-            answer,
-        } = mapped
-    {
-        return Error::AdmissionUnavailable {
-            answer,
-            message,
-            code,
-            problem: None,
-        };
-    }
     let mapped = crate::transport::Factory::map_error(err);
     if mapped.mutation_outcome_unknown() && !mapped.is_retryable() {
         return mapped;

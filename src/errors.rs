@@ -1894,36 +1894,6 @@ fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
     AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
-/// Whether `err` is the batch transfer refusal the contract documents as
-/// made before anything is recorded under the key: a ConnectRPC
-/// `unavailable` answered with HTTP 503 whose typed `transfer.v1.ErrorDetail`
-/// (exactly that type) names `ERROR_CODE_SERVICE_UNAVAILABLE` or
-/// `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`. Any other status, detail type or
-/// place the code appears in is not.
-pub(crate) fn is_transfer_pre_admission_unavailable(
-    err: &ConnectError,
-    status: Option<u16>,
-) -> bool {
-    const NAME: &str = "transfer.v1.ErrorDetail";
-    err.code == ErrorCode::Unavailable
-        && status == Some(503)
-        && err.details.iter().any(|detail| {
-            let url = detail.type_url.as_str();
-            (url == NAME || url.strip_prefix("type.googleapis.com/") == Some(NAME))
-                && decode_detail_bytes(detail)
-                    .and_then(|bytes| TransferErrorDetail::decode_from_slice(&bytes).ok())
-                    .is_some_and(|d| {
-                        matches!(
-                            d.code.as_known(),
-                            Some(
-                                TransferErrorCode::ERROR_CODE_SERVICE_UNAVAILABLE
-                                    | TransferErrorCode::ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE
-                            )
-                        )
-                    })
-        })
-}
-
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
     if !detail.type_url.ends_with("transfer.v1.ErrorDetail") {
         return None;

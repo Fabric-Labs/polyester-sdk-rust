@@ -266,15 +266,13 @@ const BATCH_ID: &str = "92640625967207661803151833376978068587";
 /// A batch sends every leg exactly, in order, with the source sub-account of
 /// each leg and one idempotency key; the reply reads leg by leg, and the
 /// batch reads back by its request ID.
-/// A batch whose checks could not be decided yet is refused `unavailable`
-/// before anything is recorded under its key: only an HTTP 503 ConnectRPC
-/// `unavailable` with a typed `transfer.v1.ErrorDetail` naming one of the
-/// documented codes is retryable with the same key and legs, and it keeps the
-/// answer's status and Retry-After. A 502 or 504, another detail type,
-/// generic JSON, the code in the message only, or another transfer code stays
-/// an unknown outcome that is not retried.
+/// Every failure of a batch create is an unknown outcome this SDK does not
+/// retry, whatever the answer: a 503 `unavailable` with a typed pre-admission
+/// code included, as well as a 502 or 504, rate limits, typed refusals and
+/// REST problems. Each keeps the answer's status and Retry-After, and is sent
+/// once: the caller retries under the same idempotency key and legs.
 #[tokio::test]
-async fn batch_transfer_pre_admission_unavailable_is_retryable() {
+async fn batch_transfer_failures_are_unknown_outcomes() {
     use polyester::proto::chain::withdraw::v1::{
         ErrorCode as WithdrawCode, ErrorDetail as WithdrawDetail,
     };
@@ -317,20 +315,74 @@ async fn batch_transfer_pre_admission_unavailable_is_retryable() {
     })
     .to_string();
     let json = "application/json";
+    let detail_json = |code: TransferCode| {
+        json!({
+            "type": "transfer.v1.ErrorDetail",
+            "value": b64(ErrorDetail { code: code.into(), ..Default::default() }.encode_to_vec()),
+        })
+    };
+    let service = detail_json(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE);
+    let no_code = json!({"message": "try again", "details": [service.clone()]}).to_string();
+    let unknown_code =
+        json!({"code": "not_a_code", "message": "try again", "details": [service.clone()]})
+            .to_string();
+    let capitals =
+        json!({"code": "UNAVAILABLE", "message": "try again", "details": [service.clone()]})
+            .to_string();
+    let conflicting = json!({
+        "code": "unavailable",
+        "message": "try again",
+        "details": [service.clone(), detail_json(TransferCode::ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE)],
+    })
+    .to_string();
+    let twice = json!({
+        "code": "unavailable",
+        "message": "try again",
+        "details": [service.clone(), service.clone()],
+    })
+    .to_string();
+    let service_detail = service.to_string();
+    let with_entry = |entry: &str| {
+        format!(
+            r#"{{"code":"unavailable","message":"try again","details":[{service_detail},{entry}]}}"#
+        )
+    };
+    let type_only = with_entry(r#"{"type":"transfer.v1.ErrorDetail"}"#);
+    let null_value = with_entry(r#"{"type":"transfer.v1.ErrorDetail","value":null}"#);
+    let no_type = with_entry(r#"{"value":"CBc"}"#);
+    let dup_last = format!(
+        r#"{{"code":"internal","code":"unavailable","message":"try again","details":[{service_detail}]}}"#
+    );
+    let dup_same = format!(
+        r#"{{"code":"unavailable","code":"unavailable","message":"try again","details":[{service_detail}]}}"#
+    );
+    let with_foreign = json!({
+        "code": "unavailable",
+        "message": "try again",
+        "details": [service, {
+            "type": "chain.withdraw.v1.ErrorDetail",
+            "value": b64(WithdrawDetail {
+                code: WithdrawCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                ..Default::default()
+            }
+            .encode_to_vec()),
+        }],
+    })
+    .to_string();
     let cases: Vec<(&str, u16, &str, String, bool)> = vec![
         (
             "typed service",
             503,
             json,
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed shard",
             503,
             json,
             transfer(TransferCode::ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "other transfer code",
@@ -375,56 +427,153 @@ async fn batch_transfer_pre_admission_unavailable_is_retryable() {
             503,
             "application/json; charset=utf-8",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, JSON in capitals",
             503,
             "Application/JSON",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, problem+json",
             503,
             "application/problem+json",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, jsonx",
             503,
             "application/jsonx",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, text/plain",
             503,
             "text/plain",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, vendor JSON",
             503,
             "application/vnd.polyester+json",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, proto",
             503,
             "application/proto",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
         ),
         (
             "typed, combined Content-Type",
             503,
             "application/json, application/problem+json",
             transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
-            true,
+            false,
+        ),
+        // The ConnectRPC code must be on the wire, exactly `unavailable`:
+        // never inferred from the HTTP status.
+        ("no wire code", 503, json, no_code.clone(), false),
+        (
+            "no wire code, text/plain",
+            503,
+            "text/plain",
+            no_code.clone(),
+            false,
+        ),
+        ("unknown wire code", 503, json, unknown_code.clone(), false),
+        (
+            "unknown wire code, text/plain",
+            503,
+            "text/plain",
+            unknown_code.clone(),
+            false,
+        ),
+        (
+            "unknown wire code, no Content-Type",
+            503,
+            "",
+            unknown_code,
+            false,
+        ),
+        (
+            "no wire code, no Content-Type",
+            503,
+            "",
+            no_code.clone(),
+            false,
+        ),
+        ("wire code in capitals", 503, json, capitals, false),
+        // The answer cannot forge the SDK's record of the wire code.
+        (
+            "forged wire-code header",
+            503,
+            "spoof",
+            no_code.clone(),
+            false,
+        ),
+        (
+            "forged wire-code trailer",
+            503,
+            "spoof-trailer",
+            no_code.clone(),
+            false,
+        ),
+        // Nor its record of the answer's status.
+        (
+            "forged status on a 502",
+            502,
+            "spoof-status",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            false,
+        ),
+        // Exactly one typed detail, with an admission code.
+        ("conflicting typed details", 503, json, conflicting, false),
+        ("the typed detail twice", 503, json, twice, false),
+        (
+            "typed detail with a foreign one",
+            503,
+            json,
+            with_foreign,
+            false,
+        ),
+        // Every raw entry counts, decodable or not.
+        (
+            "a second entry with only a type",
+            503,
+            json,
+            type_only,
+            false,
+        ),
+        (
+            "a second entry with a null value",
+            503,
+            json,
+            null_value,
+            false,
+        ),
+        ("a second entry without a type", 503, json, no_type, false),
+        // A duplicated wire code is ambiguous, whichever value comes last.
+        (
+            "duplicate code, unavailable last",
+            503,
+            json,
+            dup_last,
+            false,
+        ),
+        (
+            "duplicate code, unavailable twice",
+            503,
+            json,
+            dup_same,
+            false,
         ),
         // Every other failure is an unknown outcome, whatever it maps to.
         (
@@ -488,14 +637,30 @@ async fn batch_transfer_pre_admission_unavailable_is_retryable() {
     ];
     for (case, status, content_type, body, retryable) in cases {
         let content_type = content_type.to_owned();
-        let (client, seen) = server(move |_| HttpScript::Raw {
-            status,
-            headers: vec![
-                ("Content-Type".into(), content_type.clone()),
+        let (client, seen) = server(move |_| {
+            let mut headers = vec![
                 ("Content-Length".into(), body.len().to_string()),
                 ("Retry-After".into(), "2".into()),
-            ],
-            body: body.as_bytes().to_vec(),
+            ];
+            if let Some(forged) = content_type.strip_prefix("spoof") {
+                headers.push(("Content-Type".into(), "application/json".into()));
+                let forged: &[(&str, &str)] = match forged {
+                    "" => &[("polyester-sdk-wire-code", "unavailable")],
+                    "-trailer" => &[("Trailer-polyester-sdk-wire-code", "unavailable")],
+                    _ => &[
+                        ("polyester-sdk-answer-status", "503"),
+                        ("Trailer-polyester-sdk-answer-status", "503"),
+                    ],
+                };
+                headers.extend(forged.iter().map(|(k, v)| ((*k).into(), (*v).into())));
+            } else if !content_type.is_empty() {
+                headers.push(("Content-Type".into(), content_type.clone()));
+            }
+            HttpScript::Raw {
+                status,
+                headers,
+                body: body.as_bytes().to_vec(),
+            }
         })
         .await;
         let err = client
@@ -506,25 +671,22 @@ async fn batch_transfer_pre_admission_unavailable_is_retryable() {
             })
             .await
             .unwrap_err();
-        assert_eq!(err.is_retryable(), retryable, "{case}: {err:?}");
-        assert_eq!(
-            err.mutation_outcome_unknown(),
-            !retryable,
+        assert!(!retryable, "{case}");
+        assert!(!err.is_retryable(), "{case}: {err:?}");
+        assert!(err.mutation_outcome_unknown(), "{case}: {err:?}");
+        assert!(
+            !matches!(
+                &err,
+                Error::AdmissionUnavailable { .. } | Error::RateLimit { .. } | Error::Api { .. }
+            ),
             "{case}: {err:?}"
         );
-        if retryable {
-            assert!(
-                matches!(&err, Error::AdmissionUnavailable { .. }),
-                "{case}: {err:?}"
-            );
-            assert_eq!(err.answer().expect("the answer").status, 503, "{case}");
-            assert_eq!(err.retry_after(), Some(2.0), "{case}");
-        } else {
-            assert!(
-                !matches!(&err, Error::AdmissionUnavailable { .. }),
-                "{case}: {err:?}"
-            );
-        }
+        assert_eq!(
+            err.answer().map(|a| a.status),
+            Some(status),
+            "{case}: {err:?}"
+        );
+        assert_eq!(err.retry_after(), Some(2.0), "{case}: {err:?}");
         assert_eq!(seen.lock().unwrap().len(), 1, "{case}: sent once");
     }
 }
