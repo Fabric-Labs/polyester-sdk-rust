@@ -10,6 +10,10 @@ pub enum TradingRateLimitClass {
     TRADING_RATE_LIMIT_CLASS_PLACE = 1i32,
     /// Order and trigger cancellation.
     TRADING_RATE_LIMIT_CLASS_CANCEL = 2i32,
+    /// Order, fill, trigger, trading-limit and fee reads, and order previews.
+    /// Every API key, session and subaccount of a root account shares the root
+    /// account's read limit.
+    TRADING_RATE_LIMIT_CLASS_READ = 3i32,
 }
 impl TradingRateLimitClass {
     ///Idiomatic alias for [`Self::TRADING_RATE_LIMIT_CLASS_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -21,6 +25,9 @@ impl TradingRateLimitClass {
     ///Idiomatic alias for [`Self::TRADING_RATE_LIMIT_CLASS_CANCEL`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Cancel: Self = Self::TRADING_RATE_LIMIT_CLASS_CANCEL;
+    ///Idiomatic alias for [`Self::TRADING_RATE_LIMIT_CLASS_READ`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Read: Self = Self::TRADING_RATE_LIMIT_CLASS_READ;
 }
 impl ::core::default::Default for TradingRateLimitClass {
     fn default() -> Self {
@@ -124,6 +131,7 @@ impl ::buffa::Enumeration for TradingRateLimitClass {
             }
             1i32 => ::core::option::Option::Some(Self::TRADING_RATE_LIMIT_CLASS_PLACE),
             2i32 => ::core::option::Option::Some(Self::TRADING_RATE_LIMIT_CLASS_CANCEL),
+            3i32 => ::core::option::Option::Some(Self::TRADING_RATE_LIMIT_CLASS_READ),
             _ => ::core::option::Option::None,
         }
     }
@@ -137,6 +145,7 @@ impl ::buffa::Enumeration for TradingRateLimitClass {
             }
             Self::TRADING_RATE_LIMIT_CLASS_PLACE => "TRADING_RATE_LIMIT_CLASS_PLACE",
             Self::TRADING_RATE_LIMIT_CLASS_CANCEL => "TRADING_RATE_LIMIT_CLASS_CANCEL",
+            Self::TRADING_RATE_LIMIT_CLASS_READ => "TRADING_RATE_LIMIT_CLASS_READ",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -150,6 +159,9 @@ impl ::buffa::Enumeration for TradingRateLimitClass {
             "TRADING_RATE_LIMIT_CLASS_CANCEL" => {
                 ::core::option::Option::Some(Self::TRADING_RATE_LIMIT_CLASS_CANCEL)
             }
+            "TRADING_RATE_LIMIT_CLASS_READ" => {
+                ::core::option::Option::Some(Self::TRADING_RATE_LIMIT_CLASS_READ)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -158,17 +170,19 @@ impl ::buffa::Enumeration for TradingRateLimitClass {
             Self::TRADING_RATE_LIMIT_CLASS_UNSPECIFIED,
             Self::TRADING_RATE_LIMIT_CLASS_PLACE,
             Self::TRADING_RATE_LIMIT_CLASS_CANCEL,
+            Self::TRADING_RATE_LIMIT_CLASS_READ,
         ]
     }
 }
-/// TradingRateLimitRule describes one weighted placement or cancellation quota
-/// for one VIP tier.
+/// TradingRateLimitRule describes one weighted placement, cancellation or read
+/// quota for one VIP tier.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct TradingRateLimitRule {
     /// Trading operation family governed by this rule. Public responses contain
-    /// TRADING_RATE_LIMIT_CLASS_PLACE or TRADING_RATE_LIMIT_CLASS_CANCEL.
+    /// TRADING_RATE_LIMIT_CLASS_PLACE, TRADING_RATE_LIMIT_CLASS_CANCEL or
+    /// TRADING_RATE_LIMIT_CLASS_READ.
     ///
     /// Field 1: `policy_class`
     #[serde(
@@ -503,8 +517,8 @@ pub const __GET_RATE_LIMIT_CONFIG_REQUEST_JSON_ANY: ::buffa::type_registry::Json
     from_json: ::buffa::type_registry::any_from_json::<GetRateLimitConfigRequest>,
     is_wkt: false,
 };
-/// GetRateLimitConfigResponse contains all placement and cancellation rules for
-/// one complete policy version.
+/// GetRateLimitConfigResponse contains all placement, cancellation and read
+/// rules for one complete policy version.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -530,9 +544,10 @@ pub struct GetRateLimitConfigResponse {
     pub effective_from: ::buffa::MessageField<
         ::buffa_types::google::protobuf::Timestamp,
     >,
-    /// Complete placement and cancellation catalog. Rules are ordered by policy
-    /// class, then by tier ascending. The list contains one rule per class for
-    /// each VIP0 through VIP10 tier and is not paginated.
+    /// Complete placement, cancellation and read catalog. Rules are ordered by
+    /// policy class (cancellation, placement, read), then by tier ascending. The
+    /// list contains one rule per class for each VIP0 through VIP10 tier and is
+    /// not paginated.
     ///
     /// Field 3: `rules`
     #[serde(
@@ -845,10 +860,13 @@ pub const __GET_TRADING_RATE_LIMITS_REQUEST_JSON_ANY: ::buffa::type_registry::Js
     from_json: ::buffa::type_registry::any_from_json::<GetTradingRateLimitsRequest>,
     is_wkt: false,
 };
-/// GetTradingRateLimitsResponse contains the placement and cancellation limits
-/// enforced for the selected account target. Trading limits apply per account:
-/// the root account and each subaccount have their own limits, and every API
-/// key and session that trades for an account shares that account's limits.
+/// GetTradingRateLimitsResponse contains the placement, cancellation and read
+/// limits enforced for the selected account target. Placement and cancellation
+/// limits apply per account: the root account and each subaccount have their
+/// own limits, and every API key and session that trades for an account shares
+/// that account's limits. The read limit applies per root account: the root
+/// account, all of its subaccounts and every API key and session share one
+/// read limit.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -875,9 +893,10 @@ pub struct GetTradingRateLimitsResponse {
     pub effective_from: ::buffa::MessageField<
         ::buffa_types::google::protobuf::Timestamp,
     >,
-    /// Placement and cancellation rules enforced for the selected account,
-    /// ordered with placement first and cancellation second. All of the
-    /// account's API keys and sessions draw on these limits together.
+    /// Placement, cancellation and read rules enforced for the selected
+    /// account, ordered placement, cancellation, read. All of the account's API
+    /// keys and sessions draw on the placement and cancellation limits together;
+    /// the read rule is the root account's, shared with all of its subaccounts.
     ///
     /// Field 3: `rules`
     #[serde(
@@ -886,8 +905,8 @@ pub struct GetTradingRateLimitsResponse {
         deserialize_with = "::buffa::json_helpers::null_as_default"
     )]
     pub rules: ::buffa::alloc::vec::Vec<TradingRateLimitRule>,
-    /// Placement and cancellation rules resolved for the calling API key, ordered
-    /// with placement first and cancellation second. Present only when the caller
+    /// Placement, cancellation and read rules resolved for the calling API key,
+    /// ordered placement, cancellation, read. Present only when the caller
     /// authenticated with an API key. These rules are informational: trading
     /// requests are not limited per API key, and only the account rules in
     /// `rules` are enforced.
@@ -1102,12 +1121,13 @@ pub mod __buffa {
     pub mod view {
         #[allow(unused_imports)]
         use super::*;
-        /// TradingRateLimitRule describes one weighted placement or cancellation quota
-        /// for one VIP tier.
+        /// TradingRateLimitRule describes one weighted placement, cancellation or read
+        /// quota for one VIP tier.
         #[derive(Clone, Debug, Default)]
         pub struct TradingRateLimitRuleView<'a> {
             /// Trading operation family governed by this rule. Public responses contain
-            /// TRADING_RATE_LIMIT_CLASS_PLACE or TRADING_RATE_LIMIT_CLASS_CANCEL.
+            /// TRADING_RATE_LIMIT_CLASS_PLACE, TRADING_RATE_LIMIT_CLASS_CANCEL or
+            /// TRADING_RATE_LIMIT_CLASS_READ.
             ///
             /// Field 1: `policy_class`
             pub policy_class: ::buffa::EnumValue<super::super::TradingRateLimitClass>,
@@ -1454,7 +1474,8 @@ pub mod __buffa {
                 self.0.into_bytes()
             }
             /// Trading operation family governed by this rule. Public responses contain
-            /// TRADING_RATE_LIMIT_CLASS_PLACE or TRADING_RATE_LIMIT_CLASS_CANCEL.
+            /// TRADING_RATE_LIMIT_CLASS_PLACE, TRADING_RATE_LIMIT_CLASS_CANCEL or
+            /// TRADING_RATE_LIMIT_CLASS_READ.
             ///
             /// Field 1: `policy_class`
             #[must_use]
@@ -1775,8 +1796,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetRateLimitConfigResponse contains all placement and cancellation rules for
-        /// one complete policy version.
+        /// GetRateLimitConfigResponse contains all placement, cancellation and read
+        /// rules for one complete policy version.
         #[derive(Clone, Debug, Default)]
         pub struct GetRateLimitConfigResponseView<'a> {
             /// Positive identifier of the returned rate-limit policy version.
@@ -1789,9 +1810,10 @@ pub mod __buffa {
             pub effective_from: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Complete placement and cancellation catalog. Rules are ordered by policy
-            /// class, then by tier ascending. The list contains one rule per class for
-            /// each VIP0 through VIP10 tier and is not paginated.
+            /// Complete placement, cancellation and read catalog. Rules are ordered by
+            /// policy class (cancellation, placement, read), then by tier ascending. The
+            /// list contains one rule per class for each VIP0 through VIP10 tier and is
+            /// not paginated.
             ///
             /// Field 3: `rules`
             pub rules: ::buffa::RepeatedView<
@@ -2144,9 +2166,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().effective_from
             }
-            /// Complete placement and cancellation catalog. Rules are ordered by policy
-            /// class, then by tier ascending. The list contains one rule per class for
-            /// each VIP0 through VIP10 tier and is not paginated.
+            /// Complete placement, cancellation and read catalog. Rules are ordered by
+            /// policy class (cancellation, placement, read), then by tier ascending. The
+            /// list contains one rule per class for each VIP0 through VIP10 tier and is
+            /// not paginated.
             ///
             /// Field 3: `rules`
             #[must_use]
@@ -2482,10 +2505,13 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// GetTradingRateLimitsResponse contains the placement and cancellation limits
-        /// enforced for the selected account target. Trading limits apply per account:
-        /// the root account and each subaccount have their own limits, and every API
-        /// key and session that trades for an account shares that account's limits.
+        /// GetTradingRateLimitsResponse contains the placement, cancellation and read
+        /// limits enforced for the selected account target. Placement and cancellation
+        /// limits apply per account: the root account and each subaccount have their
+        /// own limits, and every API key and session that trades for an account shares
+        /// that account's limits. The read limit applies per root account: the root
+        /// account, all of its subaccounts and every API key and session share one
+        /// read limit.
         #[derive(Clone, Debug, Default)]
         pub struct GetTradingRateLimitsResponseView<'a> {
             /// Positive identifier of the rate-limit policy version used for the
@@ -2499,17 +2525,18 @@ pub mod __buffa {
             pub effective_from: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
-            /// Placement and cancellation rules enforced for the selected account,
-            /// ordered with placement first and cancellation second. All of the
-            /// account's API keys and sessions draw on these limits together.
+            /// Placement, cancellation and read rules enforced for the selected
+            /// account, ordered placement, cancellation, read. All of the account's API
+            /// keys and sessions draw on the placement and cancellation limits together;
+            /// the read rule is the root account's, shared with all of its subaccounts.
             ///
             /// Field 3: `rules`
             pub rules: ::buffa::RepeatedView<
                 'a,
                 super::super::__buffa::view::TradingRateLimitRuleView<'a>,
             >,
-            /// Placement and cancellation rules resolved for the calling API key, ordered
-            /// with placement first and cancellation second. Present only when the caller
+            /// Placement, cancellation and read rules resolved for the calling API key,
+            /// ordered placement, cancellation, read. Present only when the caller
             /// authenticated with an API key. These rules are informational: trading
             /// requests are not limited per API key, and only the account rules in
             /// `rules` are enforced.
@@ -2905,9 +2932,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().effective_from
             }
-            /// Placement and cancellation rules enforced for the selected account,
-            /// ordered with placement first and cancellation second. All of the
-            /// account's API keys and sessions draw on these limits together.
+            /// Placement, cancellation and read rules enforced for the selected
+            /// account, ordered placement, cancellation, read. All of the account's API
+            /// keys and sessions draw on the placement and cancellation limits together;
+            /// the read rule is the root account's, shared with all of its subaccounts.
             ///
             /// Field 3: `rules`
             #[must_use]
@@ -2919,8 +2947,8 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().rules
             }
-            /// Placement and cancellation rules resolved for the calling API key, ordered
-            /// with placement first and cancellation second. Present only when the caller
+            /// Placement, cancellation and read rules resolved for the calling API key,
+            /// ordered placement, cancellation, read. Present only when the caller
             /// authenticated with an API key. These rules are informational: trading
             /// requests are not limited per API key, and only the account rules in
             /// `rules` are enforced.

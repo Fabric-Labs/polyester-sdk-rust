@@ -7,6 +7,17 @@ pub struct SpotMarketRule {
     pub symbol: String,
 }
 
+/// The template a policy was copied from, recorded when the copy was made.
+/// It never changes, even after the template is edited or deleted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyTemplateSource {
+    /// Public ID of the template, base58.
+    pub template_id: String,
+    /// The template's revision when it was copied: compare it with the
+    /// template's current `revision` to see whether it changed since.
+    pub template_revision: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubaccountPolicy {
     pub policy_id: String,
@@ -29,6 +40,12 @@ pub struct SubaccountPolicy {
     /// `"READ_BALANCES"`, in the order the server sent them; `"UNKNOWN(n)"`
     /// for an action this SDK version does not know.
     pub actions: Vec<String>,
+    /// True for a template: a reusable policy of the main account that is
+    /// never attached itself. Applying it attaches a new copy, so editing it
+    /// later changes nothing it was applied to.
+    pub is_template: bool,
+    /// The template this policy is a copy of; `None` when it is not a copy.
+    pub source_template: Option<PolicyTemplateSource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,6 +85,12 @@ pub struct ApiPolicy {
     /// policy kinds. Tell them apart by name, not by number:
     /// `CREATE_DEPOSIT_ADDRESS` is 10, among the product actions.
     pub actions: Vec<String>,
+    /// True for a template: a reusable policy of the main account that is
+    /// never attached itself. Applying it attaches a new copy, so editing it
+    /// later changes nothing it was applied to.
+    pub is_template: bool,
+    /// The template this policy is a copy of; `None` when it is not a copy.
+    pub source_template: Option<PolicyTemplateSource>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

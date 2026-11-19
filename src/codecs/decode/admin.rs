@@ -116,8 +116,8 @@ mod tests {
     use crate::proto::auth::v1::ApiKeyStatus;
     use buffa_types::google::protobuf::Timestamp;
 
-    /// A key reads its purpose: `"STANDARD"` for the user's own keys and
-    /// `"ASSISTANT"` for the assistant's; empty when the server names none,
+    /// A key reads its purpose: `"STANDARD"` for the user's own keys,
+    /// `"ASSISTANT"` for the assistant's and `"ADMIN_KEY"` for an admin key; empty when the server names none,
     /// and `"UNKNOWN(n)"` for a purpose newer than this SDK.
     #[test]
     fn api_key_reads_its_purpose() {
@@ -132,6 +132,7 @@ mod tests {
         };
         assert_eq!(purpose(ApiKeyPurpose::STANDARD.into()), "STANDARD");
         assert_eq!(purpose(ApiKeyPurpose::ASSISTANT.into()), "ASSISTANT");
+        assert_eq!(purpose(ApiKeyPurpose::ADMIN_KEY.into()), "ADMIN_KEY");
         assert_eq!(purpose(ApiKeyPurpose::PURPOSE_UNSPECIFIED.into()), "");
         assert_eq!(purpose(buffa::EnumValue::from(9)), "UNKNOWN(9)");
     }

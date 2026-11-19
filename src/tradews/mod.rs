@@ -257,6 +257,13 @@ pub struct CancelAllOrders {
     pub correlation_id: u64,
     pub symbol_ids: Vec<u32>,
     pub side: Option<Side>,
+    /// Also stop the account's waiting triggers in that scope (stop-loss,
+    /// take-profit, trailing stop, TWAP, ladder and attached legs created
+    /// before the request was accepted): each ends canceled with reason
+    /// `cancel_all` and places no order after the answer. `false`, the
+    /// default, cancels only orders. It is part of the request's criteria:
+    /// a retry under the same `correlation_id` must keep it.
+    pub include_triggers: bool,
 }
 
 impl CancelAllOrders {
@@ -265,6 +272,34 @@ impl CancelAllOrders {
             correlation_id: new_correlation_id(),
             symbol_ids,
             side: None,
+            include_triggers: false,
+        }
+    }
+
+    /// Also stops the account's waiting triggers in the request's scope; see
+    /// [`Self::include_triggers`].
+    pub fn with_triggers(mut self) -> Self {
+        self.include_triggers = true;
+        self
+    }
+}
+
+/// Options of [`TradeSender::cancel_all_after_with`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CancelAllAfterOptions {
+    /// When the timer expires, also stop the account's waiting triggers
+    /// created before its expiry time, as [`CancelAllOrders::include_triggers`]
+    /// does; `false`, the default, cancels only orders. Set it on every arm
+    /// and refresh: each one replaces the timer's scope. A disarm ignores it.
+    pub include_triggers: bool,
+}
+
+impl CancelAllAfterOptions {
+    /// Options that also stop triggers when the timer expires.
+    pub fn with_triggers() -> Self {
+        Self {
+            include_triggers: true,
         }
     }
 }
@@ -743,6 +778,9 @@ pub struct CancelAllAck {
     pub correlation_id: u64,
     /// Open orders that matched.
     pub matched_orders: u32,
+    /// With [`CancelAllOrders::include_triggers`], the triggers that matched,
+    /// each stopped; zero without it.
+    pub matched_triggers: u32,
     pub submitted_cancels: u32,
     pub failed_cancels: u32,
     /// The orders whose cancellation was requested, oldest first, at most

@@ -253,10 +253,11 @@ pub const LIFECYCLE_READ_SERVICE_GET_ACCOUNT_FLOW_SPEC: ::connectrpc::Spec = ::c
 #[allow(clippy::type_complexity)]
 pub trait LifecycleReadService: Send + Sync + 'static {
     /// GetFlowById retrieves one lifecycle flow by public flow id. It finds only
-    /// flows a chain transaction started, which carry `source_tx_hash`; a flow
-    /// settled without one, such as a transfer between Trading accounts or a
-    /// Trading withdrawal not yet sent to a chain, is not found. Its account
-    /// reads it with GetAccountFlow.
+    /// flows that carry a chain transaction, `source_tx_hash`; a flow without
+    /// one, such as a Trading withdrawal not yet sent to a chain, or a transfer
+    /// between Trading accounts before the Polyester Chain transaction that
+    /// records it is observed, is not found. Its account reads it with
+    /// GetAccountFlow.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -280,7 +281,7 @@ pub trait LifecycleReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// ListFlows lists lifecycle flows with optional filters and keyset
-    /// pagination. It lists only flows a chain transaction started, which carry
+    /// pagination. It lists only flows that carry a chain transaction,
     /// `source_tx_hash`, and identifies accounts by smart account address. An
     /// account lists all of its own flows with ListAccountFlows.
     ///
@@ -306,7 +307,7 @@ pub trait LifecycleReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// ListFlowsByTx lists lifecycle flows that reference a transaction hash. It
-    /// finds only flows a chain transaction started.
+    /// finds only flows that carry a chain transaction, `source_tx_hash`.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -331,7 +332,7 @@ pub trait LifecycleReadService: Send + Sync + 'static {
     > + Send;
     /// ListAccountFlows lists the authenticated account's lifecycle flows with
     /// optional filters and keyset pagination: the flows it owns and the
-    /// transfers it receives, including those no chain transaction started. API
+    /// transfers it receives, including those without a chain transaction. API
     /// keys need the READ_FUNDING_FLOWS policy action.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
@@ -356,7 +357,7 @@ pub trait LifecycleReadService: Send + Sync + 'static {
         >,
     > + Send;
     /// GetAccountFlow retrieves one lifecycle flow the authenticated account owns
-    /// or receives, including one no chain transaction started. A flow the
+    /// or receives, including one without a chain transaction. A flow the
     /// account takes no part in is not found. API keys need the
     /// READ_FUNDING_FLOWS policy action.
     ///

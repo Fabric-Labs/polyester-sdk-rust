@@ -527,10 +527,12 @@ pub enum DepositDisposition {
     ELIGIBLE = 2i32,
     /// Not accepted: it is returned to return_address and never executes. A
     /// deposit found ineligible after it was credited, such as a late deposit
-    /// (LATE_DEPOSIT), one below min_deposit_amount (DEPOSIT_BELOW_MINIMUM) or
-    /// above max_deposit_amount (DEPOSIT_ABOVE_MAXIMUM), or one of the wrong
+    /// (LATE_DEPOSIT), one below min_deposit_amount but at least the source
+    /// network's minimum deposit (DEPOSIT_BELOW_MINIMUM) or above
+    /// max_deposit_amount (DEPOSIT_ABOVE_MAXIMUM), or one of the wrong
     /// asset or network (WRONG_ASSET), keeps credited_at and is returned from its
-    /// credit.
+    /// credit. One never credited is returned directly, and direct_return
+    /// reports that return.
     RETURN_ONLY = 3i32,
     /// Held for review; it neither executes nor returns until released. A
     /// deposit blocked by its risk screen (SOURCE_SCREENING_BLOCKED) keeps this
@@ -734,7 +736,10 @@ pub enum QuickSwapReason {
     /// The deposit is below the published min_deposit_amount, or its credit after
     /// the deposit network fee is below the smallest order the route's market
     /// accepts. It is not executed: it is returned to return_address, and the
-    /// QuickSwap shows RETURNING and RETURNED with this reason. A deposit that
+    /// QuickSwap shows RETURNING and RETURNED with this reason. Only a deposit
+    /// that reaches the source network's minimum deposit
+    /// (AssetChainVariant.deposit_min_amount) is returned; one below it is not
+    /// detected and never appears on the QuickSwap. A deposit that
     /// cannot be returned on the network it was received on is held (HELD with
     /// this reason); the broker contacts Polyester broker support with the
     /// swap_id.
@@ -801,6 +806,20 @@ pub enum QuickSwapReason {
     /// QuickSwap is REJECTED: it never gets a deposit address, and nothing can
     /// be deposited to it.
     SOURCE_WALLET_SCREENING_FAILED = 28i32,
+    /// Available liquidity did not fill an order at its protected price; untraded
+    /// input or intermediate funds are returned or refunded. Shown on the payout
+    /// statuses that follow, including COMPLETED when a partly traded swap
+    /// refunded the rest. A trade failure reason (this one or ORDER_REJECTED)
+    /// is used only when the execution ended without another reason, such as
+    /// EXECUTION_DEADLINE_REACHED or PROTECTION_NOT_MET; it is then the first
+    /// slice in schedule order whose reason or carry_reason is
+    /// INSUFFICIENT_LIQUIDITY or ORDER_REJECTED, the reason before the
+    /// carry_reason within a slice.
+    INSUFFICIENT_LIQUIDITY = 29i32,
+    /// An order was refused; untraded input or intermediate funds are returned
+    /// or refunded. Shown on the payout statuses that follow, chosen as for
+    /// INSUFFICIENT_LIQUIDITY.
+    ORDER_REJECTED = 30i32,
 }
 impl QuickSwapReason {
     ///Idiomatic alias for [`Self::REASON_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -866,6 +885,12 @@ impl QuickSwapReason {
     ///Idiomatic alias for [`Self::SOURCE_WALLET_SCREENING_FAILED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SourceWalletScreeningFailed: Self = Self::SOURCE_WALLET_SCREENING_FAILED;
+    ///Idiomatic alias for [`Self::INSUFFICIENT_LIQUIDITY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const InsufficientLiquidity: Self = Self::INSUFFICIENT_LIQUIDITY;
+    ///Idiomatic alias for [`Self::ORDER_REJECTED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const OrderRejected: Self = Self::ORDER_REJECTED;
 }
 impl ::core::default::Default for QuickSwapReason {
     fn default() -> Self {
@@ -984,6 +1009,8 @@ impl ::buffa::Enumeration for QuickSwapReason {
             26i32 => ::core::option::Option::Some(Self::INTERMEDIATE_BELOW_MINIMUM),
             27i32 => ::core::option::Option::Some(Self::MARKET_CLOSED),
             28i32 => ::core::option::Option::Some(Self::SOURCE_WALLET_SCREENING_FAILED),
+            29i32 => ::core::option::Option::Some(Self::INSUFFICIENT_LIQUIDITY),
+            30i32 => ::core::option::Option::Some(Self::ORDER_REJECTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1013,6 +1040,8 @@ impl ::buffa::Enumeration for QuickSwapReason {
             Self::INTERMEDIATE_BELOW_MINIMUM => "INTERMEDIATE_BELOW_MINIMUM",
             Self::MARKET_CLOSED => "MARKET_CLOSED",
             Self::SOURCE_WALLET_SCREENING_FAILED => "SOURCE_WALLET_SCREENING_FAILED",
+            Self::INSUFFICIENT_LIQUIDITY => "INSUFFICIENT_LIQUIDITY",
+            Self::ORDER_REJECTED => "ORDER_REJECTED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1072,6 +1101,10 @@ impl ::buffa::Enumeration for QuickSwapReason {
             "SOURCE_WALLET_SCREENING_FAILED" => {
                 ::core::option::Option::Some(Self::SOURCE_WALLET_SCREENING_FAILED)
             }
+            "INSUFFICIENT_LIQUIDITY" => {
+                ::core::option::Option::Some(Self::INSUFFICIENT_LIQUIDITY)
+            }
+            "ORDER_REJECTED" => ::core::option::Option::Some(Self::ORDER_REJECTED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1098,6 +1131,170 @@ impl ::buffa::Enumeration for QuickSwapReason {
             Self::INTERMEDIATE_BELOW_MINIMUM,
             Self::MARKET_CLOSED,
             Self::SOURCE_WALLET_SCREENING_FAILED,
+            Self::INSUFFICIENT_LIQUIDITY,
+            Self::ORDER_REJECTED,
+        ]
+    }
+}
+/// DepositReturnState is the progress of a deposit's direct return.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DepositReturnState {
+    /// No state; never returned.
+    RETURN_UNSPECIFIED = 0i32,
+    /// The return is queued or being sent.
+    RETURN_PENDING = 1i32,
+    /// The return was sent to return_address; tx_hash is its transaction.
+    RETURN_COMPLETED = 2i32,
+    /// The return is held for review and is not sent until review releases it.
+    /// The broker contacts Polyester broker support with the swap_id.
+    RETURN_HELD = 3i32,
+}
+impl DepositReturnState {
+    ///Idiomatic alias for [`Self::RETURN_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnUnspecified: Self = Self::RETURN_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::RETURN_PENDING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnPending: Self = Self::RETURN_PENDING;
+    ///Idiomatic alias for [`Self::RETURN_COMPLETED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnCompleted: Self = Self::RETURN_COMPLETED;
+    ///Idiomatic alias for [`Self::RETURN_HELD`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReturnHeld: Self = Self::RETURN_HELD;
+}
+impl ::core::default::Default for DepositReturnState {
+    fn default() -> Self {
+        Self::RETURN_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DepositReturnState {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DepositReturnState {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DepositReturnState;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(DepositReturnState)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DepositReturnState, E> {
+                <DepositReturnState as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DepositReturnState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DepositReturnState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DepositReturnState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DepositReturnState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DepositReturnState, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DepositReturnState {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DepositReturnState {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::RETURN_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::RETURN_PENDING),
+            2i32 => ::core::option::Option::Some(Self::RETURN_COMPLETED),
+            3i32 => ::core::option::Option::Some(Self::RETURN_HELD),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::RETURN_UNSPECIFIED => "RETURN_UNSPECIFIED",
+            Self::RETURN_PENDING => "RETURN_PENDING",
+            Self::RETURN_COMPLETED => "RETURN_COMPLETED",
+            Self::RETURN_HELD => "RETURN_HELD",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "RETURN_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::RETURN_UNSPECIFIED)
+            }
+            "RETURN_PENDING" => ::core::option::Option::Some(Self::RETURN_PENDING),
+            "RETURN_COMPLETED" => ::core::option::Option::Some(Self::RETURN_COMPLETED),
+            "RETURN_HELD" => ::core::option::Option::Some(Self::RETURN_HELD),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::RETURN_UNSPECIFIED,
+            Self::RETURN_PENDING,
+            Self::RETURN_COMPLETED,
+            Self::RETURN_HELD,
         ]
     }
 }
@@ -4335,10 +4532,15 @@ pub struct QuickSwapQuote {
     )]
     pub min_rate: ::buffa::alloc::string::String,
     /// Published minimum deposit, in source token units, compared with the
-    /// deposit before its network fee. A smaller deposit is returned to
-    /// return_address (DEPOSIT_BELOW_MINIMUM). It is never below the source
-    /// network's minimum
-    /// (AssetChainVariant.deposit_min_amount in the config), and differs from
+    /// deposit before its network fee. Send at least this amount. It is never
+    /// below the source network's minimum deposit
+    /// (AssetChainVariant.deposit_min_amount in the config, for
+    /// DepositInstructions.zipped_asset_id). A smaller deposit is returned to
+    /// return_address (DEPOSIT_BELOW_MINIMUM) only if it reaches the source
+    /// network's minimum deposit; a deposit below that minimum is not detected,
+    /// recorded or returned, and is lost. For a bridge, min_deposit_amount
+    /// often equals the source network's minimum deposit; when they are equal,
+    /// any smaller deposit is lost. It differs from
     /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
     /// quotes. For a TWAP it is the slice count times the smallest deposit one
     /// slice takes, and at least a market execution's minimum.
@@ -5411,6 +5613,20 @@ pub struct Deposit {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub flow_id: ::buffa::alloc::string::String,
+    /// Direct return to return_address of a deposit that was never credited: a
+    /// RETURN_ONLY deposit that reached the address after its one eligible
+    /// deposit or after its funding window. On a MANUAL_RECOVERY deposit it
+    /// reports a direct return once one is recorded. Unset until a direct return
+    /// is recorded, and on every other deposit, which is returned through
+    /// withdrawals.
+    ///
+    /// Field 15: `direct_return`
+    #[serde(
+        rename = "directReturn",
+        alias = "direct_return",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub direct_return: ::buffa::MessageField<DepositReturn>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -5430,6 +5646,7 @@ impl ::core::fmt::Debug for Deposit {
             .field("detected_at", &self.detected_at)
             .field("credited_at", &self.credited_at)
             .field("flow_id", &self.flow_id)
+            .field("direct_return", &self.direct_return)
             .finish()
     }
 }
@@ -5523,6 +5740,14 @@ impl ::buffa::Message for Deposit {
         if !self.flow_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
         }
+        if self.direct_return.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.direct_return.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5577,6 +5802,10 @@ impl ::buffa::Message for Deposit {
         }
         if !self.flow_id.is_empty() {
             ::buffa::types::put_string_field(14u32, &self.flow_id, buf);
+        }
+        if self.direct_return.is_set() {
+            ::buffa::types::put_len_delimited_header(15u32, __cache.consume_next(), buf);
+            self.direct_return.write_to(__cache, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5691,6 +5920,17 @@ impl ::buffa::Message for Deposit {
                 )?;
                 ::buffa::types::merge_string(&mut self.flow_id, buf)?;
             }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.direct_return.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5711,6 +5951,7 @@ impl ::buffa::Message for Deposit {
         self.detected_at = ::buffa::MessageField::none();
         self.credited_at = ::buffa::MessageField::none();
         self.flow_id.clear();
+        self.direct_return = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -5741,6 +5982,203 @@ pub const __DEPOSIT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::ty
     type_url: "type.googleapis.com/swap.quickswap.v1.Deposit",
     to_json: ::buffa::type_registry::any_to_json::<Deposit>,
     from_json: ::buffa::type_registry::any_from_json::<Deposit>,
+    is_wkt: false,
+};
+/// DepositReturn is a deposit's direct return to return_address. It pays the
+/// return address only, never the deposit's sender, in the asset and on the
+/// network the deposit was received in.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DepositReturn {
+    /// Return progress. Accept state values added later.
+    ///
+    /// Field 1: `state`
+    #[serde(
+        rename = "state",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub state: ::buffa::EnumValue<DepositReturnState>,
+    /// Return transaction on the deposit's network, in the network's native
+    /// text form; set once RETURN_COMPLETED.
+    ///
+    /// Field 2: `tx_hash`
+    #[serde(
+        rename = "txHash",
+        alias = "tx_hash",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub tx_hash: ::buffa::alloc::string::String,
+    /// When the return last changed state.
+    ///
+    /// Field 3: `updated_at`
+    #[serde(
+        rename = "updatedAt",
+        alias = "updated_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub updated_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DepositReturn {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DepositReturn")
+            .field("state", &self.state)
+            .field("tx_hash", &self.tx_hash)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
+}
+impl DepositReturn {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.DepositReturn";
+}
+::buffa::impl_default_instance!(DepositReturn);
+impl ::buffa::MessageName for DepositReturn {
+    const PACKAGE: &'static str = "swap.quickswap.v1";
+    const NAME: &'static str = "DepositReturn";
+    const FULL_NAME: &'static str = "swap.quickswap.v1.DepositReturn";
+    const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.DepositReturn";
+}
+impl ::buffa::Message for DepositReturn {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.tx_hash.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.tx_hash) as u32;
+        }
+        if self.updated_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.updated_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(1u32, val, buf);
+            }
+        }
+        if !self.tx_hash.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.tx_hash, buf);
+        }
+        if self.updated_at.is_set() {
+            ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
+            self.updated_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.state = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.tx_hash, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.updated_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.state = ::buffa::EnumValue::from(0);
+        self.tx_hash.clear();
+        self.updated_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DepositReturn {
+    const PROTO_FQN: &'static str = "swap.quickswap.v1.DepositReturn";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DepositReturn {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DEPOSIT_RETURN_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/swap.quickswap.v1.DepositReturn",
+    to_json: ::buffa::type_registry::any_to_json::<DepositReturn>,
+    from_json: ::buffa::type_registry::any_from_json::<DepositReturn>,
     is_wkt: false,
 };
 /// ExecutionProgress is the trading progress of a QuickSwap.
@@ -8155,8 +8593,9 @@ pub struct QuickSwap {
     /// and withdrawal details can be corrected as documented on Withdrawal;
     /// another deposit reaching the address also shows as RETURN_ONLY, and
     /// another deposit observed on an already retired address shows as
-    /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
-    /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+    /// MANUAL_RECOVERY. Such a deposit is returned directly, not through
+    /// withdrawals: its direct_return reports the return, and RETURN_ONLY alone
+    /// does not confirm a completed return.
     /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
     /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
     /// reports such a deposit or needs the final retirement time.
@@ -43421,10 +43860,15 @@ pub mod __buffa {
             /// Field 4: `min_rate`
             pub min_rate: &'a str,
             /// Published minimum deposit, in source token units, compared with the
-            /// deposit before its network fee. A smaller deposit is returned to
-            /// return_address (DEPOSIT_BELOW_MINIMUM). It is never below the source
-            /// network's minimum
-            /// (AssetChainVariant.deposit_min_amount in the config), and differs from
+            /// deposit before its network fee. Send at least this amount. It is never
+            /// below the source network's minimum deposit
+            /// (AssetChainVariant.deposit_min_amount in the config, for
+            /// DepositInstructions.zipped_asset_id). A smaller deposit is returned to
+            /// return_address (DEPOSIT_BELOW_MINIMUM) only if it reaches the source
+            /// network's minimum deposit; a deposit below that minimum is not detected,
+            /// recorded or returned, and is lost. For a bridge, min_deposit_amount
+            /// often equals the source network's minimum deposit; when they are equal,
+            /// any smaller deposit is lost. It differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
             /// quotes. For a TWAP it is the slice count times the smallest deposit one
             /// slice takes, and at least a market execution's minimum.
@@ -44298,10 +44742,15 @@ pub mod __buffa {
                 self.0.reborrow().min_rate
             }
             /// Published minimum deposit, in source token units, compared with the
-            /// deposit before its network fee. A smaller deposit is returned to
-            /// return_address (DEPOSIT_BELOW_MINIMUM). It is never below the source
-            /// network's minimum
-            /// (AssetChainVariant.deposit_min_amount in the config), and differs from
+            /// deposit before its network fee. Send at least this amount. It is never
+            /// below the source network's minimum deposit
+            /// (AssetChainVariant.deposit_min_amount in the config, for
+            /// DepositInstructions.zipped_asset_id). A smaller deposit is returned to
+            /// return_address (DEPOSIT_BELOW_MINIMUM) only if it reaches the source
+            /// network's minimum deposit; a deposit below that minimum is not detected,
+            /// recorded or returned, and is lost. For a bridge, min_deposit_amount
+            /// often equals the source network's minimum deposit; when they are equal,
+            /// any smaller deposit is lost. It differs from
             /// ErrorDetail.min_deposit_amount, the smallest deposit that currently
             /// quotes. For a TWAP it is the slice count times the smallest deposit one
             /// slice takes, and at least a market execution's minimum.
@@ -45448,6 +45897,17 @@ pub mod __buffa {
             ///
             /// Field 14: `flow_id`
             pub flow_id: &'a str,
+            /// Direct return to return_address of a deposit that was never credited: a
+            /// RETURN_ONLY deposit that reached the address after its one eligible
+            /// deposit or after its funding window. On a MANUAL_RECOVERY deposit it
+            /// reports a direct return once one is recorded. Unset until a direct return
+            /// is recorded, and on every other deposit, which is returned through
+            /// withdrawals.
+            ///
+            /// Field 15: `direct_return`
+            pub direct_return: ::buffa::MessageFieldView<
+                super::super::__buffa::view::DepositReturnView<'a>,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for DepositView<'a> {
@@ -45627,6 +46087,31 @@ pub mod __buffa {
                         )?;
                         view.flow_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.direct_return.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.direct_return = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::DepositReturnView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -45683,6 +46168,14 @@ pub mod __buffa {
                         None => ::buffa::MessageField::none(),
                     },
                     flow_id: self.flow_id.to_string(),
+                    direct_return: match self.direct_return.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::DepositReturn,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -45772,6 +46265,14 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::string_encoded_len(&self.flow_id) as u32;
                 }
+                if self.direct_return.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.direct_return.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -45847,6 +46348,14 @@ pub mod __buffa {
                 }
                 if !self.flow_id.is_empty() {
                     ::buffa::types::put_string_field(14u32, &self.flow_id, buf);
+                }
+                if self.direct_return.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        15u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.direct_return.write_to(__cache, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -45944,6 +46453,14 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.flow_id) {
                     __map.serialize_entry("flowId", self.flow_id)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .direct_return
+                        .as_option()
+                    {
+                        __map.serialize_entry("directReturn", __v)?;
+                    }
                 }
                 __map.end()
             }
@@ -46150,6 +46667,22 @@ pub mod __buffa {
             pub fn flow_id(&self) -> &'_ str {
                 self.0.reborrow().flow_id
             }
+            /// Direct return to return_address of a deposit that was never credited: a
+            /// RETURN_ONLY deposit that reached the address after its one eligible
+            /// deposit or after its funding window. On a MANUAL_RECOVERY deposit it
+            /// reports a direct return once one is recorded. Unset until a direct return
+            /// is recorded, and on every other deposit, which is returned through
+            /// withdrawals.
+            ///
+            /// Field 15: `direct_return`
+            #[must_use]
+            pub fn direct_return(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::DepositReturnView<'_>,
+            > {
+                &self.0.reborrow().direct_return
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<DepositView<'static>>>
         for DepositOwnedView {
@@ -46174,6 +46707,388 @@ pub mod __buffa {
             type ViewHandle = DepositOwnedView;
         }
         impl ::serde::Serialize for DepositOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// DepositReturn is a deposit's direct return to return_address. It pays the
+        /// return address only, never the deposit's sender, in the asset and on the
+        /// network the deposit was received in.
+        #[derive(Clone, Debug, Default)]
+        pub struct DepositReturnView<'a> {
+            /// Return progress. Accept state values added later.
+            ///
+            /// Field 1: `state`
+            pub state: ::buffa::EnumValue<super::super::DepositReturnState>,
+            /// Return transaction on the deposit's network, in the network's native
+            /// text form; set once RETURN_COMPLETED.
+            ///
+            /// Field 2: `tx_hash`
+            pub tx_hash: &'a str,
+            /// When the return last changed state.
+            ///
+            /// Field 3: `updated_at`
+            pub updated_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DepositReturnView<'a> {
+            type Owned = super::super::DepositReturn;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.state = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.tx_hash = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.updated_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.updated_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DepositReturn,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DepositReturn,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DepositReturn {
+                    state: self.state,
+                    tx_hash: self.tx_hash.to_string(),
+                    updated_at: match self.updated_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DepositReturnView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.tx_hash.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.tx_hash) as u32;
+                }
+                if self.updated_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.updated_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(1u32, val, buf);
+                    }
+                }
+                if !self.tx_hash.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.tx_hash, buf);
+                }
+                if self.updated_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        3u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.updated_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DepositReturnView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.state) {
+                    __map.serialize_entry("state", &self.state)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.tx_hash) {
+                    __map.serialize_entry("txHash", self.tx_hash)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .updated_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("updatedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DepositReturnView<'a> {
+            const PACKAGE: &'static str = "swap.quickswap.v1";
+            const NAME: &'static str = "DepositReturn";
+            const FULL_NAME: &'static str = "swap.quickswap.v1.DepositReturn";
+            const TYPE_URL: &'static str = "type.googleapis.com/swap.quickswap.v1.DepositReturn";
+        }
+        ::buffa::impl_default_view_instance!(DepositReturnView);
+        ::buffa::impl_view_reborrow!(DepositReturnView);
+        /** Self-contained, `'static` owned view of a `DepositReturn` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DepositReturnView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DepositReturnView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DepositReturnOwnedView(
+            ::buffa::OwnedView<DepositReturnView<'static>>,
+        );
+        impl DepositReturnOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DepositReturnOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DepositReturnOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DepositReturn,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DepositReturnOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`DepositReturnView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DepositReturnView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DepositReturn,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Return progress. Accept state values added later.
+            ///
+            /// Field 1: `state`
+            #[must_use]
+            pub fn state(&self) -> ::buffa::EnumValue<super::super::DepositReturnState> {
+                self.0.reborrow().state
+            }
+            /// Return transaction on the deposit's network, in the network's native
+            /// text form; set once RETURN_COMPLETED.
+            ///
+            /// Field 2: `tx_hash`
+            #[must_use]
+            pub fn tx_hash(&self) -> &'_ str {
+                self.0.reborrow().tx_hash
+            }
+            /// When the return last changed state.
+            ///
+            /// Field 3: `updated_at`
+            #[must_use]
+            pub fn updated_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().updated_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<DepositReturnView<'static>>>
+        for DepositReturnOwnedView {
+            fn from(inner: ::buffa::OwnedView<DepositReturnView<'static>>) -> Self {
+                DepositReturnOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DepositReturnOwnedView>
+        for ::buffa::OwnedView<DepositReturnView<'static>> {
+            fn from(wrapper: DepositReturnOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<DepositReturnView<'static>>>
+        for DepositReturnOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<DepositReturnView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DepositReturn {
+            type View<'a> = DepositReturnView<'a>;
+            type ViewHandle = DepositReturnOwnedView;
+        }
+        impl ::serde::Serialize for DepositReturnOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -49580,8 +50495,9 @@ pub mod __buffa {
             /// and withdrawal details can be corrected as documented on Withdrawal;
             /// another deposit reaching the address also shows as RETURN_ONLY, and
             /// another deposit observed on an already retired address shows as
-            /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
-            /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+            /// MANUAL_RECOVERY. Such a deposit is returned directly, not through
+            /// withdrawals: its direct_return reports the return, and RETURN_ONLY alone
+            /// does not confirm a completed return.
             /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
             /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
             /// reports such a deposit or needs the final retirement time.
@@ -51092,8 +52008,9 @@ pub mod __buffa {
             /// and withdrawal details can be corrected as documented on Withdrawal;
             /// another deposit reaching the address also shows as RETURN_ONLY, and
             /// another deposit observed on an already retired address shows as
-            /// MANUAL_RECOVERY. Returns made directly for such deposits are not yet
-            /// reported in withdrawals; RETURN_ONLY does not confirm a completed return.
+            /// MANUAL_RECOVERY. Such a deposit is returned directly, not through
+            /// withdrawals: its direct_return reports the return, and RETURN_ONLY alone
+            /// does not confirm a completed return.
             /// An EXPIRED QuickSwap whose dropped or replaced deposit confirms after all
             /// becomes HELD (see QuickSwapStatus.EXPIRED). Read again if the end user
             /// reports such a deposit or needs the final retirement time.
@@ -107061,6 +107978,7 @@ pub mod __buffa {
         reg.register_json_any(super::__SCREENING_JSON_ANY);
         reg.register_json_any(super::__DEPOSIT_INSTRUCTIONS_JSON_ANY);
         reg.register_json_any(super::__DEPOSIT_JSON_ANY);
+        reg.register_json_any(super::__DEPOSIT_RETURN_JSON_ANY);
         reg.register_json_any(super::__EXECUTION_PROGRESS_JSON_ANY);
         reg.register_json_any(super::__EXECUTION_SLICE_JSON_ANY);
         reg.register_json_any(super::execution_slice::__SECOND_LEG_JSON_ANY);
@@ -107248,6 +108166,10 @@ pub use self::__buffa::view::DepositInstructionsOwnedView;
 pub use self::__buffa::view::DepositView;
 #[doc(inline)]
 pub use self::__buffa::view::DepositOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DepositReturnView;
+#[doc(inline)]
+pub use self::__buffa::view::DepositReturnOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ExecutionProgressView;
 #[doc(inline)]

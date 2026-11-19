@@ -483,12 +483,28 @@ pub trait OrdersService: Send + Sync + 'static {
         >,
     > + Send;
     /// Cancels all matching open orders for an account (kill switch).
-    /// Evaluates matching orders from a consistent snapshot at request start and
-    /// requests cancellation of every one, however many match. The response
-    /// lists up to 200 of them, oldest first, with the total count.
-    /// Final state is confirmed via the order update stream or read path.
-    /// It cancels orders, not triggers. Open orders that triggers placed match
-    /// like any other order and are canceled: a TWAP's working slice, a
+    /// Unless dry_run is set, what it cancels is fixed when its request_id is
+    /// first admitted: every matching order of the account admitted before
+    /// that, from any interface, and none admitted after it. An order whose create, batch
+    /// create, modify or batch replace response arrived before this request was
+    /// sent was admitted before it and is covered, including an order not yet
+    /// reported open and an order that replaced an earlier one. Requests still
+    /// in flight when this request is sent, and requests whose outcome is
+    /// unknown, have no defined order with it: an order they create may be
+    /// admitted after it and stay open. Wait for their responses before sending
+    /// the cancel-all, or send another once they are answered.
+    /// It requests cancellation of every covered order, however many match. The
+    /// response confirms admission, not completion, and lists up to 200 of them,
+    /// oldest first, with the total count. Each covered order eventually ends;
+    /// any still open when the cancellation applies is canceled. Final state is
+    /// confirmed via the order update stream or read path. A retry with the same
+    /// request_id returns the original outcome and covers no order admitted
+    /// after the original request. A rejected request, or one whose outcome is
+    /// unknown, is no barrier: orders sent before it may stay open, so retry it
+    /// or read open orders before relying on it.
+    /// By default it cancels orders, not triggers; with `include_triggers` it
+    /// also stops the account's matching triggers (see the field). Open orders
+    /// that triggers placed match like any other order and are canceled: a TWAP's working slice, a
     /// ladder's levels, the order a fired stop placed, and the working exit of
     /// an attached take-profit, stop-loss or trailing stop. The triggers
     /// themselves are not canceled, and their reserved funds stay reserved:
@@ -503,12 +519,10 @@ pub trait OrdersService: Send + Sync + 'static {
     /// the parent order itself is canceled; they end only if the parent is
     /// canceled before any fill.
     /// - A paused trigger stays paused and can be resumed.
-    /// To stop all automated trading, cancel each live trigger with
-    /// TriggersService.CancelTrigger, then cancel the orders: a trigger that
-    /// fires before its cancel places an order that the cancel-all then
-    /// cancels. TriggersService.ListTriggers with the statuses STATUS_CREATED,
-    /// STATUS_ARMED, STATUS_RUNNING and STATUS_PAUSED lists the live triggers,
-    /// attached legs included.
+    /// To stop all automated trading in one request, set `include_triggers`:
+    /// every matching trigger ends canceled with reason
+    /// TRIGGER_CANCEL_REASON_CANCEL_ALL, none places an order after the
+    /// response, and `matched_triggers` counts them.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -535,11 +549,11 @@ pub trait OrdersService: Send + Sync + 'static {
     /// Arms or disables automatic cancel-all if heartbeat is not refreshed before expiry.
     /// When the switch fires, it cancels what CancelAllOrders with the same
     /// symbol and side scope cancels: open orders, including those that
-    /// triggers placed, and no trigger. Standalone stop-loss, take-profit and
-    /// trailing stops and running TWAPs stay active and can place new orders
-    /// after it fires, and attached legs end or keep protecting the position
-    /// exactly as after CancelAllOrders. The switch does not stop them: only
-    /// TriggersService.CancelTrigger cancels a trigger.
+    /// triggers placed, and, only with `include_triggers`, the matching
+    /// triggers. Without it, standalone stop-loss, take-profit and trailing
+    /// stops and running TWAPs stay active and can place new orders after it
+    /// fires, and attached legs end or keep protecting the position exactly
+    /// as after CancelAllOrders.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2006,6 +2020,8 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// While the current state of an order in scope is temporarily unavailable, the call
     /// fails with a retryable UNAVAILABLE rather than omitting the order or returning a
     /// stale state; retry the same request.
+    /// Costs one unit of the root account's trading read limit per 100 rows the
+    /// limit asks for, rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2033,6 +2049,8 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// While the current state of an order on the page is temporarily unavailable, the call
     /// fails with a retryable UNAVAILABLE rather than returning a stale state; retry the
     /// same request.
+    /// Costs two units of the root account's trading read limit per 100 rows the
+    /// limit asks for, rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2058,6 +2076,8 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve per-user trade fills for an account.
     /// Supports exact physical-order or logical-lineage scope, an inclusive generation
     /// cutoff, and subaccount, symbol, side and time filters with cursor pagination.
+    /// Costs two units of the root account's trading read limit per 100 rows the
+    /// limit asks for, rounded up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2083,6 +2103,7 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve order state and a bounded page of its lineage executions by order or client order ID.
     /// Use GetUserTrades for paginated execution history and optional settlement legs.
     /// Recent accepted orders may wait briefly for read availability; retry UNAVAILABLE with the same lookup key.
+    /// Costs one unit of the root account's trading read limit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2108,6 +2129,7 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve the execution status of one accepted batch replacement, retained
     /// for 60 seconds from its acceptance. Retry UNAVAILABLE with the same
     /// request; NOT_FOUND means no retained batch, never a rejected replacement.
+    /// Costs one unit of the root account's trading read limit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

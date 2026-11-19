@@ -7,7 +7,7 @@ pub use super::SBE_SCHEMA_ID;
 pub use super::SBE_SCHEMA_VERSION;
 pub use super::SBE_SEMANTIC_VERSION;
 
-pub const SBE_BLOCK_LENGTH: u16 = 30;
+pub const SBE_BLOCK_LENGTH: u16 = 31;
 pub const SBE_TEMPLATE_ID: u16 = 5;
 
 pub mod encoder {
@@ -145,6 +145,21 @@ pub mod encoder {
         pub fn recv_window_ms(&mut self, value: u32) {
             let offset = self.offset + 26;
             self.get_buf_mut().put_u32_at(offset, value);
+        }
+
+        /// primitive field 'includeTriggers'
+        /// - min value: 0
+        /// - max value: 254
+        /// - null value: 0xff_u8
+        /// - characterEncoding: null
+        /// - semanticType: null
+        /// - encodedOffset: 30
+        /// - encodedLength: 1
+        /// - version: 50
+        #[inline]
+        pub fn include_triggers(&mut self, value: u8) {
+            let offset = self.offset + 30;
+            self.get_buf_mut().put_u8_at(offset, value);
         }
 
         /// GROUP ENCODER (id=8, description='Up to 100 positive trading-pair IDs; empty matches all pairs; duplicates are ignored and ordering is immaterial')
@@ -385,6 +400,16 @@ pub mod decoder {
             if value == 0x0_u32 { None } else { Some(value) }
         }
 
+        /// primitive field - 'REQUIRED'
+        #[inline]
+        pub fn include_triggers(&self) -> u8 {
+            if self.acting_version() < 50 {
+                return 0xff_u8;
+            }
+
+            self.get_buf().get_u8_at(self.offset + 30)
+        }
+
         /// GROUP DECODER (id=8, description='Up to 100 positive trading-pair IDs; empty matches all pairs; duplicates are ignored and ordering is immaterial')
         #[inline]
         pub fn symbols_decoder(self) -> SymbolsDecoder<Self> {
@@ -456,7 +481,7 @@ pub mod decoder {
             self
         }
 
-        /// group token - Token{signal=BEGIN_GROUP, name='symbols', referencedName='null', description='Up to 100 positive trading-pair IDs; empty matches all pairs; duplicates are ignored and ordering is immaterial', packageName='null', id=8, version=0, deprecated=0, encodedLength=4, offset=30, componentTokenCount=9, encoding=Encoding{presence=REQUIRED, primitiveType=null, byteOrder=LITTLE_ENDIAN, minValue=null, maxValue=null, nullValue=null, constValue=null, characterEncoding='null', epoch='null', timeUnit=null, semanticType='null'}}
+        /// group token - Token{signal=BEGIN_GROUP, name='symbols', referencedName='null', description='Up to 100 positive trading-pair IDs; empty matches all pairs; duplicates are ignored and ordering is immaterial', packageName='null', id=8, version=0, deprecated=0, encodedLength=4, offset=31, componentTokenCount=9, encoding=Encoding{presence=REQUIRED, primitiveType=null, byteOrder=LITTLE_ENDIAN, minValue=null, maxValue=null, nullValue=null, constValue=null, characterEncoding='null', epoch='null', timeUnit=null, semanticType='null'}}
         #[inline]
         pub fn parent(&mut self) -> SbeResult<P> {
             self.parent.take().ok_or(SbeErr::ParentNotSet)

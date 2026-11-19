@@ -107,7 +107,9 @@ impl HeatmapService {
     /// is `close` or `peak`. `depth` is requested as itself when it is a supported
     /// depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else as the smallest supported
     /// depth covering it, and 0 as 50; the response's `depth` names the depth
-    /// requested. A depth above 1000 is a validation error before any request.
+    /// requested, and a reply that names another tier, or none, is refused
+    /// with [`crate::Error::ResponseContract`]. A depth above 1000 is a
+    /// validation error before any request.
     pub async fn get(
         &self,
         symbol: &str,
@@ -144,6 +146,7 @@ impl HeatmapService {
         };
         use crate::errors::Error;
         use crate::proto::marketdata::v1::{GetOrderbookHeatmapRequest, HeatmapTimeRange};
+        use buffa::Enumeration as _;
         use buffa_types::google::protobuf::Timestamp;
         use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -204,6 +207,19 @@ impl HeatmapService {
         let resp = super::unary::await_public(client.get_orderbook_heatmap(req))
             .await?
             .into_owned();
+        // The reply names the depth it was read at: the tier asked for. No
+        // tier, an unknown one, 5000 (which the heatmap refuses) or another
+        // tier breaks the contract.
+        if resp.depth.as_known() != Some(depth_enum) {
+            return Err(Error::response_contract(
+                "GetOrderbookHeatmap",
+                format!(
+                    "served depth tier {} for a request at {}",
+                    crate::codecs::decode::enum_proto_name(&resp.depth),
+                    depth_enum.proto_name()
+                ),
+            ));
+        }
         Ok(api_data_from_proto(&resp))
     }
 
@@ -349,9 +365,11 @@ impl InternalTransfersService {
     /// and asset combination may appear only once (both refused by the API
     /// with `INVALID_REQUEST`). A batch counts once against the internal
     /// transfer rate limit, with a weight of `max(ceil(legs / 50), distinct
-    /// source accounts)`; one that outweighs the account's burst is refused
-    /// with `RATE_LIMIT_EXCEEDED` and no `Retry-After`: waiting does not admit
-    /// it, so split it rather than retry.
+    /// source accounts)`: size batches to stay within the account's burst
+    /// before sending, since one that outweighs it is never admitted. Like
+    /// every failure of this call, its `RATE_LIMIT_EXCEEDED` is an unknown
+    /// outcome: retry under the same key with the same legs, after
+    /// Retry-After when there is one.
     ///
     /// Refused before sending: no legs or more than 500, an idempotency key
     /// that is empty or over 128 characters, a leg without an asset ID or
@@ -359,6 +377,14 @@ impl InternalTransfersService {
     /// 18 decimals. A reply that breaks the contract is an
     /// [`crate::errors::Error::ResponseContract`]: the batch may have moved
     /// funds, so retry it with the same key.
+    ///
+    /// A `refused` batch is final for its key: fix the cause and submit under
+    /// a new key. Every failure of the call, whatever the server answered, is
+    /// an [`crate::errors::Error::Server`] with an unknown outcome
+    /// ([`crate::errors::Error::mutation_outcome_unknown`]) that this SDK does
+    /// not retry, keeping the answer's status, Retry-After and code: send the
+    /// batch again under the same idempotency key and legs, which is safe
+    /// whether or not it was admitted.
     pub async fn batch_create(
         &self,
         params: crate::models::BatchCreateInternalTransfersParams,
@@ -367,14 +393,15 @@ impl InternalTransfersService {
         let req = self.encode_batch_create(params)?;
         let requested = req.legs.len();
         let client = self.connect_client();
-        let resp = super::unary::await_auth(
-            &self.ctx.factory,
-            "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers",
-            req,
-            |req, opts| client.batch_create_internal_transfers_with_options(req, opts),
-        )
+        const PROCEDURE: &str = "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers";
+        let resp = match super::unary::try_auth(&self.ctx.factory, PROCEDURE, req, |req, opts| {
+            client.batch_create_internal_transfers_with_options(req, opts)
+        })
         .await?
-        .into_owned();
+        {
+            Ok(resp) => resp.into_owned(),
+            Err(err) => return Err(batch_create_failure(err).for_procedure(PROCEDURE)),
+        };
         internal_transfer_batch_from_proto(&resp, requested)
     }
 
@@ -1959,6 +1986,40 @@ impl RateLimitService {
         .await?
         .into_owned();
         Ok(trading_rate_limits_from_proto(&resp))
+    }
+}
+
+/// The error of a batch create the server answered with a failure: always
+/// an unknown outcome that this SDK does not retry, whatever it maps to (a
+/// rate limit, a typed refusal, an `unavailable` or a reply that breaks the
+/// contract included). It keeps the failure's code as mapped (or as the
+/// answer names it) and the answer's real status and Retry-After. The batch
+/// is only ever sent again under the same idempotency key and legs, which
+/// the contract makes safe whether or not it was admitted.
+fn batch_create_failure(err: connectrpc::ConnectError) -> crate::errors::Error {
+    use crate::errors::Error;
+    let mapped = crate::transport::Factory::map_error(err.clone());
+    let mapped_code = match &mapped {
+        Error::Api { code, .. }
+        | Error::AdmissionUnavailable { code, .. }
+        | Error::ApiKeyRejected { code, .. }
+        | Error::PermissionDenied { code, .. } => Some(code.clone()),
+        Error::RateLimit { code, .. }
+        | Error::Server { code, .. }
+        | Error::GatewayTimeout { code, .. } => code.clone(),
+        other => other.auth_error_code().map(str::to_owned),
+    };
+    let code = mapped_code
+        .filter(|code| !code.is_empty())
+        .or_else(|| crate::errors::answer_error_code(&err));
+    let answer = mapped
+        .answer()
+        .cloned()
+        .or_else(|| crate::errors::answer_meta(&err));
+    Error::Server {
+        message: mapped.to_string(),
+        code,
+        answer: answer.map(Box::new),
     }
 }
 

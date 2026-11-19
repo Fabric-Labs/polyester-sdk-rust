@@ -628,6 +628,7 @@ async fn btc_reference_candle_at_scale_8_decodes_83589() {
 async fn orderbook_level_price_decodes_from_q9() {
     let (client, _, _server) = fixture_client(|path| match path {
         "/orderbook.v1.OrderbookService/GetOrderBook" => connect_proto_ok(&GetOrderBookResponse {
+            depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_5.into(),
             book_seq: 5,
             bids: vec![PriceLevel {
                 price_ticks: ETH_2420_TICKS,

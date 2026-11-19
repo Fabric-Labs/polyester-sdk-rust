@@ -4,19 +4,57 @@ use super::money::{decode_price_ticks, decode_qty_scaled};
 use crate::errors::{Error, Result};
 use crate::models::{OrderbookData, OrderbookLevel};
 use crate::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
+use crate::proto::polyester::r#type::v1::DepthTier;
 
-/// Depths the server publishes on the delta stream. It also accepts a
-/// subscribe at any other depth, and then never sends anything on it.
+/// Depths the server publishes on the delta stream. A subscribe at any other
+/// depth is refused (Centrifugo error 107), so the SDK never subscribes there.
 pub const ORDERBOOK_STREAM_DEPTHS: [u32; 5] = [1, 20, 50, 200, 500];
 
-/// Depth per side a snapshot request with depth 0 (unset) receives.
+/// Depth per side a snapshot request with no depth tier receives.
 pub const ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH: u32 = 50;
 
-/// The depth a snapshot of `depth` levels per side reports: `depth` itself, or
-/// [`ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH`] for 0, which the server reads as unset.
-/// The largest depth the server accepts is its own setting, reported as
-/// `max_depth` in every snapshot; a deeper request is refused by the server,
-/// never truncated.
+/// The contract's depth tiers (`polyester.type.v1.DepthTier`), in levels per
+/// side, ascending. A snapshot serves every tier.
+pub const DEPTH_TIERS: [u32; 10] = [1, 5, 10, 20, 50, 100, 200, 500, 1000, 5000];
+
+/// The depth tier of exactly `levels` levels per side; `None` for a count
+/// that is no tier.
+pub fn depth_tier_for_levels(levels: u32) -> Option<DepthTier> {
+    Some(match levels {
+        1 => DepthTier::DEPTH_1,
+        5 => DepthTier::DEPTH_5,
+        10 => DepthTier::DEPTH_10,
+        20 => DepthTier::DEPTH_20,
+        50 => DepthTier::DEPTH_50,
+        100 => DepthTier::DEPTH_100,
+        200 => DepthTier::DEPTH_200,
+        500 => DepthTier::DEPTH_500,
+        1000 => DepthTier::DEPTH_1000,
+        5000 => DepthTier::DEPTH_5000,
+        _ => return None,
+    })
+}
+
+/// The levels per side of `tier`; `None` for `DEPTH_UNSPECIFIED` and a tier
+/// this SDK does not name.
+pub fn depth_tier_levels(tier: &buffa::EnumValue<DepthTier>) -> Option<u32> {
+    Some(match tier.as_known()? {
+        DepthTier::DEPTH_UNSPECIFIED => return None,
+        DepthTier::DEPTH_1 => 1,
+        DepthTier::DEPTH_5 => 5,
+        DepthTier::DEPTH_10 => 10,
+        DepthTier::DEPTH_20 => 20,
+        DepthTier::DEPTH_50 => 50,
+        DepthTier::DEPTH_100 => 100,
+        DepthTier::DEPTH_200 => 200,
+        DepthTier::DEPTH_500 => 500,
+        DepthTier::DEPTH_1000 => 1000,
+        DepthTier::DEPTH_5000 => 5000,
+    })
+}
+
+/// The depth a snapshot of `depth` levels per side asks for: `depth` itself,
+/// or [`ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH`] for 0, which sends no tier.
 pub fn orderbook_snapshot_depth(depth: u32) -> u32 {
     if depth == 0 {
         ORDERBOOK_SNAPSHOT_DEFAULT_DEPTH
@@ -88,18 +126,38 @@ pub fn levels_from_proto(
         .collect()
 }
 
+/// Decode a snapshot asked at `depth` levels per side (0 for no tier, which
+/// the server serves at 50). The contract serves every tier as asked, so a
+/// snapshot that names no tier, a tier this SDK does not know, or another
+/// tier than the one asked for is refused with `Error::ResponseContract`,
+/// never read as the depth asked for.
 pub fn orderbook_from_proto(
     msg: &GetOrderBookResponse,
     symbol: &str,
     depth: u32,
     quantity_scale: u32,
 ) -> Result<OrderbookData> {
+    let asked = orderbook_snapshot_depth(depth);
+    let served = depth_tier_levels(&msg.depth).ok_or_else(|| {
+        Error::response_contract(
+            "GetOrderBook",
+            format!(
+                "missing or unknown depth tier ({}), asked {asked}",
+                msg.depth.to_i32()
+            ),
+        )
+    })?;
+    if served != asked {
+        return Err(Error::response_contract(
+            "GetOrderBook",
+            format!("served depth tier {served}, asked {asked}"),
+        ));
+    }
     Ok(OrderbookData {
         symbol: symbol.to_owned(),
-        depth,
+        depth: served,
         book_seq: msg.book_seq.to_string(),
         book_epoch: msg.book_epoch.to_string(),
-        max_depth: msg.max_depth,
         bids: levels_from_proto(&msg.bids, symbol, quantity_scale)?,
         asks: levels_from_proto(&msg.asks, symbol, quantity_scale)?,
         available: msg.available,
@@ -146,6 +204,7 @@ mod tests {
     #[test]
     fn orderbook_maps_levels() {
         let msg = GetOrderBookResponse {
+            depth: DepthTier::DEPTH_50.into(),
             book_seq: 7,
             bids: vec![PriceLevel {
                 price_ticks: 1_000_000,
@@ -175,6 +234,7 @@ mod tests {
     fn orderbook_maps_availability() {
         let current = orderbook_from_proto(
             &GetOrderBookResponse {
+                depth: DepthTier::DEPTH_50.into(),
                 book_seq: 7,
                 available: true,
                 ..Default::default()
@@ -188,6 +248,7 @@ mod tests {
 
         let building = orderbook_from_proto(
             &GetOrderBookResponse {
+                depth: DepthTier::DEPTH_50.into(),
                 book_seq: 7,
                 available: false,
                 ..Default::default()
@@ -209,25 +270,51 @@ mod tests {
         }
     }
 
+    /// A snapshot reports the tier the server served; one that names no tier,
+    /// an unknown tier or another tier than the one asked for is refused.
     #[test]
-    fn orderbook_maps_epoch_and_max_depth() {
-        let book = orderbook_from_proto(
-            &GetOrderBookResponse {
-                book_seq: 984_321,
-                book_epoch: u64::MAX,
-                max_depth: 5000,
-                available: true,
-                ..Default::default()
-            },
-            "BTC-USDT",
-            2500,
-            8,
-        )
-        .unwrap();
+    fn orderbook_maps_epoch_and_served_tier() {
+        let served = |tier: buffa::EnumValue<DepthTier>| {
+            orderbook_from_proto(
+                &GetOrderBookResponse {
+                    book_seq: 984_321,
+                    book_epoch: u64::MAX,
+                    depth: tier,
+                    available: true,
+                    ..Default::default()
+                },
+                "BTC-USDT",
+                50,
+                8,
+            )
+        };
+        let book = served(DepthTier::DEPTH_50.into()).unwrap();
         assert_eq!(book.book_epoch, u64::MAX.to_string());
-        assert_eq!(book.max_depth, 5000);
-        assert_eq!(book.depth, 2500);
+        assert_eq!(book.depth, 50);
         assert_eq!(book.book_seq, "984321");
+        for tier in [
+            DepthTier::DEPTH_UNSPECIFIED.into(),
+            buffa::EnumValue::from(42),
+            DepthTier::DEPTH_5000.into(),
+        ] {
+            assert!(
+                matches!(served(tier), Err(Error::ResponseContract { .. })),
+                "{tier:?}"
+            );
+        }
+    }
+
+    /// Every tier maps to its level count and back; a count that is no tier
+    /// has none.
+    #[test]
+    fn depth_tiers_round_trip() {
+        for levels in DEPTH_TIERS {
+            let tier = depth_tier_for_levels(levels).expect("a tier");
+            assert_eq!(depth_tier_levels(&tier.into()), Some(levels));
+        }
+        for levels in [0, 2, 15, 21, 501, 2500, 5001, u32::MAX] {
+            assert_eq!(depth_tier_for_levels(levels), None, "{levels}");
+        }
     }
 
     fn snapshot(epoch: &str, seq: &str) -> OrderbookData {
@@ -236,7 +323,6 @@ mod tests {
             depth: 50,
             book_seq: seq.into(),
             book_epoch: epoch.into(),
-            max_depth: 5000,
             bids: vec![],
             asks: vec![],
             available: true,
@@ -325,6 +411,7 @@ mod tests {
     fn empty_orderbook_with_zero_sequence_is_success() {
         let book = orderbook_from_proto(
             &GetOrderBookResponse {
+                depth: DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 0,
                 ..Default::default()

@@ -117,7 +117,25 @@ and the message names the missing permission. A client that rewrites a
 policy's whole action list must keep the permissions it read back. Starting,
 confirming and unlinking a social verification (Telegram included) stay
 session-only.
+
+An **admin API key** (`ApiKeySummary::purpose` `"ADMIN_KEY"`) is an elevated
+key the main account's owner creates in a signed-in session; it can create,
+change and revoke the account's other API keys and attach or update its keys'
+and sub-accounts' policies by API, with the admin permissions
+`MANAGE_API_KEYS`, `MANAGE_API_KEY_POLICIES` and `MANAGE_SUBACCOUNT_POLICIES`
+on its policy (they mean nothing on any other key). It needs an IP allowlist of
+/24 (IPv4) or /48 (IPv6) or narrower, can never be allowed a money-out action,
+and can never create, promote or change an admin key. Its refusals are the
+`auth_codes::ADMIN_KEY_*` codes, all final. This SDK lists admin keys like any
+key but does not wrap the key and policy writes yet. Connecting outside apps
+(`auth.v1.ConnectedAppService`) is session-only and not wrapped either.
+
 Private streams require an Account ID and the corresponding API-key permission.
+`auth.me()` names the key's scope: `MeResult::api_key_scope` is `"SCOPE_ROOT"`
+for a main-account key and `"SCOPE_SUBACCOUNT"` for a key bound to one
+sub-account, whose ID is `MeResult::subaccount_id`.
+`MeResult::account_channel_target()` returns the account a key's private
+channels and account reads name: the bound sub-account, else `account_id`.
 A successful Centrifugo subscribe call means the token exchange and realtime
 handshake completed. The connection and subscription tokens are renewed on the
 same connection before they expire; a renewal the API or the server refuses is
@@ -1046,11 +1064,24 @@ omitted when unset. `settled_volume_quality` and `average_aop_quality` say how c
 rolling 30-day metric is (`complete`, `price_unavailable` or `incomplete_history`, with
 `incomplete_hours`); when the volume's status is `price_unavailable`, `settled_volume_30d_usd`
 is a lower bound. `policy_class` uses full protobuf enum names
-(`TRADING_RATE_LIMIT_CLASS_PLACE` / `_CANCEL`). Trading limits apply per account: the main
-account and each sub-account have their own, and every API key and session that trades for an
-account shares them. Budget against `TradingRateLimits::rules` (placement first, cancellation
-second); `api_key_rules` are informational only, since trading requests are not limited per API
-key, so adding a key does not add capacity.
+(`TRADING_RATE_LIMIT_CLASS_PLACE`, `_CANCEL` and `_READ`). Placement and cancellation limits
+apply per account: the main account and each sub-account have their own, and every API key and
+session that trades for an account shares them. The read limit belongs to the root account: the
+root account, all of its sub-accounts and every API key and session share one, also when a
+sub-account is selected. Budget against `TradingRateLimits::rules` (placement, cancellation and
+read), and select a rule by `policy_class`, not by its position or the number of rules;
+`api_key_rules` are informational only, since trading requests are not limited per API key, so
+adding a key does not add capacity.
+
+Trading reads draw on the read limit (`TRADING_READ`) shared with `orders.preview`, at a cost
+fixed by what they ask for: `orders.get_with`, `orders.get_batch_replace_status`, `triggers.get`
+and `rate_limits.get_trading_rate_limits` cost 1; `orders.list_open_with` and `triggers.list`
+1 per 100 rows of `limit`, `orders.list_history_with`, `trades.list_with` and
+`triggers.list_events` 2 per 100, rounded up, with no `limit` read as 100; `fees.get_spot_fee_rates`
+1 per 100 symbols returned. A read over the limit is the same `Error::RateLimit` an order
+placement raises, with `detail.policy_class` `TRADING_READ` and `retry_after()`; the SDK does
+not retry it, so wait before the next read. Follow orders with the private order stream rather
+than polling.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1522,8 +1553,20 @@ malformed sub-account ID is refused with the ledger code
 `ERROR_CODE_INVALID_SUBACCOUNT_ID` (11), read from `Error::Api`'s `code`.
 
 To stop all automated trading, call `client.stop_all_trading(scope)`. Cancel-all
-and the dead-man switch cancel open orders, never triggers: an unfired stop
-stays armed, a TWAP keeps running. An attached stop-loss, take-profit or
+and the dead-man switch cancel open orders only, unless asked to stop triggers
+too: by default an unfired stop stays armed, a TWAP keeps running. With
+`CancelAllOpts { include_triggers: true, .. }` (`orders.cancel_all_with`) a
+cancel-all also stops every trigger in its scope that was created before the
+request was accepted: stop-loss, take-profit, trailing stop, TWAP, ladder and
+attached legs on the matched markets whose orders trade on the side filter.
+Each ends canceled with cancel reason `cancel_all`, releases its reserved
+funds and places nothing after the response; `matched_triggers` counts them.
+`orders.cancel_all_after_with(CancelAllAfterOpts { include_triggers: true, .. })`
+arms the dead-man switch to do the same when it expires, for triggers created
+before the expiry time; every arm or refresh sets it again. A trigger that
+tried to fire while it was being stopped placed no order: its `fire_refused`
+event carries `fire_refusal_reason` `trigger_stopping`, and it then ends
+canceled `cancel_all`. Without `include_triggers`, an attached stop-loss, take-profit or
 trailing leg whose working exit order a cancel-all cancels ends, and with
 `oco` so do its siblings, so the position loses that protection.
 `stop_all_trading` pages through the live
@@ -1635,12 +1678,23 @@ SDK notes:
   and nothing will under this key: the legs that caused it carry `error_code`)
   or `processing` (it completes on its own: follow it with
   `client.internal_transfers.get_batch(&batch.request_id)`, or retry with the
-  same key and legs). A batch debits at most 10 distinct source accounts
+  same key and legs). `refused` is final for its key in every case, a leg that
+  failed its checks included: a retry with the same key and legs answers
+  `refused` again even once the leg would pass, and one with other legs is
+  refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key.
+  Every failure of the call itself is an unknown outcome
+  (`mutation_outcome_unknown()`) that the SDK does not retry, whatever the
+  server answered, keeping the answer's status, `Retry-After` and code: send
+  the batch again under the same idempotency key and legs (after
+  `retry_after()` when it is set), which is safe whether or not it was
+  admitted and answers the batch's outcome. A batch debits at most 10 distinct source accounts
   (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
   asset pairs. It counts once against the internal transfer rate limit, with a
-  weight of `max(ceil(legs / 50), distinct source accounts)`: a
-  `RATE_LIMIT_EXCEEDED` without `Retry-After` means the batch outweighs the
-  burst, so split it rather than retry.
+  weight of `max(ceil(legs / 50), distinct source accounts)`: size batches to
+  stay within the account's burst before sending, since one that outweighs it
+  is never admitted. For any ambiguous failure, a `RATE_LIMIT_EXCEEDED`
+  included, retry under the same key with the same legs, after `Retry-After`
+  when there is one.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -1660,13 +1714,22 @@ let leg = |asset_id: u32, amount: &str| -> Result<InternalTransferBatchLeg, poly
         destination_smart_account_address: Some("0x2222222222222222222222222222222222222222".into()),
     })
 };
-let batch = client
-    .internal_transfers
-    .batch_create(BatchCreateInternalTransfersParams {
-        legs: vec![leg(1, "0.5")?, leg(3, "0.001")?],
-        idempotency_key: "rebalance-2026-11-13-1".into(),
-    })
-    .await?;
+let params = BatchCreateInternalTransfersParams {
+    legs: vec![leg(1, "0.5")?, leg(3, "0.001")?],
+    idempotency_key: "rebalance-2026-11-13-1".into(),
+};
+let batch = match client.internal_transfers.batch_create(params.clone()).await {
+    Ok(batch) => batch,
+    // Unknown outcome: the same key and legs are safe to send again,
+    // admitted or not, and answer the batch's outcome.
+    Err(err) if err.mutation_outcome_unknown() => {
+        if let Some(seconds) = err.retry_after() {
+            tokio::time::sleep(std::time::Duration::from_secs_f64(seconds)).await;
+        }
+        client.internal_transfers.batch_create(params).await?
+    }
+    Err(err) => return Err(err.into()),
+};
 for leg in &batch.legs {
     println!("leg {} {} {:?}", leg.leg_index, leg.status, leg.error_code);
 }
@@ -2106,7 +2169,8 @@ prove a request was refused. Only a 401 or 403 is a refusal on its status alone 
 bare 404 stays `Error::RouteNotFound`, also with an unknown outcome. A well-formed but unrecognised
 code at HTTP 429 returns `Error::Api`: known and not retryable.
 
-A `cancel_all_with` retry with the same `request_id` within 120 seconds returns the original
+A `cancel_all_with` retry with the same `request_id` (and the same criteria,
+`include_triggers` included) within 120 seconds returns the original
 counts with an empty `cancelled_orders` and `listing_status` `not_retained_read_open_orders`.
 An empty retried list does not mean nothing was canceled: read open orders for current state.
 
@@ -2128,8 +2192,13 @@ A request body over an endpoint's size limit is refused with HTTP 413 and the pr
 `REQUEST_TOO_LARGE` on every service, before the request is authenticated. It is an `Error::Api`
 with code `problem_codes::REQUEST_TOO_LARGE` and the problem in `http_problem()`;
 `Error::is_request_too_large()` reports it. Nothing changed and the same body is refused again:
-reduce it to fit the limit. A ConnectRPC message over the limit once decoded keeps its Connect
-`resource_exhausted` answer and maps as before.
+reduce it to fit the limit. Over ConnectRPC the same refusal is `resource_exhausted` with a
+`polyester.api.v1.RequestErrorDetail` of code `REQUEST_TOO_LARGE`: the SDK maps it to the same
+`Error::Api`, final and never retried (not a rate limit), and `Error::request_limit_bytes()`
+returns the limit it names (`None` on REST, which names none). Only that typed detail makes a
+`resource_exhausted` a size refusal: without it, one stays an `Error::RateLimit`, whatever its
+message says. A typed refusal that names no limit breaks the contract and is an
+`Error::ResponseContract`.
 
 Preview and batch rejections expose the same
 payload on `OrderErrorDetail.rate_limit` / batch item `rate_limit`. That error payload is
@@ -2540,6 +2609,14 @@ good-till-cancelled limit orders.
   a disarm closes the gate at once and writing a refresh bounds it by its own
   timeout, before their answers arrive. A new connection starts with the gate
   closed, so arm again after every `Event::Ready`.
+- **Stopping triggers too.** `CancelAllOrders::with_triggers()` (or
+  `include_triggers: true`) also stops the account's waiting stop-loss,
+  take-profit, trailing-stop, TWAP, ladder and attached legs in the request's
+  scope; each ends canceled with reason `cancel_all`, and the acknowledgement's
+  `matched_triggers` counts them. `TradeSession::cancel_all_after_with` with
+  `CancelAllAfterOptions::with_triggers()` does the same when the timer
+  expires: set it on every arm and refresh. Without it, only orders are
+  canceled and triggers keep running, as before.
 - **Commands.** `create_order`, `cancel_order`, `modify_order` (amend or
   replace, `ModifyBehavior`), `cancel_all_orders`, `batch_create_orders` (up to
   20), `batch_replace_orders` (up to 50 on one pair) and `batch_cancel_orders`
@@ -2821,12 +2898,13 @@ if let Some(snapshot) = book.updates().recv().await {
 # }
 ```
 
-`orderbook.get` takes any level count per side from 1 to the `max_depth` every
-snapshot reports (5,000 levels by default) and sends it as given; `None` or
-`Some(0)` asks for the default of 50, and the result's `depth` is the depth
-requested, 50 for the default. A depth above `max_depth` is refused by the server
-with `invalid_argument` (`Error::Api` with code `InvalidArgument`), never
-truncated: ask for at most `max_depth`. A snapshot also carries `book_epoch`, the
+`orderbook.get` takes one of the contract's depth tiers, 1, 5, 10, 20, 50, 100,
+200, 500, 1000 or 5000 levels per side
+(`polyester::codecs::decode::DEPTH_TIERS`), and sends it as that tier; `None`
+asks for the default of 50. Any other count, `Some(0)` included, is
+`Error::Validation` before sending: round it up to the next tier and trim the
+result yourself. The result's `depth` is the tier the server served. A
+snapshot also carries `book_epoch`, the
 epoch of its `book_seq`: order snapshots by `(book_epoch, book_seq)` with
 `polyester::codecs::decode::compare_snapshots`, since a new epoch may restart
 `book_seq`, and keep only the newest. A snapshot is a frozen view at its own
@@ -2836,8 +2914,8 @@ position: never apply stream updates to it, and fetch it again to refresh it.
 # async fn example(client: polyester::Client) -> polyester::Result<()> {
 use polyester::codecs::decode::compare_snapshots;
 
-let first = client.orderbook.get("BTC-USDT", Some(2500)).await?;
-let again = client.orderbook.get("BTC-USDT", Some(first.max_depth)).await?;
+let first = client.orderbook.get("BTC-USDT", Some(1000)).await?;
+let again = client.orderbook.get("BTC-USDT", Some(first.depth)).await?;
 let newest = if compare_snapshots(&again, &first)?.is_ge() { again } else { first };
 println!("epoch {} seq {}", newest.book_epoch, newest.book_seq);
 # Ok(())
@@ -2845,9 +2923,11 @@ println!("epoch {} seq {}", newest.book_epoch, newest.book_seq);
 ```
 
 The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
-(`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
-subscribe at any other depth and then sends nothing on it, so the SDK does not
-subscribe there:
+(`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server refuses a
+subscribe at any other depth (Centrifugo error 107), so the SDK does not subscribe
+there. A managed book stitches its stream only onto a snapshot of exactly the tier
+it rides: a snapshot of another tier, or of none, fails the subscription with
+`Error::ResponseContract`:
 
 - `orderbook.create_subscription` with `depth: Some(10)` takes any depth from 1 to
   500. It rides the smallest published depth that covers it, 20 here, with its
@@ -2859,8 +2939,7 @@ subscribe there:
   connecting, and `set_bucket` returns it and keeps the current bucket. A depth above
   500, or `Some(0)`, is `Error::Validation` before connecting; for more than 500
   levels, read a snapshot with `orderbook.get`. A managed view is not a snapshot:
-  its `book_epoch` is empty and its `max_depth` 0, since the stream carries no
-  epoch.
+  its `book_epoch` is empty, since the stream carries no epoch.
 - `orderbook.subscribe_deltas` delivers raw deltas, which can't be trimmed, so it takes
   only a published depth and returns `Error::Validation` for any other.
 

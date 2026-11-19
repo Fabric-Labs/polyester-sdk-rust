@@ -71,6 +71,8 @@ auth.v1.BeginMFAChallengeResponse.challenge_id	required
 auth.v1.BeginPasskeyEnrollmentResponse.enrollment_id	required	
 auth.v1.BeginTOTPEnrollmentResponse.enrollment_id	required	
 auth.v1.ClaimFreshStepUpResponse.step_up_id	required	
+auth.v1.ConnectedApp.connected_app_id	required	
+auth.v1.ConnectedAppClient.client_id	required	
 auth.v1.CreateSubaccountChallengeResponse.polyester_chain_id	not_required	reference to a chain
 auth.v1.CreateSubaccountResponse.subaccount_id	required	
 auth.v1.ExternalAddressBookEntry.address_book_entry_id	required	
@@ -94,9 +96,12 @@ auth.v1.LoginWithWalletResponse.account_id	required
 auth.v1.MFAFactor.factor_id	required	
 auth.v1.MeResponse.account_id	required	
 auth.v1.MeResponse.api_key_id	not_required	optional reference; 0 or empty means none
+auth.v1.MeResponse.subaccount_id	not_required	set only for a sub-account key, where the decoder requires it
 auth.v1.MirroredWithdrawWhitelistEntry.polychain_chain_id	not_required	reference to a chain
 auth.v1.ResolvedAccount.account_id	required	
 auth.v1.SessionInfo.session_id	required	
+auth.v1.SetApiKeyPolicyResponse.policy_id	not_required	the policy attached; 0 when the policy was cleared
+auth.v1.SetSubaccountPolicyResponse.policy_id	not_required	the policy attached; 0 when the policy was cleared
 auth.v1.SocialVerification.id	not_required	an API-key read returns only the link status; every other field, id included, is empty by contract
 auth.v1.SocialVerification.provider_user_id	not_required	reference to another object; 0 or empty when none
 auth.v1.SpotMarketRule.symbol_id	not_required	reference to a market
@@ -194,6 +199,10 @@ marketdata.v1.PairConfig.symbol_id	not_required	reference to a market
 marketdata.v1.TradeEpochEnd.last_trade_id	not_required	sequence position; (epoch-1) * 2^40 when the epoch had no trades
 marketoverview.v1.MarketOverview.symbol_id	not_required	reference to a market
 marketoverview.v1.SpotPairVolumeSeries.symbol_id	not_required	reference to a market
+notifications.v1.AdminKeyActionNotice.admin_key_id	required	
+notifications.v1.AdminKeyActionNotice.key_id	not_required	optional reference; 0 or empty means none
+notifications.v1.AdminKeyActionNotice.policy_id	not_required	optional reference; 0 or empty means none
+notifications.v1.AdminKeyActionNotice.subaccount_id	not_required	reference to an account; 0 or empty where the contract allows
 notifications.v1.BrokerAllowlistNotice.change_id	not_required	reference to another object; 0 or empty when none
 notifications.v1.BrokerAllowlistNotice.destination_chain_id	not_required	reference to a chain
 notifications.v1.BrokerAllowlistNotice.requested_by_account_id	not_required	reference to an account; 0 or empty where the contract allows

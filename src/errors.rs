@@ -17,6 +17,7 @@ use crate::proto::ledger::read::v1::{
     ErrorCode as LedgerErrorCode, ErrorDetail as LedgerErrorDetail,
 };
 use crate::proto::orders::v1::{ErrorCode as OrderErrorCode, ErrorDetail as OrderErrorDetail};
+use crate::proto::polyester::api::v1::{RequestErrorCode, RequestErrorDetail};
 use crate::proto::polyester::ratelimit::v1::RateLimitDetail as ProtoRateLimitDetail;
 use crate::proto::transfer::v1::{
     ErrorCode as TransferErrorCode, ErrorDetail as TransferErrorDetail,
@@ -509,6 +510,33 @@ pub mod auth_codes {
     /// again. Log in with the account address the wallet already uses; see
     /// [`super::Error::is_wallet_already_linked`].
     pub const WALLET_ALREADY_LINKED: &str = "AUTH_WALLET_ALREADY_LINKED";
+    /// The call accepts an API key only when it is an admin key, and the key
+    /// that signed it is not one (HTTP 403). Final.
+    pub const ADMIN_KEY_REQUIRED: &str = "AUTH_ADMIN_KEY_REQUIRED";
+    /// An API key tried to create, promote or change an admin key, or attach
+    /// an admin permission (`MANAGE_*`); only the main account's owner may,
+    /// in a signed-in session with a fresh step-up proof (HTTP 403). Final.
+    pub const ADMIN_KEY_ESCALATION_DENIED: &str = "AUTH_ADMIN_KEY_ESCALATION_DENIED";
+    /// An admin key's change would give a key more than the admin key's own
+    /// scope: an IP allowlist entry outside its allowlist, or more actions or
+    /// markets on a sub-account key than the sub-account's policy (HTTP 403).
+    /// Final.
+    pub const ADMIN_KEY_SCOPE_EXCEEDED: &str = "AUTH_ADMIN_KEY_SCOPE_EXCEEDED";
+    /// An admin key can never reach this target: an assistant key, a key or
+    /// policy that allows a money-out action, a locked sub-account policy, or
+    /// a sub-account the main account does not own (HTTP 403). Final.
+    pub const ADMIN_KEY_FORBIDDEN_TARGET: &str = "AUTH_ADMIN_KEY_FORBIDDEN_TARGET";
+    /// An admin key's IP allowlist is empty or has an entry broader than /24
+    /// (IPv4) or /48 (IPv6), or an IPv4-mapped IPv6 entry (HTTP 400). Final.
+    pub const ADMIN_KEY_ALLOWLIST_INVALID: &str = "AUTH_ADMIN_KEY_ALLOWLIST_INVALID";
+    /// An admin key's policy can never allow an action that moves value out
+    /// of the account or manages where it goes (`EXTERNAL_WITHDRAW`,
+    /// `INTERNAL_TRANSFER`, `MANAGE_ADDRESS_BOOK`, `MANAGE_AUTO_WITHDRAW`)
+    /// (HTTP 412). Final.
+    pub const ADMIN_KEY_ACTION_NOT_ALLOWED: &str = "AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED";
+    /// The account already has the most connected apps it may have (20);
+    /// disconnect one before connecting another (`failed_precondition`).
+    pub const CONNECTED_APP_LIMIT_REACHED: &str = "AUTH_CONNECTED_APP_LIMIT_REACHED";
 
     /// The `auth.v1.AuthErrorCode` of a REST problem `code` or an API-gateway
     /// rejection code: the code with the `AUTH_` prefix added
@@ -759,6 +787,8 @@ const LEVEL_INDEX_METADATA: &str = "level_index";
 /// [`Error::Api`] metadata key holding [`Error::retry_at`], as
 /// `<unix seconds>.<nanoseconds>`.
 const AUTH_RETRY_AFTER_METADATA: &str = "auth_retry_after";
+/// The size limit, in bytes, a `REQUEST_TOO_LARGE` refusal names.
+const REQUEST_LIMIT_BYTES_METADATA: &str = "request_limit_bytes";
 
 /// A `Timestamp` at or after the epoch as `<unix seconds>.<nanoseconds>`.
 fn timestamp_metadata(at: &buffa_types::google::protobuf::Timestamp) -> Option<String> {
@@ -1620,11 +1650,26 @@ impl Error {
         self.auth_error_code() == Some(order_codes::TRIGGER_STATUS_INVALID)
     }
 
-    /// True when a request body over the endpoint's size limit was refused
-    /// ([`problem_codes::REQUEST_TOO_LARGE`], HTTP 413). Nothing changed;
-    /// reduce the body to fit the limit.
+    /// True when a request over the endpoint's size limit was refused
+    /// ([`problem_codes::REQUEST_TOO_LARGE`]): REST HTTP 413, or ConnectRPC
+    /// `resource_exhausted` with a `polyester.api.v1.RequestErrorDetail`
+    /// naming it. Nothing changed, and the same request is refused again:
+    /// reduce it to fit the limit ([`Self::request_limit_bytes`]). Never
+    /// retried, and never a rate limit.
     pub fn is_request_too_large(&self) -> bool {
         matches!(self, Self::Api { code, .. } if code == problem_codes::REQUEST_TOO_LARGE)
+    }
+
+    /// With [`Self::is_request_too_large`]: the size limit the request is
+    /// over, in bytes, as the ConnectRPC refusal's `limit_bytes` names it;
+    /// `None` when the refusal names none, as a REST 413 does not.
+    pub fn request_limit_bytes(&self) -> Option<u64> {
+        if !self.is_request_too_large() {
+            return None;
+        }
+        self.api_metadata(REQUEST_LIMIT_BYTES_METADATA)?
+            .parse()
+            .ok()
     }
 
     /// True when the request's `X-API-RECV-WINDOW` header was refused
@@ -1849,6 +1894,46 @@ fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
     AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
+/// The HTTP answer behind `err`: its real status, as the transport recorded
+/// it, and the delay it asked for. `None` when the transport saw no answer.
+pub(crate) fn answer_meta(err: &ConnectError) -> Option<AnswerMeta> {
+    err.response_headers()
+        .get(crate::transport::ANSWER_STATUS_HEADER)
+        .and_then(|value| value.to_str().ok()?.parse::<u16>().ok())
+        .map(|status| AnswerMeta {
+            status,
+            retry_after: retry_after_seconds(err),
+        })
+}
+
+/// The structured code a failed answer names: the first typed service
+/// detail's code (auth, orders, transfer, withdraw, ledger or alerts), else a
+/// REST problem's own `code`. `None` when it names none.
+pub(crate) fn answer_error_code(err: &ConnectError) -> Option<String> {
+    fn label<T: Enumeration>(code: &buffa::EnumValue<T>) -> Option<String> {
+        (code.to_i32() != 0)
+            .then(|| known_or_unknown_code(code.as_known().map(|c| c.proto_name()), code.to_i32()))
+    }
+    err.details
+        .iter()
+        .find_map(|detail| {
+            decode_auth_error_detail(detail)
+                .and_then(|d| label(&d.code))
+                .or_else(|| decode_order_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_transfer_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_withdraw_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_ledger_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_alert_error_detail(detail).and_then(|d| label(&d.code)))
+        })
+        .or_else(|| {
+            err.details
+                .iter()
+                .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
+                .and_then(|d| d.debug.as_ref()?.get("code")?.as_str().map(str::to_owned))
+                .filter(|code| !code.is_empty())
+        })
+}
+
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
     if !detail.type_url.ends_with("transfer.v1.ErrorDetail") {
         return None;
@@ -1869,6 +1954,17 @@ fn is_auth_like_error_code(code: &str) -> bool {
         || code.contains("API_KEY")
         || code.contains("WALLET_BINDING")
         || code.contains("POLICY")
+}
+
+/// The request-size detail, read only under its exact type name: bare, as
+/// the Connect protocol sends it, or as the standard `Any` type URL.
+fn decode_request_error_detail(detail: &ErrorDetail) -> Option<RequestErrorDetail> {
+    const NAME: &str = "polyester.api.v1.RequestErrorDetail";
+    let url = detail.type_url.as_str();
+    if url != NAME && url.strip_prefix("type.googleapis.com/") != Some(NAME) {
+        return None;
+    }
+    RequestErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
 fn decode_rate_limit_detail(detail: &ErrorDetail) -> Option<ProtoRateLimitDetail> {
@@ -2069,14 +2165,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     // The status is the answer's own, recorded by the transport, never one
     // inferred from the error's code; an error the transport saw no answer
     // for, such as a refused connection, has none.
-    let answer = err
-        .response_headers()
-        .get(crate::transport::ANSWER_STATUS_HEADER)
-        .and_then(|value| value.to_str().ok()?.parse::<u16>().ok())
-        .map(|status| AnswerMeta {
-            status,
-            retry_after: retry_after_seconds(&err),
-        });
+    let answer = answer_meta(&err);
     // The window a skew refusal states: an `auth.v1.AuthErrorDetail`'s
     // typed window, whichever path names the refusal (its detail code, or
     // the code in the message as the gateway answers it), or a REST
@@ -2224,6 +2313,34 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
                 message: fallback_message,
                 answer: None,
             }
+        };
+    }
+    // A request every API refuses alike for its size, before reading it:
+    // `resource_exhausted` like a rate limit, but only this typed detail
+    // tells them apart, and waiting does not help. Without the detail,
+    // `resource_exhausted` stays a rate limit.
+    if let Some(too_large) = err.details.iter().find_map(|detail| {
+        decode_request_error_detail(detail)
+            .filter(|d| d.code.as_known() == Some(RequestErrorCode::REQUEST_TOO_LARGE))
+    }) {
+        // The contract sets the limit for this code: a refusal without it is
+        // malformed, and fails closed rather than reading as a plain final
+        // size refusal.
+        if too_large.limit_bytes == 0 {
+            return Error::response_contract(
+                "polyester.api.v1.RequestErrorDetail",
+                "REQUEST_TOO_LARGE without limit_bytes",
+            );
+        }
+        return Error::Api {
+            message: fallback_message,
+            code: problem_codes::REQUEST_TOO_LARGE.to_owned(),
+            metadata: vec![(
+                REQUEST_LIMIT_BYTES_METADATA.to_owned(),
+                too_large.limit_bytes.to_string(),
+            )],
+            violations: Vec::new(),
+            answer: None,
         };
     }
     if raw_message == auth_codes::TIMESTAMP_SKEW {
@@ -2586,15 +2703,19 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
     }
-    let named_code = err
+    let problem_code = err
         .details
         .iter()
         .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
         .and_then(|d| d.debug.as_ref())
         .and_then(|d| d.get("code"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or(raw_message);
-    let named_code = if is_placeholder_code(named_code) {
+        .and_then(serde_json::Value::as_str);
+    let named_code = problem_code.unwrap_or(raw_message);
+    // The size refusal is read from its typed detail (above) or a REST
+    // problem's own code, never from message text alone.
+    let untyped_size_text =
+        named_code == problem_codes::REQUEST_TOO_LARGE && problem_code != Some(named_code);
+    let named_code = if is_placeholder_code(named_code) || untyped_size_text {
         ""
     } else {
         named_code
@@ -2663,7 +2784,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         },
         _ => Error::Api {
             message,
-            code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) {
+            code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) && !untyped_size_text {
                 error_code_from_name(named_code)
             } else {
                 format!("{code:?}")
@@ -2950,6 +3071,70 @@ mod tests {
             assert!(!matches!(mapped, Error::Auth { .. }));
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
             assert!(mapped.mutation_outcome_unknown());
+        }
+    }
+
+    /// A REST problem names the size refusal only by its own `code`: one
+    /// without a code whose message text reads `REQUEST_TOO_LARGE` is not one.
+    #[test]
+    fn only_a_problem_code_names_the_rest_size_refusal() {
+        let problem = |debug: serde_json::Value| ErrorDetail {
+            type_url: crate::transport::HTTP_PROBLEM_TYPE.into(),
+            value: None,
+            debug: Some(debug),
+        };
+        for code in [ErrorCode::ResourceExhausted, ErrorCode::InvalidArgument] {
+            let err = map_connect_error(
+                ConnectError::new(code, "REQUEST_TOO_LARGE")
+                    .with_detail(problem(serde_json::json!({"status": 413}))),
+            );
+            assert!(!err.is_request_too_large(), "{code:?}: {err:?}");
+        }
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::InvalidArgument, "request too large").with_detail(
+                problem(serde_json::json!({"status": 413, "code": "REQUEST_TOO_LARGE"})),
+            ),
+        );
+        assert!(err.is_request_too_large(), "{err:?}");
+    }
+
+    #[test]
+    fn admin_key_and_connected_app_codes_are_the_contract_names() {
+        for (constant, code) in [
+            (
+                auth_codes::ADMIN_KEY_REQUIRED,
+                AuthErrorCode::AUTH_ADMIN_KEY_REQUIRED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ESCALATION_DENIED,
+                AuthErrorCode::AUTH_ADMIN_KEY_ESCALATION_DENIED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_SCOPE_EXCEEDED,
+                AuthErrorCode::AUTH_ADMIN_KEY_SCOPE_EXCEEDED,
+            ),
+            (
+                auth_codes::ADMIN_KEY_FORBIDDEN_TARGET,
+                AuthErrorCode::AUTH_ADMIN_KEY_FORBIDDEN_TARGET,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ALLOWLIST_INVALID,
+                AuthErrorCode::AUTH_ADMIN_KEY_ALLOWLIST_INVALID,
+            ),
+            (
+                auth_codes::ADMIN_KEY_ACTION_NOT_ALLOWED,
+                AuthErrorCode::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED,
+            ),
+            (
+                auth_codes::CONNECTED_APP_LIMIT_REACHED,
+                AuthErrorCode::AUTH_CONNECTED_APP_LIMIT_REACHED,
+            ),
+        ] {
+            assert_eq!(constant, code.proto_name());
+            assert_eq!(auth_codes::from_rest_code(constant), Some(code));
+            let err = map_auth(code, "refused");
+            assert_eq!(err.auth_error_code(), Some(constant), "{err:?}");
+            assert!(!err.is_retryable(), "{err:?}");
         }
     }
 

@@ -177,6 +177,11 @@ pub enum NotificationType {
     /// detail telegram_link. The linked Telegram account also receives it. If the
     /// caller did not link it, unlink it and review the account's sessions.
     TELEGRAM_LINKED = 4i32,
+    /// An admin API key of the caller's main account created, changed or
+    /// revoked an API key, or changed an API key or sub-account policy.
+    /// Category SECURITY; detail admin_key_action. If nobody on the account
+    /// made the change, revoke the admin key and review the account's API keys.
+    ADMIN_KEY_ACTION = 5i32,
 }
 impl NotificationType {
     ///Idiomatic alias for [`Self::TYPE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -194,6 +199,9 @@ impl NotificationType {
     ///Idiomatic alias for [`Self::TELEGRAM_LINKED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const TelegramLinked: Self = Self::TELEGRAM_LINKED;
+    ///Idiomatic alias for [`Self::ADMIN_KEY_ACTION`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AdminKeyAction: Self = Self::ADMIN_KEY_ACTION;
 }
 impl ::core::default::Default for NotificationType {
     fn default() -> Self {
@@ -296,6 +304,7 @@ impl ::buffa::Enumeration for NotificationType {
             2i32 => ::core::option::Option::Some(Self::TELEGRAM_APPROVAL),
             3i32 => ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE),
             4i32 => ::core::option::Option::Some(Self::TELEGRAM_LINKED),
+            5i32 => ::core::option::Option::Some(Self::ADMIN_KEY_ACTION),
             _ => ::core::option::Option::None,
         }
     }
@@ -309,6 +318,7 @@ impl ::buffa::Enumeration for NotificationType {
             Self::TELEGRAM_APPROVAL => "TELEGRAM_APPROVAL",
             Self::BROKER_ALLOWLIST_CHANGE => "BROKER_ALLOWLIST_CHANGE",
             Self::TELEGRAM_LINKED => "TELEGRAM_LINKED",
+            Self::ADMIN_KEY_ACTION => "ADMIN_KEY_ACTION",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -320,6 +330,7 @@ impl ::buffa::Enumeration for NotificationType {
                 ::core::option::Option::Some(Self::BROKER_ALLOWLIST_CHANGE)
             }
             "TELEGRAM_LINKED" => ::core::option::Option::Some(Self::TELEGRAM_LINKED),
+            "ADMIN_KEY_ACTION" => ::core::option::Option::Some(Self::ADMIN_KEY_ACTION),
             _ => ::core::option::Option::None,
         }
     }
@@ -330,6 +341,7 @@ impl ::buffa::Enumeration for NotificationType {
             Self::TELEGRAM_APPROVAL,
             Self::BROKER_ALLOWLIST_CHANGE,
             Self::TELEGRAM_LINKED,
+            Self::ADMIN_KEY_ACTION,
         ]
     }
 }
@@ -653,6 +665,9 @@ pub enum TelegramApprovalAction {
     RESUME_TRIGGER = 8i32,
     /// Swap between assets within the trading account.
     SWAP = 9i32,
+    /// Convert dust, balances too small to trade, into one asset within the
+    /// trading account.
+    CONVERT_DUST = 10i32,
 }
 impl TelegramApprovalAction {
     ///Idiomatic alias for [`Self::ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -685,6 +700,9 @@ impl TelegramApprovalAction {
     ///Idiomatic alias for [`Self::SWAP`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Swap: Self = Self::SWAP;
+    ///Idiomatic alias for [`Self::CONVERT_DUST`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ConvertDust: Self = Self::CONVERT_DUST;
 }
 impl ::core::default::Default for TelegramApprovalAction {
     fn default() -> Self {
@@ -793,6 +811,7 @@ impl ::buffa::Enumeration for TelegramApprovalAction {
             7i32 => ::core::option::Option::Some(Self::PAUSE_TRIGGER),
             8i32 => ::core::option::Option::Some(Self::RESUME_TRIGGER),
             9i32 => ::core::option::Option::Some(Self::SWAP),
+            10i32 => ::core::option::Option::Some(Self::CONVERT_DUST),
             _ => ::core::option::Option::None,
         }
     }
@@ -811,6 +830,7 @@ impl ::buffa::Enumeration for TelegramApprovalAction {
             Self::PAUSE_TRIGGER => "PAUSE_TRIGGER",
             Self::RESUME_TRIGGER => "RESUME_TRIGGER",
             Self::SWAP => "SWAP",
+            Self::CONVERT_DUST => "CONVERT_DUST",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -827,6 +847,7 @@ impl ::buffa::Enumeration for TelegramApprovalAction {
             "PAUSE_TRIGGER" => ::core::option::Option::Some(Self::PAUSE_TRIGGER),
             "RESUME_TRIGGER" => ::core::option::Option::Some(Self::RESUME_TRIGGER),
             "SWAP" => ::core::option::Option::Some(Self::SWAP),
+            "CONVERT_DUST" => ::core::option::Option::Some(Self::CONVERT_DUST),
             _ => ::core::option::Option::None,
         }
     }
@@ -842,6 +863,7 @@ impl ::buffa::Enumeration for TelegramApprovalAction {
             Self::PAUSE_TRIGGER,
             Self::RESUME_TRIGGER,
             Self::SWAP,
+            Self::CONVERT_DUST,
         ]
     }
 }
@@ -1173,6 +1195,200 @@ impl ::buffa::Enumeration for BrokerAllowlistAction {
         ]
     }
 }
+/// AdminKeyAction is what an admin API key changed.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum AdminKeyAction {
+    /// Not set. Never returned.
+    ADMIN_KEY_ACTION_UNSPECIFIED = 0i32,
+    /// Created an API key (CreateApiKey).
+    CREATE_API_KEY = 1i32,
+    /// Updated an API key (UpdateApiKey).
+    UPDATE_API_KEY = 2i32,
+    /// Revoked an API key (DeleteApiKey).
+    DELETE_API_KEY = 3i32,
+    /// Attached or cleared an API key's policy (SetApiKeyPolicy).
+    SET_API_KEY_POLICY = 4i32,
+    /// Attached or cleared a sub-account's policy (SetSubaccountPolicy).
+    SET_SUBACCOUNT_POLICY = 5i32,
+    /// Updated a sub-account policy (UpdateSubaccountPolicy).
+    UPDATE_SUBACCOUNT_POLICY = 6i32,
+}
+impl AdminKeyAction {
+    ///Idiomatic alias for [`Self::ADMIN_KEY_ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AdminKeyActionUnspecified: Self = Self::ADMIN_KEY_ACTION_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::CREATE_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CreateApiKey: Self = Self::CREATE_API_KEY;
+    ///Idiomatic alias for [`Self::UPDATE_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UpdateApiKey: Self = Self::UPDATE_API_KEY;
+    ///Idiomatic alias for [`Self::DELETE_API_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DeleteApiKey: Self = Self::DELETE_API_KEY;
+    ///Idiomatic alias for [`Self::SET_API_KEY_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SetApiKeyPolicy: Self = Self::SET_API_KEY_POLICY;
+    ///Idiomatic alias for [`Self::SET_SUBACCOUNT_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const SetSubaccountPolicy: Self = Self::SET_SUBACCOUNT_POLICY;
+    ///Idiomatic alias for [`Self::UPDATE_SUBACCOUNT_POLICY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const UpdateSubaccountPolicy: Self = Self::UPDATE_SUBACCOUNT_POLICY;
+}
+impl ::core::default::Default for AdminKeyAction {
+    fn default() -> Self {
+        Self::ADMIN_KEY_ACTION_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for AdminKeyAction {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for AdminKeyAction {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = AdminKeyAction;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(AdminKeyAction)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<AdminKeyAction, E> {
+                <AdminKeyAction as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<AdminKeyAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AdminKeyAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<AdminKeyAction, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <AdminKeyAction as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<AdminKeyAction, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AdminKeyAction {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for AdminKeyAction {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::ADMIN_KEY_ACTION_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::CREATE_API_KEY),
+            2i32 => ::core::option::Option::Some(Self::UPDATE_API_KEY),
+            3i32 => ::core::option::Option::Some(Self::DELETE_API_KEY),
+            4i32 => ::core::option::Option::Some(Self::SET_API_KEY_POLICY),
+            5i32 => ::core::option::Option::Some(Self::SET_SUBACCOUNT_POLICY),
+            6i32 => ::core::option::Option::Some(Self::UPDATE_SUBACCOUNT_POLICY),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::ADMIN_KEY_ACTION_UNSPECIFIED => "ADMIN_KEY_ACTION_UNSPECIFIED",
+            Self::CREATE_API_KEY => "CREATE_API_KEY",
+            Self::UPDATE_API_KEY => "UPDATE_API_KEY",
+            Self::DELETE_API_KEY => "DELETE_API_KEY",
+            Self::SET_API_KEY_POLICY => "SET_API_KEY_POLICY",
+            Self::SET_SUBACCOUNT_POLICY => "SET_SUBACCOUNT_POLICY",
+            Self::UPDATE_SUBACCOUNT_POLICY => "UPDATE_SUBACCOUNT_POLICY",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "ADMIN_KEY_ACTION_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::ADMIN_KEY_ACTION_UNSPECIFIED)
+            }
+            "CREATE_API_KEY" => ::core::option::Option::Some(Self::CREATE_API_KEY),
+            "UPDATE_API_KEY" => ::core::option::Option::Some(Self::UPDATE_API_KEY),
+            "DELETE_API_KEY" => ::core::option::Option::Some(Self::DELETE_API_KEY),
+            "SET_API_KEY_POLICY" => {
+                ::core::option::Option::Some(Self::SET_API_KEY_POLICY)
+            }
+            "SET_SUBACCOUNT_POLICY" => {
+                ::core::option::Option::Some(Self::SET_SUBACCOUNT_POLICY)
+            }
+            "UPDATE_SUBACCOUNT_POLICY" => {
+                ::core::option::Option::Some(Self::UPDATE_SUBACCOUNT_POLICY)
+            }
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::ADMIN_KEY_ACTION_UNSPECIFIED,
+            Self::CREATE_API_KEY,
+            Self::UPDATE_API_KEY,
+            Self::DELETE_API_KEY,
+            Self::SET_API_KEY_POLICY,
+            Self::SET_SUBACCOUNT_POLICY,
+            Self::UPDATE_SUBACCOUNT_POLICY,
+        ]
+    }
+}
 /// ErrorDetail is attached to Notification API errors as an error detail of
 /// type notifications.v1.ErrorDetail.
 #[derive(Clone, PartialEq, Default)]
@@ -1492,6 +1708,14 @@ impl ::buffa::Message for Notification {
                         += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                             + inner;
                 }
+                __buffa::oneof::notification::Detail::AdminKeyAction(x) => {
+                    let __slot = __cache.reserve();
+                    let inner = x.compute_size(__cache);
+                    __cache.set(__slot, inner);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                            + inner;
+                }
             }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -1562,6 +1786,14 @@ impl ::buffa::Message for Notification {
                 __buffa::oneof::notification::Detail::TelegramLink(x) => {
                     ::buffa::types::put_len_delimited_header(
                         13u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    x.write_to(__cache, buf);
+                }
+                __buffa::oneof::notification::Detail::AdminKeyAction(x) => {
+                    ::buffa::types::put_len_delimited_header(
+                        14u32,
                         __cache.consume_next(),
                         buf,
                     );
@@ -1722,6 +1954,28 @@ impl ::buffa::Message for Notification {
                     ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
                     self.detail = ::core::option::Option::Some(
                         __buffa::oneof::notification::Detail::TelegramLink(
+                            ::buffa::alloc::boxed::Box::new(val),
+                        ),
+                    );
+                }
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                if let ::core::option::Option::Some(
+                    __buffa::oneof::notification::Detail::AdminKeyAction(
+                        ref mut existing,
+                    ),
+                ) = self.detail
+                {
+                    ::buffa::Message::merge_length_delimited(&mut **existing, buf, ctx)?;
+                } else {
+                    let mut val = ::core::default::Default::default();
+                    ::buffa::Message::merge_length_delimited(&mut val, buf, ctx)?;
+                    self.detail = ::core::option::Option::Some(
+                        __buffa::oneof::notification::Detail::AdminKeyAction(
                             ::buffa::alloc::boxed::Box::new(val),
                         ),
                     );
@@ -1992,6 +2246,30 @@ impl<'de> serde::Deserialize<'de> for Notification {
                                 }
                                 __oneof_detail = Some(
                                     __buffa::oneof::notification::Detail::TelegramLink(
+                                        ::buffa::alloc::boxed::Box::new(v),
+                                    ),
+                                );
+                            }
+                        }
+                        "adminKeyAction" | "admin_key_action" => {
+                            let v: ::core::option::Option<AdminKeyActionNotice> = map
+                                .next_value_seed(
+                                    ::buffa::json_helpers::NullableDeserializeSeed(
+                                        ::buffa::json_helpers::DefaultDeserializeSeed::<
+                                            AdminKeyActionNotice,
+                                        >::new(),
+                                    ),
+                                )?;
+                            if let Some(v) = v {
+                                if __oneof_detail.is_some() {
+                                    return Err(
+                                        serde::de::Error::custom(
+                                            "multiple oneof fields set for 'detail'",
+                                        ),
+                                    );
+                                }
+                                __oneof_detail = Some(
+                                    __buffa::oneof::notification::Detail::AdminKeyAction(
                                         ::buffa::alloc::boxed::Box::new(v),
                                     ),
                                 );
@@ -3140,6 +3418,306 @@ pub const __BROKER_ALLOWLIST_NOTICE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
     type_url: "type.googleapis.com/notifications.v1.BrokerAllowlistNotice",
     to_json: ::buffa::type_registry::any_to_json::<BrokerAllowlistNotice>,
     from_json: ::buffa::type_registry::any_from_json::<BrokerAllowlistNotice>,
+    is_wkt: false,
+};
+/// AdminKeyActionNotice is one change an admin API key of the main account
+/// made. The account's activity shows the same change.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AdminKeyActionNotice {
+    /// Opaque identifier of the admin API key that made the change, formatted
+    /// as "ak_" followed by 32 lowercase hex characters.
+    ///
+    /// Field 1: `admin_key_id`
+    #[serde(
+        rename = "adminKeyId",
+        alias = "admin_key_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub admin_key_id: ::buffa::alloc::string::String,
+    /// What the admin key changed.
+    ///
+    /// Field 2: `action`
+    #[serde(
+        rename = "action",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub action: ::buffa::EnumValue<AdminKeyAction>,
+    /// Opaque identifier of the API key changed; empty for a sub-account policy
+    /// change.
+    ///
+    /// Field 3: `key_id`
+    #[serde(
+        rename = "keyId",
+        alias = "key_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub key_id: ::buffa::alloc::string::String,
+    /// Public ID of the sub-account the change applies to; 0 for the main
+    /// account, or for an update of a sub-account policy, which applies to
+    /// every sub-account it is attached to.
+    ///
+    /// Field 4: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Public ID of the policy attached or updated; 0 when the change cleared a
+    /// policy or attached none.
+    ///
+    /// Field 5: `policy_id`
+    #[serde(
+        rename = "policyId",
+        alias = "policy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub policy_id: u64,
+    /// Source IP address of the admin key's request.
+    ///
+    /// Field 6: `source_ip`
+    #[serde(
+        rename = "sourceIp",
+        alias = "source_ip",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub source_ip: ::buffa::alloc::string::String,
+    /// When the change was made.
+    ///
+    /// Field 7: `changed_at`
+    #[serde(
+        rename = "changedAt",
+        alias = "changed_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub changed_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AdminKeyActionNotice {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AdminKeyActionNotice")
+            .field("admin_key_id", &self.admin_key_id)
+            .field("action", &self.action)
+            .field("key_id", &self.key_id)
+            .field("subaccount_id", &self.subaccount_id)
+            .field("policy_id", &self.policy_id)
+            .field("source_ip", &self.source_ip)
+            .field("changed_at", &self.changed_at)
+            .finish()
+    }
+}
+impl AdminKeyActionNotice {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.AdminKeyActionNotice";
+}
+::buffa::impl_default_instance!(AdminKeyActionNotice);
+impl ::buffa::MessageName for AdminKeyActionNotice {
+    const PACKAGE: &'static str = "notifications.v1";
+    const NAME: &'static str = "AdminKeyActionNotice";
+    const FULL_NAME: &'static str = "notifications.v1.AdminKeyActionNotice";
+    const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.AdminKeyActionNotice";
+}
+impl ::buffa::Message for AdminKeyActionNotice {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.admin_key_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.admin_key_id) as u32;
+        }
+        {
+            let val = self.action.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if !self.key_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.key_id) as u32;
+        }
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.policy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if !self.source_ip.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.source_ip) as u32;
+        }
+        if self.changed_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.changed_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.admin_key_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.admin_key_id, buf);
+        }
+        {
+            let val = self.action.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if !self.key_id.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.key_id, buf);
+        }
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_fixed64_field(4u32, self.subaccount_id, buf);
+        }
+        if self.policy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(5u32, self.policy_id, buf);
+        }
+        if !self.source_ip.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.source_ip, buf);
+        }
+        if self.changed_at.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.changed_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.admin_key_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.action = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.key_id, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.policy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.source_ip, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.changed_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.admin_key_id.clear();
+        self.action = ::buffa::EnumValue::from(0);
+        self.key_id.clear();
+        self.subaccount_id = 0u64;
+        self.policy_id = 0u64;
+        self.source_ip.clear();
+        self.changed_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AdminKeyActionNotice {
+    const PROTO_FQN: &'static str = "notifications.v1.AdminKeyActionNotice";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AdminKeyActionNotice {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __ADMIN_KEY_ACTION_NOTICE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/notifications.v1.AdminKeyActionNotice",
+    to_json: ::buffa::type_registry::any_to_json::<AdminKeyActionNotice>,
+    from_json: ::buffa::type_registry::any_from_json::<AdminKeyActionNotice>,
     is_wkt: false,
 };
 /// ListNotificationsRequest lists the caller's notifications.
@@ -6014,6 +6592,37 @@ pub mod __buffa {
                             );
                         }
                     }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        if let Some(
+                            super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                                ref mut existing,
+                            ),
+                        ) = view.detail
+                        {
+                            ::buffa::MessageView::merge_into_view(
+                                &mut **existing,
+                                sub,
+                                __sub_ctx,
+                            )?;
+                        } else {
+                            view.detail = Some(
+                                super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                                    ::buffa::alloc::boxed::Box::new(
+                                        <super::super::__buffa::view::AdminKeyActionNoticeView as ::buffa::MessageView>::decode_view_ctx(
+                                            sub,
+                                            __sub_ctx,
+                                        )?,
+                                    ),
+                                ),
+                            );
+                        }
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -6099,6 +6708,15 @@ pub mod __buffa {
                                         v,
                                     ) => {
                                         super::super::__buffa::oneof::notification::Detail::TelegramLink(
+                                            ::buffa::alloc::boxed::Box::new(
+                                                v.to_owned_from_source(__buffa_src)?,
+                                            ),
+                                        )
+                                    }
+                                    super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                                        v,
+                                    ) => {
+                                        super::super::__buffa::oneof::notification::Detail::AdminKeyAction(
                                             ::buffa::alloc::boxed::Box::new(
                                                 v.to_owned_from_source(__buffa_src)?,
                                             ),
@@ -6203,6 +6821,16 @@ pub mod __buffa {
                                 += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
                                     + inner;
                         }
+                        super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                            x,
+                        ) => {
+                            let __slot = __cache.reserve();
+                            let inner = x.compute_size(__cache);
+                            __cache.set(__slot, inner);
+                            size
+                                += 1u32 + ::buffa::encoding::varint_len(inner as u64) as u32
+                                    + inner;
+                        }
                     }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
@@ -6295,6 +6923,16 @@ pub mod __buffa {
                             );
                             x.write_to(__cache, buf);
                         }
+                        super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                            x,
+                        ) => {
+                            ::buffa::types::put_len_delimited_header(
+                                14u32,
+                                __cache.consume_next(),
+                                buf,
+                            );
+                            x.write_to(__cache, buf);
+                        }
                     }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
@@ -6373,6 +7011,11 @@ pub mod __buffa {
                             v,
                         ) => {
                             __map.serialize_entry("telegramLink", v)?;
+                        }
+                        super::super::__buffa::view::oneof::notification::Detail::AdminKeyAction(
+                            v,
+                        ) => {
+                            __map.serialize_entry("adminKeyAction", v)?;
                         }
                     }
                 }
@@ -8491,6 +9134,523 @@ pub mod __buffa {
             type ViewHandle = BrokerAllowlistNoticeOwnedView;
         }
         impl ::serde::Serialize for BrokerAllowlistNoticeOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// AdminKeyActionNotice is one change an admin API key of the main account
+        /// made. The account's activity shows the same change.
+        #[derive(Clone, Debug, Default)]
+        pub struct AdminKeyActionNoticeView<'a> {
+            /// Opaque identifier of the admin API key that made the change, formatted
+            /// as "ak_" followed by 32 lowercase hex characters.
+            ///
+            /// Field 1: `admin_key_id`
+            pub admin_key_id: &'a str,
+            /// What the admin key changed.
+            ///
+            /// Field 2: `action`
+            pub action: ::buffa::EnumValue<super::super::AdminKeyAction>,
+            /// Opaque identifier of the API key changed; empty for a sub-account policy
+            /// change.
+            ///
+            /// Field 3: `key_id`
+            pub key_id: &'a str,
+            /// Public ID of the sub-account the change applies to; 0 for the main
+            /// account, or for an update of a sub-account policy, which applies to
+            /// every sub-account it is attached to.
+            ///
+            /// Field 4: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Public ID of the policy attached or updated; 0 when the change cleared a
+            /// policy or attached none.
+            ///
+            /// Field 5: `policy_id`
+            pub policy_id: u64,
+            /// Source IP address of the admin key's request.
+            ///
+            /// Field 6: `source_ip`
+            pub source_ip: &'a str,
+            /// When the change was made.
+            ///
+            /// Field 7: `changed_at`
+            pub changed_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AdminKeyActionNoticeView<'a> {
+            type Owned = super::super::AdminKeyActionNotice;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.admin_key_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.action = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.key_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.source_ip = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.changed_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.changed_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AdminKeyActionNotice,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AdminKeyActionNotice,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AdminKeyActionNotice {
+                    admin_key_id: self.admin_key_id.to_string(),
+                    action: self.action,
+                    key_id: self.key_id.to_string(),
+                    subaccount_id: self.subaccount_id,
+                    policy_id: self.policy_id,
+                    source_ip: self.source_ip.to_string(),
+                    changed_at: match self.changed_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AdminKeyActionNoticeView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.admin_key_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.admin_key_id)
+                                as u32;
+                }
+                {
+                    let val = self.action.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if !self.key_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.key_id) as u32;
+                }
+                if self.subaccount_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.policy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if !self.source_ip.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.source_ip) as u32;
+                }
+                if self.changed_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.changed_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.admin_key_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.admin_key_id, buf);
+                }
+                {
+                    let val = self.action.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if !self.key_id.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.key_id, buf);
+                }
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(4u32, self.subaccount_id, buf);
+                }
+                if self.policy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(5u32, self.policy_id, buf);
+                }
+                if !self.source_ip.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.source_ip, buf);
+                }
+                if self.changed_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.changed_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AdminKeyActionNoticeView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.admin_key_id) {
+                    __map.serialize_entry("adminKeyId", self.admin_key_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.action) {
+                    __map.serialize_entry("action", &self.action)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.key_id) {
+                    __map.serialize_entry("keyId", self.key_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.policy_id) {
+                    __map
+                        .serialize_entry(
+                            "policyId",
+                            &::buffa::json_helpers::ProtoJson(&self.policy_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.source_ip) {
+                    __map.serialize_entry("sourceIp", self.source_ip)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .changed_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("changedAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AdminKeyActionNoticeView<'a> {
+            const PACKAGE: &'static str = "notifications.v1";
+            const NAME: &'static str = "AdminKeyActionNotice";
+            const FULL_NAME: &'static str = "notifications.v1.AdminKeyActionNotice";
+            const TYPE_URL: &'static str = "type.googleapis.com/notifications.v1.AdminKeyActionNotice";
+        }
+        ::buffa::impl_default_view_instance!(AdminKeyActionNoticeView);
+        ::buffa::impl_view_reborrow!(AdminKeyActionNoticeView);
+        /** Self-contained, `'static` owned view of a `AdminKeyActionNotice` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AdminKeyActionNoticeView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AdminKeyActionNoticeView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AdminKeyActionNoticeOwnedView(
+            ::buffa::OwnedView<AdminKeyActionNoticeView<'static>>,
+        );
+        impl AdminKeyActionNoticeOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AdminKeyActionNoticeOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AdminKeyActionNoticeOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AdminKeyActionNotice,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AdminKeyActionNoticeOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AdminKeyActionNoticeView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AdminKeyActionNoticeView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AdminKeyActionNotice,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Opaque identifier of the admin API key that made the change, formatted
+            /// as "ak_" followed by 32 lowercase hex characters.
+            ///
+            /// Field 1: `admin_key_id`
+            #[must_use]
+            pub fn admin_key_id(&self) -> &'_ str {
+                self.0.reborrow().admin_key_id
+            }
+            /// What the admin key changed.
+            ///
+            /// Field 2: `action`
+            #[must_use]
+            pub fn action(&self) -> ::buffa::EnumValue<super::super::AdminKeyAction> {
+                self.0.reborrow().action
+            }
+            /// Opaque identifier of the API key changed; empty for a sub-account policy
+            /// change.
+            ///
+            /// Field 3: `key_id`
+            #[must_use]
+            pub fn key_id(&self) -> &'_ str {
+                self.0.reborrow().key_id
+            }
+            /// Public ID of the sub-account the change applies to; 0 for the main
+            /// account, or for an update of a sub-account policy, which applies to
+            /// every sub-account it is attached to.
+            ///
+            /// Field 4: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Public ID of the policy attached or updated; 0 when the change cleared a
+            /// policy or attached none.
+            ///
+            /// Field 5: `policy_id`
+            #[must_use]
+            pub fn policy_id(&self) -> u64 {
+                self.0.reborrow().policy_id
+            }
+            /// Source IP address of the admin key's request.
+            ///
+            /// Field 6: `source_ip`
+            #[must_use]
+            pub fn source_ip(&self) -> &'_ str {
+                self.0.reborrow().source_ip
+            }
+            /// When the change was made.
+            ///
+            /// Field 7: `changed_at`
+            #[must_use]
+            pub fn changed_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().changed_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AdminKeyActionNoticeView<'static>>>
+        for AdminKeyActionNoticeOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<AdminKeyActionNoticeView<'static>>,
+            ) -> Self {
+                AdminKeyActionNoticeOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AdminKeyActionNoticeOwnedView>
+        for ::buffa::OwnedView<AdminKeyActionNoticeView<'static>> {
+            fn from(wrapper: AdminKeyActionNoticeOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<AdminKeyActionNoticeView<'static>>,
+        > for AdminKeyActionNoticeOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AdminKeyActionNoticeView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AdminKeyActionNotice {
+            type View<'a> = AdminKeyActionNoticeView<'a>;
+            type ViewHandle = AdminKeyActionNoticeOwnedView;
+        }
+        impl ::serde::Serialize for AdminKeyActionNoticeOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -13192,6 +14352,13 @@ pub mod __buffa {
                             >,
                         >,
                     ),
+                    AdminKeyAction(
+                        ::buffa::alloc::boxed::Box<
+                            super::super::super::super::__buffa::view::AdminKeyActionNoticeView<
+                                'a,
+                            >,
+                        >,
+                    ),
                 }
             }
         }
@@ -13222,6 +14389,9 @@ pub mod __buffa {
                 ),
                 TelegramLink(
                     ::buffa::alloc::boxed::Box<super::super::super::TelegramLinkNotice>,
+                ),
+                AdminKeyAction(
+                    ::buffa::alloc::boxed::Box<super::super::super::AdminKeyActionNotice>,
                 ),
             }
             impl ::buffa::Oneof for Detail {}
@@ -13269,6 +14439,17 @@ pub mod __buffa {
                     Self::Some(Detail::from(v))
                 }
             }
+            impl From<super::super::super::AdminKeyActionNotice> for Detail {
+                fn from(v: super::super::super::AdminKeyActionNotice) -> Self {
+                    Self::AdminKeyAction(::buffa::alloc::boxed::Box::new(v))
+                }
+            }
+            impl From<super::super::super::AdminKeyActionNotice>
+            for ::core::option::Option<Detail> {
+                fn from(v: super::super::super::AdminKeyActionNotice) -> Self {
+                    Self::Some(Detail::from(v))
+                }
+            }
             impl serde::Serialize for Detail {
                 fn serialize<S: serde::Serializer>(
                     &self,
@@ -13289,6 +14470,9 @@ pub mod __buffa {
                         Self::TelegramLink(v) => {
                             map.serialize_entry("telegramLink", v)?;
                         }
+                        Self::AdminKeyAction(v) => {
+                            map.serialize_entry("adminKeyAction", v)?;
+                        }
                     }
                     map.end()
                 }
@@ -13303,6 +14487,7 @@ pub mod __buffa {
         reg.register_json_any(super::__NOTICE_FIELD_JSON_ANY);
         reg.register_json_any(super::__TELEGRAM_APPROVAL_NOTICE_JSON_ANY);
         reg.register_json_any(super::__BROKER_ALLOWLIST_NOTICE_JSON_ANY);
+        reg.register_json_any(super::__ADMIN_KEY_ACTION_NOTICE_JSON_ANY);
         reg.register_json_any(super::__LIST_NOTIFICATIONS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__LIST_NOTIFICATIONS_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_NOTIFICATION_REQUEST_JSON_ANY);
@@ -13343,6 +14528,10 @@ pub use self::__buffa::view::TelegramApprovalNoticeOwnedView;
 pub use self::__buffa::view::BrokerAllowlistNoticeView;
 #[doc(inline)]
 pub use self::__buffa::view::BrokerAllowlistNoticeOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AdminKeyActionNoticeView;
+#[doc(inline)]
+pub use self::__buffa::view::AdminKeyActionNoticeOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ListNotificationsRequestView;
 #[doc(inline)]

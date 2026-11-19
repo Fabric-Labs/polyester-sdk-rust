@@ -7,6 +7,10 @@ service = "auth.v1.MFAService"
 reason = "MFA enrollment and step-up are outside the API-key SDK surface."
 
 [[allowlist]]
+service = "auth.v1.ConnectedAppService"
+reason = "Connecting outside apps (OAuth consent, connected-app list and revoke) is session-only, for the website; API keys are refused."
+
+[[allowlist]]
 procedure = "/auth.v1.AuthService/CreateWalletChallenge"
 reason = "Wallet login is intentionally outside the API-key SDK surface."
 
@@ -16,7 +20,7 @@ reason = "Wallet login is intentionally outside the API-key SDK surface."
 
 [[allowlist]]
 service = "auth.v1.PolicyService"
-reason = "Policy writes are session-only. API keys may read policies (ListApiPolicies/GetApiPolicy with READ_API_POLICIES, ListSubaccountPolicies/GetSubaccountPolicy with READ_SUBACCOUNT_POLICIES), but the unary reads are not wrapped yet; this SDK exposes the policy subscriptions."
+reason = "Policy writes are session-only, except that an admin API key may attach and update policies (SetApiKeyPolicy with MANAGE_API_KEY_POLICIES, SetSubaccountPolicy and UpdateSubaccountPolicy with MANAGE_SUBACCOUNT_POLICIES); those are not wrapped yet. API keys may read policies (ListApiPolicies/GetApiPolicy with READ_API_POLICIES, ListSubaccountPolicies/GetSubaccountPolicy with READ_SUBACCOUNT_POLICIES), but the unary reads are not wrapped yet; this SDK exposes the policy subscriptions."
 
 [[allowlist]]
 service = "auth.v1.ResolveService"
@@ -28,15 +32,15 @@ reason = "Profile writes and username generation are session-only. GetProfile an
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/CreateApiKey"
-reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+reason = "API key create/update/delete need a session or an admin API key with MANAGE_API_KEYS, and are not wrapped yet; list/get/subscribe remain."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/UpdateApiKey"
-reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+reason = "API key create/update/delete need a session or an admin API key with MANAGE_API_KEYS, and are not wrapped yet; list/get/subscribe remain."
 
 [[allowlist]]
 procedure = "/auth.v1.ApiKeyService/DeleteApiKey"
-reason = "API key create/update/delete are JWT/session-only; list/get/subscribe remain."
+reason = "API key create/update/delete need a session or an admin API key with MANAGE_API_KEYS, and are not wrapped yet; list/get/subscribe remain."
 
 [[allowlist]]
 procedure = "/auth.v1.SubaccountService/CreateSubaccount"

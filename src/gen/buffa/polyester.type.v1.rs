@@ -154,6 +154,236 @@ pub const __U128_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_
     from_json: ::buffa::type_registry::any_from_json::<U128>,
     is_wkt: false,
 };
+/// DepthTier is a number of price levels per side of an order book view, the
+/// one depth vocabulary of every order book surface. REST represents a tier by
+/// its level count, for example 20.
+///
+/// Which tiers each surface serves:
+/// - Order book snapshot: every tier.
+/// - Order book stream: 1, 20, 50, 200 and 500. A subscription at another tier
+///   is refused. To follow a streamed book, subscribe at a streamed tier, then
+///   fetch the snapshot at exactly that tier.
+/// - Order book heatmap: every tier except DEPTH_5000, which it refuses with
+///   INVALID_ARGUMENT.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum DepthTier {
+    /// No tier selected. Each request field that accepts it states its default.
+    DEPTH_UNSPECIFIED = 0i32,
+    /// 1 level per side: the best bid and the best ask.
+    DEPTH_1 = 1i32,
+    /// 5 levels per side.
+    DEPTH_5 = 2i32,
+    /// 10 levels per side.
+    DEPTH_10 = 3i32,
+    /// 20 levels per side.
+    DEPTH_20 = 4i32,
+    /// 50 levels per side.
+    DEPTH_50 = 5i32,
+    /// 100 levels per side.
+    DEPTH_100 = 6i32,
+    /// 200 levels per side.
+    DEPTH_200 = 7i32,
+    /// 500 levels per side.
+    DEPTH_500 = 8i32,
+    /// 1000 levels per side.
+    DEPTH_1000 = 9i32,
+    /// 5000 levels per side, the deepest snapshot.
+    DEPTH_5000 = 10i32,
+}
+impl DepthTier {
+    ///Idiomatic alias for [`Self::DEPTH_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const DepthUnspecified: Self = Self::DEPTH_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::DEPTH_1`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth1: Self = Self::DEPTH_1;
+    ///Idiomatic alias for [`Self::DEPTH_5`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth5: Self = Self::DEPTH_5;
+    ///Idiomatic alias for [`Self::DEPTH_10`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth10: Self = Self::DEPTH_10;
+    ///Idiomatic alias for [`Self::DEPTH_20`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth20: Self = Self::DEPTH_20;
+    ///Idiomatic alias for [`Self::DEPTH_50`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth50: Self = Self::DEPTH_50;
+    ///Idiomatic alias for [`Self::DEPTH_100`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth100: Self = Self::DEPTH_100;
+    ///Idiomatic alias for [`Self::DEPTH_200`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth200: Self = Self::DEPTH_200;
+    ///Idiomatic alias for [`Self::DEPTH_500`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth500: Self = Self::DEPTH_500;
+    ///Idiomatic alias for [`Self::DEPTH_1000`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth1000: Self = Self::DEPTH_1000;
+    ///Idiomatic alias for [`Self::DEPTH_5000`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Depth5000: Self = Self::DEPTH_5000;
+}
+impl ::core::default::Default for DepthTier {
+    fn default() -> Self {
+        Self::DEPTH_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for DepthTier {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for DepthTier {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = DepthTier;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!("a string, integer, or null for ", stringify!(DepthTier)),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<DepthTier, E> {
+                <DepthTier as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<DepthTier, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DepthTier as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<DepthTier, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <DepthTier as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<DepthTier, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DepthTier {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for DepthTier {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::DEPTH_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::DEPTH_1),
+            2i32 => ::core::option::Option::Some(Self::DEPTH_5),
+            3i32 => ::core::option::Option::Some(Self::DEPTH_10),
+            4i32 => ::core::option::Option::Some(Self::DEPTH_20),
+            5i32 => ::core::option::Option::Some(Self::DEPTH_50),
+            6i32 => ::core::option::Option::Some(Self::DEPTH_100),
+            7i32 => ::core::option::Option::Some(Self::DEPTH_200),
+            8i32 => ::core::option::Option::Some(Self::DEPTH_500),
+            9i32 => ::core::option::Option::Some(Self::DEPTH_1000),
+            10i32 => ::core::option::Option::Some(Self::DEPTH_5000),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::DEPTH_UNSPECIFIED => "DEPTH_UNSPECIFIED",
+            Self::DEPTH_1 => "DEPTH_1",
+            Self::DEPTH_5 => "DEPTH_5",
+            Self::DEPTH_10 => "DEPTH_10",
+            Self::DEPTH_20 => "DEPTH_20",
+            Self::DEPTH_50 => "DEPTH_50",
+            Self::DEPTH_100 => "DEPTH_100",
+            Self::DEPTH_200 => "DEPTH_200",
+            Self::DEPTH_500 => "DEPTH_500",
+            Self::DEPTH_1000 => "DEPTH_1000",
+            Self::DEPTH_5000 => "DEPTH_5000",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "DEPTH_UNSPECIFIED" => ::core::option::Option::Some(Self::DEPTH_UNSPECIFIED),
+            "DEPTH_1" => ::core::option::Option::Some(Self::DEPTH_1),
+            "DEPTH_5" => ::core::option::Option::Some(Self::DEPTH_5),
+            "DEPTH_10" => ::core::option::Option::Some(Self::DEPTH_10),
+            "DEPTH_20" => ::core::option::Option::Some(Self::DEPTH_20),
+            "DEPTH_50" => ::core::option::Option::Some(Self::DEPTH_50),
+            "DEPTH_100" => ::core::option::Option::Some(Self::DEPTH_100),
+            "DEPTH_200" => ::core::option::Option::Some(Self::DEPTH_200),
+            "DEPTH_500" => ::core::option::Option::Some(Self::DEPTH_500),
+            "DEPTH_1000" => ::core::option::Option::Some(Self::DEPTH_1000),
+            "DEPTH_5000" => ::core::option::Option::Some(Self::DEPTH_5000),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::DEPTH_UNSPECIFIED,
+            Self::DEPTH_1,
+            Self::DEPTH_5,
+            Self::DEPTH_10,
+            Self::DEPTH_20,
+            Self::DEPTH_50,
+            Self::DEPTH_100,
+            Self::DEPTH_200,
+            Self::DEPTH_500,
+            Self::DEPTH_1000,
+            Self::DEPTH_5000,
+        ]
+    }
+}
 #[allow(
     non_camel_case_types,
     dead_code,

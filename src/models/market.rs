@@ -334,11 +334,6 @@ pub struct OrderbookData {
     /// A snapshot is a frozen view at its own `(book_epoch, book_seq)`: keep it
     /// apart from a live book and never apply stream updates to it.
     pub book_epoch: String,
-    /// Largest depth per side the server accepts, as it reported it in an
-    /// `orderbook.get` snapshot, available or not (5,000 by default). A deeper
-    /// request is refused with `invalid_argument`, never truncated. 0 on a
-    /// managed subscription view, and from a server that predates the field.
-    pub max_depth: u32,
     pub bids: Vec<OrderbookLevel>,
     pub asks: Vec<OrderbookLevel>,
     /// True when the book is current: `bids` and `asks` are its levels, and

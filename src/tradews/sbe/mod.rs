@@ -60,8 +60,8 @@ pub mod trigger_price_source;
 pub mod var_data_encoding_codec;
 
 pub const SBE_SCHEMA_ID: u16 = 7;
-pub const SBE_SCHEMA_VERSION: u16 = 49;
-pub const SBE_SEMANTIC_VERSION: &str = "2.5.0";
+pub const SBE_SCHEMA_VERSION: u16 = 50;
+pub const SBE_SEMANTIC_VERSION: &str = "2.6.0";
 
 pub type SbeResult<T> = core::result::Result<T, SbeErr>;
 

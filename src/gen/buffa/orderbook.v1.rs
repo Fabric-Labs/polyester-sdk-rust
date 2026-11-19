@@ -15,17 +15,17 @@ pub struct GetOrderBookRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub symbol_id: u32,
-    /// Number of price levels per side, from 1 to the max_depth every response
-    /// reports. 0 (unset) selects the default of 50. A depth above max_depth is
-    /// rejected with INVALID_ARGUMENT, never truncated.
+    /// Price levels per side. Every tier is served; DEPTH_UNSPECIFIED selects
+    /// DEPTH_50. To follow the book in real time, subscribe to the order book
+    /// stream at a streamed tier, then fetch this snapshot at exactly that tier.
     ///
-    /// Field 3: `depth`
+    /// Field 2: `depth`
     #[serde(
         rename = "depth",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub depth: u32,
+    pub depth: ::buffa::EnumValue<super::super::polyester::r#type::v1::DepthTier>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -66,8 +66,11 @@ impl ::buffa::Message for GetOrderBookRequest {
         if self.symbol_id != 0u32 {
             size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
         }
-        if self.depth != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.depth) as u32;
+        {
+            let val = self.depth.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -82,8 +85,11 @@ impl ::buffa::Message for GetOrderBookRequest {
         if self.symbol_id != 0u32 {
             ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
         }
-        if self.depth != 0u32 {
-            ::buffa::types::put_uint32_field(3u32, self.depth, buf);
+        {
+            let val = self.depth.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -105,12 +111,14 @@ impl ::buffa::Message for GetOrderBookRequest {
                 )?;
                 self.symbol_id = ::buffa::types::decode_uint32(buf)?;
             }
-            3u32 => {
+            2u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.depth = ::buffa::types::decode_uint32(buf)?;
+                self.depth = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -121,7 +129,7 @@ impl ::buffa::Message for GetOrderBookRequest {
     }
     fn clear(&mut self) {
         self.symbol_id = 0u32;
-        self.depth = 0u32;
+        self.depth = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -391,17 +399,16 @@ pub struct GetOrderBookResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub book_epoch: u64,
-    /// Largest depth per side the service accepts, the upper bound of the
-    /// request's depth. Set in every response, available or not.
+    /// Tier this snapshot was served at: the request's depth, or DEPTH_50 when
+    /// the request left it unset. Set in every response, available or not.
     ///
-    /// Field 8: `max_depth`
+    /// Field 9: `depth`
     #[serde(
-        rename = "maxDepth",
-        alias = "max_depth",
-        with = "::buffa::json_helpers::uint32",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+        rename = "depth",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub max_depth: u32,
+    pub depth: ::buffa::EnumValue<super::super::polyester::r#type::v1::DepthTier>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -416,7 +423,7 @@ impl ::core::fmt::Debug for GetOrderBookResponse {
             .field("ts", &self.ts)
             .field("available", &self.available)
             .field("book_epoch", &self.book_epoch)
-            .field("max_depth", &self.max_depth)
+            .field("depth", &self.depth)
             .finish()
     }
 }
@@ -481,8 +488,11 @@ impl ::buffa::Message for GetOrderBookResponse {
         if self.book_epoch != 0u64 {
             size += 1u32 + ::buffa::types::uint64_encoded_len(self.book_epoch) as u32;
         }
-        if self.max_depth != 0u32 {
-            size += 1u32 + ::buffa::types::uint32_encoded_len(self.max_depth) as u32;
+        {
+            let val = self.depth.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
         }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
@@ -518,8 +528,11 @@ impl ::buffa::Message for GetOrderBookResponse {
         if self.book_epoch != 0u64 {
             ::buffa::types::put_uint64_field(7u32, self.book_epoch, buf);
         }
-        if self.max_depth != 0u32 {
-            ::buffa::types::put_uint32_field(8u32, self.max_depth, buf);
+        {
+            let val = self.depth.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(9u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -591,12 +604,14 @@ impl ::buffa::Message for GetOrderBookResponse {
                 )?;
                 self.book_epoch = ::buffa::types::decode_uint64(buf)?;
             }
-            8u32 => {
+            9u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
                     ::buffa::encoding::WireType::Varint,
                 )?;
-                self.max_depth = ::buffa::types::decode_uint32(buf)?;
+                self.depth = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
             }
             _ => {
                 self.__buffa_unknown_fields
@@ -613,7 +628,7 @@ impl ::buffa::Message for GetOrderBookResponse {
         self.ts = ::buffa::MessageField::none();
         self.available = false;
         self.book_epoch = 0u64;
-        self.max_depth = 0u32;
+        self.depth = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -659,7 +674,8 @@ pub const __GET_ORDER_BOOK_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEnt
 ///   A reset carrying the full view is sent periodically, currently about every
 ///   30 seconds, and after a sequence gap.
 ///
-/// To start, subscribe, then fetch GetOrderBook with the tier's depth. Drop
+/// To start, subscribe at a streamed tier, then fetch GetOrderBook at exactly
+/// that tier. Drop
 /// deltas whose book_seq_end is at most the snapshot's book_seq, and apply the
 /// first delta only when its book_seq_start equals that book_seq; then apply
 /// each delta only when its book_seq_start equals the previous book_seq_end.
@@ -992,12 +1008,14 @@ pub mod __buffa {
             ///
             /// Field 1: `symbol_id`
             pub symbol_id: u32,
-            /// Number of price levels per side, from 1 to the max_depth every response
-            /// reports. 0 (unset) selects the default of 50. A depth above max_depth is
-            /// rejected with INVALID_ARGUMENT, never truncated.
+            /// Price levels per side. Every tier is served; DEPTH_UNSPECIFIED selects
+            /// DEPTH_50. To follow the book in real time, subscribe to the order book
+            /// stream at a streamed tier, then fetch this snapshot at exactly that tier.
             ///
-            /// Field 3: `depth`
-            pub depth: u32,
+            /// Field 2: `depth`
+            pub depth: ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderBookRequestView<'a> {
@@ -1038,12 +1056,14 @@ pub mod __buffa {
                         )?;
                         view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
                     }
-                    3u32 => {
+                    2u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.depth = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.depth = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
@@ -1095,8 +1115,11 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
                 }
-                if self.depth != 0u32 {
-                    size += 1u32 + ::buffa::types::uint32_encoded_len(self.depth) as u32;
+                {
+                    let val = self.depth.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -1112,8 +1135,11 @@ pub mod __buffa {
                 if self.symbol_id != 0u32 {
                     ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
                 }
-                if self.depth != 0u32 {
-                    ::buffa::types::put_uint32_field(3u32, self.depth, buf);
+                {
+                    let val = self.depth.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -1143,12 +1169,8 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.symbol_id),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.depth) {
-                    __map
-                        .serialize_entry(
-                            "depth",
-                            &::buffa::json_helpers::ProtoJson(&self.depth),
-                        )?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.depth) {
+                    __map.serialize_entry("depth", &self.depth)?;
                 }
                 __map.end()
             }
@@ -1253,13 +1275,17 @@ pub mod __buffa {
             pub fn symbol_id(&self) -> u32 {
                 self.0.reborrow().symbol_id
             }
-            /// Number of price levels per side, from 1 to the max_depth every response
-            /// reports. 0 (unset) selects the default of 50. A depth above max_depth is
-            /// rejected with INVALID_ARGUMENT, never truncated.
+            /// Price levels per side. Every tier is served; DEPTH_UNSPECIFIED selects
+            /// DEPTH_50. To follow the book in real time, subscribe to the order book
+            /// stream at a streamed tier, then fetch this snapshot at exactly that tier.
             ///
-            /// Field 3: `depth`
+            /// Field 2: `depth`
             #[must_use]
-            pub fn depth(&self) -> u32 {
+            pub fn depth(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            > {
                 self.0.reborrow().depth
             }
         }
@@ -1643,11 +1669,13 @@ pub mod __buffa {
             ///
             /// Field 7: `book_epoch`
             pub book_epoch: u64,
-            /// Largest depth per side the service accepts, the upper bound of the
-            /// request's depth. Set in every response, available or not.
+            /// Tier this snapshot was served at: the request's depth, or DEPTH_50 when
+            /// the request left it unset. Set in every response, available or not.
             ///
-            /// Field 8: `max_depth`
-            pub max_depth: u32,
+            /// Field 9: `depth`
+            pub depth: ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            >,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for GetOrderBookResponseView<'a> {
@@ -1734,12 +1762,14 @@ pub mod __buffa {
                         )?;
                         view.book_epoch = ::buffa::types::decode_uint64(&mut cur)?;
                     }
-                    8u32 => {
+                    9u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
                             ::buffa::encoding::WireType::Varint,
                         )?;
-                        view.max_depth = ::buffa::types::decode_uint32(&mut cur)?;
+                        view.depth = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
                     }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
@@ -1822,7 +1852,7 @@ pub mod __buffa {
                     },
                     available: self.available,
                     book_epoch: self.book_epoch,
-                    max_depth: self.max_depth,
+                    depth: self.depth,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -1879,10 +1909,11 @@ pub mod __buffa {
                         += 1u32
                             + ::buffa::types::uint64_encoded_len(self.book_epoch) as u32;
                 }
-                if self.max_depth != 0u32 {
-                    size
-                        += 1u32
-                            + ::buffa::types::uint32_encoded_len(self.max_depth) as u32;
+                {
+                    let val = self.depth.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
                 }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
@@ -1931,8 +1962,11 @@ pub mod __buffa {
                 if self.book_epoch != 0u64 {
                     ::buffa::types::put_uint64_field(7u32, self.book_epoch, buf);
                 }
-                if self.max_depth != 0u32 {
-                    ::buffa::types::put_uint32_field(8u32, self.max_depth, buf);
+                {
+                    let val = self.depth.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(9u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -1990,12 +2024,8 @@ pub mod __buffa {
                             &::buffa::json_helpers::ProtoJson(&self.book_epoch),
                         )?;
                 }
-                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.max_depth) {
-                    __map
-                        .serialize_entry(
-                            "maxDepth",
-                            &::buffa::json_helpers::ProtoJson(&self.max_depth),
-                        )?;
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.depth) {
+                    __map.serialize_entry("depth", &self.depth)?;
                 }
                 __map.end()
             }
@@ -2165,13 +2195,17 @@ pub mod __buffa {
             pub fn book_epoch(&self) -> u64 {
                 self.0.reborrow().book_epoch
             }
-            /// Largest depth per side the service accepts, the upper bound of the
-            /// request's depth. Set in every response, available or not.
+            /// Tier this snapshot was served at: the request's depth, or DEPTH_50 when
+            /// the request left it unset. Set in every response, available or not.
             ///
-            /// Field 8: `max_depth`
+            /// Field 9: `depth`
             #[must_use]
-            pub fn max_depth(&self) -> u32 {
-                self.0.reborrow().max_depth
+            pub fn depth(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            > {
+                self.0.reborrow().depth
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<GetOrderBookResponseView<'static>>>
@@ -2220,7 +2254,8 @@ pub mod __buffa {
         ///   A reset carrying the full view is sent periodically, currently about every
         ///   30 seconds, and after a sequence gap.
         ///
-        /// To start, subscribe, then fetch GetOrderBook with the tier's depth. Drop
+        /// To start, subscribe at a streamed tier, then fetch GetOrderBook at exactly
+        /// that tier. Drop
         /// deltas whose book_seq_end is at most the snapshot's book_seq, and apply the
         /// first delta only when its book_seq_start equals that book_seq; then apply
         /// each delta only when its book_seq_start equals the previous book_seq_end.

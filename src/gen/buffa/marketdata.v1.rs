@@ -8313,207 +8313,6 @@ impl ::buffa::Enumeration for HeatmapInterval {
         ]
     }
 }
-/// HeatmapDepth controls top-N levels included per side in each heatmap bucket.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(i32)]
-pub enum HeatmapDepth {
-    DEPTH_UNSPECIFIED = 0i32,
-    DEPTH_1 = 1i32,
-    DEPTH_5 = 2i32,
-    DEPTH_10 = 3i32,
-    DEPTH_20 = 4i32,
-    DEPTH_50 = 5i32,
-    DEPTH_100 = 6i32,
-    DEPTH_200 = 7i32,
-    DEPTH_500 = 8i32,
-    DEPTH_1000 = 9i32,
-}
-impl HeatmapDepth {
-    ///Idiomatic alias for [`Self::DEPTH_UNSPECIFIED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const DepthUnspecified: Self = Self::DEPTH_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::DEPTH_1`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth1: Self = Self::DEPTH_1;
-    ///Idiomatic alias for [`Self::DEPTH_5`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth5: Self = Self::DEPTH_5;
-    ///Idiomatic alias for [`Self::DEPTH_10`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth10: Self = Self::DEPTH_10;
-    ///Idiomatic alias for [`Self::DEPTH_20`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth20: Self = Self::DEPTH_20;
-    ///Idiomatic alias for [`Self::DEPTH_50`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth50: Self = Self::DEPTH_50;
-    ///Idiomatic alias for [`Self::DEPTH_100`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth100: Self = Self::DEPTH_100;
-    ///Idiomatic alias for [`Self::DEPTH_200`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth200: Self = Self::DEPTH_200;
-    ///Idiomatic alias for [`Self::DEPTH_500`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth500: Self = Self::DEPTH_500;
-    ///Idiomatic alias for [`Self::DEPTH_1000`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Depth1000: Self = Self::DEPTH_1000;
-}
-impl ::core::default::Default for HeatmapDepth {
-    fn default() -> Self {
-        Self::DEPTH_UNSPECIFIED
-    }
-}
-impl ::serde::Serialize for HeatmapDepth {
-    fn serialize<S: ::serde::Serializer>(
-        &self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        s.serialize_str(::buffa::Enumeration::proto_name(self))
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for HeatmapDepth {
-    fn deserialize<D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl ::serde::de::Visitor<'_> for _V {
-            type Value = HeatmapDepth;
-            fn expecting(
-                &self,
-                f: &mut ::core::fmt::Formatter<'_>,
-            ) -> ::core::fmt::Result {
-                f.write_str(
-                    concat!("a string, integer, or null for ", stringify!(HeatmapDepth)),
-                )
-            }
-            fn visit_str<E: ::serde::de::Error>(
-                self,
-                v: &str,
-            ) -> ::core::result::Result<HeatmapDepth, E> {
-                <HeatmapDepth as ::buffa::Enumeration>::from_proto_name(v)
-                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-            }
-            fn visit_i64<E: ::serde::de::Error>(
-                self,
-                v: i64,
-            ) -> ::core::result::Result<HeatmapDepth, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <HeatmapDepth as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_u64<E: ::serde::de::Error>(
-                self,
-                v: u64,
-            ) -> ::core::result::Result<HeatmapDepth, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <HeatmapDepth as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_unit<E: ::serde::de::Error>(
-                self,
-            ) -> ::core::result::Result<HeatmapDepth, E> {
-                ::core::result::Result::Ok(::core::default::Default::default())
-            }
-        }
-        d.deserialize_any(_V)
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for HeatmapDepth {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-impl ::buffa::Enumeration for HeatmapDepth {
-    fn from_i32(value: i32) -> ::core::option::Option<Self> {
-        match value {
-            0i32 => ::core::option::Option::Some(Self::DEPTH_UNSPECIFIED),
-            1i32 => ::core::option::Option::Some(Self::DEPTH_1),
-            2i32 => ::core::option::Option::Some(Self::DEPTH_5),
-            3i32 => ::core::option::Option::Some(Self::DEPTH_10),
-            4i32 => ::core::option::Option::Some(Self::DEPTH_20),
-            5i32 => ::core::option::Option::Some(Self::DEPTH_50),
-            6i32 => ::core::option::Option::Some(Self::DEPTH_100),
-            7i32 => ::core::option::Option::Some(Self::DEPTH_200),
-            8i32 => ::core::option::Option::Some(Self::DEPTH_500),
-            9i32 => ::core::option::Option::Some(Self::DEPTH_1000),
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn to_i32(&self) -> i32 {
-        *self as i32
-    }
-    fn proto_name(&self) -> &'static str {
-        match self {
-            Self::DEPTH_UNSPECIFIED => "DEPTH_UNSPECIFIED",
-            Self::DEPTH_1 => "DEPTH_1",
-            Self::DEPTH_5 => "DEPTH_5",
-            Self::DEPTH_10 => "DEPTH_10",
-            Self::DEPTH_20 => "DEPTH_20",
-            Self::DEPTH_50 => "DEPTH_50",
-            Self::DEPTH_100 => "DEPTH_100",
-            Self::DEPTH_200 => "DEPTH_200",
-            Self::DEPTH_500 => "DEPTH_500",
-            Self::DEPTH_1000 => "DEPTH_1000",
-        }
-    }
-    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-        match name {
-            "DEPTH_UNSPECIFIED" => ::core::option::Option::Some(Self::DEPTH_UNSPECIFIED),
-            "DEPTH_1" => ::core::option::Option::Some(Self::DEPTH_1),
-            "DEPTH_5" => ::core::option::Option::Some(Self::DEPTH_5),
-            "DEPTH_10" => ::core::option::Option::Some(Self::DEPTH_10),
-            "DEPTH_20" => ::core::option::Option::Some(Self::DEPTH_20),
-            "DEPTH_50" => ::core::option::Option::Some(Self::DEPTH_50),
-            "DEPTH_100" => ::core::option::Option::Some(Self::DEPTH_100),
-            "DEPTH_200" => ::core::option::Option::Some(Self::DEPTH_200),
-            "DEPTH_500" => ::core::option::Option::Some(Self::DEPTH_500),
-            "DEPTH_1000" => ::core::option::Option::Some(Self::DEPTH_1000),
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn values() -> &'static [Self] {
-        &[
-            Self::DEPTH_UNSPECIFIED,
-            Self::DEPTH_1,
-            Self::DEPTH_5,
-            Self::DEPTH_10,
-            Self::DEPTH_20,
-            Self::DEPTH_50,
-            Self::DEPTH_100,
-            Self::DEPTH_200,
-            Self::DEPTH_500,
-            Self::DEPTH_1000,
-        ]
-    }
-}
 /// HeatmapQuantityMode controls what qty_scaled means in returned levels.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
@@ -8856,7 +8655,8 @@ pub struct GetOrderbookHeatmapRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub interval: ::buffa::EnumValue<HeatmapInterval>,
-    /// Top-N levels per side included in each bucket.
+    /// Top-N levels per side included in each bucket. Every tier except
+    /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
     ///
     /// Field 3: `depth`
     #[serde(
@@ -8864,7 +8664,7 @@ pub struct GetOrderbookHeatmapRequest {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub depth: ::buffa::EnumValue<HeatmapDepth>,
+    pub depth: ::buffa::EnumValue<super::super::polyester::r#type::v1::DepthTier>,
     /// Absolute time range for the first page. Reuse the same request filters and
     /// pass page_token from the prior response to continue older buckets.
     ///
@@ -10803,7 +10603,7 @@ pub struct GetOrderbookHeatmapResponse {
         with = "::buffa::json_helpers::proto_enum",
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
-    pub depth: ::buffa::EnumValue<HeatmapDepth>,
+    pub depth: ::buffa::EnumValue<super::super::polyester::r#type::v1::DepthTier>,
     /// Always returned as snapshot + sparse deltas for the requested interval.
     ///
     /// Field 4: `chain`
@@ -24335,10 +24135,13 @@ pub mod __buffa {
             ///
             /// Field 2: `interval`
             pub interval: ::buffa::EnumValue<super::super::HeatmapInterval>,
-            /// Top-N levels per side included in each bucket.
+            /// Top-N levels per side included in each bucket. Every tier except
+            /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
             ///
             /// Field 3: `depth`
-            pub depth: ::buffa::EnumValue<super::super::HeatmapDepth>,
+            pub depth: ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            >,
             /// Absolute time range for the first page. Reuse the same request filters and
             /// pass page_token from the prior response to continue older buckets.
             ///
@@ -24785,11 +24588,16 @@ pub mod __buffa {
             pub fn interval(&self) -> ::buffa::EnumValue<super::super::HeatmapInterval> {
                 self.0.reborrow().interval
             }
-            /// Top-N levels per side included in each bucket.
+            /// Top-N levels per side included in each bucket. Every tier except
+            /// DEPTH_5000, which is refused with INVALID_ARGUMENT.
             ///
             /// Field 3: `depth`
             #[must_use]
-            pub fn depth(&self) -> ::buffa::EnumValue<super::super::HeatmapDepth> {
+            pub fn depth(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            > {
                 self.0.reborrow().depth
             }
             /// Absolute time range for the first page. Reuse the same request filters and
@@ -27790,7 +27598,9 @@ pub mod __buffa {
             /// Top-N depth requested per side.
             ///
             /// Field 3: `depth`
-            pub depth: ::buffa::EnumValue<super::super::HeatmapDepth>,
+            pub depth: ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            >,
             /// Always returned as snapshot + sparse deltas for the requested interval.
             ///
             /// Field 4: `chain`
@@ -28398,7 +28208,11 @@ pub mod __buffa {
             ///
             /// Field 3: `depth`
             #[must_use]
-            pub fn depth(&self) -> ::buffa::EnumValue<super::super::HeatmapDepth> {
+            pub fn depth(
+                &self,
+            ) -> ::buffa::EnumValue<
+                super::super::super::super::polyester::r#type::v1::DepthTier,
+            > {
                 self.0.reborrow().depth
             }
             /// Always returned as snapshot + sparse deltas for the requested interval.

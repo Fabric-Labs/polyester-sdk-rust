@@ -4,11 +4,11 @@ use super::limits::{
 };
 use super::unary;
 use crate::codecs::decode::{
-    asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
+    DEPTH_TIERS, asset_info_list_from_proto, candles_columns_from_proto, candles_from_proto,
     currency_conversion_config_from_proto, currency_conversion_rates_from_proto,
-    market_overview_list_from_proto, market_trades_from_proto, orderbook_from_proto,
-    orderbook_snapshot_depth, orderbook_stream_tier, require_published_stream_depth,
-    spot_config_from_proto, spot_volume_history_from_proto,
+    depth_tier_for_levels, market_overview_list_from_proto, market_trades_from_proto,
+    orderbook_from_proto, orderbook_snapshot_depth, orderbook_stream_tier,
+    require_published_stream_depth, spot_config_from_proto, spot_volume_history_from_proto,
 };
 use crate::connect::marketdata::v1::MarketDataServiceClient;
 use crate::connect::marketoverview::v1::MarketOverviewServiceClient;
@@ -29,6 +29,7 @@ use crate::proto::marketoverview::v1::{
     GetSpotVolumeHistoryRequest, ListMarketOverviewRequest,
 };
 use crate::proto::orderbook::v1::GetOrderBookRequest;
+use crate::proto::polyester::r#type::v1::DepthTier;
 use crate::types::money::Quantity;
 use buffa_types::google::protobuf::Timestamp;
 
@@ -880,25 +881,31 @@ impl OrderbookService {
         Self { ctx }
     }
 
-    /// Snapshot orderbook for `symbol`, `depth` levels per side. `depth` is sent
-    /// as given, from 1 to the `max_depth` every snapshot reports (5,000 by
-    /// default); `None` or 0 asks for the default of 50. The result's `depth` is
-    /// the depth requested, 50 for the default. A depth above the server's
-    /// `max_depth` is refused by the server with `invalid_argument`
-    /// ([`Error::Api`] with code `InvalidArgument`), never truncated: ask for at
-    /// most `max_depth`.
+    /// Snapshot orderbook for `symbol`, `depth` levels per side: one of the
+    /// contract's depth tiers, 1, 5, 10, 20, 50, 100, 200, 500, 1000 or 5000
+    /// ([`crate::codecs::decode::DEPTH_TIERS`]), sent as that tier. `None`
+    /// sends no tier, and the server serves 50. Any other count, 0 included,
+    /// is refused with [`Error::Validation`] before sending. The result's `depth` is the
+    /// tier the server served.
     ///
     /// Order snapshots by `(book_epoch, book_seq)` with
     /// [`crate::codecs::decode::compare_snapshots`]. A snapshot is a frozen view:
     /// never apply stream updates to it, and fetch it again to refresh it.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
-        let wire_depth = depth.unwrap_or(0);
-        let depth = orderbook_snapshot_depth(wire_depth);
+        let tier = match depth {
+            None => DepthTier::DEPTH_UNSPECIFIED,
+            Some(levels) => depth_tier_for_levels(levels).ok_or_else(|| {
+                Error::validation(format!(
+                    "orderbook depth {levels} is no depth tier; use one of {DEPTH_TIERS:?}, or None for 50"
+                ))
+            })?,
+        };
+        let depth = orderbook_snapshot_depth(depth.unwrap_or(0));
         // Levels are decoded with the pair's catalog quantity scale.
         self.ctx.wait_for_catalogs().await?;
         let req = GetOrderBookRequest {
             symbol_id: self.ctx.catalogs.require_symbol_id(symbol)?,
-            depth: wire_depth,
+            depth: tier.into(),
             ..Default::default()
         };
         let quantity_scale = self
@@ -1491,7 +1498,6 @@ mod tests {
                             depth: 1,
                             book_seq: "1".into(),
                             book_epoch: "1".into(),
-                            max_depth: 5000,
                             bids: vec![],
                             asks: vec![],
                             available: true,
@@ -1554,7 +1560,6 @@ mod tests {
                             depth: 1,
                             book_seq: "1".into(),
                             book_epoch: "1".into(),
-                            max_depth: 5000,
                             bids: vec![],
                             asks: vec![],
                             available: true,
@@ -1591,7 +1596,6 @@ mod tests {
                 depth: 1,
                 book_seq: "1".into(),
                 book_epoch: String::new(),
-                max_depth: 0,
                 bids: vec![],
                 asks: vec![],
                 available: true,

@@ -358,10 +358,10 @@ fn inventory_lists_every_reply_id_field() {
     );
 }
 
-/// The messages of the 0.93.3, 0.93.4 and 0.93.5 contract changes whose every
+/// The messages of the 0.93.3 to 0.93.6 contract changes whose every
 /// field the SDK sets from a parameter or exposes on a model, unless the
 /// inventory says why not.
-const FIELD_INVENTORY_MESSAGES: [&str; 43] = [
+const FIELD_INVENTORY_MESSAGES: [&str; 48] = [
     "ledger.read.v1.CreateStatementExportRequest",
     "ledger.read.v1.GetStatementExportRequest",
     "ledger.read.v1.ListStatementExportsRequest",
@@ -405,6 +405,11 @@ const FIELD_INVENTORY_MESSAGES: [&str; 43] = [
     "orderbook.v1.GetOrderBookRequest",
     "orderbook.v1.GetOrderBookResponse",
     "system.v1.GetTimeResponse",
+    "orders.v1.CancelAllOrdersRequest",
+    "orders.v1.CancelAllOrdersResponse",
+    "orders.v1.CancelAllAfterRequest",
+    "auth.v1.MeResponse",
+    "polyester.api.v1.RequestErrorDetail",
 ];
 
 /// Every proto field of `message` as `<message>.<field>`, a oneof's members

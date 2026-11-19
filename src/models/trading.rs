@@ -443,6 +443,10 @@ pub struct CancelAllOrdersResult {
     pub total_cancelled: u32,
     /// True when more orders were canceled than `cancelled_orders` lists.
     pub truncated: bool,
+    /// With [`CancelAllOpts::include_triggers`], the number of triggers that
+    /// matched the filters when the request was accepted, each stopped unless
+    /// it was a dry run. Zero without `include_triggers`.
+    pub matched_triggers: u32,
     /// Whether `cancelled_orders` is available: `included` on the first
     /// response, `not_retained_read_open_orders` when a retry with the same
     /// `request_id` returns the original counts without the listing, empty
@@ -1010,7 +1014,8 @@ pub struct CancelAllAfterResult {
 
 /// The recorded scope of an armed dead-man switch. Expiry cancels working
 /// orders in this scope, including working child orders; waiting triggers
-/// stay active and may create further orders.
+/// stay active and may create further orders unless the switch was armed with
+/// [`CancelAllAfterOpts::include_triggers`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeadManSwitchScope {
     /// Public ID of the account or sub-account whose orders are canceled.
@@ -1019,6 +1024,30 @@ pub struct DeadManSwitchScope {
     pub symbol_id: u32,
     /// `buy`, `sell`, empty for both sides, or `UNKNOWN(<number>)`.
     pub side: String,
+}
+
+/// Options for [`crate::services::OrdersService::cancel_all_after_with`].
+#[derive(Debug, Clone, Default)]
+pub struct CancelAllAfterOpts {
+    /// 10 to 120 seconds, or 0 to disarm the switch.
+    pub timeout_sec: u32,
+    /// Market whose orders the switch cancels; `None` covers every market.
+    pub symbol: Option<String>,
+    pub subaccount_id: SubAccountScope,
+    /// `buy` or `sell` to cancel one side only on expiry; `None` covers
+    /// both.
+    pub side: Option<String>,
+    /// When the switch expires, also stop the account's triggers in its
+    /// scope, as [`CancelAllOpts::include_triggers`] does: those created
+    /// before the expiry time, even when the expiry is processed later, and
+    /// none of them places an order once it is processed. A trigger created
+    /// at or after the expiry time is not stopped. `false` (the default)
+    /// cancels orders only. Every arm or refresh sets it again; a disarm
+    /// ignores it.
+    pub include_triggers: bool,
+    /// Generated when omitted. Reuse a stable non-empty value when retrying
+    /// the same arm, refresh or disarm.
+    pub request_id: Option<String>,
 }
 
 /// Options for [`crate::services::OrdersService::list_open_with`].
@@ -1122,6 +1151,15 @@ pub struct CancelAllOpts {
     pub dry_run: bool,
     pub subaccount_id: SubAccountScope,
     pub side: Option<String>,
+    /// Also stop the account's triggers in the same scope: every stop-loss,
+    /// take-profit, trailing stop, TWAP, ladder and attached leg on the
+    /// matched symbols whose orders trade on the side filter, created before
+    /// the request was accepted. Each ends canceled with cancel reason
+    /// `cancel_all` and releases its reserved funds, and none places an order
+    /// after the response. `false` (the default) cancels orders only and
+    /// leaves triggers running. Keep it unchanged when retrying with the same
+    /// `request_id`.
+    pub include_triggers: bool,
     /// Optional mutation request id (API-required on the wire).
     ///
     /// When omitted or blank, the SDK generates a unique id (TypeScript/Go/Python parity).
@@ -1605,7 +1643,11 @@ pub struct InternalTransferBatchResult {
     /// not known yet: the batch completes on its own, ending `accepted` or
     /// `refused`; follow it with `get_batch` or retry it with the same key
     /// and legs) or `refused` (nothing moved, and nothing will under this
-    /// idempotency key; the legs that caused it carry `error_code`).
+    /// idempotency key; the legs that caused it carry `error_code`). A
+    /// refusal is final for its key in every case: a retry with the same
+    /// key and legs answers `refused` again, even once the leg would pass,
+    /// and one with other legs is refused `IDEMPOTENCY_CONFLICT`. Fix the
+    /// cause and submit under a new key.
     pub status: String,
     /// One result per leg, in request order.
     pub legs: Vec<InternalTransferBatchLegResult>,
@@ -1727,9 +1769,11 @@ pub struct ApiKeySummary {
     pub expires_at: Option<Timestamp>,
     /// Monotonic resource revision for conditional updates.
     pub revision: u64,
-    /// What the key is for: `"STANDARD"` for a key the user created and
+    /// What the key is for: `"STANDARD"` for a key the user created,
     /// `"ASSISTANT"` for a key the user set up for the Polyester assistant
-    /// (listed and revoked like any key); empty when the server names none,
+    /// (listed and revoked like any key) and `"ADMIN_KEY"` for an elevated
+    /// key that manages the account's other keys and its sub-accounts'
+    /// policies (show it as elevated); empty when the server names none,
     /// and `"UNKNOWN(n)"` for a purpose this SDK version does not know.
     /// Existing keys read `"STANDARD"`.
     pub purpose: String,
