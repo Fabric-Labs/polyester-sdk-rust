@@ -1600,6 +1600,25 @@ fn on_message(
         Msg::Order(update) => emit_or_exit(events, Event::Order(update)),
         Msg::Execution(execution) => emit_or_exit(events, Event::Execution(execution)),
         Msg::MarketResync(resync) => emit_or_exit(events, Event::MarketResync(resync)),
+        Msg::OcoAck { seq, ack } => {
+            // This client sends no CreateOco or CancelOco, so an OcoAck
+            // cannot answer a command or ping of this connection.
+            if conn.in_flight.contains_key(&seq) {
+                return Some(Exit::Lost(TradeError::frame(
+                    31,
+                    format!("an OcoAck for seq {seq}, which is no OCO command"),
+                )));
+            }
+            emit_or_exit(events, Event::OcoAck(ack))
+        }
+        Msg::Unknown { template_id } => {
+            tracing::debug!(
+                template_id,
+                connection = conn.number,
+                "tradews skipped a message of a template this client does not know"
+            );
+            emit_or_exit(events, Event::Unknown { template_id })
+        }
     }
 }
 

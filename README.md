@@ -2636,7 +2636,11 @@ good-till-cancelled limit orders.
   a lost connection left unanswered.
 - **Events.** `Event::Order` (with `CancelReason`, including `CancelAllAfter`
   and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
-  (reconcile the pair through the Orders API).
+  (reconcile the pair through the Orders API). The schema adds messages
+  without changing its version: a message of a template this client does not
+  know is skipped and reported as `Event::Unknown { template_id }`, and the
+  connection carries on. `Event` and the other `tradews` enums that grow are
+  `#[non_exhaustive]`, so match them with a `_ =>` arm.
 
 - **Concurrency.** `TradeSession::split` divides a session into a
   `TradeSender` and a `TradeEvents`, as a WebSocket stream splits into its

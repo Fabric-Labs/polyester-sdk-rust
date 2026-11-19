@@ -14,17 +14,18 @@ use crate::tradews::sbe::{
     self, WriteBuf, batch_create_ack_codec, batch_item_status, batch_replace_ack_codec,
     cancel_all_after_codec, cancel_all_listing_status, cancel_all_orders_codec, command_ack_codec,
     command_reject_codec, command_type, execution_event_codec, fee_asset, market_resync_codec,
-    market_resync_reason, order_event_codec, order_status, reject_code, replace_action, side,
+    market_resync_reason, oco_ack_codec, order_event_codec, order_status, reject_code,
+    replace_action, side,
 };
 use crate::tradews::{
     BatchCancelOrders, BatchCreateOrders, BatchReplaceOrders, BatchStatus, CancelAllAfterOptions,
     CancelAllListing, CancelAllOrders, CancelItem, CancelReason, CancelledOrder, Deadline,
-    FeeAsset, ModifyBehavior, ModifyOrder, OrderRef, OrderStatus, PostOnlyOrder, RejectCode,
-    ReplaceAction, ReplaceItem, ResyncReason, Side, TradeError,
+    FeeAsset, ModifyBehavior, ModifyOrder, OcoAck, OcoCommand, OrderRef, OrderStatus,
+    PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItem, ResyncReason, Side, TradeError,
 };
 use crate::types::{Price, Quantity, QuantityDomain};
 
-const ORDER: u64 = 5_764_607_523_034_234_881;
+pub(super) const ORDER: u64 = 5_764_607_523_034_234_881;
 const OTHER: u64 = 9_223_372_036_854_775_837;
 const ACK_NS: u64 = 1_801_234_567_890_123_456;
 const GATEWAY_NS: u64 = 1_801_234_567_000_000_000;
@@ -336,9 +337,8 @@ fn every_short_long_or_foreign_frame_is_refused_before_a_read() {
             ..
         }))
     ));
-    let mut unknown_template = server()[0].clone();
-    unknown_template[2] = 99;
-    assert!(frame_error(codec::decode(&unknown_template)));
+    // A template this client does not know is skipped, not refused:
+    // `unknown_templates_are_skipped_whole`.
     // A batch result count past the frame's end.
     let mut overlong = server()[7].clone();
     overlong[HEADER + batch_create_ack_codec::SBE_BLOCK_LENGTH as usize + 2] = 9;
@@ -347,6 +347,156 @@ fn every_short_long_or_foreign_frame_is_refused_before_a_read() {
     let mut short_block = server()[2].clone();
     short_block[0] -= 1;
     assert!(frame_error(codec::decode(&short_block)));
+}
+
+/// A message of a template this client does not know, of this schema and
+/// version: a 12-byte block, then a group of two 3-byte entries and a 5-byte
+/// data field, whose layout only that template's schema would tell.
+pub(super) fn unknown(template_id: u16) -> Vec<u8> {
+    let mut f = Vec::new();
+    for v in [12, template_id, codec::SCHEMA_ID, codec::SCHEMA_VERSION] {
+        f.extend(u16::to_le_bytes(v));
+    }
+    f.extend([0xab; 12]);
+    f.extend(3u16.to_le_bytes());
+    f.extend(2u16.to_le_bytes());
+    f.extend([1u8; 6]);
+    f.extend(5u32.to_le_bytes());
+    f.extend(b"hello");
+    f
+}
+
+#[test]
+fn unknown_templates_are_skipped_whole() {
+    // BatchReplaceItemReject (32) from a newer server, and any other.
+    for template_id in [32, 99, u16::MAX] {
+        assert_eq!(
+            codec::decode(&unknown(template_id)).unwrap(),
+            Msg::Unknown { template_id }
+        );
+    }
+    // A header alone, declaring an empty block.
+    let mut bare = unknown(32)[..HEADER].to_vec();
+    bare[..2].copy_from_slice(&0u16.to_le_bytes());
+    assert_eq!(
+        codec::decode(&bare).unwrap(),
+        Msg::Unknown { template_id: 32 }
+    );
+    // Each WebSocket message is one SBE message: the known frames around an
+    // unknown one decode as they do alone.
+    let stream = [server()[0].clone(), unknown(32), server()[1].clone()];
+    let got: Vec<Msg> = stream.iter().map(|f| codec::decode(f).unwrap()).collect();
+    assert_eq!(
+        got,
+        [decoded(0), Msg::Unknown { template_id: 32 }, decoded(1)]
+    );
+    // Shorter than its header and the block the header declares: refused.
+    let frame = unknown(32);
+    for len in 0..HEADER + 12 {
+        let got = codec::decode(&frame[..len]);
+        assert!(frame_error(got.clone()), "{len}: {got:?}");
+    }
+    // Another schema or version is refused whatever the template.
+    let mut newer = unknown(32);
+    newer[6..8].copy_from_slice(&(codec::SCHEMA_VERSION + 1).to_le_bytes());
+    assert!(matches!(
+        codec::decode(&newer),
+        Err(Error::TradeSession(TradeError::Schema { .. }))
+    ));
+    let mut other = unknown(32);
+    other[4..6].copy_from_slice(&20u16.to_le_bytes());
+    assert!(matches!(
+        codec::decode(&other),
+        Err(Error::TradeSession(TradeError::Schema {
+            schema_id: 20,
+            ..
+        }))
+    ));
+}
+
+/// An `OcoAck` as the generated encoder writes it; a create names both legs.
+pub(super) fn oco_ack(
+    seq: u64,
+    correlation_id: u64,
+    command: command_type::CommandType,
+    client_list_id: &[u8],
+) -> Vec<u8> {
+    let mut buf =
+        vec![0u8; HEADER + oco_ack_codec::SBE_BLOCK_LENGTH as usize + 4 + client_list_id.len()];
+    let mut e = oco_ack_codec::OcoAckEncoder::default()
+        .wrap(WriteBuf::new(&mut buf), HEADER)
+        .header(0)
+        .parent()
+        .unwrap();
+    e.seq(seq);
+    e.correlation_id(correlation_id);
+    e.command_type(command);
+    e.order_list_id(ORDER);
+    if command == command_type::CommandType::CREATE_OCO {
+        e.take_profit_trigger_id(OTHER);
+        e.stop_loss_trigger_id(OTHER + 1);
+    }
+    e.ts_ns(ACK_NS);
+    e.client_list_id(client_list_id);
+    buf
+}
+
+#[test]
+fn oco_acks_decode_for_a_create_and_a_cancel() {
+    use command_type::CommandType as T;
+    assert_eq!(
+        codec::decode(&oco_ack(3, 9003, T::CREATE_OCO, b"oco-1")).unwrap(),
+        Msg::OcoAck {
+            seq: 3,
+            ack: OcoAck {
+                correlation_id: 9003,
+                command: OcoCommand::Create,
+                order_list_id: ORDER,
+                take_profit_trigger_id: Some(OTHER),
+                stop_loss_trigger_id: Some(OTHER + 1),
+                client_list_id: Some("oco-1".into()),
+                acked_at: at(ACK_NS),
+            },
+        }
+    );
+    assert_eq!(
+        codec::decode(&oco_ack(4, 9004, T::CANCEL_OCO, b"")).unwrap(),
+        Msg::OcoAck {
+            seq: 4,
+            ack: OcoAck {
+                correlation_id: 9004,
+                command: OcoCommand::Cancel,
+                order_list_id: ORDER,
+                take_profit_trigger_id: None,
+                stop_loss_trigger_id: None,
+                client_list_id: None,
+                acked_at: at(ACK_NS),
+            },
+        }
+    );
+    // A command type this client does not name keeps its number.
+    let mut other = oco_ack(5, 9005, T::CANCEL_OCO, b"");
+    other[HEADER + codec::OCO_ACK_COMMAND] = 40;
+    assert!(matches!(
+        codec::decode(&other).unwrap(),
+        Msg::OcoAck { ack, .. } if ack.command == OcoCommand::Unknown(40)
+    ));
+    // Every short frame, a trailing byte and an ID that is not UTF-8 are
+    // refused.
+    let frame = oco_ack(3, 9003, T::CREATE_OCO, b"oco-1");
+    for len in 0..frame.len() {
+        let got = codec::decode(&frame[..len]);
+        assert!(frame_error(got.clone()), "{len}: {got:?}");
+    }
+    let mut longer = frame.clone();
+    longer.push(0);
+    assert!(frame_error(codec::decode(&longer)));
+    assert!(frame_error(codec::decode(&oco_ack(
+        3,
+        9003,
+        T::CREATE_OCO,
+        &[0xff, 0xfe]
+    ))));
 }
 
 /// A deadline in the past, so the fixture does not depend on today's date.
@@ -646,6 +796,11 @@ fn raw_offsets_are_the_generated_codecs() {
         e.status(sbe::batch_status::BatchStatus::REJECTED);
     });
     assert_eq!(f[HEADER + codec::REPLACE_ACK_STATUS], 3);
+    let f = generated!(oco_ack_codec::OcoAckEncoder, |e| {
+        e.command_type(command_type::CommandType::CANCEL_OCO);
+    });
+    assert_eq!(f[HEADER + codec::OCO_ACK_COMMAND], 12);
+    assert_eq!(u8::from(command_type::CommandType::CREATE_OCO), 11);
 
     // Group entries: one entry each, after the block and the group header.
     let mut buf = vec![0u8; HEADER + 64 + 4 + 35];

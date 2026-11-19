@@ -61,6 +61,10 @@ struct Script {
     reject: Option<reject_code::RejectCode>,
     /// Frames sent right after the SubscriptionAck.
     after_ready: Vec<Vec<u8>>,
+    /// Frames sent before every command's answer, while it is in flight.
+    before_answer: Vec<Vec<u8>>,
+    /// Answer every command with an OcoAck of its seq instead.
+    oco_answer: bool,
     /// Close the socket, unanswered, on a frame of this template.
     close_on: Option<u16>,
     /// Answer every `CancelAllAfter` after the first this much later.
@@ -88,6 +92,8 @@ fn serve() -> Script {
         hold: None,
         reject: None,
         after_ready: Vec::new(),
+        before_answer: Vec::new(),
+        oco_answer: false,
         close_on: None,
         delay_later_timers: None,
         stall_after_ready: false,
@@ -478,6 +484,9 @@ fn answer(script: &Script, template: u16, seq: u64, corr: u64, frame: &[u8]) -> 
     if let Some(code) = script.reject {
         return Some(reject(seq, corr, code));
     }
+    if script.oco_answer {
+        return Some(super::codec::oco_ack(seq, corr, T::CREATE_OCO, b"oco-1"));
+    }
     Some(match template {
         2 => ack(seq, corr, T::CREATE_ORDER),
         3 => ack(seq, corr, T::CANCEL_ORDER),
@@ -630,6 +639,11 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                         && let Some(delay) = current.delay_later_timers
                     {
                         tokio::time::sleep(delay).await;
+                    }
+                }
+                if !matches!(template, 1 | 6) {
+                    for pushed in &current.before_answer {
+                        let _ = ws.send(Message::Binary(pushed.clone().into())).await;
                     }
                 }
                 if ws.send(Message::Binary(reply.into())).await.is_err() {
@@ -1513,6 +1527,112 @@ async fn order_events_carry_cancel_on_disconnect_and_cancel_all_after() {
             (12, Some(CancelReason::CancelAllAfter))
         ]
     );
+}
+
+#[tokio::test]
+async fn unknown_templates_and_oco_acks_keep_the_connection_and_its_commands() {
+    use super::codec::{oco_ack, unknown};
+    use command_type::CommandType as T;
+    let script = Script {
+        after_ready: vec![
+            unknown(32),
+            order_event(11, 1),
+            oco_ack(0, 77, T::CANCEL_OCO, b""),
+        ],
+        // While each command is in flight: a BatchReplaceItemReject from a
+        // newer server, an OcoAck of no command, another unknown template.
+        before_answer: vec![
+            unknown(32),
+            oco_ack(0, 78, T::CREATE_OCO, b"oco-1"),
+            unknown(99),
+        ],
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![script]).await;
+    let mut session = start(url).await;
+    ready_on(&mut session, 1).await;
+    let (one, two, three) = (
+        OrderRef::Id(1),
+        OrderRef::Id(2),
+        OrderRef::Client("c3".into()),
+    );
+    let (a, b, c) = tokio::join!(
+        session.cancel_order(7, &one, within(1_000)),
+        session.cancel_order(7, &two, within(1_000)),
+        session.cancel_order(7, &three, within(1_000)),
+    );
+    for result in [a, b, c] {
+        assert!(result.expect("answered").order_id.is_some());
+    }
+    // The same connection takes the next command.
+    let mut cancel_all = CancelAllOrders::new(vec![]);
+    cancel_all.correlation_id = 5;
+    session
+        .cancel_all_orders(&cancel_all, within(1_000))
+        .await
+        .expect("answered");
+
+    let mut seen = Vec::new();
+    while seen.len() < 3 + 4 * 3 {
+        let event = wait(&mut session, |e| {
+            (!matches!(e, Event::Pong { .. })).then(|| e.clone())
+        })
+        .await;
+        assert!(
+            !matches!(event, Event::Disconnected { .. } | Event::Connected { .. }),
+            "{event:?}"
+        );
+        seen.push(match event {
+            Event::Unknown { template_id } => format!("unknown {template_id}"),
+            Event::Order(o) => format!("order {}", o.order_id),
+            Event::OcoAck(ack) => {
+                assert_eq!(ack.order_list_id, super::codec::ORDER);
+                format!("oco {} {:?}", ack.correlation_id, ack.command)
+            }
+            other => panic!("{other:?}"),
+        });
+    }
+    let mut want = vec![
+        "unknown 32".to_string(),
+        "order 11".into(),
+        "oco 77 Cancel".into(),
+    ];
+    for _ in 0..4 {
+        want.extend([
+            "unknown 32".into(),
+            "oco 78 Create".into(),
+            "unknown 99".into(),
+        ]);
+    }
+    assert_eq!(seen, want);
+    let all = record.lock().unwrap().clone();
+    assert_eq!(all.len(), 1, "one connection");
+    assert!(session.is_alive());
+}
+
+#[tokio::test]
+async fn an_oco_ack_answering_a_command_in_flight_ends_the_connection() {
+    let misanswer = Script {
+        oco_answer: true,
+        ..serve()
+    };
+    let (url, _) = stand_in(vec![misanswer, serve()]).await;
+    let mut session = start(url).await;
+    ready_on(&mut session, 1).await;
+    let result = session
+        .cancel_order(7, &OrderRef::Id(1), within(1_000))
+        .await;
+    assert!(matches!(
+        trade_error(result),
+        TradeError::OutcomeUnknown {
+            command: Command::CancelOrder,
+            ..
+        }
+    ));
+    let (reason, unanswered) = disconnected(&mut session).await;
+    assert!(reason.contains("an OcoAck for seq"), "{reason}");
+    assert_eq!(unanswered.len(), 1);
+    ready_on(&mut session, 2).await;
 }
 
 #[tokio::test]
