@@ -365,9 +365,11 @@ impl InternalTransfersService {
     /// and asset combination may appear only once (both refused by the API
     /// with `INVALID_REQUEST`). A batch counts once against the internal
     /// transfer rate limit, with a weight of `max(ceil(legs / 50), distinct
-    /// source accounts)`; one that outweighs the account's burst is refused
-    /// with `RATE_LIMIT_EXCEEDED` and no `Retry-After`: waiting does not admit
-    /// it, so split it rather than retry.
+    /// source accounts)`: size batches to stay within the account's burst
+    /// before sending, since one that outweighs it is never admitted. Like
+    /// every failure of this call, its `RATE_LIMIT_EXCEEDED` is an unknown
+    /// outcome: retry under the same key with the same legs, after
+    /// Retry-After when there is one.
     ///
     /// Refused before sending: no legs or more than 500, an idempotency key
     /// that is empty or over 128 characters, a leg without an asset ID or
@@ -1989,27 +1991,35 @@ impl RateLimitService {
 
 /// The error of a batch create the server answered with a failure: always
 /// an unknown outcome that this SDK does not retry, whatever it maps to (a
-/// rate limit, a typed refusal or an `unavailable` included), keeping its
-/// code and the answer's status and Retry-After. The batch is only ever sent
-/// again under the same idempotency key and legs, which the contract makes
-/// safe whether or not it was admitted.
+/// rate limit, a typed refusal, an `unavailable` or a reply that breaks the
+/// contract included). It keeps the failure's code as mapped (or as the
+/// answer names it) and the answer's real status and Retry-After. The batch
+/// is only ever sent again under the same idempotency key and legs, which
+/// the contract makes safe whether or not it was admitted.
 fn batch_create_failure(err: connectrpc::ConnectError) -> crate::errors::Error {
     use crate::errors::Error;
-    let mapped = crate::transport::Factory::map_error(err);
-    if mapped.mutation_outcome_unknown() && !mapped.is_retryable() {
-        return mapped;
-    }
-    let code = match &mapped {
+    let mapped = crate::transport::Factory::map_error(err.clone());
+    let mapped_code = match &mapped {
         Error::Api { code, .. }
         | Error::AdmissionUnavailable { code, .. }
-        | Error::ApiKeyRejected { code, .. } => Some(code.clone()),
-        Error::RateLimit { code, .. } | Error::Server { code, .. } => code.clone(),
+        | Error::ApiKeyRejected { code, .. }
+        | Error::PermissionDenied { code, .. } => Some(code.clone()),
+        Error::RateLimit { code, .. }
+        | Error::Server { code, .. }
+        | Error::GatewayTimeout { code, .. } => code.clone(),
         other => other.auth_error_code().map(str::to_owned),
     };
+    let code = mapped_code
+        .filter(|code| !code.is_empty())
+        .or_else(|| crate::errors::answer_error_code(&err));
+    let answer = mapped
+        .answer()
+        .cloned()
+        .or_else(|| crate::errors::answer_meta(&err));
     Error::Server {
         message: mapped.to_string(),
         code,
-        answer: mapped.answer().cloned().map(Box::new),
+        answer: answer.map(Box::new),
     }
 }
 

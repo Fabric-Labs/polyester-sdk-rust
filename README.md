@@ -1690,9 +1690,11 @@ SDK notes:
   admitted and answers the batch's outcome. A batch debits at most 10 distinct source accounts
   (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
   asset pairs. It counts once against the internal transfer rate limit, with a
-  weight of `max(ceil(legs / 50), distinct source accounts)`: a
-  `RATE_LIMIT_EXCEEDED` without `Retry-After` means the batch outweighs the
-  burst, so split it rather than retry.
+  weight of `max(ceil(legs / 50), distinct source accounts)`: size batches to
+  stay within the account's burst before sending, since one that outweighs it
+  is never admitted. For any ambiguous failure, a `RATE_LIMIT_EXCEEDED`
+  included, retry under the same key with the same legs, after `Retry-After`
+  when there is one.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {

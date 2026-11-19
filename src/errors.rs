@@ -1894,6 +1894,46 @@ fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
     AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
+/// The HTTP answer behind `err`: its real status, as the transport recorded
+/// it, and the delay it asked for. `None` when the transport saw no answer.
+pub(crate) fn answer_meta(err: &ConnectError) -> Option<AnswerMeta> {
+    err.response_headers()
+        .get(crate::transport::ANSWER_STATUS_HEADER)
+        .and_then(|value| value.to_str().ok()?.parse::<u16>().ok())
+        .map(|status| AnswerMeta {
+            status,
+            retry_after: retry_after_seconds(err),
+        })
+}
+
+/// The structured code a failed answer names: the first typed service
+/// detail's code (auth, orders, transfer, withdraw, ledger or alerts), else a
+/// REST problem's own `code`. `None` when it names none.
+pub(crate) fn answer_error_code(err: &ConnectError) -> Option<String> {
+    fn label<T: Enumeration>(code: &buffa::EnumValue<T>) -> Option<String> {
+        (code.to_i32() != 0)
+            .then(|| known_or_unknown_code(code.as_known().map(|c| c.proto_name()), code.to_i32()))
+    }
+    err.details
+        .iter()
+        .find_map(|detail| {
+            decode_auth_error_detail(detail)
+                .and_then(|d| label(&d.code))
+                .or_else(|| decode_order_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_transfer_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_withdraw_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_ledger_error_detail(detail).and_then(|d| label(&d.code)))
+                .or_else(|| decode_alert_error_detail(detail).and_then(|d| label(&d.code)))
+        })
+        .or_else(|| {
+            err.details
+                .iter()
+                .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
+                .and_then(|d| d.debug.as_ref()?.get("code")?.as_str().map(str::to_owned))
+                .filter(|code| !code.is_empty())
+        })
+}
+
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
     if !detail.type_url.ends_with("transfer.v1.ErrorDetail") {
         return None;
@@ -2125,14 +2165,7 @@ pub fn map_connect_error(err: ConnectError) -> Error {
     // The status is the answer's own, recorded by the transport, never one
     // inferred from the error's code; an error the transport saw no answer
     // for, such as a refused connection, has none.
-    let answer = err
-        .response_headers()
-        .get(crate::transport::ANSWER_STATUS_HEADER)
-        .and_then(|value| value.to_str().ok()?.parse::<u16>().ok())
-        .map(|status| AnswerMeta {
-            status,
-            retry_after: retry_after_seconds(&err),
-        });
+    let answer = answer_meta(&err);
     // The window a skew refusal states: an `auth.v1.AuthErrorDetail`'s
     // typed window, whichever path names the refusal (its detail code, or
     // the code in the message as the gateway answers it), or a REST

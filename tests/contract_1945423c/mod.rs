@@ -691,6 +691,139 @@ async fn batch_transfer_failures_are_unknown_outcomes() {
     }
 }
 
+/// A batch create's unknown outcome keeps the failure's structured code as
+/// mapped, and the answer's real status and Retry-After, also when the
+/// answer itself breaks the contract.
+#[tokio::test]
+async fn batch_transfer_failures_keep_their_code_and_answer() {
+    use polyester::proto::polyester::api::v1::{RequestErrorCode, RequestErrorDetail};
+    use polyester::proto::transfer::v1::{ErrorCode as TransferCode, ErrorDetail};
+    let b64 = |bytes: Vec<u8>| base64::engine::general_purpose::STANDARD_NO_PAD.encode(bytes);
+    let cases: Vec<(&str, u16, &str, String, Option<&str>)> = vec![
+        (
+            "REST MFA elevation",
+            403,
+            "application/problem+json",
+            json!({
+                "type": "https://polyester.dev/problems/auth-mfa-elevation-required",
+                "title": "MFA Elevation Required",
+                "status": 403,
+                "code": "AUTH_MFA_ELEVATION_REQUIRED",
+                "detail": "complete an MFA challenge",
+            })
+            .to_string(),
+            Some("AUTH_MFA_ELEVATION_REQUIRED"),
+        ),
+        (
+            "typed transfer permission",
+            403,
+            "application/json",
+            json!({
+                "code": "permission_denied",
+                "message": "denied",
+                "details": [{
+                    "type": "transfer.v1.ErrorDetail",
+                    "value": b64(ErrorDetail {
+                        code: TransferCode::ERROR_CODE_PERMISSION_DENIED.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            Some("ERROR_CODE_PERMISSION_DENIED"),
+        ),
+        (
+            "rate-limit problem on a 500",
+            500,
+            "application/problem+json",
+            json!({
+                "type": "https://polyester.dev/problems/rate-limit-exceeded",
+                "title": "Too Many Requests",
+                "status": 500,
+                "code": "RATE_LIMIT_EXCEEDED",
+                "rateLimit": {"reason": "QUOTA_EXCEEDED", "retryAfterMs": "2000"},
+            })
+            .to_string(),
+            // As the SDK maps the REST rate-limit code.
+            Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
+        ),
+        (
+            "genuine 429",
+            429,
+            "application/json",
+            json!({
+                "code": "resource_exhausted",
+                "message": "slow down",
+                "details": [{
+                    "type": "transfer.v1.ErrorDetail",
+                    "value": b64(ErrorDetail {
+                        code: TransferCode::ERROR_CODE_RATE_LIMIT_EXCEEDED.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
+        ),
+        (
+            "size refusal without its limit",
+            429,
+            "application/json",
+            json!({
+                "code": "resource_exhausted",
+                "message": "request too large",
+                "details": [{
+                    "type": "polyester.api.v1.RequestErrorDetail",
+                    "value": b64(RequestErrorDetail {
+                        code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            None,
+        ),
+    ];
+    for (case, status, content_type, body, code) in cases {
+        let content_type = content_type.to_owned();
+        let (client, _) = server(move |_| HttpScript::Raw {
+            status,
+            headers: vec![
+                ("Content-Type".into(), content_type.clone()),
+                ("Content-Length".into(), body.len().to_string()),
+                ("Retry-After".into(), "2".into()),
+            ],
+            body: body.as_bytes().to_vec(),
+        })
+        .await;
+        let err = client
+            .internal_transfers
+            .batch_create(BatchCreateInternalTransfersParams {
+                legs: vec![leg(1, "0.5")],
+                idempotency_key: "rebalance-3".into(),
+            })
+            .await
+            .unwrap_err();
+        assert!(err.mutation_outcome_unknown(), "{case}: {err:?}");
+        assert!(!err.is_retryable(), "{case}: {err:?}");
+        assert_eq!(
+            err.answer().map(|a| a.status),
+            Some(status),
+            "{case}: {err:?}"
+        );
+        assert_eq!(err.retry_after(), Some(2.0), "{case}: {err:?}");
+        if let Some(code) = code {
+            assert!(
+                matches!(&err, Error::Server { code: Some(c), .. } if c == code),
+                "{case}: {err:?}"
+            );
+        }
+    }
+}
+
 #[tokio::test]
 async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
     let leg_result = |index: u32, status: InternalTransferBatchLegStatus, flow: &str| {
