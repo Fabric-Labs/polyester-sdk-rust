@@ -665,6 +665,10 @@ pub enum TriggerCancelReason {
     /// reserved funds. The market's open orders were canceled at the same time.
     /// The market refuses new triggers until it trades again.
     TRIGGER_CANCEL_REASON_MARKET_HALTED = 13i32,
+    /// The account's cancel-all, or its dead-man switch, with triggers included
+    /// stopped the trigger: its reserved funds were released and its open
+    /// orders were canceled with the account's other orders.
+    TRIGGER_CANCEL_REASON_CANCEL_ALL = 16i32,
     /// The terminal state did not contain a cancellation reason.
     TRIGGER_CANCEL_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure canceled the trigger.
@@ -704,6 +708,9 @@ impl TriggerCancelReason {
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MARKET_HALTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MarketHalted: Self = Self::TRIGGER_CANCEL_REASON_MARKET_HALTED;
+    ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_CANCEL_ALL`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const CancelAll: Self = Self::TRIGGER_CANCEL_REASON_CANCEL_ALL;
     ///Idiomatic alias for [`Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE;
@@ -847,6 +854,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             13i32 => {
                 ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_MARKET_HALTED)
             }
+            16i32 => ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_CANCEL_ALL),
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -894,6 +902,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_MARKET_HALTED => {
                 "TRIGGER_CANCEL_REASON_MARKET_HALTED"
             }
+            Self::TRIGGER_CANCEL_REASON_CANCEL_ALL => "TRIGGER_CANCEL_REASON_CANCEL_ALL",
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE"
             }
@@ -947,6 +956,9 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             "TRIGGER_CANCEL_REASON_MARKET_HALTED" => {
                 ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_MARKET_HALTED)
             }
+            "TRIGGER_CANCEL_REASON_CANCEL_ALL" => {
+                ::core::option::Option::Some(Self::TRIGGER_CANCEL_REASON_CANCEL_ALL)
+            }
             "TRIGGER_CANCEL_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
@@ -971,6 +983,7 @@ impl ::buffa::Enumeration for TriggerCancelReason {
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_LADDER,
             Self::TRIGGER_CANCEL_REASON_PAIR_DRAIN_ATTACHED_LEG,
             Self::TRIGGER_CANCEL_REASON_MARKET_HALTED,
+            Self::TRIGGER_CANCEL_REASON_CANCEL_ALL,
             Self::TRIGGER_CANCEL_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_CANCEL_REASON_INTERNAL_ERROR,
         ]
@@ -1194,6 +1207,11 @@ pub enum TriggerFailureReason {
     /// price; once that order is gone or no longer first there, it fires again if
     /// its trigger condition still holds.
     TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED = 249i32,
+    /// The account's cancel-all, or its dead-man switch, with triggers included
+    /// was stopping the trigger, so the fire placed no order; the trigger then
+    /// ends canceled with reason TRIGGER_CANCEL_REASON_CANCEL_ALL. Only on
+    /// EVENT_FIRE_REFUSED.
+    TRIGGER_FAILURE_REASON_TRIGGER_STOPPING = 263i32,
     /// The terminal state did not contain a failure reason.
     TRIGGER_FAILURE_REASON_MISSING_REASON_CODE = 998i32,
     /// An internal invariant or processing failure caused the trigger to fail.
@@ -1485,6 +1503,9 @@ impl TriggerFailureReason {
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const SelfTradePrevented: Self = Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED;
+    ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const TriggerStopping: Self = Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING;
     ///Idiomatic alias for [`Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const MissingReasonCode: Self = Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE;
@@ -2018,6 +2039,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
                 )
             }
+            263i32 => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING,
+                )
+            }
             998i32 => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2314,6 +2340,9 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             }
             Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED => {
                 "TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED"
+            }
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING => {
+                "TRIGGER_FAILURE_REASON_TRIGGER_STOPPING"
             }
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE => {
                 "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE"
@@ -2760,6 +2789,11 @@ impl ::buffa::Enumeration for TriggerFailureReason {
                     Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
                 )
             }
+            "TRIGGER_FAILURE_REASON_TRIGGER_STOPPING" => {
+                ::core::option::Option::Some(
+                    Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING,
+                )
+            }
             "TRIGGER_FAILURE_REASON_MISSING_REASON_CODE" => {
                 ::core::option::Option::Some(
                     Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
@@ -2868,6 +2902,7 @@ impl ::buffa::Enumeration for TriggerFailureReason {
             Self::TRIGGER_FAILURE_REASON_INDEX_PRICE_UNAVAILABLE,
             Self::TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY,
             Self::TRIGGER_FAILURE_REASON_SELF_TRADE_PREVENTED,
+            Self::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING,
             Self::TRIGGER_FAILURE_REASON_MISSING_REASON_CODE,
             Self::TRIGGER_FAILURE_REASON_INTERNAL_ERROR,
         ]

@@ -353,6 +353,14 @@ pub trait ApiKeyService: Send + Sync + 'static {
     /// MFA enrollment or a fresh step-up proof. The acting caller's root account
     /// must have accepted the current terms, including when targeting a shared
     /// subaccount; otherwise FailedPrecondition with AUTH_TERMS_NOT_ACCEPTED is returned.
+    /// Creating an admin key always takes a fresh step-up proof.
+    /// An admin API key with MANAGE_API_KEYS may also create a standard key, for
+    /// the main account or a sub-account it owns, without a session. The new key
+    /// needs an ip_whitelist whose every entry lies within the admin key's own
+    /// allowlist (else PermissionDenied with AUTH_ADMIN_KEY_SCOPE_EXCEEDED). A
+    /// request for an admin key from any API key returns PermissionDenied with
+    /// AUTH_ADMIN_KEY_ESCALATION_DENIED. Any other API key returns
+    /// PermissionDenied with AUTH_ADMIN_KEY_REQUIRED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -426,6 +434,11 @@ pub trait ApiKeyService: Send + Sync + 'static {
         >,
     > + Send;
     /// Revoke an API key permanently.
+    /// An admin API key with MANAGE_API_KEYS may also revoke a standard key of
+    /// the main account or of a sub-account it owns, without a session. It can
+    /// never revoke an admin or assistant key, itself included:
+    /// PermissionDenied with AUTH_ADMIN_KEY_ESCALATION_DENIED or
+    /// AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -449,7 +462,16 @@ pub trait ApiKeyService: Send + Sync + 'static {
         >,
     > + Send;
     /// Update API key metadata and allowed status transitions. Revocation must use
-    /// DeleteApiKey.
+    /// DeleteApiKey. Promoting a key to an admin key, demoting one, and any change
+    /// to an admin key always take a fresh step-up proof.
+    /// An admin API key with MANAGE_API_KEYS may also update a standard key of
+    /// the main account or of a sub-account it owns, without a session, when the
+    /// key's policy allows no money-out action. The key's ip_whitelist after the
+    /// update must lie within the admin key's own allowlist (else
+    /// PermissionDenied with AUTH_ADMIN_KEY_SCOPE_EXCEEDED). It can never select
+    /// purpose, nor change an admin or assistant key, itself included:
+    /// PermissionDenied with AUTH_ADMIN_KEY_ESCALATION_DENIED or
+    /// AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -475,12 +497,12 @@ pub trait ApiKeyService: Send + Sync + 'static {
     /// Create or replace the caller's Polyester AI assistant key set: one
     /// ASSISTANT key per enabled account, each bounded by its API policy or by a
     /// permission preset. One step-up covers the whole set, including the
-    /// policies its presets create, and the change is all or nothing. Send a
-    /// fresh step-up proof in the X-Auth-Step-Up header, which the change
-    /// consumes, or no proof while the session's recent-MFA window is open for
-    /// RECENT_MFA_ACTION_ASSISTANT_ACCESS (GetRecentMFA). Without either,
-    /// PermissionDenied with AUTH_STEP_UP_REQUIRED, or AUTH_RECENT_MFA_EXPIRED
-    /// when the window has closed. An entry whose account already has an assistant key with the same
+    /// policies its presets create, and the change is all or nothing. An
+    /// MFA-elevated session (one that completed an MFA challenge in the last 30
+    /// minutes) needs no proof; any other session sends a fresh step-up proof in
+    /// the X-Auth-Step-Up header, which the change consumes. Without either,
+    /// PermissionDenied with AUTH_STEP_UP_REQUIRED. An entry whose account
+    /// already has an assistant key with the same
     /// public key keeps that key, with its status, and takes the requested
     /// policy; any other entry replaces the account's key. Accounts left out of
     /// the set have their assistant key revoked. A sub-account entry needs the
@@ -1993,7 +2015,8 @@ pub const POLICY_SERVICE_SET_API_KEY_POLICY_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// PolicyService manages sub-account and API key policy templates and bindings.
+/// PolicyService manages sub-account and API key policies, their templates, and
+/// which policy each sub-account and API key holds.
 ///
 /// # Implementing handlers
 ///
@@ -2117,7 +2140,13 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Change selected fields on an existing sub-account policy template.
+    /// Change selected fields on an existing sub-account policy. Editing a
+    /// template changes only the template: sub-accounts it was applied to keep
+    /// their copies.
+    /// An admin API key with MANAGE_SUBACCOUNT_POLICIES may also update a policy
+    /// of the main account's own sub-accounts without a session. The result can
+    /// never allow a money-out action, and it can never lock, unlock or change a
+    /// locked policy: PermissionDenied with AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2163,7 +2192,13 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Attach or clear a sub-account policy for a sub-account.
+    /// Attach a policy to a sub-account, apply a template to it as a new copy, or
+    /// clear its policy.
+    /// An admin API key with MANAGE_SUBACCOUNT_POLICIES may also attach, apply or
+    /// clear the policy of a sub-account the main account owns, without a
+    /// session. It can never attach or apply a policy that allows a money-out
+    /// action, replace a locked policy, or reach a sub-account shared with the
+    /// main account: PermissionDenied with AUTH_ADMIN_KEY_FORBIDDEN_TARGET.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2259,9 +2294,12 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Change selected fields on an existing API key policy template. Adding a
-    /// money-out action to a policy attached to an assistant API key returns
-    /// FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
+    /// Change selected fields on an existing API key policy. Editing a template
+    /// changes only the template: keys it was applied to keep their copies.
+    /// Adding a money-out action to a policy attached to an assistant API key
+    /// returns FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED, and
+    /// to a policy attached to an admin API key FailedPrecondition with
+    /// AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -2307,9 +2345,20 @@ pub trait PolicyService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
-    /// Attach or clear an API key policy for a key. Attaching a policy that allows
-    /// a money-out action to an assistant API key returns FailedPrecondition with
-    /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
+    /// Attach a policy to a key, apply a template to it as a new copy, or clear
+    /// its policy. Attaching a policy that allows a money-out action to an
+    /// assistant API key returns FailedPrecondition with
+    /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED, and applying a template to one
+    /// returns FailedPrecondition with AUTH_POLICY_INVALID.
+    /// An admin API key with MANAGE_API_KEY_POLICIES may also attach, apply or
+    /// clear the policy of a standard key it may manage, without a session; the
+    /// key needs an IP allowlist within the admin key's own. The policy can never
+    /// allow a money-out action (AUTH_ADMIN_KEY_FORBIDDEN_TARGET) or an admin
+    /// permission (AUTH_ADMIN_KEY_ESCALATION_DENIED), and on a sub-account key
+    /// never more actions or markets than the sub-account's policy
+    /// (AUTH_ADMIN_KEY_SCOPE_EXCEEDED), each PermissionDenied. Attaching a
+    /// money-out policy to an admin key returns FailedPrecondition with
+    /// AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -10059,22 +10108,6 @@ pub type OwnedReleaseFreshStepUpRequestView = ::buffa::view::OwnedView<
 pub type OwnedReleaseFreshStepUpResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::ReleaseFreshStepUpResponseView<'static>,
 >;
-///Shorthand for `OwnedView<GetRecentMfaRequestView<'static>>`.
-pub type OwnedGetRecentMfaRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<'static>,
->;
-///Shorthand for `OwnedView<GetRecentMfaResponseView<'static>>`.
-pub type OwnedGetRecentMfaResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
->;
-///Shorthand for `OwnedView<EndRecentMfaRequestView<'static>>`.
-pub type OwnedEndRecentMfaRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<'static>,
->;
-///Shorthand for `OwnedView<EndRecentMfaResponseView<'static>>`.
-pub type OwnedEndRecentMfaResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
->;
 impl ::connectrpc::Encodable<crate::proto::auth::v1::ListMFAFactorsResponse>
 for crate::proto::auth::v1::__buffa::view::ListMFAFactorsResponseView<'_> {
     fn encode(
@@ -10335,46 +10368,6 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetRecentMFAResponse>
-for crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetRecentMFAResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::EndRecentMFAResponse>
-for crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'_> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self, codec)
-    }
-}
-impl ::connectrpc::Encodable<crate::proto::auth::v1::EndRecentMFAResponse>
-for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
-> {
-    fn encode(
-        &self,
-        codec: ::connectrpc::CodecFormat,
-    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
-        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
-    }
-}
 /// Full service name for this service.
 pub const MFA_SERVICE_SERVICE_NAME: &str = "auth.v1.MFAService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListMFAFactors` RPC.
@@ -10512,24 +10505,6 @@ pub const MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC: ::connectrpc::Spec = ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetRecentMFA` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_GET_RECENT_MFA_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/GetRecentMFA",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `EndRecentMFA` RPC.
-///
-/// The dispatcher surfaces this on
-/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const MFA_SERVICE_END_RECENT_MFA_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.MFAService/EndRecentMFA",
-        ::connectrpc::StreamType::Unary,
-    )
-    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
 /// MFA management service for enrollment, challenges, fresh step-up proofs, and recovery codes.
 ///
 /// # Implementing handlers
@@ -10923,58 +10898,6 @@ pub trait MfaService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::auth::v1::ReleaseFreshStepUpResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// Read whether the session's recent-MFA window is open for an action, and
-    /// until when, so the client can skip the MFA prompt while it is.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn get_recent_mfa<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::GetRecentMFARequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::GetRecentMFAResponse,
-            > + Send + use<'a, Self>,
-        >,
-    > + Send;
-    /// End the session's recent-MFA window at sign-out. It also cancels the
-    /// session's pending MFA challenges and revokes its unused step-up proofs,
-    /// including one an MFA challenge completing at the same time issues: it
-    /// answers once that completion has finished. A step-up completed later,
-    /// with a new challenge, opens a new window. Ending a window that is not
-    /// open succeeds.
-    ///
-    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
-    ///
-    /// `request` is borrowed from the request body and is valid for the
-    /// duration of the call; message fields are read directly on it
-    /// (zero-copy). The response cannot borrow from `request` — use
-    /// `.to_owned_message()` (or copy the specific fields) for anything
-    /// returned, stored, or moved into `tokio::spawn`.
-    fn end_recent_mfa<'a>(
-        &'a self,
-        ctx: ::connectrpc::RequestContext,
-        request: ::connectrpc::ServiceRequest<
-            '_,
-            crate::proto::auth::v1::EndRecentMFARequest,
-        >,
-    ) -> impl ::std::future::Future<
-        Output = ::connectrpc::ServiceResult<
-            impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::EndRecentMFAResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -11445,64 +11368,6 @@ impl<S: MfaService> MfaServiceExt for S {
                 },
             )
             .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC)
-            .route_view_idempotent(
-                MFA_SERVICE_SERVICE_NAME,
-                "GetRecentMFA",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::GetRecentMFARequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_recent_mfa(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::GetRecentMFAResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_GET_RECENT_MFA_SPEC)
-            .route_view(
-                MFA_SERVICE_SERVICE_NAME,
-                "EndRecentMFA",
-                {
-                    let svc = ::std::sync::Arc::clone(&self);
-                    ::connectrpc::view_handler_fn(move |
-                        ctx,
-                        req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<
-                                'static,
-                            >,
-                        >,
-                        format|
-                    {
-                        let svc = ::std::sync::Arc::clone(&svc);
-                        async move {
-                            let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::EndRecentMFARequest,
-                            >::from_parts(req.reborrow(), req.bytes());
-                            svc.end_recent_mfa(ctx, sreq)
-                                .await?
-                                .encode::<
-                                    crate::proto::auth::v1::EndRecentMFAResponse,
-                                >(format)
-                        }
-                    })
-                },
-            )
-            .with_spec(MFA_SERVICE_END_RECENT_MFA_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -11645,18 +11510,6 @@ impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(MFA_SERVICE_RELEASE_FRESH_STEP_UP_SPEC),
-                )
-            }
-            "GetRecentMFA" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
-                        .with_spec(MFA_SERVICE_GET_RECENT_MFA_SPEC),
-                )
-            }
-            "EndRecentMFA" => {
-                Some(
-                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(MFA_SERVICE_END_RECENT_MFA_SPEC),
                 )
             }
             _ => None,
@@ -11985,44 +11838,6 @@ impl<T: MfaService> ::connectrpc::Dispatcher for MfaServiceServer<T> {
                         .encode::<
                             crate::proto::auth::v1::ReleaseFreshStepUpResponse,
                         >(format)
-                })
-            }
-            "GetRecentMFA" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::GetRecentMFARequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::GetRecentMFARequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::GetRecentMFARequest,
-                    >::from_parts(&req, &body);
-                    svc.get_recent_mfa(ctx, req)
-                        .await?
-                        .encode::<crate::proto::auth::v1::GetRecentMFAResponse>(format)
-                })
-            }
-            "EndRecentMFA" => {
-                let svc = ::std::sync::Arc::clone(&self.inner);
-                Box::pin(async move {
-                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::EndRecentMFARequest,
-                    >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::EndRecentMFARequestView<
-                        '_,
-                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
-                        &body,
-                    )?;
-                    let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::EndRecentMFARequest,
-                    >::from_parts(&req, &body);
-                    svc.end_recent_mfa(ctx, req)
-                        .await?
-                        .encode::<crate::proto::auth::v1::EndRecentMFAResponse>(format)
                 })
             }
             _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
@@ -12797,88 +12612,6 @@ where
                 &self.config,
                 MFA_SERVICE_SERVICE_NAME,
                 "ReleaseFreshStepUp",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the GetRecentMFA RPC. Sends a request to /auth.v1.MFAService/GetRecentMFA.
-    pub async fn get_recent_mfa(
-        &self,
-        request: crate::proto::auth::v1::GetRecentMFARequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.get_recent_mfa_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the GetRecentMFA RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_recent_mfa_with_options(
-        &self,
-        request: crate::proto::auth::v1::GetRecentMFARequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetRecentMFAResponseView<'static>,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "GetRecentMFA",
-                request,
-                options,
-            )
-            .await
-    }
-    /// Call the EndRecentMFA RPC. Sends a request to /auth.v1.MFAService/EndRecentMFA.
-    pub async fn end_recent_mfa(
-        &self,
-        request: crate::proto::auth::v1::EndRecentMFARequest,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        self.end_recent_mfa_with_options(
-                request,
-                ::connectrpc::client::CallOptions::default(),
-            )
-            .await
-    }
-    /// Call the EndRecentMFA RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn end_recent_mfa_with_options(
-        &self,
-        request: crate::proto::auth::v1::EndRecentMFARequest,
-        options: ::connectrpc::client::CallOptions,
-    ) -> Result<
-        ::connectrpc::client::UnaryResponse<
-            ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::EndRecentMFAResponseView<'static>,
-            >,
-        >,
-        ::connectrpc::ConnectError,
-    > {
-        ::connectrpc::client::call_unary(
-                &self.transport,
-                &self.config,
-                MFA_SERVICE_SERVICE_NAME,
-                "EndRecentMFA",
                 request,
                 options,
             )
@@ -13760,6 +13493,1087 @@ where
                 &self.config,
                 AUTH_SERVICE_SERVICE_NAME,
                 "Me",
+                request,
+                options,
+            )
+            .await
+    }
+}
+
+///Shorthand for `OwnedView<GetAppAuthorizationRequestView<'static>>`.
+pub type OwnedGetAppAuthorizationRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetAppAuthorizationResponseView<'static>>`.
+pub type OwnedGetAppAuthorizationResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ApproveAppAuthorizationRequestView<'static>>`.
+pub type OwnedApproveAppAuthorizationRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ApproveAppAuthorizationResponseView<'static>>`.
+pub type OwnedApproveAppAuthorizationResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<DenyAppAuthorizationRequestView<'static>>`.
+pub type OwnedDenyAppAuthorizationRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<'static>,
+>;
+///Shorthand for `OwnedView<DenyAppAuthorizationResponseView<'static>>`.
+pub type OwnedDenyAppAuthorizationResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'static>,
+>;
+///Shorthand for `OwnedView<ListConnectedAppsRequestView<'static>>`.
+pub type OwnedListConnectedAppsRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListConnectedAppsRequestView<'static>,
+>;
+///Shorthand for `OwnedView<ListConnectedAppsResponseView<'static>>`.
+pub type OwnedListConnectedAppsResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListConnectedAppsResponseView<'static>,
+>;
+///Shorthand for `OwnedView<RevokeConnectedAppRequestView<'static>>`.
+pub type OwnedRevokeConnectedAppRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RevokeConnectedAppRequestView<'static>,
+>;
+///Shorthand for `OwnedView<RevokeConnectedAppResponseView<'static>>`.
+pub type OwnedRevokeConnectedAppResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<'static>,
+>;
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppAuthorizationResponse>
+for crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppAuthorizationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppAuthorizationResponse>
+for crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppAuthorizationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppAuthorizationResponse>
+for crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppAuthorizationResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListConnectedAppsResponse>
+for crate::proto::auth::v1::__buffa::view::ListConnectedAppsResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ListConnectedAppsResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ListConnectedAppsResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::RevokeConnectedAppResponse>
+for crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::auth::v1::RevokeConnectedAppResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+/// Full service name for this service.
+pub const CONNECTED_APP_SERVICE_SERVICE_NAME: &str = "auth.v1.ConnectedAppService";
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetAppAuthorization` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/GetAppAuthorization",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ApproveAppAuthorization` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/ApproveAppAuthorization",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DenyAppAuthorization` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/DenyAppAuthorization",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListConnectedApps` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CONNECTED_APP_SERVICE_LIST_CONNECTED_APPS_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/ListConnectedApps",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `RevokeConnectedApp` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const CONNECTED_APP_SERVICE_REVOKE_CONNECTED_APP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/RevokeConnectedApp",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
+/// ConnectedAppService connects outside apps, such as an AI assistant, to the
+/// account with OAuth ("Sign in with Polyester"), and lists and disconnects
+/// them. A connected app uses the account as the signed-in website does, for
+/// the scopes the account granted; it never moves money out of the account
+/// and never changes its security settings. A connection lasts until the
+/// account or the app disconnects it, or until it expires; signing out of the
+/// website does not end it.
+///
+/// # Implementing handlers
+///
+/// Implement methods with plain `async fn`; the returned future satisfies
+/// the `Send` bound automatically.
+///
+/// **Unary and server-streaming requests** arrive as
+/// [`ServiceRequest<'_, Req>`](::connectrpc::ServiceRequest): a zero-copy
+/// view of the request plus its body, valid for the duration of the call.
+/// Fields are read directly (`request.name` is a `&str` into the decoded
+/// buffer) and the borrow may be held across `.await` points. Anything
+/// that must outlive the call — `tokio::spawn`, channels, server state,
+/// or data captured by a returned response stream — takes owned data:
+/// call `request.to_owned_message()` (or copy the specific fields)
+/// first.
+///
+/// **Client-streaming and bidi requests** arrive as
+/// [`InboundStream<Req>`](::connectrpc::InboundStream) — a
+/// `ServiceStream` of [`StreamMessage`](::connectrpc::StreamMessage)s.
+/// Each item owns its decoded buffer and is `Send + 'static`, so items
+/// can be buffered or moved into spawned tasks; read fields zero-copy
+/// through the generated accessor methods (`item.name()`) or `.view()`,
+/// convert with `.to_owned_message()`, or yield an item back unchanged —
+/// `StreamMessage<M>` implements `Encodable<M>`.
+///
+/// Request types resolved through `extern_path` (e.g. well-known types
+/// from another crate) use the same wrappers; the crate that owns the
+/// type must be generated with buffa ≥ 0.8.0 and views enabled so the
+/// backing `HasMessageView` impl exists.
+///
+/// The `impl Encodable<Out>` return bound accepts the owned `Out`, the
+/// generated `OutView<'_>` / `OwnedOutView`,
+/// [`MaybeBorrowed`](::connectrpc::MaybeBorrowed), or
+/// [`PreEncoded`](::connectrpc::PreEncoded) for handlers that encode a
+/// non-`'static` view internally and pass the bytes across the handler
+/// boundary. View bodies are not emitted for output types mapped via
+/// `extern_path` (the impl would be an orphan); return owned for
+/// WKT/extern outputs.
+///
+/// Server-streaming and bidi-streaming methods return
+/// `ServiceStream<impl Encodable<Out> + Send + use<Self>>`. The
+/// `use<Self>` precise-capturing clause excludes `&self`'s lifetime and
+/// the request's lifetime (unary methods use `use<'a, Self>` and may
+/// borrow from `&self`), so stream items must be `'static` and cannot
+/// borrow from the request. To stream view-encoded data, encode each
+/// item inside the stream body and yield
+/// [`PreEncoded`](::connectrpc::PreEncoded) — see its `# Streaming
+/// example` doc.
+#[allow(clippy::type_complexity)]
+pub trait ConnectedAppService: Send + Sync + 'static {
+    /// Read a pending app connection request, to show the consent page. An
+    /// unknown, expired or already answered request is NotFound.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_app_authorization<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::GetAppAuthorizationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::GetAppAuthorizationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Approve a pending app connection request. The account must have MFA
+    /// enrolled, and the request must carry a fresh step-up proof: connecting
+    /// an app is durable delegated access. The app receives a one-time
+    /// authorization code through the returned redirect URL. An unknown,
+    /// expired or already answered request is NotFound; an account with 20
+    /// connected apps is FailedPrecondition with AUTH_CONNECTED_APP_LIMIT_REACHED.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn approve_app_authorization<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Deny a pending app connection request. The app receives the
+    /// `access_denied` error through the returned redirect URL. An unknown,
+    /// expired or already answered request is NotFound.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn deny_app_authorization<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::DenyAppAuthorizationRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::DenyAppAuthorizationResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// List the apps connected to the account.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_connected_apps<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::ListConnectedAppsRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::ListConnectedAppsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// Disconnect an app. Its access and refresh tokens stop working at once.
+    /// Disconnecting an app that is already disconnected or expired succeeds;
+    /// an ID that is not one of the account's connected apps is NotFound.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn revoke_connected_app<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::auth::v1::RevokeConnectedAppRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::auth::v1::RevokeConnectedAppResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+}
+/// Extension trait for registering a service implementation with a Router.
+///
+/// This trait is automatically implemented for all types that implement the service trait.
+/// Prefer [`Router::add_service`](::connectrpc::Router::add_service) for
+/// top-down registration; `register` remains available for compatibility
+/// and cases where the service-first call shape is more convenient.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::sync::Arc;
+///
+/// let service = Arc::new(MyServiceImpl);
+/// let router = service.register(Router::new());
+/// ```
+pub trait ConnectedAppServiceExt: ConnectedAppService {
+    /// Register this service implementation with a Router.
+    ///
+    /// Takes ownership of the `Arc<Self>` and returns a new Router with
+    /// this service's methods registered.
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router;
+}
+impl<S: ConnectedAppService> ConnectedAppServiceExt for S {
+    fn register(
+        self: ::std::sync::Arc<Self>,
+        router: ::connectrpc::Router,
+    ) -> ::connectrpc::Router {
+        router
+            .route_view_idempotent(
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "GetAppAuthorization",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::GetAppAuthorizationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_app_authorization(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::GetAppAuthorizationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC)
+            .route_view(
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "ApproveAppAuthorization",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.approve_app_authorization(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC)
+            .route_view(
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "DenyAppAuthorization",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.deny_app_authorization(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::DenyAppAuthorizationResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC)
+            .route_view_idempotent(
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "ListConnectedApps",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::ListConnectedAppsRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::ListConnectedAppsRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_connected_apps(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::ListConnectedAppsResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTED_APP_SERVICE_LIST_CONNECTED_APPS_SPEC)
+            .route_view(
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "RevokeConnectedApp",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::auth::v1::__buffa::view::RevokeConnectedAppRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::auth::v1::RevokeConnectedAppRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.revoke_connected_app(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::auth::v1::RevokeConnectedAppResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(CONNECTED_APP_SERVICE_REVOKE_CONNECTED_APP_SPEC)
+    }
+}
+/// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
+#[doc(hidden)]
+pub struct ConnectedAppServiceRegisterMarker;
+impl<
+    S: ConnectedAppService,
+> ::connectrpc::ServiceRegister<ConnectedAppServiceRegisterMarker>
+for ::std::sync::Arc<S> {
+    fn register_service(self, router: ::connectrpc::Router) -> ::connectrpc::Router {
+        <S as ConnectedAppServiceExt>::register(self, router)
+    }
+}
+/// Monomorphic dispatcher for `ConnectedAppService`.
+///
+/// Unlike `.register(Router)` which type-erases each method into an `Arc<dyn ErasedHandler>` stored in a `HashMap`, this struct dispatches via a compile-time `match` on method name: no vtable, no hash lookup.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use connectrpc::ConnectRpcService;
+///
+/// let server = ConnectedAppServiceServer::new(MyImpl);
+/// let service = ConnectRpcService::new(server);
+/// // hand `service` to axum/hyper as a fallback_service
+/// ```
+pub struct ConnectedAppServiceServer<T> {
+    inner: ::std::sync::Arc<T>,
+}
+impl<T: ConnectedAppService> ConnectedAppServiceServer<T> {
+    /// Wrap a service implementation in a monomorphic dispatcher.
+    pub fn new(service: T) -> Self {
+        Self {
+            inner: ::std::sync::Arc::new(service),
+        }
+    }
+    /// Wrap an already-`Arc`'d service implementation.
+    pub fn from_arc(inner: ::std::sync::Arc<T>) -> Self {
+        Self { inner }
+    }
+}
+impl<T> Clone for ConnectedAppServiceServer<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: ::std::sync::Arc::clone(&self.inner),
+        }
+    }
+}
+impl<T: ConnectedAppService> ::connectrpc::Dispatcher for ConnectedAppServiceServer<T> {
+    #[inline]
+    fn lookup(
+        &self,
+        path: &str,
+    ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
+        let method = path.strip_prefix("auth.v1.ConnectedAppService/")?;
+        match method {
+            "GetAppAuthorization" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC),
+                )
+            }
+            "ApproveAppAuthorization" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC),
+                )
+            }
+            "DenyAppAuthorization" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC),
+                )
+            }
+            "ListConnectedApps" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
+                        .with_spec(CONNECTED_APP_SERVICE_LIST_CONNECTED_APPS_SPEC),
+                )
+            }
+            "RevokeConnectedApp" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(CONNECTED_APP_SERVICE_REVOKE_CONNECTED_APP_SPEC),
+                )
+            }
+            _ => None,
+        }
+    }
+    fn call_unary(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::Payload,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.ConnectedAppService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            "GetAppAuthorization" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::GetAppAuthorizationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::GetAppAuthorizationRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_app_authorization(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::GetAppAuthorizationResponse,
+                        >(format)
+                })
+            }
+            "ApproveAppAuthorization" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                    >::from_parts(&req, &body);
+                    svc.approve_app_authorization(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+                        >(format)
+                })
+            }
+            "DenyAppAuthorization" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                    >::from_parts(&req, &body);
+                    svc.deny_app_authorization(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::DenyAppAuthorizationResponse,
+                        >(format)
+                })
+            }
+            "ListConnectedApps" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::ListConnectedAppsRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::ListConnectedAppsRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::ListConnectedAppsRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_connected_apps(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::ListConnectedAppsResponse,
+                        >(format)
+                })
+            }
+            "RevokeConnectedApp" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::auth::v1::RevokeConnectedAppRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::auth::v1::__buffa::view::RevokeConnectedAppRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::auth::v1::RevokeConnectedAppRequest,
+                    >::from_parts(&req, &body);
+                    svc.revoke_connected_app(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::auth::v1::RevokeConnectedAppResponse,
+                        >(format)
+                })
+            }
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_server_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        request: ::buffa::bytes::Bytes,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.ConnectedAppService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &request, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+    fn call_client_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::UnaryResult {
+        let Some(method) = path.strip_prefix("auth.v1.ConnectedAppService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_unary(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_unary(path),
+        }
+    }
+    fn call_bidi_streaming(
+        &self,
+        path: &str,
+        ctx: ::connectrpc::RequestContext,
+        requests: ::connectrpc::dispatcher::codegen::RequestStream,
+        format: ::connectrpc::CodecFormat,
+    ) -> ::connectrpc::dispatcher::codegen::StreamingResult {
+        let Some(method) = path.strip_prefix("auth.v1.ConnectedAppService/") else {
+            return ::connectrpc::dispatcher::codegen::unimplemented_streaming(path);
+        };
+        let _ = (&ctx, &requests, &format);
+        match method {
+            _ => ::connectrpc::dispatcher::codegen::unimplemented_streaming(path),
+        }
+    }
+}
+/// Client for this service.
+///
+/// Generic over `T: ClientTransport`. For **gRPC** (HTTP/2), use
+/// `Http2Connection` — it has honest `poll_ready` and composes with
+/// `tower::balance` for multi-connection load balancing. For **Connect
+/// over HTTP/1.1** (or unknown protocol), use `HttpClient`.
+///
+/// # Working with the response
+///
+/// Unary calls return [`UnaryResponse<OwnedView<FooView>>`](::connectrpc::client::UnaryResponse).
+/// [`view()`](::connectrpc::client::UnaryResponse::view) borrows the response
+/// message, so field access is zero-copy:
+///
+/// ```rust,ignore
+/// let resp = client.get_app_authorization(request).await?;
+/// let name: &str = resp.view().name;  // borrow into the response buffer
+/// ```
+///
+/// If you need the owned struct (e.g. to store or pass by value), use
+/// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
+///
+/// ```rust,ignore
+/// let owned = client.get_app_authorization(request).await?.into_owned();
+/// ```
+///
+/// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
+/// zero-copy decoded body (an `OwnedView`) without copying; field access on it
+/// goes through `.reborrow()`. Streaming responses yield one
+/// [`StreamMessage`](::connectrpc::StreamMessage) per received message from
+/// `.message().await` — read fields zero-copy through the generated accessor
+/// methods (`msg.name()`) or `.view()`, or convert with `.to_owned_message()`.
+#[derive(Clone)]
+pub struct ConnectedAppServiceClient<T> {
+    transport: T,
+    config: ::connectrpc::client::ClientConfig,
+}
+impl<T> ConnectedAppServiceClient<T>
+where
+    T: ::connectrpc::client::ClientTransport,
+    <T::ResponseBody as ::connectrpc::http_body::Body>::Error: ::std::fmt::Display,
+{
+    /// Create a new client with the given transport and configuration.
+    pub fn new(transport: T, config: ::connectrpc::client::ClientConfig) -> Self {
+        Self { transport, config }
+    }
+    /// Get the client configuration.
+    pub fn config(&self) -> &::connectrpc::client::ClientConfig {
+        &self.config
+    }
+    /// Get a mutable reference to the client configuration.
+    pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
+        &mut self.config
+    }
+    /// Call the GetAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/GetAppAuthorization.
+    pub async fn get_app_authorization(
+        &self,
+        request: crate::proto::auth::v1::GetAppAuthorizationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_app_authorization_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_app_authorization_with_options(
+        &self,
+        request: crate::proto::auth::v1::GetAppAuthorizationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "GetAppAuthorization",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ApproveAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/ApproveAppAuthorization.
+    pub async fn approve_app_authorization(
+        &self,
+        request: crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.approve_app_authorization_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ApproveAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn approve_app_authorization_with_options(
+        &self,
+        request: crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "ApproveAppAuthorization",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the DenyAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/DenyAppAuthorization.
+    pub async fn deny_app_authorization(
+        &self,
+        request: crate::proto::auth::v1::DenyAppAuthorizationRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.deny_app_authorization_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the DenyAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn deny_app_authorization_with_options(
+        &self,
+        request: crate::proto::auth::v1::DenyAppAuthorizationRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "DenyAppAuthorization",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListConnectedApps RPC. Sends a request to /auth.v1.ConnectedAppService/ListConnectedApps.
+    pub async fn list_connected_apps(
+        &self,
+        request: crate::proto::auth::v1::ListConnectedAppsRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListConnectedAppsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_connected_apps_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListConnectedApps RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_connected_apps_with_options(
+        &self,
+        request: crate::proto::auth::v1::ListConnectedAppsRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::ListConnectedAppsResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "ListConnectedApps",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the RevokeConnectedApp RPC. Sends a request to /auth.v1.ConnectedAppService/RevokeConnectedApp.
+    pub async fn revoke_connected_app(
+        &self,
+        request: crate::proto::auth::v1::RevokeConnectedAppRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.revoke_connected_app_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the RevokeConnectedApp RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn revoke_connected_app_with_options(
+        &self,
+        request: crate::proto::auth::v1::RevokeConnectedAppRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                CONNECTED_APP_SERVICE_SERVICE_NAME,
+                "RevokeConnectedApp",
                 request,
                 options,
             )
@@ -15492,14 +16306,14 @@ pub trait SocialVerificationService: Send + Sync + 'static {
     /// linked Telegram account becomes a channel to the account, so the caller
     /// needs enrolled MFA and a fresh, single-use step-up proof in the
     /// X-Auth-Step-Up header, obtained by completing an MFA challenge for fresh
-    /// step-up, which the link consumes. While the session's recent-MFA window
-    /// is open for RECENT_MFA_ACTION_TELEGRAM_LINK (GetRecentMFA), no proof is
-    /// needed. A retried confirmation of an existing link needs no new proof.
+    /// step-up, which the link consumes. An MFA-elevated session (one that
+    /// completed an MFA challenge in the last 30 minutes) needs no proof. A
+    /// retried confirmation of an existing link needs no new proof.
     /// AUTH_RESOURCE_NOT_FOUND means no verification exists; start one first.
     /// AUTH_SOCIAL_VERIFICATION_EXPIRED means the challenge window passed; start a new verification.
     /// AUTH_SOCIAL_VERIFICATION_INVALID_STATE means no submitted account awaits confirmation, or provider_user_id is not the account that submitted the code.
     /// AUTH_SOCIAL_ACCOUNT_ALREADY_LINKED means that Telegram account is linked to another Polyester account; the verification fails.
-    /// AUTH_MFA_NOT_ENROLLED means enroll MFA first; AUTH_STEP_UP_REQUIRED, AUTH_RECENT_MFA_EXPIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new fresh step-up and retry.
+    /// AUTH_MFA_NOT_ENROLLED means enroll MFA first; AUTH_STEP_UP_REQUIRED and AUTH_STEP_UP_PROOF_UNAVAILABLE mean complete a new MFA challenge and retry with the elevated session it returns.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

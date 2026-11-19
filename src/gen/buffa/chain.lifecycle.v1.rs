@@ -5681,7 +5681,10 @@ pub struct FlowTxMatchView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub flow_kind: ::buffa::EnumValue<FlowKind>,
-    /// First observed source transaction hash for the flow when known.
+    /// First observed source transaction hash for the flow when known. For a
+    /// transfer between Trading accounts, this is the Polyester Chain transaction
+    /// that records the settled transfer; it is empty until that transaction is
+    /// observed.
     ///
     /// Field 4: `source_tx_hash`
     #[serde(
@@ -6608,7 +6611,10 @@ pub struct FlowSummaryView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub request_fee: ::buffa::MessageField<RequestFee>,
-    /// First observed source transaction hash for the flow when known.
+    /// First observed source transaction hash for the flow when known. For a
+    /// transfer between Trading accounts, this is the Polyester Chain transaction
+    /// that records the settled transfer; it is empty until that transaction is
+    /// observed.
     ///
     /// Field 11: `source_tx_hash`
     #[serde(
@@ -14403,7 +14409,10 @@ pub mod __buffa {
             ///
             /// Field 3: `flow_kind`
             pub flow_kind: ::buffa::EnumValue<super::super::FlowKind>,
-            /// First observed source transaction hash for the flow when known.
+            /// First observed source transaction hash for the flow when known. For a
+            /// transfer between Trading accounts, this is the Polyester Chain transaction
+            /// that records the settled transfer; it is empty until that transaction is
+            /// observed.
             ///
             /// Field 4: `source_tx_hash`
             pub source_tx_hash: &'a str,
@@ -15283,7 +15292,10 @@ pub mod __buffa {
             pub fn flow_kind(&self) -> ::buffa::EnumValue<super::super::FlowKind> {
                 self.0.reborrow().flow_kind
             }
-            /// First observed source transaction hash for the flow when known.
+            /// First observed source transaction hash for the flow when known. For a
+            /// transfer between Trading accounts, this is the Polyester Chain transaction
+            /// that records the settled transfer; it is empty until that transaction is
+            /// observed.
             ///
             /// Field 4: `source_tx_hash`
             #[must_use]
@@ -15871,7 +15883,10 @@ pub mod __buffa {
             pub request_fee: ::buffa::MessageFieldView<
                 super::super::__buffa::view::RequestFeeView<'a>,
             >,
-            /// First observed source transaction hash for the flow when known.
+            /// First observed source transaction hash for the flow when known. For a
+            /// transfer between Trading accounts, this is the Polyester Chain transaction
+            /// that records the settled transfer; it is empty until that transaction is
+            /// observed.
             ///
             /// Field 11: `source_tx_hash`
             pub source_tx_hash: &'a str,
@@ -17244,7 +17259,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().request_fee
             }
-            /// First observed source transaction hash for the flow when known.
+            /// First observed source transaction hash for the flow when known. For a
+            /// transfer between Trading accounts, this is the Polyester Chain transaction
+            /// that records the settled transfer; it is empty until that transaction is
+            /// observed.
             ///
             /// Field 11: `source_tx_hash`
             #[must_use]

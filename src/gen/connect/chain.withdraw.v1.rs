@@ -1505,7 +1505,9 @@ pub trait WithdrawService: Send + Sync + 'static {
     > + Send;
     /// Create or return one wallet/JWT withdraw from Trading.
     /// Root-owner Trading to Funding and root-owner withdrawals to explicitly
-    /// whitelisted external destinations accept recent MFA. Other external,
+    /// whitelisted external destinations accept an MFA-elevated session, one
+    /// that completed an MFA challenge in the last 30 minutes (otherwise
+    /// AUTH_MFA_ELEVATION_REQUIRED). Other external,
     /// cross-owner, and delegated movements require a fresh single-use step-up.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).

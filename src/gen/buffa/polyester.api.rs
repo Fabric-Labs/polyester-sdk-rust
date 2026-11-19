@@ -9,7 +9,8 @@
 pub enum MFARequirement {
     /// No interactive MFA requirement is declared; documentation treats this as none.
     MFA_UNSPECIFIED = 0i32,
-    /// The RPC requires recently completed interactive MFA. Stale assurance must be renewed.
+    /// The RPC requires an MFA-elevated session: an MFA challenge completed in the last 30 minutes.
+    /// An older elevation must be renewed with a new MFA challenge.
     MFA_RECENT = 1i32,
     /// The RPC always requires a fresh, single-use step-up proof, even when MFA was completed recently.
     MFA_FRESH_STEP_UP = 2i32,

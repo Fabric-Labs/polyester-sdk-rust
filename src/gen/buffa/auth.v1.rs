@@ -169,6 +169,17 @@ pub enum ApiKeyPurpose {
     /// assistant key is revoked when its creator loses the role that manages the
     /// sub-account's API keys or leaves the sub-account.
     ASSISTANT = 2i32,
+    /// An elevated key the main account's owner created or promoted in a
+    /// signed-in session with a fresh step-up proof. Its policy's admin
+    /// permissions (MANAGE_API_KEYS, MANAGE_API_KEY_POLICIES and
+    /// MANAGE_SUBACCOUNT_POLICIES) let it manage the main account's other keys
+    /// and its owned sub-accounts' policies without a session. An admin key acts
+    /// for the main account only, needs a non-empty IP allowlist of entries no
+    /// broader than /24 (IPv4) or /48 (IPv6), and its policy can never allow an
+    /// action that moves value out of the account or manages where it goes. No
+    /// API key can create, promote, change or delete an admin key, including the
+    /// key itself; only its owner's session with a fresh step-up proof can.
+    ADMIN_KEY = 3i32,
 }
 impl ApiKeyPurpose {
     ///Idiomatic alias for [`Self::PURPOSE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -180,6 +191,9 @@ impl ApiKeyPurpose {
     ///Idiomatic alias for [`Self::ASSISTANT`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const Assistant: Self = Self::ASSISTANT;
+    ///Idiomatic alias for [`Self::ADMIN_KEY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AdminKey: Self = Self::ADMIN_KEY;
 }
 impl ::core::default::Default for ApiKeyPurpose {
     fn default() -> Self {
@@ -278,6 +292,7 @@ impl ::buffa::Enumeration for ApiKeyPurpose {
             0i32 => ::core::option::Option::Some(Self::PURPOSE_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::STANDARD),
             2i32 => ::core::option::Option::Some(Self::ASSISTANT),
+            3i32 => ::core::option::Option::Some(Self::ADMIN_KEY),
             _ => ::core::option::Option::None,
         }
     }
@@ -289,6 +304,7 @@ impl ::buffa::Enumeration for ApiKeyPurpose {
             Self::PURPOSE_UNSPECIFIED => "PURPOSE_UNSPECIFIED",
             Self::STANDARD => "STANDARD",
             Self::ASSISTANT => "ASSISTANT",
+            Self::ADMIN_KEY => "ADMIN_KEY",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -298,11 +314,12 @@ impl ::buffa::Enumeration for ApiKeyPurpose {
             }
             "STANDARD" => ::core::option::Option::Some(Self::STANDARD),
             "ASSISTANT" => ::core::option::Option::Some(Self::ASSISTANT),
+            "ADMIN_KEY" => ::core::option::Option::Some(Self::ADMIN_KEY),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::PURPOSE_UNSPECIFIED, Self::STANDARD, Self::ASSISTANT]
+        &[Self::PURPOSE_UNSPECIFIED, Self::STANDARD, Self::ASSISTANT, Self::ADMIN_KEY]
     }
 }
 /// AssistantKeyPreset is a fixed permission set for a Polyester AI assistant
@@ -1125,6 +1142,19 @@ pub struct CreateApiKeyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
     )]
     pub public_key_ed25519: ::buffa::alloc::vec::Vec<u8>,
+    /// What the key is for. Unspecified or STANDARD creates a standard key.
+    /// ADMIN_KEY creates an admin key: only the main account's owner may, in a
+    /// signed-in session with a fresh step-up proof, for the main account
+    /// (subaccount_id unset), with an ip_whitelist that admin keys accept.
+    /// ASSISTANT keys are created with SetAssistantKeys.
+    ///
+    /// Field 8: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<ApiKeyPurpose>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -1138,6 +1168,7 @@ impl ::core::fmt::Debug for CreateApiKeyRequest {
             .field("color", &self.color)
             .field("ip_whitelist", &self.ip_whitelist)
             .field("public_key_ed25519", &self.public_key_ed25519)
+            .field("purpose", &self.purpose)
             .finish()
     }
 }
@@ -1195,6 +1226,12 @@ impl ::buffa::Message for CreateApiKeyRequest {
         if !self.color.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
         }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -1222,6 +1259,12 @@ impl ::buffa::Message for CreateApiKeyRequest {
         }
         if !self.color.is_empty() {
             ::buffa::types::put_string_field(7u32, &self.color, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(8u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -1280,6 +1323,15 @@ impl ::buffa::Message for CreateApiKeyRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.color, buf)?;
             }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -1294,6 +1346,7 @@ impl ::buffa::Message for CreateApiKeyRequest {
         self.public_key_ed25519.clear();
         self.icon.clear();
         self.color.clear();
+        self.purpose = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2288,6 +2341,19 @@ pub struct ApiKeyUpdateSpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// New purpose: STANDARD demotes an admin key, ADMIN_KEY promotes a
+    /// standard key. Only the main account's owner may select it, in a signed-in session
+    /// with a fresh step-up proof. A promoted key must act for the main account,
+    /// have an IP allowlist that admin keys accept, and have no policy that
+    /// allows a money-out action. An assistant key's purpose never changes.
+    ///
+    /// Field 7: `purpose`
+    #[serde(
+        rename = "purpose",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub purpose: ::buffa::EnumValue<ApiKeyPurpose>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -2301,6 +2367,7 @@ impl ::core::fmt::Debug for ApiKeyUpdateSpec {
             .field("status", &self.status)
             .field("ip_whitelist", &self.ip_whitelist)
             .field("expires_at", &self.expires_at)
+            .field("purpose", &self.purpose)
             .finish()
     }
 }
@@ -2355,6 +2422,12 @@ impl ::buffa::Message for ApiKeyUpdateSpec {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -2386,6 +2459,12 @@ impl ::buffa::Message for ApiKeyUpdateSpec {
         if self.expires_at.is_set() {
             ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
             self.expires_at.write_to(__cache, buf);
+        }
+        {
+            let val = self.purpose.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(7u32, val, buf);
+            }
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -2448,6 +2527,15 @@ impl ::buffa::Message for ApiKeyUpdateSpec {
                     ctx,
                 )?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.purpose = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -2462,6 +2550,7 @@ impl ::buffa::Message for ApiKeyUpdateSpec {
         self.status = ::buffa::EnumValue::from(0);
         self.ip_whitelist.clear();
         self.expires_at = ::buffa::MessageField::none();
+        self.purpose = ::buffa::EnumValue::from(0);
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -2881,7 +2970,8 @@ pub struct AssistantKeySpec {
     )]
     pub public_key_ed25519: ::buffa::alloc::vec::Vec<u8>,
     /// API policy that bounds the key (opaque ID). It must belong to the same
-    /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+    /// main account as the key, must not be a template (FailedPrecondition with
+    /// AUTH_POLICY_INVALID), and must not allow EXTERNAL_WITHDRAW,
     /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
     /// exactly one of policy_id and preset.
     ///
@@ -3903,7 +3993,9 @@ pub const __DELETE_ASSISTANT_KEYS_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
 /// exactly the calls it names and never implies another permission. A
 /// main-account permission is honored only for an API key scoped to the main
 /// account; a key scoped to a sub-account is refused even when its policy
-/// grants it. An API key without a policy has no permission at all.
+/// grants it. Admin permissions, documented below, apply to API-key policies
+/// only and are honored only for an admin API key. An API key without a policy
+/// has no permission at all.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum PolicyAction {
@@ -4041,6 +4133,24 @@ pub enum PolicyAction {
     /// reads all of them, a key scoped to a sub-account only that sub-account's.
     /// Account permission.
     READ_ACCOUNT_ACTIVITY = 42i32,
+    /// Allow creating, updating and revoking the standard API keys of the main
+    /// account and of the sub-accounts it owns. Admin permission: honored only
+    /// for an admin API key, which never manages an admin or assistant key, a
+    /// key whose policy allows a money-out action, or a sub-account shared with
+    /// the main account. A key it creates or updates needs an IP allowlist
+    /// within the admin key's own.
+    MANAGE_API_KEYS = 43i32,
+    /// Allow attaching and clearing the API policies of the standard API keys
+    /// the admin key may manage. A policy it attaches can never allow a
+    /// money-out action or an admin permission, and on a sub-account key can
+    /// never allow more actions or markets than the sub-account's policy. Admin
+    /// permission: honored only for an admin API key.
+    MANAGE_API_KEY_POLICIES = 44i32,
+    /// Allow attaching, clearing and updating the policies of the sub-accounts
+    /// the main account owns. The resulting policy can never allow a money-out
+    /// action, and a locked policy is never changed. Admin permission: honored
+    /// only for an admin API key.
+    MANAGE_SUBACCOUNT_POLICIES = 45i32,
 }
 impl PolicyAction {
     ///Idiomatic alias for [`Self::UNSPECIFIED`]; `Debug` prints the variant name.
@@ -4160,6 +4270,15 @@ impl PolicyAction {
     ///Idiomatic alias for [`Self::READ_ACCOUNT_ACTIVITY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ReadAccountActivity: Self = Self::READ_ACCOUNT_ACTIVITY;
+    ///Idiomatic alias for [`Self::MANAGE_API_KEYS`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageApiKeys: Self = Self::MANAGE_API_KEYS;
+    ///Idiomatic alias for [`Self::MANAGE_API_KEY_POLICIES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageApiKeyPolicies: Self = Self::MANAGE_API_KEY_POLICIES;
+    ///Idiomatic alias for [`Self::MANAGE_SUBACCOUNT_POLICIES`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ManageSubaccountPolicies: Self = Self::MANAGE_SUBACCOUNT_POLICIES;
 }
 impl ::core::default::Default for PolicyAction {
     fn default() -> Self {
@@ -4294,6 +4413,9 @@ impl ::buffa::Enumeration for PolicyAction {
             40i32 => ::core::option::Option::Some(Self::READ_FUNDING_FLOWS),
             41i32 => ::core::option::Option::Some(Self::READ_NOTIFICATIONS),
             42i32 => ::core::option::Option::Some(Self::READ_ACCOUNT_ACTIVITY),
+            43i32 => ::core::option::Option::Some(Self::MANAGE_API_KEYS),
+            44i32 => ::core::option::Option::Some(Self::MANAGE_API_KEY_POLICIES),
+            45i32 => ::core::option::Option::Some(Self::MANAGE_SUBACCOUNT_POLICIES),
             _ => ::core::option::Option::None,
         }
     }
@@ -4341,6 +4463,9 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_FUNDING_FLOWS => "READ_FUNDING_FLOWS",
             Self::READ_NOTIFICATIONS => "READ_NOTIFICATIONS",
             Self::READ_ACCOUNT_ACTIVITY => "READ_ACCOUNT_ACTIVITY",
+            Self::MANAGE_API_KEYS => "MANAGE_API_KEYS",
+            Self::MANAGE_API_KEY_POLICIES => "MANAGE_API_KEY_POLICIES",
+            Self::MANAGE_SUBACCOUNT_POLICIES => "MANAGE_SUBACCOUNT_POLICIES",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4424,6 +4549,13 @@ impl ::buffa::Enumeration for PolicyAction {
             "READ_ACCOUNT_ACTIVITY" => {
                 ::core::option::Option::Some(Self::READ_ACCOUNT_ACTIVITY)
             }
+            "MANAGE_API_KEYS" => ::core::option::Option::Some(Self::MANAGE_API_KEYS),
+            "MANAGE_API_KEY_POLICIES" => {
+                ::core::option::Option::Some(Self::MANAGE_API_KEY_POLICIES)
+            }
+            "MANAGE_SUBACCOUNT_POLICIES" => {
+                ::core::option::Option::Some(Self::MANAGE_SUBACCOUNT_POLICIES)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4468,6 +4600,9 @@ impl ::buffa::Enumeration for PolicyAction {
             Self::READ_FUNDING_FLOWS,
             Self::READ_NOTIFICATIONS,
             Self::READ_ACCOUNT_ACTIVITY,
+            Self::MANAGE_API_KEYS,
+            Self::MANAGE_API_KEY_POLICIES,
+            Self::MANAGE_SUBACCOUNT_POLICIES,
         ]
     }
 }
@@ -5038,8 +5173,10 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// True if this policy is a reusable template; false if it is a
-    /// per-sub-account instance.
+    /// True if this policy is a template: a reusable policy of the main account
+    /// that is never attached to a sub-account itself. Applying it with
+    /// SetSubaccountPolicy attaches a copy, so editing the template later changes
+    /// no sub-account. Set when the policy is created and never changes.
     ///
     /// Field 10: `is_template`
     #[serde(
@@ -5049,8 +5186,9 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_template: bool,
-    /// Optional source template this policy was copied from (opaque ID). This is
-    /// audit metadata only and does not imply live linkage.
+    /// Template this policy was copied from (opaque ID), or 0 when it is not a
+    /// copy. Set when the copy is made and never changes, even after the template
+    /// is edited or deleted; the copy is not linked to the template.
     ///
     /// Field 11: `source_template_id`
     #[serde(
@@ -5060,6 +5198,18 @@ pub struct SubaccountPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub source_template_id: u64,
+    /// Revision of the template when this policy was copied from it, or 0 when
+    /// it is not a copy. Compare it with the template's current revision to see
+    /// whether the template changed since. Never changes.
+    ///
+    /// Field 31: `source_template_revision`
+    #[serde(
+        rename = "sourceTemplateRevision",
+        alias = "source_template_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub source_template_revision: u64,
     /// Maximum notional size allowed for any single order on this sub-account,
     /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
     /// A value of 0 means "no explicit cap".
@@ -5171,6 +5321,7 @@ impl ::core::fmt::Debug for SubaccountPolicyView {
             .field("actions", &self.actions)
             .field("is_template", &self.is_template)
             .field("source_template_id", &self.source_template_id)
+            .field("source_template_revision", &self.source_template_revision)
             .field("max_order_notional", &self.max_order_notional)
             .field("max_open_orders", &self.max_open_orders)
             .field("trading_halted", &self.trading_halted)
@@ -5297,6 +5448,12 @@ impl ::buffa::Message for SubaccountPolicyView {
         if self.revision != 0u64 {
             size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
         }
+        if self.source_template_revision != 0u64 {
+            size
+                += 2u32
+                    + ::buffa::types::uint64_encoded_len(self.source_template_revision)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -5373,6 +5530,9 @@ impl ::buffa::Message for SubaccountPolicyView {
         }
         if self.revision != 0u64 {
             ::buffa::types::put_uint64_field(30u32, self.revision, buf);
+        }
+        if self.source_template_revision != 0u64 {
+            ::buffa::types::put_uint64_field(31u32, self.source_template_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -5557,6 +5717,13 @@ impl ::buffa::Message for SubaccountPolicyView {
                 )?;
                 self.revision = ::buffa::types::decode_uint64(buf)?;
             }
+            31u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source_template_revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -5582,6 +5749,7 @@ impl ::buffa::Message for SubaccountPolicyView {
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
         self.revision = 0u64;
+        self.source_template_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6315,6 +6483,19 @@ pub struct SubaccountPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Whether the policy is a template, which SetSubaccountPolicy applies as a
+    /// copy. Only the main account owner creates templates, and never together
+    /// with subaccount_id. Chosen at creation: an update_mask that selects it is
+    /// refused with InvalidArgument.
+    ///
+    /// Field 28: `is_template`
+    #[serde(
+        rename = "isTemplate",
+        alias = "is_template",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub is_template: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -6333,6 +6514,7 @@ impl ::core::fmt::Debug for SubaccountPolicySpec {
             .field("locked", &self.locked)
             .field("review_at", &self.review_at)
             .field("expires_at", &self.expires_at)
+            .field("is_template", &self.is_template)
             .finish()
     }
 }
@@ -6422,6 +6604,9 @@ impl ::buffa::Message for SubaccountPolicySpec {
                 += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if self.is_template {
+            size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -6478,6 +6663,9 @@ impl ::buffa::Message for SubaccountPolicySpec {
         if self.expires_at.is_set() {
             ::buffa::types::put_len_delimited_header(27u32, __cache.consume_next(), buf);
             self.expires_at.write_to(__cache, buf);
+        }
+        if self.is_template {
+            ::buffa::types::put_bool_field(28u32, self.is_template, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -6612,6 +6800,13 @@ impl ::buffa::Message for SubaccountPolicySpec {
                     ctx,
                 )?;
             }
+            28u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.is_template = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -6631,6 +6826,7 @@ impl ::buffa::Message for SubaccountPolicySpec {
         self.locked = false;
         self.review_at = ::buffa::MessageField::none();
         self.expires_at = ::buffa::MessageField::none();
+        self.is_template = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -6663,8 +6859,8 @@ pub const __SUBACCOUNT_POLICY_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntr
     from_json: ::buffa::type_registry::any_from_json::<SubaccountPolicySpec>,
     is_wkt: false,
 };
-/// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
-/// an optional attach step for one target sub-account.
+/// CreateSubaccountPolicyRequest defines a new sub-account policy, with an
+/// optional attach step for one target sub-account.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -6677,7 +6873,9 @@ pub struct CreateSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub policy: ::buffa::MessageField<SubaccountPolicySpec>,
-    /// Optional target sub-account to attach atomically after creation.
+    /// Optional target sub-account to attach atomically after creation. A
+    /// template cannot be attached: setting it with policy.is_template is refused
+    /// with InvalidArgument.
     ///
     /// Field 2: `subaccount_id`
     #[serde(
@@ -7333,8 +7531,8 @@ pub const __UPDATE_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<UpdateSubaccountPolicyResponse>,
     is_wkt: false,
 };
-/// DeleteSubaccountPolicyRequest deletes a sub-account policy template when it
-/// is not in use.
+/// DeleteSubaccountPolicyRequest deletes a sub-account policy when it is not in
+/// use. A template is never in use; copies made from it keep their lineage.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -7564,8 +7762,8 @@ pub const __DELETE_SUBACCOUNT_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::
     from_json: ::buffa::type_registry::any_from_json::<DeleteSubaccountPolicyResponse>,
     is_wkt: false,
 };
-/// SetSubaccountPolicyRequest attaches or clears a policy template on a
-/// sub-account.
+/// SetSubaccountPolicyRequest attaches a policy to a sub-account, applies a
+/// template to it, or clears its policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -7580,8 +7778,10 @@ pub struct SetSubaccountPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub subaccount_id: u64,
-    /// Policy template to attach (opaque ID). A value of 0 clears the explicit
-    /// binding and restores the system Read Only policy.
+    /// Policy to attach (opaque ID), owned by the sub-account's main account. A
+    /// template is applied: the sub-account gets a new copy of its current
+    /// revision, which later edits of the template do not change. A value of 0
+    /// clears the explicit binding and restores the system Read Only policy.
     ///
     /// Field 2: `policy_id`
     #[serde(
@@ -7719,18 +7919,31 @@ pub const __SET_SUBACCOUNT_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::Json
     from_json: ::buffa::type_registry::any_from_json::<SetSubaccountPolicyRequest>,
     is_wkt: false,
 };
-/// SetSubaccountPolicyResponse is empty when the policy binding succeeds.
+/// SetSubaccountPolicyResponse returns the policy now attached.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SetSubaccountPolicyResponse {
+    /// Policy now attached to the sub-account (opaque ID): the new copy when
+    /// policy_id named a template, else policy_id. 0 when the policy was cleared.
+    ///
+    /// Field 1: `policy_id`
+    #[serde(
+        rename = "policyId",
+        alias = "policy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub policy_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for SetSubaccountPolicyResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("SetSubaccountPolicyResponse").finish()
+        f.debug_struct("SetSubaccountPolicyResponse")
+            .field("policy_id", &self.policy_id)
+            .finish()
     }
 }
 impl SetSubaccountPolicyResponse {
@@ -7758,6 +7971,9 @@ impl ::buffa::Message for SetSubaccountPolicyResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.policy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7768,6 +7984,9 @@ impl ::buffa::Message for SetSubaccountPolicyResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if self.policy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -7781,6 +8000,13 @@ impl ::buffa::Message for SetSubaccountPolicyResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.policy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7789,6 +8015,7 @@ impl ::buffa::Message for SetSubaccountPolicyResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.policy_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7887,8 +8114,10 @@ pub struct ApiPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub spot_market_scope: ::buffa::EnumValue<market_scope::Value>,
-    /// When true, this policy is intended to be reused as a template across
-    /// multiple API keys. When false, it represents a single-key instance.
+    /// True if this policy is a template: a reusable policy of the main account
+    /// that is never attached to an API key itself. Applying it with
+    /// SetApiKeyPolicy attaches a copy, so editing the template later changes no
+    /// API key. Set when the policy is created and never changes.
     ///
     /// Field 19: `is_template`
     #[serde(
@@ -7898,8 +8127,9 @@ pub struct ApiPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
     )]
     pub is_template: bool,
-    /// Optional source template this policy was copied from (opaque ID). This is
-    /// audit metadata only and does not imply live linkage.
+    /// Template this policy was copied from (opaque ID), or 0 when it is not a
+    /// copy. Set when the copy is made and never changes, even after the template
+    /// is edited or deleted; the copy is not linked to the template.
     ///
     /// Field 20: `source_template_id`
     #[serde(
@@ -7909,6 +8139,18 @@ pub struct ApiPolicyView {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
     )]
     pub source_template_id: u64,
+    /// Revision of the template when this policy was copied from it, or 0 when
+    /// it is not a copy. Compare it with the template's current revision to see
+    /// whether the template changed since. Never changes.
+    ///
+    /// Field 24: `source_template_revision`
+    #[serde(
+        rename = "sourceTemplateRevision",
+        alias = "source_template_revision",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub source_template_revision: u64,
     /// Creation time in UTC.
     ///
     /// Field 21: `created_at`
@@ -7951,6 +8193,7 @@ impl ::core::fmt::Debug for ApiPolicyView {
             .field("spot_market_scope", &self.spot_market_scope)
             .field("is_template", &self.is_template)
             .field("source_template_id", &self.source_template_id)
+            .field("source_template_revision", &self.source_template_revision)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .field("revision", &self.revision)
@@ -8039,6 +8282,12 @@ impl ::buffa::Message for ApiPolicyView {
         if self.revision != 0u64 {
             size += 2u32 + ::buffa::types::uint64_encoded_len(self.revision) as u32;
         }
+        if self.source_template_revision != 0u64 {
+            size
+                += 2u32
+                    + ::buffa::types::uint64_encoded_len(self.source_template_revision)
+                        as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8095,6 +8344,9 @@ impl ::buffa::Message for ApiPolicyView {
         }
         if self.revision != 0u64 {
             ::buffa::types::put_uint64_field(23u32, self.revision, buf);
+        }
+        if self.source_template_revision != 0u64 {
+            ::buffa::types::put_uint64_field(24u32, self.source_template_revision, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8229,6 +8481,13 @@ impl ::buffa::Message for ApiPolicyView {
                 )?;
                 self.revision = ::buffa::types::decode_uint64(buf)?;
             }
+            24u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.source_template_revision = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8248,6 +8507,7 @@ impl ::buffa::Message for ApiPolicyView {
         self.created_at = ::buffa::MessageField::none();
         self.updated_at = ::buffa::MessageField::none();
         self.revision = 0u64;
+        self.source_template_revision = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8915,7 +9175,10 @@ pub struct ApiPolicySpec {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec"
     )]
     pub actions: ::buffa::alloc::vec::Vec<::buffa::EnumValue<PolicyAction>>,
-    /// Whether this policy should be treated as a reusable template.
+    /// Whether the policy is a template, which SetApiKeyPolicy applies as a copy.
+    /// Only the main account owner creates templates, and never together with
+    /// assign_to_key_id. Chosen at creation: an update_mask that selects it is
+    /// refused with InvalidArgument.
     ///
     /// Field 19: `is_template`
     #[serde(
@@ -9174,7 +9437,7 @@ pub const __API_POLICY_SPEC_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::b
     from_json: ::buffa::type_registry::any_from_json::<ApiPolicySpec>,
     is_wkt: false,
 };
-/// CreateApiPolicyRequest defines a new API key policy template.
+/// CreateApiPolicyRequest defines a new API key policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -9189,9 +9452,12 @@ pub struct CreateApiPolicyRequest {
     pub policy: ::buffa::MessageField<ApiPolicySpec>,
     /// Optional API key identifier to bind this newly-created policy to
     /// atomically. When set, the caller must be allowed to manage the key and the
-    /// create+assign operation consumes a single fresh step-up proof. An
-    /// assistant API key cannot be assigned a policy that allows a money-out
-    /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
+    /// create+assign operation consumes a single fresh step-up proof. A template
+    /// cannot be assigned: setting it with policy.is_template is refused with
+    /// InvalidArgument. An assistant API key cannot be assigned a policy that
+    /// allows a money-out action: FailedPrecondition with
+    /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED. Nor can an admin API key:
+    /// FailedPrecondition with AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED.
     ///
     /// Field 2: `assign_to_key_id`
     #[serde(
@@ -9834,7 +10100,8 @@ pub const __UPDATE_API_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<UpdateApiPolicyResponse>,
     is_wkt: false,
 };
-/// DeleteApiPolicyRequest deletes an API key policy template when it is not in use.
+/// DeleteApiPolicyRequest deletes an API key policy when it is not in use. A
+/// template is never in use; copies made from it keep their lineage.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10064,7 +10331,8 @@ pub const __DELETE_API_POLICY_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<DeleteApiPolicyResponse>,
     is_wkt: false,
 };
-/// SetApiKeyPolicyRequest attaches or clears a policy template on an API key.
+/// SetApiKeyPolicyRequest attaches a policy to an API key, applies a template to
+/// it, or clears its policy.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -10080,8 +10348,10 @@ pub struct SetApiKeyPolicyRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub key_id: ::buffa::alloc::string::String,
-    /// Policy template to attach (opaque ID). A value of 0 clears the binding.
-    /// An API key without an attached policy has no permissions.
+    /// Policy to attach (opaque ID), owned by the key's main account. A template
+    /// is applied: the key gets a new copy of its current revision, which later
+    /// edits of the template do not change. A value of 0 clears the binding. An
+    /// API key without an attached policy has no permissions.
     ///
     /// Field 2: `policy_id`
     #[serde(
@@ -10219,18 +10489,31 @@ pub const __SET_API_KEY_POLICY_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAny
     from_json: ::buffa::type_registry::any_from_json::<SetApiKeyPolicyRequest>,
     is_wkt: false,
 };
-/// SetApiKeyPolicyResponse is empty when the policy binding succeeds.
+/// SetApiKeyPolicyResponse returns the policy now attached.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct SetApiKeyPolicyResponse {
+    /// Policy now attached to the key (opaque ID): the new copy when policy_id
+    /// named a template, else policy_id. 0 when the policy was cleared.
+    ///
+    /// Field 1: `policy_id`
+    #[serde(
+        rename = "policyId",
+        alias = "policy_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub policy_id: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
 }
 impl ::core::fmt::Debug for SetApiKeyPolicyResponse {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("SetApiKeyPolicyResponse").finish()
+        f.debug_struct("SetApiKeyPolicyResponse")
+            .field("policy_id", &self.policy_id)
+            .finish()
     }
 }
 impl SetApiKeyPolicyResponse {
@@ -10258,6 +10541,9 @@ impl ::buffa::Message for SetApiKeyPolicyResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         let mut size = 0u32;
+        if self.policy_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -10268,6 +10554,9 @@ impl ::buffa::Message for SetApiKeyPolicyResponse {
     ) {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
+        if self.policy_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+        }
         self.__buffa_unknown_fields.write_to(buf);
     }
     fn merge_field(
@@ -10281,6 +10570,13 @@ impl ::buffa::Message for SetApiKeyPolicyResponse {
         #[allow(unused_imports)]
         use ::buffa::Enumeration as _;
         match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.policy_id = ::buffa::types::decode_fixed64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -10289,6 +10585,7 @@ impl ::buffa::Message for SetApiKeyPolicyResponse {
         ::core::result::Result::Ok(())
     }
     fn clear(&mut self) {
+        self.policy_id = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -20880,7 +21177,7 @@ pub const __LIST_ACCOUNT_ACTIVITY_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     from_json: ::buffa::type_registry::any_from_json::<ListAccountActivityResponse>,
     is_wkt: false,
 };
-/// AccountScopeType identifies whether address-book data belongs to the root account or a subaccount.
+/// AccountScopeType identifies whether address-book data or an API key belongs to the root account or a subaccount.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum AccountScopeType {
@@ -34132,195 +34429,6 @@ impl ::buffa::Enumeration for MFAChallengePurpose {
         ]
     }
 }
-/// An action that one step-up covers for a short time in the same signed-in
-/// session: the recent-MFA window. The window opens when the session completes
-/// an MFA challenge for fresh step-up, and lasts 5 minutes. It closes earlier
-/// when the session ends (EndRecentMFA or session expiry). Every other action
-/// that needs MFA, including withdrawals, transfers, auto-withdraw rules, API
-/// key and policy changes outside the assistant, address book changes and MFA
-/// settings, still needs a fresh, single-use step-up proof each time.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[repr(i32)]
-pub enum RecentMFAAction {
-    /// No action was specified.
-    RECENT_MFA_ACTION_UNSPECIFIED = 0i32,
-    /// Confirming a Telegram link (SocialVerificationService.ConfirmSocialVerification
-    /// for TELEGRAM).
-    RECENT_MFA_ACTION_TELEGRAM_LINK = 1i32,
-    /// Changing the Polyester AI assistant's account access
-    /// (ApiKeyService.SetAssistantKeys, with policies or presets).
-    RECENT_MFA_ACTION_ASSISTANT_ACCESS = 2i32,
-    /// Raising or removing a Telegram approval limit
-    /// (ai.v1.AssistantService.SetTelegramApprovalLimits). Setting or lowering a
-    /// limit never needs MFA.
-    RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS = 3i32,
-}
-impl RecentMFAAction {
-    ///Idiomatic alias for [`Self::RECENT_MFA_ACTION_UNSPECIFIED`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const Unspecified: Self = Self::RECENT_MFA_ACTION_UNSPECIFIED;
-    ///Idiomatic alias for [`Self::RECENT_MFA_ACTION_TELEGRAM_LINK`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const TelegramLink: Self = Self::RECENT_MFA_ACTION_TELEGRAM_LINK;
-    ///Idiomatic alias for [`Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const AssistantAccess: Self = Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS;
-    ///Idiomatic alias for [`Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS`]; `Debug` prints the variant name.
-    #[allow(non_upper_case_globals)]
-    pub const TelegramApprovalLimits: Self = Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS;
-}
-impl ::core::default::Default for RecentMFAAction {
-    fn default() -> Self {
-        Self::RECENT_MFA_ACTION_UNSPECIFIED
-    }
-}
-impl ::serde::Serialize for RecentMFAAction {
-    fn serialize<S: ::serde::Serializer>(
-        &self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        s.serialize_str(::buffa::Enumeration::proto_name(self))
-    }
-}
-impl<'de> ::serde::Deserialize<'de> for RecentMFAAction {
-    fn deserialize<D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        struct _V;
-        impl ::serde::de::Visitor<'_> for _V {
-            type Value = RecentMFAAction;
-            fn expecting(
-                &self,
-                f: &mut ::core::fmt::Formatter<'_>,
-            ) -> ::core::fmt::Result {
-                f.write_str(
-                    concat!(
-                        "a string, integer, or null for ", stringify!(RecentMFAAction)
-                    ),
-                )
-            }
-            fn visit_str<E: ::serde::de::Error>(
-                self,
-                v: &str,
-            ) -> ::core::result::Result<RecentMFAAction, E> {
-                <RecentMFAAction as ::buffa::Enumeration>::from_proto_name(v)
-                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
-            }
-            fn visit_i64<E: ::serde::de::Error>(
-                self,
-                v: i64,
-            ) -> ::core::result::Result<RecentMFAAction, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <RecentMFAAction as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_u64<E: ::serde::de::Error>(
-                self,
-                v: u64,
-            ) -> ::core::result::Result<RecentMFAAction, E> {
-                let v32 = i32::try_from(v)
-                    .map_err(|_| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
-                        )
-                    })?;
-                <RecentMFAAction as ::buffa::Enumeration>::from_i32(v32)
-                    .ok_or_else(|| {
-                        ::serde::de::Error::custom(
-                            ::buffa::alloc::format!("unknown enum value {v32}"),
-                        )
-                    })
-            }
-            fn visit_unit<E: ::serde::de::Error>(
-                self,
-            ) -> ::core::result::Result<RecentMFAAction, E> {
-                ::core::result::Result::Ok(::core::default::Default::default())
-            }
-        }
-        d.deserialize_any(_V)
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for RecentMFAAction {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-impl ::buffa::Enumeration for RecentMFAAction {
-    fn from_i32(value: i32) -> ::core::option::Option<Self> {
-        match value {
-            0i32 => ::core::option::Option::Some(Self::RECENT_MFA_ACTION_UNSPECIFIED),
-            1i32 => ::core::option::Option::Some(Self::RECENT_MFA_ACTION_TELEGRAM_LINK),
-            2i32 => {
-                ::core::option::Option::Some(Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS)
-            }
-            3i32 => {
-                ::core::option::Option::Some(
-                    Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS,
-                )
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn to_i32(&self) -> i32 {
-        *self as i32
-    }
-    fn proto_name(&self) -> &'static str {
-        match self {
-            Self::RECENT_MFA_ACTION_UNSPECIFIED => "RECENT_MFA_ACTION_UNSPECIFIED",
-            Self::RECENT_MFA_ACTION_TELEGRAM_LINK => "RECENT_MFA_ACTION_TELEGRAM_LINK",
-            Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS => {
-                "RECENT_MFA_ACTION_ASSISTANT_ACCESS"
-            }
-            Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS => {
-                "RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS"
-            }
-        }
-    }
-    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
-        match name {
-            "RECENT_MFA_ACTION_UNSPECIFIED" => {
-                ::core::option::Option::Some(Self::RECENT_MFA_ACTION_UNSPECIFIED)
-            }
-            "RECENT_MFA_ACTION_TELEGRAM_LINK" => {
-                ::core::option::Option::Some(Self::RECENT_MFA_ACTION_TELEGRAM_LINK)
-            }
-            "RECENT_MFA_ACTION_ASSISTANT_ACCESS" => {
-                ::core::option::Option::Some(Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS)
-            }
-            "RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS" => {
-                ::core::option::Option::Some(
-                    Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS,
-                )
-            }
-            _ => ::core::option::Option::None,
-        }
-    }
-    fn values() -> &'static [Self] {
-        &[
-            Self::RECENT_MFA_ACTION_UNSPECIFIED,
-            Self::RECENT_MFA_ACTION_TELEGRAM_LINK,
-            Self::RECENT_MFA_ACTION_ASSISTANT_ACCESS,
-            Self::RECENT_MFA_ACTION_TELEGRAM_APPROVAL_LIMITS,
-        ]
-    }
-}
 /// Current assurance details for an interactive session.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -38721,507 +38829,6 @@ pub const __RELEASE_FRESH_STEP_UP_RESPONSE_JSON_ANY: ::buffa::type_registry::Jso
     from_json: ::buffa::type_registry::any_from_json::<ReleaseFreshStepUpResponse>,
     is_wkt: false,
 };
-/// Request to read whether the session's recent-MFA window covers an action.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct GetRecentMFARequest {
-    /// The action the client is about to perform.
-    ///
-    /// Field 1: `action`
-    #[serde(
-        rename = "action",
-        with = "::buffa::json_helpers::proto_enum",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
-    )]
-    pub action: ::buffa::EnumValue<RecentMFAAction>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for GetRecentMFARequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetRecentMFARequest").field("action", &self.action).finish()
-    }
-}
-impl GetRecentMFARequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFARequest";
-}
-::buffa::impl_default_instance!(GetRecentMFARequest);
-impl ::buffa::MessageName for GetRecentMFARequest {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "GetRecentMFARequest";
-    const FULL_NAME: &'static str = "auth.v1.GetRecentMFARequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFARequest";
-}
-impl ::buffa::Message for GetRecentMFARequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        {
-            let val = self.action.to_i32();
-            if val != 0 {
-                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-            }
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        {
-            let val = self.action.to_i32();
-            if val != 0 {
-                ::buffa::types::put_int32_field(1u32, val, buf);
-            }
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.action = ::buffa::EnumValue::from(
-                    ::buffa::types::decode_int32(buf)?,
-                );
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.action = ::buffa::EnumValue::from(0);
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for GetRecentMFARequest {
-    const PROTO_FQN: &'static str = "auth.v1.GetRecentMFARequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for GetRecentMFARequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __GET_RECENT_MFA_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.GetRecentMFARequest",
-    to_json: ::buffa::type_registry::any_to_json::<GetRecentMFARequest>,
-    from_json: ::buffa::type_registry::any_from_json::<GetRecentMFARequest>,
-    is_wkt: false,
-};
-/// Whether the session's recent-MFA window is open for the action.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct GetRecentMFAResponse {
-    /// True when the action needs no new step-up now: send it without a step-up
-    /// proof. False when the client must complete an MFA challenge for fresh
-    /// step-up first.
-    ///
-    /// Field 1: `open`
-    #[serde(
-        rename = "open",
-        with = "::buffa::json_helpers::proto_bool",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
-    )]
-    pub open: bool,
-    /// Time when the window closes. Empty when open is false. A request that
-    /// arrives after this time needs a new step-up.
-    ///
-    /// Field 2: `expires_at`
-    #[serde(
-        rename = "expiresAt",
-        alias = "expires_at",
-        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
-    )]
-    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for GetRecentMFAResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("GetRecentMFAResponse")
-            .field("open", &self.open)
-            .field("expires_at", &self.expires_at)
-            .finish()
-    }
-}
-impl GetRecentMFAResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFAResponse";
-}
-::buffa::impl_default_instance!(GetRecentMFAResponse);
-impl ::buffa::MessageName for GetRecentMFAResponse {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "GetRecentMFAResponse";
-    const FULL_NAME: &'static str = "auth.v1.GetRecentMFAResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFAResponse";
-}
-impl ::buffa::Message for GetRecentMFAResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        if self.open {
-            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-        }
-        if self.expires_at.is_set() {
-            let __slot = __cache.reserve();
-            let inner_size = self.expires_at.compute_size(__cache);
-            __cache.set(__slot, inner_size);
-            size
-                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                    + inner_size;
-        }
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        __cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        if self.open {
-            ::buffa::types::put_bool_field(1u32, self.open, buf);
-        }
-        if self.expires_at.is_set() {
-            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
-            self.expires_at.write_to(__cache, buf);
-        }
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            1u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::Varint,
-                )?;
-                self.open = ::buffa::types::decode_bool(buf)?;
-            }
-            2u32 => {
-                ::buffa::encoding::check_wire_type(
-                    tag,
-                    ::buffa::encoding::WireType::LengthDelimited,
-                )?;
-                ::buffa::Message::merge_length_delimited(
-                    self.expires_at.get_or_insert_default(),
-                    buf,
-                    ctx,
-                )?;
-            }
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.open = false;
-        self.expires_at = ::buffa::MessageField::none();
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for GetRecentMFAResponse {
-    const PROTO_FQN: &'static str = "auth.v1.GetRecentMFAResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for GetRecentMFAResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __GET_RECENT_MFA_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.GetRecentMFAResponse",
-    to_json: ::buffa::type_registry::any_to_json::<GetRecentMFAResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<GetRecentMFAResponse>,
-    is_wkt: false,
-};
-/// Request to end the session's recent-MFA window, for example at sign-out.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct EndRecentMFARequest {
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for EndRecentMFARequest {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("EndRecentMFARequest").finish()
-    }
-}
-impl EndRecentMFARequest {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFARequest";
-}
-::buffa::impl_default_instance!(EndRecentMFARequest);
-impl ::buffa::MessageName for EndRecentMFARequest {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "EndRecentMFARequest";
-    const FULL_NAME: &'static str = "auth.v1.EndRecentMFARequest";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFARequest";
-}
-impl ::buffa::Message for EndRecentMFARequest {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for EndRecentMFARequest {
-    const PROTO_FQN: &'static str = "auth.v1.EndRecentMFARequest";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for EndRecentMFARequest {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __END_RECENT_MFA_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.EndRecentMFARequest",
-    to_json: ::buffa::type_registry::any_to_json::<EndRecentMFARequest>,
-    from_json: ::buffa::type_registry::any_from_json::<EndRecentMFARequest>,
-    is_wkt: false,
-};
-/// Empty response returned after the recent-MFA window is ended.
-#[derive(Clone, PartialEq, Default)]
-#[derive(::serde::Serialize, ::serde::Deserialize)]
-#[serde(default)]
-pub struct EndRecentMFAResponse {
-    #[serde(skip)]
-    #[doc(hidden)]
-    pub __buffa_unknown_fields: ::buffa::UnknownFields,
-}
-impl ::core::fmt::Debug for EndRecentMFAResponse {
-    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-        f.debug_struct("EndRecentMFAResponse").finish()
-    }
-}
-impl EndRecentMFAResponse {
-    /// Protobuf type URL for this message, for use with `Any::pack` and
-    /// `Any::unpack_if`.
-    ///
-    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
-    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFAResponse";
-}
-::buffa::impl_default_instance!(EndRecentMFAResponse);
-impl ::buffa::MessageName for EndRecentMFAResponse {
-    const PACKAGE: &'static str = "auth.v1";
-    const NAME: &'static str = "EndRecentMFAResponse";
-    const FULL_NAME: &'static str = "auth.v1.EndRecentMFAResponse";
-    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFAResponse";
-}
-impl ::buffa::Message for EndRecentMFAResponse {
-    /// Returns the total encoded size in bytes.
-    ///
-    /// The result is a `u32`; the protobuf specification requires all
-    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
-    /// compliant message will never overflow this type.
-    #[allow(clippy::let_and_return)]
-    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        let mut size = 0u32;
-        size += self.__buffa_unknown_fields.encoded_len() as u32;
-        size
-    }
-    fn write_to(
-        &self,
-        _cache: &mut ::buffa::SizeCache,
-        buf: &mut impl ::buffa::bytes::BufMut,
-    ) {
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        self.__buffa_unknown_fields.write_to(buf);
-    }
-    fn merge_field(
-        &mut self,
-        tag: ::buffa::encoding::Tag,
-        buf: &mut impl ::buffa::bytes::Buf,
-        ctx: ::buffa::DecodeContext<'_>,
-    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
-        #[allow(unused_imports)]
-        use ::buffa::bytes::Buf as _;
-        #[allow(unused_imports)]
-        use ::buffa::Enumeration as _;
-        match tag.field_number() {
-            _ => {
-                self.__buffa_unknown_fields
-                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
-            }
-        }
-        ::core::result::Result::Ok(())
-    }
-    fn clear(&mut self) {
-        self.__buffa_unknown_fields.clear();
-    }
-}
-impl ::buffa::ExtensionSet for EndRecentMFAResponse {
-    const PROTO_FQN: &'static str = "auth.v1.EndRecentMFAResponse";
-    fn unknown_fields(&self) -> &::buffa::UnknownFields {
-        &self.__buffa_unknown_fields
-    }
-    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
-        &mut self.__buffa_unknown_fields
-    }
-}
-impl ::buffa::json_helpers::ProtoElemJson for EndRecentMFAResponse {
-    fn serialize_proto_json<S: ::serde::Serializer>(
-        v: &Self,
-        s: S,
-    ) -> ::core::result::Result<S::Ok, S::Error> {
-        ::serde::Serialize::serialize(v, s)
-    }
-    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
-        d: D,
-    ) -> ::core::result::Result<Self, D::Error> {
-        <Self as ::serde::Deserialize>::deserialize(d)
-    }
-}
-#[doc(hidden)]
-pub const __END_RECENT_MFA_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
-    type_url: "type.googleapis.com/auth.v1.EndRecentMFAResponse",
-    to_json: ::buffa::type_registry::any_to_json::<EndRecentMFAResponse>,
-    from_json: ::buffa::type_registry::any_from_json::<EndRecentMFAResponse>,
-    is_wkt: false,
-};
 /// Request to update an MFA factor label.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
@@ -40281,10 +39888,36 @@ pub enum AuthErrorCode {
     /// less than 30 days ago: one change per provider every 30 days. retry_after
     /// says when the next one is allowed. HTTP 412, SOCIAL_CHANGE_LIMIT_REACHED.
     AUTH_SOCIAL_CHANGE_LIMIT_REACHED = 65i32,
-    /// The session's recent-MFA window has closed: the action needs a new
-    /// step-up. Complete an MFA challenge for fresh step-up and retry; the
-    /// step-up opens a new window. PermissionDenied.
-    AUTH_RECENT_MFA_EXPIRED = 66i32,
+    /// Only an admin API key may call this with an API key; the key that signed
+    /// the request is not one. HTTP 403, ADMIN_KEY_REQUIRED.
+    AUTH_ADMIN_KEY_REQUIRED = 67i32,
+    /// The request would create, promote or change an admin key, or attach an
+    /// admin permission, by API key. Only the main account's owner may, in a
+    /// signed-in session with a fresh step-up proof. HTTP 403,
+    /// ADMIN_KEY_ESCALATION_DENIED.
+    AUTH_ADMIN_KEY_ESCALATION_DENIED = 68i32,
+    /// The admin API key's change would give a key more than the admin key's own
+    /// scope allows: an IP allowlist entry outside the admin key's allowlist, or
+    /// on a sub-account key more actions or markets than the sub-account's
+    /// policy. HTTP 403, ADMIN_KEY_SCOPE_EXCEEDED.
+    AUTH_ADMIN_KEY_SCOPE_EXCEEDED = 69i32,
+    /// An admin API key can never reach this target: an assistant key, a key or
+    /// policy that allows a money-out action, a locked sub-account policy, or a
+    /// sub-account the main account does not own. HTTP 403,
+    /// ADMIN_KEY_FORBIDDEN_TARGET.
+    AUTH_ADMIN_KEY_FORBIDDEN_TARGET = 70i32,
+    /// An admin key's IP allowlist is empty, or has an entry broader than /24
+    /// (IPv4) or /48 (IPv6), or an IPv4-mapped IPv6 entry. HTTP 400,
+    /// ADMIN_KEY_ALLOWLIST_INVALID.
+    AUTH_ADMIN_KEY_ALLOWLIST_INVALID = 71i32,
+    /// An admin API key can never be allowed an action that moves value out of
+    /// the account or manages where it goes: EXTERNAL_WITHDRAW,
+    /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. HTTP 412,
+    /// ADMIN_KEY_ACTION_NOT_ALLOWED.
+    AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED = 72i32,
+    /// The account already has the most connected apps it may have. Disconnect
+    /// an app before connecting another. FailedPrecondition.
+    AUTH_CONNECTED_APP_LIMIT_REACHED = 73i32,
 }
 impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -40482,9 +40115,27 @@ impl AuthErrorCode {
     ///Idiomatic alias for [`Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const AuthSocialChangeLimitReached: Self = Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED;
-    ///Idiomatic alias for [`Self::AUTH_RECENT_MFA_EXPIRED`]; `Debug` prints the variant name.
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_REQUIRED`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
-    pub const AuthRecentMfaExpired: Self = Self::AUTH_RECENT_MFA_EXPIRED;
+    pub const AuthAdminKeyRequired: Self = Self::AUTH_ADMIN_KEY_REQUIRED;
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_ESCALATION_DENIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAdminKeyEscalationDenied: Self = Self::AUTH_ADMIN_KEY_ESCALATION_DENIED;
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAdminKeyScopeExceeded: Self = Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED;
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAdminKeyForbiddenTarget: Self = Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET;
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAdminKeyAllowlistInvalid: Self = Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID;
+    ///Idiomatic alias for [`Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthAdminKeyActionNotAllowed: Self = Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED;
+    ///Idiomatic alias for [`Self::AUTH_CONNECTED_APP_LIMIT_REACHED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const AuthConnectedAppLimitReached: Self = Self::AUTH_CONNECTED_APP_LIMIT_REACHED;
 }
 impl ::core::default::Default for AuthErrorCode {
     fn default() -> Self {
@@ -40673,7 +40324,15 @@ impl ::buffa::Enumeration for AuthErrorCode {
             63i32 => ::core::option::Option::Some(Self::AUTH_REPLAY_DETECTED),
             64i32 => ::core::option::Option::Some(Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN),
             65i32 => ::core::option::Option::Some(Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED),
-            66i32 => ::core::option::Option::Some(Self::AUTH_RECENT_MFA_EXPIRED),
+            67i32 => ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_REQUIRED),
+            68i32 => ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ESCALATION_DENIED),
+            69i32 => ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED),
+            70i32 => ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET),
+            71i32 => ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID),
+            72i32 => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED)
+            }
+            73i32 => ::core::option::Option::Some(Self::AUTH_CONNECTED_APP_LIMIT_REACHED),
             _ => ::core::option::Option::None,
         }
     }
@@ -40769,7 +40428,15 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_REPLAY_DETECTED => "AUTH_REPLAY_DETECTED",
             Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN => "AUTH_SOCIAL_ACCOUNT_COOLDOWN",
             Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED => "AUTH_SOCIAL_CHANGE_LIMIT_REACHED",
-            Self::AUTH_RECENT_MFA_EXPIRED => "AUTH_RECENT_MFA_EXPIRED",
+            Self::AUTH_ADMIN_KEY_REQUIRED => "AUTH_ADMIN_KEY_REQUIRED",
+            Self::AUTH_ADMIN_KEY_ESCALATION_DENIED => "AUTH_ADMIN_KEY_ESCALATION_DENIED",
+            Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED => "AUTH_ADMIN_KEY_SCOPE_EXCEEDED",
+            Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET => "AUTH_ADMIN_KEY_FORBIDDEN_TARGET",
+            Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID => "AUTH_ADMIN_KEY_ALLOWLIST_INVALID",
+            Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED => {
+                "AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED"
+            }
+            Self::AUTH_CONNECTED_APP_LIMIT_REACHED => "AUTH_CONNECTED_APP_LIMIT_REACHED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -40967,8 +40634,26 @@ impl ::buffa::Enumeration for AuthErrorCode {
             "AUTH_SOCIAL_CHANGE_LIMIT_REACHED" => {
                 ::core::option::Option::Some(Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED)
             }
-            "AUTH_RECENT_MFA_EXPIRED" => {
-                ::core::option::Option::Some(Self::AUTH_RECENT_MFA_EXPIRED)
+            "AUTH_ADMIN_KEY_REQUIRED" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_REQUIRED)
+            }
+            "AUTH_ADMIN_KEY_ESCALATION_DENIED" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ESCALATION_DENIED)
+            }
+            "AUTH_ADMIN_KEY_SCOPE_EXCEEDED" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED)
+            }
+            "AUTH_ADMIN_KEY_FORBIDDEN_TARGET" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET)
+            }
+            "AUTH_ADMIN_KEY_ALLOWLIST_INVALID" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID)
+            }
+            "AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED" => {
+                ::core::option::Option::Some(Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED)
+            }
+            "AUTH_CONNECTED_APP_LIMIT_REACHED" => {
+                ::core::option::Option::Some(Self::AUTH_CONNECTED_APP_LIMIT_REACHED)
             }
             _ => ::core::option::Option::None,
         }
@@ -41040,7 +40725,13 @@ impl ::buffa::Enumeration for AuthErrorCode {
             Self::AUTH_REPLAY_DETECTED,
             Self::AUTH_SOCIAL_ACCOUNT_COOLDOWN,
             Self::AUTH_SOCIAL_CHANGE_LIMIT_REACHED,
-            Self::AUTH_RECENT_MFA_EXPIRED,
+            Self::AUTH_ADMIN_KEY_REQUIRED,
+            Self::AUTH_ADMIN_KEY_ESCALATION_DENIED,
+            Self::AUTH_ADMIN_KEY_SCOPE_EXCEEDED,
+            Self::AUTH_ADMIN_KEY_FORBIDDEN_TARGET,
+            Self::AUTH_ADMIN_KEY_ALLOWLIST_INVALID,
+            Self::AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED,
+            Self::AUTH_CONNECTED_APP_LIMIT_REACHED,
         ]
     }
 }
@@ -42079,6 +41770,32 @@ pub struct MeResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub root_smart_account_address: ::buffa::alloc::string::String,
+    /// Account scope of the API key that authenticated this request: SCOPE_ROOT
+    /// for a key of the main account, SCOPE_SUBACCOUNT for a key bound to one
+    /// sub-account. SCOPE_UNSPECIFIED when the request was not authenticated with
+    /// an API key.
+    ///
+    /// Field 13: `api_key_scope`
+    #[serde(
+        rename = "apiKeyScope",
+        alias = "api_key_scope",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub api_key_scope: ::buffa::EnumValue<AccountScopeType>,
+    /// Sub-account the API key is bound to (opaque ID). Present only when
+    /// api_key_scope is SCOPE_SUBACCOUNT. The key's private realtime channels
+    /// and account reads name this sub-account, for example
+    /// private:ledger:balances:\<subaccount_id\>.
+    ///
+    /// Field 14: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subaccount_id: ::core::option::Option<u64>,
     /// Session assurance details for the presented access token, if any.
     ///
     /// Field 20: `session`
@@ -42098,6 +41815,8 @@ impl ::core::fmt::Debug for MeResponse {
             .field("api_key_id", &self.api_key_id)
             .field("username", &self.username)
             .field("root_smart_account_address", &self.root_smart_account_address)
+            .field("api_key_scope", &self.api_key_scope)
+            .field("subaccount_id", &self.subaccount_id)
             .field("session", &self.session)
             .finish()
     }
@@ -42118,6 +41837,13 @@ impl MeResponse {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.api_key_id = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subaccount_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subaccount_id(mut self, value: u64) -> Self {
+        self.subaccount_id = Some(value);
         self
     }
 }
@@ -42155,6 +41881,15 @@ impl ::buffa::Message for MeResponse {
                         &self.root_smart_account_address,
                     ) as u32;
         }
+        {
+            let val = self.api_key_scope.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.subaccount_id.is_some() {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
         if self.session.is_set() {
             let __slot = __cache.reserve();
             let inner_size = self.session.compute_size(__cache);
@@ -42188,6 +41923,15 @@ impl ::buffa::Message for MeResponse {
                 &self.root_smart_account_address,
                 buf,
             );
+        }
+        {
+            let val = self.api_key_scope.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(13u32, val, buf);
+            }
+        }
+        if let Some(v) = self.subaccount_id {
+            ::buffa::types::put_fixed64_field(14u32, v, buf);
         }
         if self.session.is_set() {
             ::buffa::types::put_len_delimited_header(20u32, __cache.consume_next(), buf);
@@ -42239,6 +41983,24 @@ impl ::buffa::Message for MeResponse {
                 )?;
                 ::buffa::types::merge_string(&mut self.root_smart_account_address, buf)?;
             }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.api_key_scope = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.subaccount_id = ::core::option::Option::Some(
+                    ::buffa::types::decode_fixed64(buf)?,
+                );
+            }
             20u32 => {
                 ::buffa::encoding::check_wire_type(
                     tag,
@@ -42262,6 +42024,8 @@ impl ::buffa::Message for MeResponse {
         self.api_key_id = ::core::option::Option::None;
         self.username.clear();
         self.root_smart_account_address.clear();
+        self.api_key_scope = ::buffa::EnumValue::from(0);
+        self.subaccount_id = ::core::option::Option::None;
         self.session = ::buffa::MessageField::none();
         self.__buffa_unknown_fields.clear();
     }
@@ -42913,6 +42677,1964 @@ pub const __ACCEPT_TERMS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
     type_url: "type.googleapis.com/auth.v1.AcceptTermsResponse",
     to_json: ::buffa::type_registry::any_to_json::<AcceptTermsResponse>,
     from_json: ::buffa::type_registry::any_from_json::<AcceptTermsResponse>,
+    is_wkt: false,
+};
+/// An app that asks to use the account, as the OAuth client that registered
+/// with Polyester presents itself.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ConnectedAppClient {
+    /// OAuth client identifier of the app.
+    ///
+    /// Field 1: `client_id`
+    #[serde(
+        rename = "clientId",
+        alias = "client_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub client_id: ::buffa::alloc::string::String,
+    /// Name of the app, as shown on the consent page.
+    ///
+    /// Field 2: `name`
+    #[serde(
+        rename = "name",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub name: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConnectedAppClient {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConnectedAppClient")
+            .field("client_id", &self.client_id)
+            .field("name", &self.name)
+            .finish()
+    }
+}
+impl ConnectedAppClient {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedAppClient";
+}
+::buffa::impl_default_instance!(ConnectedAppClient);
+impl ::buffa::MessageName for ConnectedAppClient {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ConnectedAppClient";
+    const FULL_NAME: &'static str = "auth.v1.ConnectedAppClient";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedAppClient";
+}
+impl ::buffa::Message for ConnectedAppClient {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.client_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.client_id) as u32;
+        }
+        if !self.name.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.client_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+        }
+        if !self.name.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.client_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.name, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.client_id.clear();
+        self.name.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConnectedAppClient {
+    const PROTO_FQN: &'static str = "auth.v1.ConnectedAppClient";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConnectedAppClient {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONNECTED_APP_CLIENT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ConnectedAppClient",
+    to_json: ::buffa::type_registry::any_to_json::<ConnectedAppClient>,
+    from_json: ::buffa::type_registry::any_from_json::<ConnectedAppClient>,
+    is_wkt: false,
+};
+/// A pending request from an app to connect to the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct AppAuthorization {
+    /// The app that asks.
+    ///
+    /// Field 1: `client`
+    #[serde(
+        rename = "client",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub client: ::buffa::MessageField<ConnectedAppClient>,
+    /// OAuth scopes the app asks for. "account:read" lets the app read the
+    /// account as the signed-in website does: balances, orders, trades and
+    /// account settings. A connected app never moves money out of the account
+    /// and never changes its security settings.
+    ///
+    /// Field 2: `scopes`
+    #[serde(
+        rename = "scopes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub scopes: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// The server the app will use the account through, as an absolute URL.
+    ///
+    /// Field 3: `resource`
+    #[serde(
+        rename = "resource",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub resource: ::buffa::alloc::string::String,
+    /// Host the app receives the answer on, from its registered redirect URL.
+    ///
+    /// Field 4: `redirect_host`
+    #[serde(
+        rename = "redirectHost",
+        alias = "redirect_host",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub redirect_host: ::buffa::alloc::string::String,
+    /// Time after which the request can no longer be approved or denied.
+    ///
+    /// Field 5: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for AppAuthorization {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("AppAuthorization")
+            .field("client", &self.client)
+            .field("scopes", &self.scopes)
+            .field("resource", &self.resource)
+            .field("redirect_host", &self.redirect_host)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+impl AppAuthorization {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AppAuthorization";
+}
+::buffa::impl_default_instance!(AppAuthorization);
+impl ::buffa::MessageName for AppAuthorization {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "AppAuthorization";
+    const FULL_NAME: &'static str = "auth.v1.AppAuthorization";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AppAuthorization";
+}
+impl ::buffa::Message for AppAuthorization {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.client.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.client.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.scopes {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if !self.resource.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.resource) as u32;
+        }
+        if !self.redirect_host.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.redirect_host) as u32;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.client.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.client.write_to(__cache, buf);
+        }
+        for v in &self.scopes {
+            ::buffa::types::put_string_field(2u32, v, buf);
+        }
+        if !self.resource.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.resource, buf);
+        }
+        if !self.redirect_host.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.redirect_host, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.client.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.scopes.push(::buffa::types::decode_string(buf)?);
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.resource, buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.redirect_host, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.client = ::buffa::MessageField::none();
+        self.scopes.clear();
+        self.resource.clear();
+        self.redirect_host.clear();
+        self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for AppAuthorization {
+    const PROTO_FQN: &'static str = "auth.v1.AppAuthorization";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for AppAuthorization {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __APP_AUTHORIZATION_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.AppAuthorization",
+    to_json: ::buffa::type_registry::any_to_json::<AppAuthorization>,
+    from_json: ::buffa::type_registry::any_from_json::<AppAuthorization>,
+    is_wkt: false,
+};
+/// An app connected to the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ConnectedApp {
+    /// Opaque connected app ID.
+    ///
+    /// Field 1: `connected_app_id`
+    #[serde(
+        rename = "connectedAppId",
+        alias = "connected_app_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub connected_app_id: u64,
+    /// The connected app.
+    ///
+    /// Field 2: `client`
+    #[serde(
+        rename = "client",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub client: ::buffa::MessageField<ConnectedAppClient>,
+    /// OAuth scopes the account granted the app.
+    ///
+    /// Field 3: `scopes`
+    #[serde(
+        rename = "scopes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub scopes: ::buffa::alloc::vec::Vec<::buffa::alloc::string::String>,
+    /// The server the app uses the account through, as an absolute URL.
+    ///
+    /// Field 4: `resource`
+    #[serde(
+        rename = "resource",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub resource: ::buffa::alloc::string::String,
+    /// Time when the account connected the app.
+    ///
+    /// Field 5: `connected_at`
+    #[serde(
+        rename = "connectedAt",
+        alias = "connected_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub connected_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Time when the app last used or refreshed its access, at minute
+    /// precision. Empty when it has not used it yet.
+    ///
+    /// Field 6: `last_used_at`
+    #[serde(
+        rename = "lastUsedAt",
+        alias = "last_used_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub last_used_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    /// Time when the connection ends unless it is disconnected before. The app
+    /// must then be connected again.
+    ///
+    /// Field 7: `expires_at`
+    #[serde(
+        rename = "expiresAt",
+        alias = "expires_at",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub expires_at: ::buffa::MessageField<::buffa_types::google::protobuf::Timestamp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ConnectedApp {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ConnectedApp")
+            .field("connected_app_id", &self.connected_app_id)
+            .field("client", &self.client)
+            .field("scopes", &self.scopes)
+            .field("resource", &self.resource)
+            .field("connected_at", &self.connected_at)
+            .field("last_used_at", &self.last_used_at)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+impl ConnectedApp {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedApp";
+}
+::buffa::impl_default_instance!(ConnectedApp);
+impl ::buffa::MessageName for ConnectedApp {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ConnectedApp";
+    const FULL_NAME: &'static str = "auth.v1.ConnectedApp";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedApp";
+}
+impl ::buffa::Message for ConnectedApp {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.connected_app_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        if self.client.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.client.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        for v in &self.scopes {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
+        if !self.resource.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.resource) as u32;
+        }
+        if self.connected_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.connected_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.last_used_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.last_used_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.expires_at.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.expires_at.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.connected_app_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.connected_app_id, buf);
+        }
+        if self.client.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.client.write_to(__cache, buf);
+        }
+        for v in &self.scopes {
+            ::buffa::types::put_string_field(3u32, v, buf);
+        }
+        if !self.resource.is_empty() {
+            ::buffa::types::put_string_field(4u32, &self.resource, buf);
+        }
+        if self.connected_at.is_set() {
+            ::buffa::types::put_len_delimited_header(5u32, __cache.consume_next(), buf);
+            self.connected_at.write_to(__cache, buf);
+        }
+        if self.last_used_at.is_set() {
+            ::buffa::types::put_len_delimited_header(6u32, __cache.consume_next(), buf);
+            self.last_used_at.write_to(__cache, buf);
+        }
+        if self.expires_at.is_set() {
+            ::buffa::types::put_len_delimited_header(7u32, __cache.consume_next(), buf);
+            self.expires_at.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.connected_app_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.client.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                self.scopes.push(::buffa::types::decode_string(buf)?);
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.resource, buf)?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.connected_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.last_used_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.expires_at.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connected_app_id = 0u64;
+        self.client = ::buffa::MessageField::none();
+        self.scopes.clear();
+        self.resource.clear();
+        self.connected_at = ::buffa::MessageField::none();
+        self.last_used_at = ::buffa::MessageField::none();
+        self.expires_at = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ConnectedApp {
+    const PROTO_FQN: &'static str = "auth.v1.ConnectedApp";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ConnectedApp {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CONNECTED_APP_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ConnectedApp",
+    to_json: ::buffa::type_registry::any_to_json::<ConnectedApp>,
+    from_json: ::buffa::type_registry::any_from_json::<ConnectedApp>,
+    is_wkt: false,
+};
+/// Request to read a pending app connection request for the consent page.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetAppAuthorizationRequest {
+    /// Request ID the authorization endpoint gave the consent page in its
+    /// `request` query parameter.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetAppAuthorizationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetAppAuthorizationRequest")
+            .field("request_id", &self.request_id)
+            .finish()
+    }
+}
+impl GetAppAuthorizationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationRequest";
+}
+::buffa::impl_default_instance!(GetAppAuthorizationRequest);
+impl ::buffa::MessageName for GetAppAuthorizationRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GetAppAuthorizationRequest";
+    const FULL_NAME: &'static str = "auth.v1.GetAppAuthorizationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationRequest";
+}
+impl ::buffa::Message for GetAppAuthorizationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetAppAuthorizationRequest {
+    const PROTO_FQN: &'static str = "auth.v1.GetAppAuthorizationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetAppAuthorizationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_APP_AUTHORIZATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GetAppAuthorizationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetAppAuthorizationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetAppAuthorizationRequest>,
+    is_wkt: false,
+};
+/// The pending app connection request.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetAppAuthorizationResponse {
+    /// The request.
+    ///
+    /// Field 1: `authorization`
+    #[serde(
+        rename = "authorization",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub authorization: ::buffa::MessageField<AppAuthorization>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetAppAuthorizationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetAppAuthorizationResponse")
+            .field("authorization", &self.authorization)
+            .finish()
+    }
+}
+impl GetAppAuthorizationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationResponse";
+}
+::buffa::impl_default_instance!(GetAppAuthorizationResponse);
+impl ::buffa::MessageName for GetAppAuthorizationResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "GetAppAuthorizationResponse";
+    const FULL_NAME: &'static str = "auth.v1.GetAppAuthorizationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationResponse";
+}
+impl ::buffa::Message for GetAppAuthorizationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.authorization.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.authorization.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.authorization.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.authorization.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.authorization.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.authorization = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetAppAuthorizationResponse {
+    const PROTO_FQN: &'static str = "auth.v1.GetAppAuthorizationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetAppAuthorizationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_APP_AUTHORIZATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.GetAppAuthorizationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetAppAuthorizationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetAppAuthorizationResponse>,
+    is_wkt: false,
+};
+/// Request to approve a pending app connection request.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ApproveAppAuthorizationRequest {
+    /// Request ID the authorization endpoint gave the consent page.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ApproveAppAuthorizationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ApproveAppAuthorizationRequest")
+            .field("request_id", &self.request_id)
+            .finish()
+    }
+}
+impl ApproveAppAuthorizationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationRequest";
+}
+::buffa::impl_default_instance!(ApproveAppAuthorizationRequest);
+impl ::buffa::MessageName for ApproveAppAuthorizationRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ApproveAppAuthorizationRequest";
+    const FULL_NAME: &'static str = "auth.v1.ApproveAppAuthorizationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationRequest";
+}
+impl ::buffa::Message for ApproveAppAuthorizationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ApproveAppAuthorizationRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ApproveAppAuthorizationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ApproveAppAuthorizationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __APPROVE_APP_AUTHORIZATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ApproveAppAuthorizationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ApproveAppAuthorizationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ApproveAppAuthorizationRequest>,
+    is_wkt: false,
+};
+/// The approved request's answer to the app.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ApproveAppAuthorizationResponse {
+    /// URL to send the browser to: the app's redirect URL carrying a one-time
+    /// authorization code. It is valid for 60 seconds.
+    ///
+    /// Field 1: `redirect_url`
+    #[serde(
+        rename = "redirectUrl",
+        alias = "redirect_url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub redirect_url: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ApproveAppAuthorizationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ApproveAppAuthorizationResponse")
+            .field("redirect_url", &self.redirect_url)
+            .finish()
+    }
+}
+impl ApproveAppAuthorizationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationResponse";
+}
+::buffa::impl_default_instance!(ApproveAppAuthorizationResponse);
+impl ::buffa::MessageName for ApproveAppAuthorizationResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ApproveAppAuthorizationResponse";
+    const FULL_NAME: &'static str = "auth.v1.ApproveAppAuthorizationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationResponse";
+}
+impl ::buffa::Message for ApproveAppAuthorizationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.redirect_url.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.redirect_url) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.redirect_url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.redirect_url, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.redirect_url, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.redirect_url.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ApproveAppAuthorizationResponse {
+    const PROTO_FQN: &'static str = "auth.v1.ApproveAppAuthorizationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ApproveAppAuthorizationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __APPROVE_APP_AUTHORIZATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ApproveAppAuthorizationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ApproveAppAuthorizationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ApproveAppAuthorizationResponse>,
+    is_wkt: false,
+};
+/// Request to deny a pending app connection request.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DenyAppAuthorizationRequest {
+    /// Request ID the authorization endpoint gave the consent page.
+    ///
+    /// Field 1: `request_id`
+    #[serde(
+        rename = "requestId",
+        alias = "request_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub request_id: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DenyAppAuthorizationRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DenyAppAuthorizationRequest")
+            .field("request_id", &self.request_id)
+            .finish()
+    }
+}
+impl DenyAppAuthorizationRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationRequest";
+}
+::buffa::impl_default_instance!(DenyAppAuthorizationRequest);
+impl ::buffa::MessageName for DenyAppAuthorizationRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "DenyAppAuthorizationRequest";
+    const FULL_NAME: &'static str = "auth.v1.DenyAppAuthorizationRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationRequest";
+}
+impl ::buffa::Message for DenyAppAuthorizationRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.request_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.request_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.request_id, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.request_id.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DenyAppAuthorizationRequest {
+    const PROTO_FQN: &'static str = "auth.v1.DenyAppAuthorizationRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DenyAppAuthorizationRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DENY_APP_AUTHORIZATION_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.DenyAppAuthorizationRequest",
+    to_json: ::buffa::type_registry::any_to_json::<DenyAppAuthorizationRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<DenyAppAuthorizationRequest>,
+    is_wkt: false,
+};
+/// The denied request's answer to the app.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct DenyAppAuthorizationResponse {
+    /// URL to send the browser to: the app's redirect URL carrying the
+    /// `access_denied` error.
+    ///
+    /// Field 1: `redirect_url`
+    #[serde(
+        rename = "redirectUrl",
+        alias = "redirect_url",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub redirect_url: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for DenyAppAuthorizationResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("DenyAppAuthorizationResponse")
+            .field("redirect_url", &self.redirect_url)
+            .finish()
+    }
+}
+impl DenyAppAuthorizationResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationResponse";
+}
+::buffa::impl_default_instance!(DenyAppAuthorizationResponse);
+impl ::buffa::MessageName for DenyAppAuthorizationResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "DenyAppAuthorizationResponse";
+    const FULL_NAME: &'static str = "auth.v1.DenyAppAuthorizationResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationResponse";
+}
+impl ::buffa::Message for DenyAppAuthorizationResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.redirect_url.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.redirect_url) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.redirect_url.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.redirect_url, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.redirect_url, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.redirect_url.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for DenyAppAuthorizationResponse {
+    const PROTO_FQN: &'static str = "auth.v1.DenyAppAuthorizationResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for DenyAppAuthorizationResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __DENY_APP_AUTHORIZATION_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.DenyAppAuthorizationResponse",
+    to_json: ::buffa::type_registry::any_to_json::<DenyAppAuthorizationResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<DenyAppAuthorizationResponse>,
+    is_wkt: false,
+};
+/// Request to list the apps connected to the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListConnectedAppsRequest {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListConnectedAppsRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListConnectedAppsRequest").finish()
+    }
+}
+impl ListConnectedAppsRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsRequest";
+}
+::buffa::impl_default_instance!(ListConnectedAppsRequest);
+impl ::buffa::MessageName for ListConnectedAppsRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListConnectedAppsRequest";
+    const FULL_NAME: &'static str = "auth.v1.ListConnectedAppsRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsRequest";
+}
+impl ::buffa::Message for ListConnectedAppsRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListConnectedAppsRequest {
+    const PROTO_FQN: &'static str = "auth.v1.ListConnectedAppsRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListConnectedAppsRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CONNECTED_APPS_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListConnectedAppsRequest",
+    to_json: ::buffa::type_registry::any_to_json::<ListConnectedAppsRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<ListConnectedAppsRequest>,
+    is_wkt: false,
+};
+/// The apps connected to the account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct ListConnectedAppsResponse {
+    /// Connected apps, newest connection first. An account has at most 20; a
+    /// disconnected or expired connection is not listed.
+    ///
+    /// Field 1: `apps`
+    #[serde(
+        rename = "apps",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub apps: ::buffa::alloc::vec::Vec<ConnectedApp>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for ListConnectedAppsResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("ListConnectedAppsResponse").field("apps", &self.apps).finish()
+    }
+}
+impl ListConnectedAppsResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsResponse";
+}
+::buffa::impl_default_instance!(ListConnectedAppsResponse);
+impl ::buffa::MessageName for ListConnectedAppsResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "ListConnectedAppsResponse";
+    const FULL_NAME: &'static str = "auth.v1.ListConnectedAppsResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsResponse";
+}
+impl ::buffa::Message for ListConnectedAppsResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.apps {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.apps {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.apps.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.apps.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for ListConnectedAppsResponse {
+    const PROTO_FQN: &'static str = "auth.v1.ListConnectedAppsResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for ListConnectedAppsResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIST_CONNECTED_APPS_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.ListConnectedAppsResponse",
+    to_json: ::buffa::type_registry::any_to_json::<ListConnectedAppsResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<ListConnectedAppsResponse>,
+    is_wkt: false,
+};
+/// Request to disconnect an app.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RevokeConnectedAppRequest {
+    /// Connected app ID from ListConnectedApps.
+    ///
+    /// Field 1: `connected_app_id`
+    #[serde(
+        rename = "connectedAppId",
+        alias = "connected_app_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub connected_app_id: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RevokeConnectedAppRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RevokeConnectedAppRequest")
+            .field("connected_app_id", &self.connected_app_id)
+            .finish()
+    }
+}
+impl RevokeConnectedAppRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppRequest";
+}
+::buffa::impl_default_instance!(RevokeConnectedAppRequest);
+impl ::buffa::MessageName for RevokeConnectedAppRequest {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "RevokeConnectedAppRequest";
+    const FULL_NAME: &'static str = "auth.v1.RevokeConnectedAppRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppRequest";
+}
+impl ::buffa::Message for RevokeConnectedAppRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.connected_app_id != 0u64 {
+            size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.connected_app_id != 0u64 {
+            ::buffa::types::put_fixed64_field(1u32, self.connected_app_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Fixed64,
+                )?;
+                self.connected_app_id = ::buffa::types::decode_fixed64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.connected_app_id = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RevokeConnectedAppRequest {
+    const PROTO_FQN: &'static str = "auth.v1.RevokeConnectedAppRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RevokeConnectedAppRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REVOKE_CONNECTED_APP_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.RevokeConnectedAppRequest",
+    to_json: ::buffa::type_registry::any_to_json::<RevokeConnectedAppRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<RevokeConnectedAppRequest>,
+    is_wkt: false,
+};
+/// Empty response returned after the app is disconnected.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct RevokeConnectedAppResponse {
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for RevokeConnectedAppResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("RevokeConnectedAppResponse").finish()
+    }
+}
+impl RevokeConnectedAppResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppResponse";
+}
+::buffa::impl_default_instance!(RevokeConnectedAppResponse);
+impl ::buffa::MessageName for RevokeConnectedAppResponse {
+    const PACKAGE: &'static str = "auth.v1";
+    const NAME: &'static str = "RevokeConnectedAppResponse";
+    const FULL_NAME: &'static str = "auth.v1.RevokeConnectedAppResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppResponse";
+}
+impl ::buffa::Message for RevokeConnectedAppResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for RevokeConnectedAppResponse {
+    const PROTO_FQN: &'static str = "auth.v1.RevokeConnectedAppResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for RevokeConnectedAppResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __REVOKE_CONNECTED_APP_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/auth.v1.RevokeConnectedAppResponse",
+    to_json: ::buffa::type_registry::any_to_json::<RevokeConnectedAppResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<RevokeConnectedAppResponse>,
     is_wkt: false,
 };
 /// --- Typed errors for ProfileService ---
@@ -49732,6 +51454,14 @@ pub mod __buffa {
             ///
             /// Field 5: `public_key_ed25519`
             pub public_key_ed25519: &'a [u8],
+            /// What the key is for. Unspecified or STANDARD creates a standard key.
+            /// ADMIN_KEY creates an admin key: only the main account's owner may, in a
+            /// signed-in session with a fresh step-up proof, for the main account
+            /// (subaccount_id unset), with an ip_whitelist that admin keys accept.
+            /// ASSISTANT keys are created with SetAssistantKeys.
+            ///
+            /// Field 8: `purpose`
+            pub purpose: ::buffa::EnumValue<super::super::ApiKeyPurpose>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CreateApiKeyRequestView<'a> {
@@ -49804,6 +51534,15 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     4u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -49850,6 +51589,7 @@ pub mod __buffa {
                         .map(|s| s.to_string())
                         .collect(),
                     public_key_ed25519: (self.public_key_ed25519).to_vec(),
+                    purpose: self.purpose,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -49887,6 +51627,12 @@ pub mod __buffa {
                     size
                         += 1u32 + ::buffa::types::string_encoded_len(&self.color) as u32;
                 }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -49915,6 +51661,12 @@ pub mod __buffa {
                 }
                 if !self.color.is_empty() {
                     ::buffa::types::put_string_field(7u32, &self.color, buf);
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(8u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -49964,6 +51716,11 @@ pub mod __buffa {
                             "publicKeyEd25519",
                             &::buffa::json_helpers::BytesJson(self.public_key_ed25519),
                         )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
                 }
                 __map.end()
             }
@@ -50106,6 +51863,17 @@ pub mod __buffa {
             #[must_use]
             pub fn public_key_ed25519(&self) -> &'_ [u8] {
                 self.0.reborrow().public_key_ed25519
+            }
+            /// What the key is for. Unspecified or STANDARD creates a standard key.
+            /// ADMIN_KEY creates an admin key: only the main account's owner may, in a
+            /// signed-in session with a fresh step-up proof, for the main account
+            /// (subaccount_id unset), with an ip_whitelist that admin keys accept.
+            /// ASSISTANT keys are created with SetAssistantKeys.
+            ///
+            /// Field 8: `purpose`
+            #[must_use]
+            pub fn purpose(&self) -> ::buffa::EnumValue<super::super::ApiKeyPurpose> {
+                self.0.reborrow().purpose
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<CreateApiKeyRequestView<'static>>>
@@ -52148,6 +53916,14 @@ pub mod __buffa {
             pub expires_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// New purpose: STANDARD demotes an admin key, ADMIN_KEY promotes a
+            /// standard key. Only the main account's owner may select it, in a signed-in session
+            /// with a fresh step-up proof. A promoted key must act for the main account,
+            /// have an IP allowlist that admin keys accept, and have no policy that
+            /// allows a money-out action. An assistant key's purpose never changes.
+            ///
+            /// Field 7: `purpose`
+            pub purpose: ::buffa::EnumValue<super::super::ApiKeyPurpose>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ApiKeyUpdateSpecView<'a> {
@@ -52236,6 +54012,15 @@ pub mod __buffa {
                             }
                         }
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.purpose = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
                     5u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -52289,6 +54074,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    purpose: self.purpose,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -52331,6 +54117,12 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -52367,6 +54159,12 @@ pub mod __buffa {
                         buf,
                     );
                     self.expires_at.write_to(__cache, buf);
+                }
+                {
+                    let val = self.purpose.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(7u32, val, buf);
+                    }
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -52411,6 +54209,11 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("expiresAt", __v)?;
                     }
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.purpose,
+                ) {
+                    __map.serialize_entry("purpose", &self.purpose)?;
                 }
                 __map.end()
             }
@@ -52554,6 +54357,17 @@ pub mod __buffa {
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
             > {
                 &self.0.reborrow().expires_at
+            }
+            /// New purpose: STANDARD demotes an admin key, ADMIN_KEY promotes a
+            /// standard key. Only the main account's owner may select it, in a signed-in session
+            /// with a fresh step-up proof. A promoted key must act for the main account,
+            /// have an IP allowlist that admin keys accept, and have no policy that
+            /// allows a money-out action. An assistant key's purpose never changes.
+            ///
+            /// Field 7: `purpose`
+            #[must_use]
+            pub fn purpose(&self) -> ::buffa::EnumValue<super::super::ApiKeyPurpose> {
+                self.0.reborrow().purpose
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ApiKeyUpdateSpecView<'static>>>
@@ -53368,7 +55182,8 @@ pub mod __buffa {
             /// Field 2: `public_key_ed25519`
             pub public_key_ed25519: &'a [u8],
             /// API policy that bounds the key (opaque ID). It must belong to the same
-            /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+            /// main account as the key, must not be a template (FailedPrecondition with
+            /// AUTH_POLICY_INVALID), and must not allow EXTERNAL_WITHDRAW,
             /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
             /// exactly one of policy_id and preset.
             ///
@@ -53802,7 +55617,8 @@ pub mod __buffa {
                 self.0.reborrow().public_key_ed25519
             }
             /// API policy that bounds the key (opaque ID). It must belong to the same
-            /// main account as the key, and must not allow EXTERNAL_WITHDRAW,
+            /// main account as the key, must not be a template (FailedPrecondition with
+            /// AUTH_POLICY_INVALID), and must not allow EXTERNAL_WITHDRAW,
             /// INTERNAL_TRANSFER, MANAGE_ADDRESS_BOOK or MANAGE_AUTO_WITHDRAW. Set
             /// exactly one of policy_id and preset.
             ///
@@ -56387,16 +58203,25 @@ pub mod __buffa {
                 'a,
                 ::buffa::EnumValue<super::super::PolicyAction>,
             >,
-            /// True if this policy is a reusable template; false if it is a
-            /// per-sub-account instance.
+            /// True if this policy is a template: a reusable policy of the main account
+            /// that is never attached to a sub-account itself. Applying it with
+            /// SetSubaccountPolicy attaches a copy, so editing the template later changes
+            /// no sub-account. Set when the policy is created and never changes.
             ///
             /// Field 10: `is_template`
             pub is_template: bool,
-            /// Optional source template this policy was copied from (opaque ID). This is
-            /// audit metadata only and does not imply live linkage.
+            /// Template this policy was copied from (opaque ID), or 0 when it is not a
+            /// copy. Set when the copy is made and never changes, even after the template
+            /// is edited or deleted; the copy is not linked to the template.
             ///
             /// Field 11: `source_template_id`
             pub source_template_id: u64,
+            /// Revision of the template when this policy was copied from it, or 0 when
+            /// it is not a copy. Compare it with the template's current revision to see
+            /// whether the template changed since. Never changes.
+            ///
+            /// Field 31: `source_template_revision`
+            pub source_template_revision: u64,
             /// Maximum notional size allowed for any single order on this sub-account,
             /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
             /// A value of 0 means "no explicit cap".
@@ -56529,6 +58354,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
                         view.source_template_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    31u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.source_template_revision = ::buffa::types::decode_uint64(
                             &mut cur,
                         )?;
                     }
@@ -56758,6 +58592,7 @@ pub mod __buffa {
                     actions: self.actions.to_vec(),
                     is_template: self.is_template,
                     source_template_id: self.source_template_id,
+                    source_template_revision: self.source_template_revision,
                     max_order_notional: self.max_order_notional,
                     max_open_orders: self.max_open_orders,
                     trading_halted: self.trading_halted,
@@ -56906,6 +58741,13 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::uint64_encoded_len(self.revision) as u32;
                 }
+                if self.source_template_revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.source_template_revision,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -57012,6 +58854,13 @@ pub mod __buffa {
                 if self.revision != 0u64 {
                     ::buffa::types::put_uint64_field(30u32, self.revision, buf);
                 }
+                if self.source_template_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        31u32,
+                        self.source_template_revision,
+                        buf,
+                    );
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -57071,6 +58920,17 @@ pub mod __buffa {
                         .serialize_entry(
                             "sourceTemplateId",
                             &::buffa::json_helpers::ProtoJson(&self.source_template_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.source_template_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "sourceTemplateRevision",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.source_template_revision,
+                            ),
                         )?;
                 }
                 if !::buffa::json_helpers::skip_if::is_zero_u64(
@@ -57284,21 +59144,33 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().actions
             }
-            /// True if this policy is a reusable template; false if it is a
-            /// per-sub-account instance.
+            /// True if this policy is a template: a reusable policy of the main account
+            /// that is never attached to a sub-account itself. Applying it with
+            /// SetSubaccountPolicy attaches a copy, so editing the template later changes
+            /// no sub-account. Set when the policy is created and never changes.
             ///
             /// Field 10: `is_template`
             #[must_use]
             pub fn is_template(&self) -> bool {
                 self.0.reborrow().is_template
             }
-            /// Optional source template this policy was copied from (opaque ID). This is
-            /// audit metadata only and does not imply live linkage.
+            /// Template this policy was copied from (opaque ID), or 0 when it is not a
+            /// copy. Set when the copy is made and never changes, even after the template
+            /// is edited or deleted; the copy is not linked to the template.
             ///
             /// Field 11: `source_template_id`
             #[must_use]
             pub fn source_template_id(&self) -> u64 {
                 self.0.reborrow().source_template_id
+            }
+            /// Revision of the template when this policy was copied from it, or 0 when
+            /// it is not a copy. Compare it with the template's current revision to see
+            /// whether the template changed since. Never changes.
+            ///
+            /// Field 31: `source_template_revision`
+            #[must_use]
+            pub fn source_template_revision(&self) -> u64 {
+                self.0.reborrow().source_template_revision
             }
             /// Maximum notional size allowed for any single order on this sub-account,
             /// expressed in canonical quote microunits (one unit is 0.000001 USDT).
@@ -58727,6 +60599,13 @@ pub mod __buffa {
             pub expires_at: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
             >,
+            /// Whether the policy is a template, which SetSubaccountPolicy applies as a
+            /// copy. Only the main account owner creates templates, and never together
+            /// with subaccount_id. Chosen at creation: an update_mask that selects it is
+            /// refused with InvalidArgument.
+            ///
+            /// Field 28: `is_template`
+            pub is_template: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubaccountPolicySpecView<'a> {
@@ -58863,6 +60742,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    28u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.is_template = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     3u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -58969,6 +60855,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    is_template: self.is_template,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -59050,6 +60937,9 @@ pub mod __buffa {
                         += 2u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if self.is_template {
+                    size += 2u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -59123,6 +61013,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.expires_at.write_to(__cache, buf);
+                }
+                if self.is_template {
+                    ::buffa::types::put_bool_field(28u32, self.is_template, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -59201,6 +61094,9 @@ pub mod __buffa {
                     {
                         __map.serialize_entry("expiresAt", __v)?;
                     }
+                }
+                if self.is_template {
+                    __map.serialize_entry("isTemplate", &self.is_template)?;
                 }
                 __map.end()
             }
@@ -59404,6 +61300,16 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().expires_at
             }
+            /// Whether the policy is a template, which SetSubaccountPolicy applies as a
+            /// copy. Only the main account owner creates templates, and never together
+            /// with subaccount_id. Chosen at creation: an update_mask that selects it is
+            /// refused with InvalidArgument.
+            ///
+            /// Field 28: `is_template`
+            #[must_use]
+            pub fn is_template(&self) -> bool {
+                self.0.reborrow().is_template
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubaccountPolicySpecView<'static>>>
         for SubaccountPolicySpecOwnedView {
@@ -59438,8 +61344,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateSubaccountPolicyRequest defines a new sub-account policy template, with
-        /// an optional attach step for one target sub-account.
+        /// CreateSubaccountPolicyRequest defines a new sub-account policy, with an
+        /// optional attach step for one target sub-account.
         #[derive(Clone, Debug, Default)]
         pub struct CreateSubaccountPolicyRequestView<'a> {
             /// Complete mutable policy configuration.
@@ -59448,7 +61354,9 @@ pub mod __buffa {
             pub policy: ::buffa::MessageFieldView<
                 super::super::__buffa::view::SubaccountPolicySpecView<'a>,
             >,
-            /// Optional target sub-account to attach atomically after creation.
+            /// Optional target sub-account to attach atomically after creation. A
+            /// template cannot be attached: setting it with policy.is_template is refused
+            /// with InvalidArgument.
             ///
             /// Field 2: `subaccount_id`
             pub subaccount_id: ::core::option::Option<u64>,
@@ -59748,7 +61656,9 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().policy
             }
-            /// Optional target sub-account to attach atomically after creation.
+            /// Optional target sub-account to attach atomically after creation. A
+            /// template cannot be attached: setting it with policy.is_template is refused
+            /// with InvalidArgument.
             ///
             /// Field 2: `subaccount_id`
             #[must_use]
@@ -60899,8 +62809,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// DeleteSubaccountPolicyRequest deletes a sub-account policy template when it
-        /// is not in use.
+        /// DeleteSubaccountPolicyRequest deletes a sub-account policy when it is not in
+        /// use. A template is never in use; copies made from it keep their lineage.
         #[derive(Clone, Debug, Default)]
         pub struct DeleteSubaccountPolicyRequestView<'a> {
             /// Policy identifier (opaque ID).
@@ -61428,16 +63338,18 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// SetSubaccountPolicyRequest attaches or clears a policy template on a
-        /// sub-account.
+        /// SetSubaccountPolicyRequest attaches a policy to a sub-account, applies a
+        /// template to it, or clears its policy.
         #[derive(Clone, Debug, Default)]
         pub struct SetSubaccountPolicyRequestView<'a> {
             /// Sub-account identifier (opaque ID).
             ///
             /// Field 1: `subaccount_id`
             pub subaccount_id: u64,
-            /// Policy template to attach (opaque ID). A value of 0 clears the explicit
-            /// binding and restores the system Read Only policy.
+            /// Policy to attach (opaque ID), owned by the sub-account's main account. A
+            /// template is applied: the sub-account gets a new copy of its current
+            /// revision, which later edits of the template do not change. A value of 0
+            /// clears the explicit binding and restores the system Read Only policy.
             ///
             /// Field 2: `policy_id`
             pub policy_id: u64,
@@ -61698,8 +63610,10 @@ pub mod __buffa {
             pub fn subaccount_id(&self) -> u64 {
                 self.0.reborrow().subaccount_id
             }
-            /// Policy template to attach (opaque ID). A value of 0 clears the explicit
-            /// binding and restores the system Read Only policy.
+            /// Policy to attach (opaque ID), owned by the sub-account's main account. A
+            /// template is applied: the sub-account gets a new copy of its current
+            /// revision, which later edits of the template do not change. A value of 0
+            /// clears the explicit binding and restores the system Read Only policy.
             ///
             /// Field 2: `policy_id`
             #[must_use]
@@ -61743,9 +63657,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// SetSubaccountPolicyResponse is empty when the policy binding succeeds.
+        /// SetSubaccountPolicyResponse returns the policy now attached.
         #[derive(Clone, Debug, Default)]
         pub struct SetSubaccountPolicyResponseView<'a> {
+            /// Policy now attached to the sub-account (opaque ID): the new copy when
+            /// policy_id named a template, else policy_id. 0 when the policy was cleared.
+            ///
+            /// Field 1: `policy_id`
+            pub policy_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SetSubaccountPolicyResponseView<'a> {
@@ -61779,6 +63698,13 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -61808,6 +63734,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SetSubaccountPolicyResponse {
+                    policy_id: self.policy_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -61822,6 +63749,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.policy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -61833,6 +63763,9 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if self.policy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -61854,6 +63787,13 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.policy_id) {
+                    __map
+                        .serialize_entry(
+                            "policyId",
+                            &::buffa::json_helpers::ProtoJson(&self.policy_id),
+                        )?;
+                }
                 __map.end()
             }
         }
@@ -61954,6 +63894,14 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
+            /// Policy now attached to the sub-account (opaque ID): the new copy when
+            /// policy_id named a template, else policy_id. 0 when the policy was cleared.
+            ///
+            /// Field 1: `policy_id`
+            #[must_use]
+            pub fn policy_id(&self) -> u64 {
+                self.0.reborrow().policy_id
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<SetSubaccountPolicyResponseView<'static>>,
@@ -62029,16 +63977,25 @@ pub mod __buffa {
             ///
             /// Field 7: `spot_market_scope`
             pub spot_market_scope: ::buffa::EnumValue<super::super::market_scope::Value>,
-            /// When true, this policy is intended to be reused as a template across
-            /// multiple API keys. When false, it represents a single-key instance.
+            /// True if this policy is a template: a reusable policy of the main account
+            /// that is never attached to an API key itself. Applying it with
+            /// SetApiKeyPolicy attaches a copy, so editing the template later changes no
+            /// API key. Set when the policy is created and never changes.
             ///
             /// Field 19: `is_template`
             pub is_template: bool,
-            /// Optional source template this policy was copied from (opaque ID). This is
-            /// audit metadata only and does not imply live linkage.
+            /// Template this policy was copied from (opaque ID), or 0 when it is not a
+            /// copy. Set when the copy is made and never changes, even after the template
+            /// is edited or deleted; the copy is not linked to the template.
             ///
             /// Field 20: `source_template_id`
             pub source_template_id: u64,
+            /// Revision of the template when this policy was copied from it, or 0 when
+            /// it is not a copy. Compare it with the template's current revision to see
+            /// whether the template changed since. Never changes.
+            ///
+            /// Field 24: `source_template_revision`
+            pub source_template_revision: u64,
             /// Creation time in UTC.
             ///
             /// Field 21: `created_at`
@@ -62131,6 +64088,15 @@ pub mod __buffa {
                             ::buffa::encoding::WireType::Fixed64,
                         )?;
                         view.source_template_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    24u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.source_template_revision = ::buffa::types::decode_uint64(
                             &mut cur,
                         )?;
                     }
@@ -62280,6 +64246,7 @@ pub mod __buffa {
                     spot_market_scope: self.spot_market_scope,
                     is_template: self.is_template,
                     source_template_id: self.source_template_id,
+                    source_template_revision: self.source_template_revision,
                     created_at: match self.created_at.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -62374,6 +64341,13 @@ pub mod __buffa {
                         += 2u32
                             + ::buffa::types::uint64_encoded_len(self.revision) as u32;
                 }
+                if self.source_template_revision != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(
+                                self.source_template_revision,
+                            ) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -62448,6 +64422,13 @@ pub mod __buffa {
                 if self.revision != 0u64 {
                     ::buffa::types::put_uint64_field(23u32, self.revision, buf);
                 }
+                if self.source_template_revision != 0u64 {
+                    ::buffa::types::put_uint64_field(
+                        24u32,
+                        self.source_template_revision,
+                        buf,
+                    );
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -62507,6 +64488,17 @@ pub mod __buffa {
                         .serialize_entry(
                             "sourceTemplateId",
                             &::buffa::json_helpers::ProtoJson(&self.source_template_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.source_template_revision,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "sourceTemplateRevision",
+                            &::buffa::json_helpers::ProtoJson(
+                                &self.source_template_revision,
+                            ),
                         )?;
                 }
                 {
@@ -62686,21 +64678,33 @@ pub mod __buffa {
             ) -> ::buffa::EnumValue<super::super::market_scope::Value> {
                 self.0.reborrow().spot_market_scope
             }
-            /// When true, this policy is intended to be reused as a template across
-            /// multiple API keys. When false, it represents a single-key instance.
+            /// True if this policy is a template: a reusable policy of the main account
+            /// that is never attached to an API key itself. Applying it with
+            /// SetApiKeyPolicy attaches a copy, so editing the template later changes no
+            /// API key. Set when the policy is created and never changes.
             ///
             /// Field 19: `is_template`
             #[must_use]
             pub fn is_template(&self) -> bool {
                 self.0.reborrow().is_template
             }
-            /// Optional source template this policy was copied from (opaque ID). This is
-            /// audit metadata only and does not imply live linkage.
+            /// Template this policy was copied from (opaque ID), or 0 when it is not a
+            /// copy. Set when the copy is made and never changes, even after the template
+            /// is edited or deleted; the copy is not linked to the template.
             ///
             /// Field 20: `source_template_id`
             #[must_use]
             pub fn source_template_id(&self) -> u64 {
                 self.0.reborrow().source_template_id
+            }
+            /// Revision of the template when this policy was copied from it, or 0 when
+            /// it is not a copy. Compare it with the template's current revision to see
+            /// whether the template changed since. Never changes.
+            ///
+            /// Field 24: `source_template_revision`
+            #[must_use]
+            pub fn source_template_revision(&self) -> u64 {
+                self.0.reborrow().source_template_revision
             }
             /// Creation time in UTC.
             ///
@@ -63988,7 +65992,10 @@ pub mod __buffa {
                 'a,
                 ::buffa::EnumValue<super::super::PolicyAction>,
             >,
-            /// Whether this policy should be treated as a reusable template.
+            /// Whether the policy is a template, which SetApiKeyPolicy applies as a copy.
+            /// Only the main account owner creates templates, and never together with
+            /// assign_to_key_id. Chosen at creation: an update_mask that selects it is
+            /// refused with InvalidArgument.
             ///
             /// Field 19: `is_template`
             pub is_template: bool,
@@ -64427,7 +66434,10 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().actions
             }
-            /// Whether this policy should be treated as a reusable template.
+            /// Whether the policy is a template, which SetApiKeyPolicy applies as a copy.
+            /// Only the main account owner creates templates, and never together with
+            /// assign_to_key_id. Chosen at creation: an update_mask that selects it is
+            /// refused with InvalidArgument.
             ///
             /// Field 19: `is_template`
             #[must_use]
@@ -64465,7 +66475,7 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// CreateApiPolicyRequest defines a new API key policy template.
+        /// CreateApiPolicyRequest defines a new API key policy.
         #[derive(Clone, Debug, Default)]
         pub struct CreateApiPolicyRequestView<'a> {
             /// Complete mutable policy configuration.
@@ -64476,9 +66486,12 @@ pub mod __buffa {
             >,
             /// Optional API key identifier to bind this newly-created policy to
             /// atomically. When set, the caller must be allowed to manage the key and the
-            /// create+assign operation consumes a single fresh step-up proof. An
-            /// assistant API key cannot be assigned a policy that allows a money-out
-            /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
+            /// create+assign operation consumes a single fresh step-up proof. A template
+            /// cannot be assigned: setting it with policy.is_template is refused with
+            /// InvalidArgument. An assistant API key cannot be assigned a policy that
+            /// allows a money-out action: FailedPrecondition with
+            /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED. Nor can an admin API key:
+            /// FailedPrecondition with AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED.
             ///
             /// Field 2: `assign_to_key_id`
             pub assign_to_key_id: &'a str,
@@ -64773,9 +66786,12 @@ pub mod __buffa {
             }
             /// Optional API key identifier to bind this newly-created policy to
             /// atomically. When set, the caller must be allowed to manage the key and the
-            /// create+assign operation consumes a single fresh step-up proof. An
-            /// assistant API key cannot be assigned a policy that allows a money-out
-            /// action: FailedPrecondition with AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED.
+            /// create+assign operation consumes a single fresh step-up proof. A template
+            /// cannot be assigned: setting it with policy.is_template is refused with
+            /// InvalidArgument. An assistant API key cannot be assigned a policy that
+            /// allows a money-out action: FailedPrecondition with
+            /// AUTH_ASSISTANT_KEY_ACTION_NOT_ALLOWED. Nor can an admin API key:
+            /// FailedPrecondition with AUTH_ADMIN_KEY_ACTION_NOT_ALLOWED.
             ///
             /// Field 2: `assign_to_key_id`
             #[must_use]
@@ -65918,7 +67934,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// DeleteApiPolicyRequest deletes an API key policy template when it is not in use.
+        /// DeleteApiPolicyRequest deletes an API key policy when it is not in use. A
+        /// template is never in use; copies made from it keep their lineage.
         #[derive(Clone, Debug, Default)]
         pub struct DeleteApiPolicyRequestView<'a> {
             /// Policy identifier (opaque ID).
@@ -66440,7 +68457,8 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// SetApiKeyPolicyRequest attaches or clears a policy template on an API key.
+        /// SetApiKeyPolicyRequest attaches a policy to an API key, applies a template to
+        /// it, or clears its policy.
         #[derive(Clone, Debug, Default)]
         pub struct SetApiKeyPolicyRequestView<'a> {
             /// Opaque API key identifier, formatted as "ak_" followed by 32 lowercase hex
@@ -66448,8 +68466,10 @@ pub mod __buffa {
             ///
             /// Field 1: `key_id`
             pub key_id: &'a str,
-            /// Policy template to attach (opaque ID). A value of 0 clears the binding.
-            /// An API key without an attached policy has no permissions.
+            /// Policy to attach (opaque ID), owned by the key's main account. A template
+            /// is applied: the key gets a new copy of its current revision, which later
+            /// edits of the template do not change. A value of 0 clears the binding. An
+            /// API key without an attached policy has no permissions.
             ///
             /// Field 2: `policy_id`
             pub policy_id: u64,
@@ -66705,8 +68725,10 @@ pub mod __buffa {
             pub fn key_id(&self) -> &'_ str {
                 self.0.reborrow().key_id
             }
-            /// Policy template to attach (opaque ID). A value of 0 clears the binding.
-            /// An API key without an attached policy has no permissions.
+            /// Policy to attach (opaque ID), owned by the key's main account. A template
+            /// is applied: the key gets a new copy of its current revision, which later
+            /// edits of the template do not change. A value of 0 clears the binding. An
+            /// API key without an attached policy has no permissions.
             ///
             /// Field 2: `policy_id`
             #[must_use]
@@ -66750,9 +68772,14 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// SetApiKeyPolicyResponse is empty when the policy binding succeeds.
+        /// SetApiKeyPolicyResponse returns the policy now attached.
         #[derive(Clone, Debug, Default)]
         pub struct SetApiKeyPolicyResponseView<'a> {
+            /// Policy now attached to the key (opaque ID): the new copy when policy_id
+            /// named a template, else policy_id. 0 when the policy was cleared.
+            ///
+            /// Field 1: `policy_id`
+            pub policy_id: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SetApiKeyPolicyResponseView<'a> {
@@ -66786,6 +68813,13 @@ pub mod __buffa {
                 let view = self;
                 let mut cur = cur;
                 match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.policy_id = ::buffa::types::decode_fixed64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -66815,6 +68849,7 @@ pub mod __buffa {
                 use ::buffa::alloc::string::ToString as _;
                 let _ = __buffa_src;
                 ::core::result::Result::Ok(super::super::SetApiKeyPolicyResponse {
+                    policy_id: self.policy_id,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -66829,6 +68864,9 @@ pub mod __buffa {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
                 let mut size = 0u32;
+                if self.policy_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -66840,6 +68878,9 @@ pub mod __buffa {
             ) {
                 #[allow(unused_imports)]
                 use ::buffa::Enumeration as _;
+                if self.policy_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.policy_id, buf);
+                }
                 self.__buffa_unknown_fields.write_to(buf);
             }
         }
@@ -66861,6 +68902,13 @@ pub mod __buffa {
             ) -> ::core::result::Result<__S::Ok, __S::Error> {
                 use ::serde::ser::SerializeMap as _;
                 let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.policy_id) {
+                    __map
+                        .serialize_entry(
+                            "policyId",
+                            &::buffa::json_helpers::ProtoJson(&self.policy_id),
+                        )?;
+                }
                 __map.end()
             }
         }
@@ -66958,6 +69006,14 @@ pub mod __buffa {
             #[must_use]
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
+            }
+            /// Policy now attached to the key (opaque ID): the new copy when policy_id
+            /// named a template, else policy_id. 0 when the policy was cleared.
+            ///
+            /// Field 1: `policy_id`
+            #[must_use]
+            pub fn policy_id(&self) -> u64 {
+                self.0.reborrow().policy_id
             }
         }
         impl ::core::convert::From<
@@ -113265,1112 +115321,6 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// Request to read whether the session's recent-MFA window covers an action.
-        #[derive(Clone, Debug, Default)]
-        pub struct GetRecentMFARequestView<'a> {
-            /// The action the client is about to perform.
-            ///
-            /// Field 1: `action`
-            pub action: ::buffa::EnumValue<super::super::RecentMFAAction>,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for GetRecentMFARequestView<'a> {
-            type Owned = super::super::GetRecentMFARequest;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.action = ::buffa::EnumValue::from(
-                            ::buffa::types::decode_int32(&mut cur)?,
-                        );
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetRecentMFARequest {
-                    action: self.action,
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for GetRecentMFARequestView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                {
-                    let val = self.action.to_i32();
-                    if val != 0 {
-                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
-                    }
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                {
-                    let val = self.action.to_i32();
-                    if val != 0 {
-                        ::buffa::types::put_int32_field(1u32, val, buf);
-                    }
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for GetRecentMFARequestView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.action) {
-                    __map.serialize_entry("action", &self.action)?;
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for GetRecentMFARequestView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "GetRecentMFARequest";
-            const FULL_NAME: &'static str = "auth.v1.GetRecentMFARequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFARequest";
-        }
-        ::buffa::impl_default_view_instance!(GetRecentMFARequestView);
-        ::buffa::impl_view_reborrow!(GetRecentMFARequestView);
-        /** Self-contained, `'static` owned view of a `GetRecentMFARequest` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`GetRecentMFARequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetRecentMFARequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct GetRecentMFARequestOwnedView(
-            ::buffa::OwnedView<GetRecentMFARequestView<'static>>,
-        );
-        impl GetRecentMFARequestOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFARequestOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFARequestOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::GetRecentMFARequest,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFARequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`GetRecentMFARequestView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &GetRecentMFARequestView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// The action the client is about to perform.
-            ///
-            /// Field 1: `action`
-            #[must_use]
-            pub fn action(&self) -> ::buffa::EnumValue<super::super::RecentMFAAction> {
-                self.0.reborrow().action
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<GetRecentMFARequestView<'static>>>
-        for GetRecentMFARequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<GetRecentMFARequestView<'static>>,
-            ) -> Self {
-                GetRecentMFARequestOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<GetRecentMFARequestOwnedView>
-        for ::buffa::OwnedView<GetRecentMFARequestView<'static>> {
-            fn from(wrapper: GetRecentMFARequestOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<GetRecentMFARequestView<'static>>>
-        for GetRecentMFARequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<GetRecentMFARequestView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::GetRecentMFARequest {
-            type View<'a> = GetRecentMFARequestView<'a>;
-            type ViewHandle = GetRecentMFARequestOwnedView;
-        }
-        impl ::serde::Serialize for GetRecentMFARequestOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        /// Whether the session's recent-MFA window is open for the action.
-        #[derive(Clone, Debug, Default)]
-        pub struct GetRecentMFAResponseView<'a> {
-            /// True when the action needs no new step-up now: send it without a step-up
-            /// proof. False when the client must complete an MFA challenge for fresh
-            /// step-up first.
-            ///
-            /// Field 1: `open`
-            pub open: bool,
-            /// Time when the window closes. Empty when open is false. A request that
-            /// arrives after this time needs a new step-up.
-            ///
-            /// Field 2: `expires_at`
-            pub expires_at: ::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
-            >,
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for GetRecentMFAResponseView<'a> {
-            type Owned = super::super::GetRecentMFAResponse;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    1u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::Varint,
-                        )?;
-                        view.open = ::buffa::types::decode_bool(&mut cur)?;
-                    }
-                    2u32 => {
-                        ::buffa::encoding::check_wire_type(
-                            tag,
-                            ::buffa::encoding::WireType::LengthDelimited,
-                        )?;
-                        let __sub_ctx = ctx.descend()?;
-                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
-                        match view.expires_at.as_mut() {
-                            Some(existing) => {
-                                ::buffa::MessageView::merge_into_view(
-                                    existing,
-                                    sub,
-                                    __sub_ctx,
-                                )?
-                            }
-                            None => {
-                                view.expires_at = ::buffa::MessageFieldView::set(
-                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
-                                        sub,
-                                        __sub_ctx,
-                                    )?,
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::GetRecentMFAResponse {
-                    open: self.open,
-                    expires_at: match self.expires_at.as_option() {
-                        Some(v) => {
-                            ::buffa::MessageField::<
-                                ::buffa_types::google::protobuf::Timestamp,
-                            >::some(v.to_owned_from_source(__buffa_src)?)
-                        }
-                        None => ::buffa::MessageField::none(),
-                    },
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for GetRecentMFAResponseView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                if self.open {
-                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
-                }
-                if self.expires_at.is_set() {
-                    let __slot = __cache.reserve();
-                    let inner_size = self.expires_at.compute_size(__cache);
-                    __cache.set(__slot, inner_size);
-                    size
-                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
-                            + inner_size;
-                }
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                __cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                if self.open {
-                    ::buffa::types::put_bool_field(1u32, self.open, buf);
-                }
-                if self.expires_at.is_set() {
-                    ::buffa::types::put_len_delimited_header(
-                        2u32,
-                        __cache.consume_next(),
-                        buf,
-                    );
-                    self.expires_at.write_to(__cache, buf);
-                }
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for GetRecentMFAResponseView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                if self.open {
-                    __map.serialize_entry("open", &self.open)?;
-                }
-                {
-                    if let ::core::option::Option::Some(__v) = self
-                        .expires_at
-                        .as_option()
-                    {
-                        __map.serialize_entry("expiresAt", __v)?;
-                    }
-                }
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for GetRecentMFAResponseView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "GetRecentMFAResponse";
-            const FULL_NAME: &'static str = "auth.v1.GetRecentMFAResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetRecentMFAResponse";
-        }
-        ::buffa::impl_default_view_instance!(GetRecentMFAResponseView);
-        ::buffa::impl_view_reborrow!(GetRecentMFAResponseView);
-        /** Self-contained, `'static` owned view of a `GetRecentMFAResponse` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`GetRecentMFAResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetRecentMFAResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct GetRecentMFAResponseOwnedView(
-            ::buffa::OwnedView<GetRecentMFAResponseView<'static>>,
-        );
-        impl GetRecentMFAResponseOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFAResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFAResponseOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::GetRecentMFAResponse,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    GetRecentMFAResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`GetRecentMFAResponseView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &GetRecentMFAResponseView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::GetRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-            /// True when the action needs no new step-up now: send it without a step-up
-            /// proof. False when the client must complete an MFA challenge for fresh
-            /// step-up first.
-            ///
-            /// Field 1: `open`
-            #[must_use]
-            pub fn open(&self) -> bool {
-                self.0.reborrow().open
-            }
-            /// Time when the window closes. Empty when open is false. A request that
-            /// arrives after this time needs a new step-up.
-            ///
-            /// Field 2: `expires_at`
-            #[must_use]
-            pub fn expires_at(
-                &self,
-            ) -> &::buffa::MessageFieldView<
-                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
-            > {
-                &self.0.reborrow().expires_at
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<GetRecentMFAResponseView<'static>>>
-        for GetRecentMFAResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<GetRecentMFAResponseView<'static>>,
-            ) -> Self {
-                GetRecentMFAResponseOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<GetRecentMFAResponseOwnedView>
-        for ::buffa::OwnedView<GetRecentMFAResponseView<'static>> {
-            fn from(wrapper: GetRecentMFAResponseOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<GetRecentMFAResponseView<'static>>,
-        > for GetRecentMFAResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<GetRecentMFAResponseView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::GetRecentMFAResponse {
-            type View<'a> = GetRecentMFAResponseView<'a>;
-            type ViewHandle = GetRecentMFAResponseOwnedView;
-        }
-        impl ::serde::Serialize for GetRecentMFAResponseOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        /// Request to end the session's recent-MFA window, for example at sign-out.
-        #[derive(Clone, Debug, Default)]
-        pub struct EndRecentMFARequestView<'a> {
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for EndRecentMFARequestView<'a> {
-            type Owned = super::super::EndRecentMFARequest;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::EndRecentMFARequest {
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for EndRecentMFARequestView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for EndRecentMFARequestView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for EndRecentMFARequestView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "EndRecentMFARequest";
-            const FULL_NAME: &'static str = "auth.v1.EndRecentMFARequest";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFARequest";
-        }
-        ::buffa::impl_default_view_instance!(EndRecentMFARequestView);
-        ::buffa::impl_view_reborrow!(EndRecentMFARequestView);
-        /** Self-contained, `'static` owned view of a `EndRecentMFARequest` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`EndRecentMFARequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`EndRecentMFARequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct EndRecentMFARequestOwnedView(
-            ::buffa::OwnedView<EndRecentMFARequestView<'static>>,
-        );
-        impl EndRecentMFARequestOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFARequestOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFARequestOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::EndRecentMFARequest,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFARequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`EndRecentMFARequestView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &EndRecentMFARequestView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFARequest,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<EndRecentMFARequestView<'static>>>
-        for EndRecentMFARequestOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<EndRecentMFARequestView<'static>>,
-            ) -> Self {
-                EndRecentMFARequestOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<EndRecentMFARequestOwnedView>
-        for ::buffa::OwnedView<EndRecentMFARequestView<'static>> {
-            fn from(wrapper: EndRecentMFARequestOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<::buffa::OwnedView<EndRecentMFARequestView<'static>>>
-        for EndRecentMFARequestOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<EndRecentMFARequestView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::EndRecentMFARequest {
-            type View<'a> = EndRecentMFARequestView<'a>;
-            type ViewHandle = EndRecentMFARequestOwnedView;
-        }
-        impl ::serde::Serialize for EndRecentMFARequestOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
-        /// Empty response returned after the recent-MFA window is ended.
-        #[derive(Clone, Debug, Default)]
-        pub struct EndRecentMFAResponseView<'a> {
-            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
-        }
-        impl<'a> ::buffa::MessageView<'a> for EndRecentMFAResponseView<'a> {
-            type Owned = super::super::EndRecentMFAResponse;
-            fn decode_view(
-                buf: &'a [u8],
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                let __limit = ::core::cell::Cell::new(
-                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
-                );
-                <Self as ::buffa::MessageView>::decode_view_ctx(
-                    buf,
-                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
-                )
-            }
-            fn decode_view_with_ctx(
-                buf: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
-            }
-            fn merge_view_field(
-                &mut self,
-                tag: ::buffa::encoding::Tag,
-                cur: &'a [u8],
-                before_tag: &'a [u8],
-                ctx: ::buffa::DecodeContext<'_>,
-            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
-                let _ = ctx;
-                #[allow(unused_variables)]
-                let view = self;
-                let mut cur = cur;
-                match tag.field_number() {
-                    _ => {
-                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
-                        let span_len = before_tag.len() - cur.len();
-                        view.__buffa_unknown_fields
-                            .push_record(before_tag, span_len, ctx)?;
-                    }
-                }
-                ::core::result::Result::Ok(cur)
-            }
-            fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                self.to_owned_from_source(None)
-            }
-            #[allow(clippy::useless_conversion, clippy::needless_update)]
-            fn to_owned_from_source(
-                &self,
-                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                #[allow(unused_imports)]
-                use ::buffa::alloc::string::ToString as _;
-                let _ = __buffa_src;
-                ::core::result::Result::Ok(super::super::EndRecentMFAResponse {
-                    __buffa_unknown_fields: self
-                        .__buffa_unknown_fields
-                        .to_owned()?
-                        .into(),
-                    ..::core::default::Default::default()
-                })
-            }
-        }
-        impl<'a> ::buffa::ViewEncode<'a> for EndRecentMFAResponseView<'a> {
-            #[allow(clippy::needless_borrow, clippy::let_and_return)]
-            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                let mut size = 0u32;
-                size += self.__buffa_unknown_fields.encoded_len() as u32;
-                size
-            }
-            #[allow(clippy::needless_borrow)]
-            fn write_to(
-                &self,
-                _cache: &mut ::buffa::SizeCache,
-                buf: &mut impl ::buffa::bytes::BufMut,
-            ) {
-                #[allow(unused_imports)]
-                use ::buffa::Enumeration as _;
-                self.__buffa_unknown_fields.write_to(buf);
-            }
-        }
-        /// Serializes this view as protobuf JSON.
-        ///
-        /// Implicit-presence fields with default values are omitted, `required`
-        /// fields are always emitted, explicit-presence (`optional`) fields are
-        /// emitted only when set, bytes fields are base64-encoded, and enum
-        /// values are their proto name strings.
-        ///
-        /// This impl uses `serialize_map(None)` because the number of emitted
-        /// fields depends on default-omission rules; serializers that require
-        /// known map lengths (e.g. `bincode`) will return a runtime error.
-        /// Use the owned message type for those formats.
-        impl<'__a> ::serde::Serialize for EndRecentMFAResponseView<'__a> {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                use ::serde::ser::SerializeMap as _;
-                let mut __map = __s.serialize_map(::core::option::Option::None)?;
-                __map.end()
-            }
-        }
-        impl<'a> ::buffa::MessageName for EndRecentMFAResponseView<'a> {
-            const PACKAGE: &'static str = "auth.v1";
-            const NAME: &'static str = "EndRecentMFAResponse";
-            const FULL_NAME: &'static str = "auth.v1.EndRecentMFAResponse";
-            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.EndRecentMFAResponse";
-        }
-        ::buffa::impl_default_view_instance!(EndRecentMFAResponseView);
-        ::buffa::impl_view_reborrow!(EndRecentMFAResponseView);
-        /** Self-contained, `'static` owned view of a `EndRecentMFAResponse` message.
-
- Wraps [`::buffa::OwnedView`]`<`[`EndRecentMFAResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
-
- Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`EndRecentMFAResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
-        #[derive(Clone, Debug)]
-        pub struct EndRecentMFAResponseOwnedView(
-            ::buffa::OwnedView<EndRecentMFAResponseView<'static>>,
-        );
-        impl EndRecentMFAResponseOwnedView {
-            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
-            ///
-            /// The view borrows directly from the buffer's data; the buffer is
-            /// retained inside the returned handle.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
-            /// protobuf data.
-            pub fn decode(
-                bytes: ::buffa::bytes::Bytes,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFAResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
-                )
-            }
-            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
-            /// max message size).
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
-            /// exceeds the configured limits.
-            pub fn decode_with_options(
-                bytes: ::buffa::bytes::Bytes,
-                opts: &::buffa::DecodeOptions,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFAResponseOwnedView(
-                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
-                    ),
-                )
-            }
-            /// Build from an owned message via an encode → decode round-trip.
-            ///
-            /// # Errors
-            ///
-            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
-            /// somehow invalid (should not happen for well-formed messages).
-            pub fn from_owned(
-                msg: &super::super::EndRecentMFAResponse,
-            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
-                ::core::result::Result::Ok(
-                    EndRecentMFAResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
-                )
-            }
-            /// Borrow the full [`EndRecentMFAResponseView`] with its lifetime tied to `&self`.
-            #[must_use]
-            pub fn view(&self) -> &EndRecentMFAResponseView<'_> {
-                self.0.reborrow()
-            }
-            /// Convert to the owned message type.
-            ///
-            /// # Errors
-            ///
-            /// Returns an error if re-materializing preserved unknown fields
-            /// fails (e.g. the unknown-field limit is exceeded).
-            pub fn to_owned_message(
-                &self,
-            ) -> ::core::result::Result<
-                super::super::EndRecentMFAResponse,
-                ::buffa::DecodeError,
-            > {
-                self.0.to_owned_message()
-            }
-            /// The underlying bytes buffer.
-            #[must_use]
-            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
-                self.0.bytes()
-            }
-            /// Consume the handle, returning the underlying bytes buffer.
-            #[must_use]
-            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
-                self.0.into_bytes()
-            }
-        }
-        impl ::core::convert::From<::buffa::OwnedView<EndRecentMFAResponseView<'static>>>
-        for EndRecentMFAResponseOwnedView {
-            fn from(
-                inner: ::buffa::OwnedView<EndRecentMFAResponseView<'static>>,
-            ) -> Self {
-                EndRecentMFAResponseOwnedView(inner)
-            }
-        }
-        impl ::core::convert::From<EndRecentMFAResponseOwnedView>
-        for ::buffa::OwnedView<EndRecentMFAResponseView<'static>> {
-            fn from(wrapper: EndRecentMFAResponseOwnedView) -> Self {
-                wrapper.0
-            }
-        }
-        impl ::core::convert::AsRef<
-            ::buffa::OwnedView<EndRecentMFAResponseView<'static>>,
-        > for EndRecentMFAResponseOwnedView {
-            fn as_ref(&self) -> &::buffa::OwnedView<EndRecentMFAResponseView<'static>> {
-                &self.0
-            }
-        }
-        impl ::buffa::HasMessageView for super::super::EndRecentMFAResponse {
-            type View<'a> = EndRecentMFAResponseView<'a>;
-            type ViewHandle = EndRecentMFAResponseOwnedView;
-        }
-        impl ::serde::Serialize for EndRecentMFAResponseOwnedView {
-            fn serialize<__S: ::serde::Serializer>(
-                &self,
-                __s: __S,
-            ) -> ::core::result::Result<__S::Ok, __S::Error> {
-                ::serde::Serialize::serialize(&self.0, __s)
-            }
-        }
         /// Request to update an MFA factor label.
         #[derive(Clone, Debug, Default)]
         pub struct UpdateMFAFactorRequestView<'a> {
@@ -117975,6 +118925,20 @@ pub mod __buffa {
             ///
             /// Field 12: `root_smart_account_address`
             pub root_smart_account_address: &'a str,
+            /// Account scope of the API key that authenticated this request: SCOPE_ROOT
+            /// for a key of the main account, SCOPE_SUBACCOUNT for a key bound to one
+            /// sub-account. SCOPE_UNSPECIFIED when the request was not authenticated with
+            /// an API key.
+            ///
+            /// Field 13: `api_key_scope`
+            pub api_key_scope: ::buffa::EnumValue<super::super::AccountScopeType>,
+            /// Sub-account the API key is bound to (opaque ID). Present only when
+            /// api_key_scope is SCOPE_SUBACCOUNT. The key's private realtime channels
+            /// and account reads name this sub-account, for example
+            /// private:ledger:balances:\<subaccount_id\>.
+            ///
+            /// Field 14: `subaccount_id`
+            pub subaccount_id: ::core::option::Option<u64>,
             /// Session assurance details for the presented access token, if any.
             ///
             /// Field 20: `session`
@@ -118044,6 +119008,24 @@ pub mod __buffa {
                             &mut cur,
                         )?;
                     }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.api_key_scope = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.subaccount_id = Some(
+                            ::buffa::types::decode_fixed64(&mut cur)?,
+                        );
+                    }
                     20u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -118098,6 +119080,8 @@ pub mod __buffa {
                     root_smart_account_address: self
                         .root_smart_account_address
                         .to_string(),
+                    api_key_scope: self.api_key_scope,
+                    subaccount_id: self.subaccount_id,
                     session: match self.session.as_option() {
                         Some(v) => {
                             ::buffa::MessageField::<
@@ -118138,6 +119122,15 @@ pub mod __buffa {
                                 &self.root_smart_account_address,
                             ) as u32;
                 }
+                {
+                    let val = self.api_key_scope.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.subaccount_id.is_some() {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
                 if self.session.is_set() {
                     let __slot = __cache.reserve();
                     let inner_size = self.session.compute_size(__cache);
@@ -118172,6 +119165,15 @@ pub mod __buffa {
                         &self.root_smart_account_address,
                         buf,
                     );
+                }
+                {
+                    let val = self.api_key_scope.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(13u32, val, buf);
+                    }
+                }
+                if let Some(v) = self.subaccount_id {
+                    ::buffa::types::put_fixed64_field(14u32, v, buf);
                 }
                 if self.session.is_set() {
                     ::buffa::types::put_len_delimited_header(
@@ -118222,6 +119224,18 @@ pub mod __buffa {
                         .serialize_entry(
                             "rootSmartAccountAddress",
                             self.root_smart_account_address,
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.api_key_scope,
+                ) {
+                    __map.serialize_entry("apiKeyScope", &self.api_key_scope)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.subaccount_id {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&__v),
                         )?;
                 }
                 {
@@ -118350,6 +119364,28 @@ pub mod __buffa {
             #[must_use]
             pub fn root_smart_account_address(&self) -> &'_ str {
                 self.0.reborrow().root_smart_account_address
+            }
+            /// Account scope of the API key that authenticated this request: SCOPE_ROOT
+            /// for a key of the main account, SCOPE_SUBACCOUNT for a key bound to one
+            /// sub-account. SCOPE_UNSPECIFIED when the request was not authenticated with
+            /// an API key.
+            ///
+            /// Field 13: `api_key_scope`
+            #[must_use]
+            pub fn api_key_scope(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::AccountScopeType> {
+                self.0.reborrow().api_key_scope
+            }
+            /// Sub-account the API key is bound to (opaque ID). Present only when
+            /// api_key_scope is SCOPE_SUBACCOUNT. The key's private realtime channels
+            /// and account reads name this sub-account, for example
+            /// private:ledger:balances:\<subaccount_id\>.
+            ///
+            /// Field 14: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().subaccount_id
             }
             /// Session assurance details for the presented access token, if any.
             ///
@@ -119678,6 +120714,4213 @@ pub mod __buffa {
             type ViewHandle = AcceptTermsResponseOwnedView;
         }
         impl ::serde::Serialize for AcceptTermsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// An app that asks to use the account, as the OAuth client that registered
+        /// with Polyester presents itself.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConnectedAppClientView<'a> {
+            /// OAuth client identifier of the app.
+            ///
+            /// Field 1: `client_id`
+            pub client_id: &'a str,
+            /// Name of the app, as shown on the consent page.
+            ///
+            /// Field 2: `name`
+            pub name: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConnectedAppClientView<'a> {
+            type Owned = super::super::ConnectedAppClient;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.client_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.name = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConnectedAppClient,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConnectedAppClient,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConnectedAppClient {
+                    client_id: self.client_id.to_string(),
+                    name: self.name.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConnectedAppClientView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.client_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.client_id) as u32;
+                }
+                if !self.name.is_empty() {
+                    size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.client_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.client_id, buf);
+                }
+                if !self.name.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConnectedAppClientView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.client_id) {
+                    __map.serialize_entry("clientId", self.client_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
+                    __map.serialize_entry("name", self.name)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConnectedAppClientView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ConnectedAppClient";
+            const FULL_NAME: &'static str = "auth.v1.ConnectedAppClient";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedAppClient";
+        }
+        ::buffa::impl_default_view_instance!(ConnectedAppClientView);
+        ::buffa::impl_view_reborrow!(ConnectedAppClientView);
+        /** Self-contained, `'static` owned view of a `ConnectedAppClient` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConnectedAppClientView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConnectedAppClientView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConnectedAppClientOwnedView(
+            ::buffa::OwnedView<ConnectedAppClientView<'static>>,
+        );
+        impl ConnectedAppClientOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppClientOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppClientOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConnectedAppClient,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppClientOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ConnectedAppClientView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConnectedAppClientView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConnectedAppClient,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// OAuth client identifier of the app.
+            ///
+            /// Field 1: `client_id`
+            #[must_use]
+            pub fn client_id(&self) -> &'_ str {
+                self.0.reborrow().client_id
+            }
+            /// Name of the app, as shown on the consent page.
+            ///
+            /// Field 2: `name`
+            #[must_use]
+            pub fn name(&self) -> &'_ str {
+                self.0.reborrow().name
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ConnectedAppClientView<'static>>>
+        for ConnectedAppClientOwnedView {
+            fn from(inner: ::buffa::OwnedView<ConnectedAppClientView<'static>>) -> Self {
+                ConnectedAppClientOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConnectedAppClientOwnedView>
+        for ::buffa::OwnedView<ConnectedAppClientView<'static>> {
+            fn from(wrapper: ConnectedAppClientOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ConnectedAppClientView<'static>>>
+        for ConnectedAppClientOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ConnectedAppClientView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ConnectedAppClient {
+            type View<'a> = ConnectedAppClientView<'a>;
+            type ViewHandle = ConnectedAppClientOwnedView;
+        }
+        impl ::serde::Serialize for ConnectedAppClientOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// A pending request from an app to connect to the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct AppAuthorizationView<'a> {
+            /// The app that asks.
+            ///
+            /// Field 1: `client`
+            pub client: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ConnectedAppClientView<'a>,
+            >,
+            /// OAuth scopes the app asks for. "account:read" lets the app read the
+            /// account as the signed-in website does: balances, orders, trades and
+            /// account settings. A connected app never moves money out of the account
+            /// and never changes its security settings.
+            ///
+            /// Field 2: `scopes`
+            pub scopes: ::buffa::RepeatedView<'a, &'a str>,
+            /// The server the app will use the account through, as an absolute URL.
+            ///
+            /// Field 3: `resource`
+            pub resource: &'a str,
+            /// Host the app receives the answer on, from its registered redirect URL.
+            ///
+            /// Field 4: `redirect_host`
+            pub redirect_host: &'a str,
+            /// Time after which the request can no longer be approved or denied.
+            ///
+            /// Field 5: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for AppAuthorizationView<'a> {
+            type Owned = super::super::AppAuthorization;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.client.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.client = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ConnectedAppClientView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.resource = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.redirect_host = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.scopes.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AppAuthorization,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::AppAuthorization,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::AppAuthorization {
+                    client: match self.client.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ConnectedAppClient,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    scopes: self.scopes.iter().map(|s| s.to_string()).collect(),
+                    resource: self.resource.to_string(),
+                    redirect_host: self.redirect_host.to_string(),
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for AppAuthorizationView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.client.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.client.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.scopes {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if !self.resource.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.resource) as u32;
+                }
+                if !self.redirect_host.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.redirect_host)
+                                as u32;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.client.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.client.write_to(__cache, buf);
+                }
+                for v in &self.scopes {
+                    ::buffa::types::put_string_field(2u32, v, buf);
+                }
+                if !self.resource.is_empty() {
+                    ::buffa::types::put_string_field(3u32, &self.resource, buf);
+                }
+                if !self.redirect_host.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.redirect_host, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for AppAuthorizationView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.client.as_option() {
+                        __map.serialize_entry("client", __v)?;
+                    }
+                }
+                if !self.scopes.is_empty() {
+                    __map.serialize_entry("scopes", &*self.scopes)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.resource) {
+                    __map.serialize_entry("resource", self.resource)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.redirect_host) {
+                    __map.serialize_entry("redirectHost", self.redirect_host)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for AppAuthorizationView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "AppAuthorization";
+            const FULL_NAME: &'static str = "auth.v1.AppAuthorization";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.AppAuthorization";
+        }
+        ::buffa::impl_default_view_instance!(AppAuthorizationView);
+        ::buffa::impl_view_reborrow!(AppAuthorizationView);
+        /** Self-contained, `'static` owned view of a `AppAuthorization` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`AppAuthorizationView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`AppAuthorizationView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct AppAuthorizationOwnedView(
+            ::buffa::OwnedView<AppAuthorizationView<'static>>,
+        );
+        impl AppAuthorizationOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AppAuthorizationOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AppAuthorizationOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::AppAuthorization,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    AppAuthorizationOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`AppAuthorizationView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &AppAuthorizationView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::AppAuthorization,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The app that asks.
+            ///
+            /// Field 1: `client`
+            #[must_use]
+            pub fn client(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ConnectedAppClientView<'_>,
+            > {
+                &self.0.reborrow().client
+            }
+            /// OAuth scopes the app asks for. "account:read" lets the app read the
+            /// account as the signed-in website does: balances, orders, trades and
+            /// account settings. A connected app never moves money out of the account
+            /// and never changes its security settings.
+            ///
+            /// Field 2: `scopes`
+            #[must_use]
+            pub fn scopes(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().scopes
+            }
+            /// The server the app will use the account through, as an absolute URL.
+            ///
+            /// Field 3: `resource`
+            #[must_use]
+            pub fn resource(&self) -> &'_ str {
+                self.0.reborrow().resource
+            }
+            /// Host the app receives the answer on, from its registered redirect URL.
+            ///
+            /// Field 4: `redirect_host`
+            #[must_use]
+            pub fn redirect_host(&self) -> &'_ str {
+                self.0.reborrow().redirect_host
+            }
+            /// Time after which the request can no longer be approved or denied.
+            ///
+            /// Field 5: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<AppAuthorizationView<'static>>>
+        for AppAuthorizationOwnedView {
+            fn from(inner: ::buffa::OwnedView<AppAuthorizationView<'static>>) -> Self {
+                AppAuthorizationOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<AppAuthorizationOwnedView>
+        for ::buffa::OwnedView<AppAuthorizationView<'static>> {
+            fn from(wrapper: AppAuthorizationOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<AppAuthorizationView<'static>>>
+        for AppAuthorizationOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<AppAuthorizationView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::AppAuthorization {
+            type View<'a> = AppAuthorizationView<'a>;
+            type ViewHandle = AppAuthorizationOwnedView;
+        }
+        impl ::serde::Serialize for AppAuthorizationOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// An app connected to the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct ConnectedAppView<'a> {
+            /// Opaque connected app ID.
+            ///
+            /// Field 1: `connected_app_id`
+            pub connected_app_id: u64,
+            /// The connected app.
+            ///
+            /// Field 2: `client`
+            pub client: ::buffa::MessageFieldView<
+                super::super::__buffa::view::ConnectedAppClientView<'a>,
+            >,
+            /// OAuth scopes the account granted the app.
+            ///
+            /// Field 3: `scopes`
+            pub scopes: ::buffa::RepeatedView<'a, &'a str>,
+            /// The server the app uses the account through, as an absolute URL.
+            ///
+            /// Field 4: `resource`
+            pub resource: &'a str,
+            /// Time when the account connected the app.
+            ///
+            /// Field 5: `connected_at`
+            pub connected_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Time when the app last used or refreshed its access, at minute
+            /// precision. Empty when it has not used it yet.
+            ///
+            /// Field 6: `last_used_at`
+            pub last_used_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            /// Time when the connection ends unless it is disconnected before. The app
+            /// must then be connected again.
+            ///
+            /// Field 7: `expires_at`
+            pub expires_at: ::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ConnectedAppView<'a> {
+            type Owned = super::super::ConnectedApp;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.connected_app_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.client.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.client = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::ConnectedAppClientView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.resource = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.connected_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.connected_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.last_used_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.last_used_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.expires_at.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.expires_at = ::buffa::MessageFieldView::set(
+                                    <::buffa_types::google::protobuf::__buffa::view::TimestampView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.scopes.push(::buffa::types::borrow_str(&mut cur)?);
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConnectedApp,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ConnectedApp,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ConnectedApp {
+                    connected_app_id: self.connected_app_id,
+                    client: match self.client.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::ConnectedAppClient,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    scopes: self.scopes.iter().map(|s| s.to_string()).collect(),
+                    resource: self.resource.to_string(),
+                    connected_at: match self.connected_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    last_used_at: match self.last_used_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    expires_at: match self.expires_at.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                ::buffa_types::google::protobuf::Timestamp,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ConnectedAppView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.connected_app_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                if self.client.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.client.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                for v in &self.scopes {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
+                if !self.resource.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.resource) as u32;
+                }
+                if self.connected_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.connected_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.last_used_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.last_used_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.expires_at.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.expires_at.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.connected_app_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.connected_app_id, buf);
+                }
+                if self.client.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.client.write_to(__cache, buf);
+                }
+                for v in &self.scopes {
+                    ::buffa::types::put_string_field(3u32, v, buf);
+                }
+                if !self.resource.is_empty() {
+                    ::buffa::types::put_string_field(4u32, &self.resource, buf);
+                }
+                if self.connected_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        5u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.connected_at.write_to(__cache, buf);
+                }
+                if self.last_used_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        6u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.last_used_at.write_to(__cache, buf);
+                }
+                if self.expires_at.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        7u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.expires_at.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ConnectedAppView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.connected_app_id) {
+                    __map
+                        .serialize_entry(
+                            "connectedAppId",
+                            &::buffa::json_helpers::ProtoJson(&self.connected_app_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.client.as_option() {
+                        __map.serialize_entry("client", __v)?;
+                    }
+                }
+                if !self.scopes.is_empty() {
+                    __map.serialize_entry("scopes", &*self.scopes)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.resource) {
+                    __map.serialize_entry("resource", self.resource)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .connected_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("connectedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .last_used_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("lastUsedAt", __v)?;
+                    }
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .expires_at
+                        .as_option()
+                    {
+                        __map.serialize_entry("expiresAt", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ConnectedAppView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ConnectedApp";
+            const FULL_NAME: &'static str = "auth.v1.ConnectedApp";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ConnectedApp";
+        }
+        ::buffa::impl_default_view_instance!(ConnectedAppView);
+        ::buffa::impl_view_reborrow!(ConnectedAppView);
+        /** Self-contained, `'static` owned view of a `ConnectedApp` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ConnectedAppView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ConnectedAppView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ConnectedAppOwnedView(::buffa::OwnedView<ConnectedAppView<'static>>);
+        impl ConnectedAppOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ConnectedApp,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ConnectedAppOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`ConnectedAppView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ConnectedAppView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ConnectedApp,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Opaque connected app ID.
+            ///
+            /// Field 1: `connected_app_id`
+            #[must_use]
+            pub fn connected_app_id(&self) -> u64 {
+                self.0.reborrow().connected_app_id
+            }
+            /// The connected app.
+            ///
+            /// Field 2: `client`
+            #[must_use]
+            pub fn client(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::ConnectedAppClientView<'_>,
+            > {
+                &self.0.reborrow().client
+            }
+            /// OAuth scopes the account granted the app.
+            ///
+            /// Field 3: `scopes`
+            #[must_use]
+            pub fn scopes(&self) -> &::buffa::RepeatedView<'_, &'_ str> {
+                &self.0.reborrow().scopes
+            }
+            /// The server the app uses the account through, as an absolute URL.
+            ///
+            /// Field 4: `resource`
+            #[must_use]
+            pub fn resource(&self) -> &'_ str {
+                self.0.reborrow().resource
+            }
+            /// Time when the account connected the app.
+            ///
+            /// Field 5: `connected_at`
+            #[must_use]
+            pub fn connected_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().connected_at
+            }
+            /// Time when the app last used or refreshed its access, at minute
+            /// precision. Empty when it has not used it yet.
+            ///
+            /// Field 6: `last_used_at`
+            #[must_use]
+            pub fn last_used_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().last_used_at
+            }
+            /// Time when the connection ends unless it is disconnected before. The app
+            /// must then be connected again.
+            ///
+            /// Field 7: `expires_at`
+            #[must_use]
+            pub fn expires_at(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                ::buffa_types::google::protobuf::__buffa::view::TimestampView<'_>,
+            > {
+                &self.0.reborrow().expires_at
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<ConnectedAppView<'static>>>
+        for ConnectedAppOwnedView {
+            fn from(inner: ::buffa::OwnedView<ConnectedAppView<'static>>) -> Self {
+                ConnectedAppOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ConnectedAppOwnedView>
+        for ::buffa::OwnedView<ConnectedAppView<'static>> {
+            fn from(wrapper: ConnectedAppOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<ConnectedAppView<'static>>>
+        for ConnectedAppOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<ConnectedAppView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ConnectedApp {
+            type View<'a> = ConnectedAppView<'a>;
+            type ViewHandle = ConnectedAppOwnedView;
+        }
+        impl ::serde::Serialize for ConnectedAppOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to read a pending app connection request for the consent page.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetAppAuthorizationRequestView<'a> {
+            /// Request ID the authorization endpoint gave the consent page in its
+            /// `request` query parameter.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetAppAuthorizationRequestView<'a> {
+            type Owned = super::super::GetAppAuthorizationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetAppAuthorizationRequest {
+                    request_id: self.request_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetAppAuthorizationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetAppAuthorizationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetAppAuthorizationRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GetAppAuthorizationRequest";
+            const FULL_NAME: &'static str = "auth.v1.GetAppAuthorizationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetAppAuthorizationRequestView);
+        ::buffa::impl_view_reborrow!(GetAppAuthorizationRequestView);
+        /** Self-contained, `'static` owned view of a `GetAppAuthorizationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetAppAuthorizationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetAppAuthorizationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetAppAuthorizationRequestOwnedView(
+            ::buffa::OwnedView<GetAppAuthorizationRequestView<'static>>,
+        );
+        impl GetAppAuthorizationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetAppAuthorizationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetAppAuthorizationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetAppAuthorizationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Request ID the authorization endpoint gave the consent page in its
+            /// `request` query parameter.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetAppAuthorizationRequestView<'static>>,
+        > for GetAppAuthorizationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetAppAuthorizationRequestView<'static>>,
+            ) -> Self {
+                GetAppAuthorizationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetAppAuthorizationRequestOwnedView>
+        for ::buffa::OwnedView<GetAppAuthorizationRequestView<'static>> {
+            fn from(wrapper: GetAppAuthorizationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetAppAuthorizationRequestView<'static>>,
+        > for GetAppAuthorizationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetAppAuthorizationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetAppAuthorizationRequest {
+            type View<'a> = GetAppAuthorizationRequestView<'a>;
+            type ViewHandle = GetAppAuthorizationRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetAppAuthorizationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// The pending app connection request.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetAppAuthorizationResponseView<'a> {
+            /// The request.
+            ///
+            /// Field 1: `authorization`
+            pub authorization: ::buffa::MessageFieldView<
+                super::super::__buffa::view::AppAuthorizationView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetAppAuthorizationResponseView<'a> {
+            type Owned = super::super::GetAppAuthorizationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.authorization.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.authorization = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::AppAuthorizationView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetAppAuthorizationResponse {
+                    authorization: match self.authorization.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::AppAuthorization,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetAppAuthorizationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.authorization.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.authorization.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.authorization.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.authorization.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetAppAuthorizationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .authorization
+                        .as_option()
+                    {
+                        __map.serialize_entry("authorization", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetAppAuthorizationResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "GetAppAuthorizationResponse";
+            const FULL_NAME: &'static str = "auth.v1.GetAppAuthorizationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.GetAppAuthorizationResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetAppAuthorizationResponseView);
+        ::buffa::impl_view_reborrow!(GetAppAuthorizationResponseView);
+        /** Self-contained, `'static` owned view of a `GetAppAuthorizationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetAppAuthorizationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetAppAuthorizationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetAppAuthorizationResponseOwnedView(
+            ::buffa::OwnedView<GetAppAuthorizationResponseView<'static>>,
+        );
+        impl GetAppAuthorizationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetAppAuthorizationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`GetAppAuthorizationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetAppAuthorizationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The request.
+            ///
+            /// Field 1: `authorization`
+            #[must_use]
+            pub fn authorization(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::AppAuthorizationView<'_>,
+            > {
+                &self.0.reborrow().authorization
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<GetAppAuthorizationResponseView<'static>>,
+        > for GetAppAuthorizationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetAppAuthorizationResponseView<'static>>,
+            ) -> Self {
+                GetAppAuthorizationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetAppAuthorizationResponseOwnedView>
+        for ::buffa::OwnedView<GetAppAuthorizationResponseView<'static>> {
+            fn from(wrapper: GetAppAuthorizationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetAppAuthorizationResponseView<'static>>,
+        > for GetAppAuthorizationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<GetAppAuthorizationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetAppAuthorizationResponse {
+            type View<'a> = GetAppAuthorizationResponseView<'a>;
+            type ViewHandle = GetAppAuthorizationResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetAppAuthorizationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to approve a pending app connection request.
+        #[derive(Clone, Debug, Default)]
+        pub struct ApproveAppAuthorizationRequestView<'a> {
+            /// Request ID the authorization endpoint gave the consent page.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ApproveAppAuthorizationRequestView<'a> {
+            type Owned = super::super::ApproveAppAuthorizationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ApproveAppAuthorizationRequest {
+                    request_id: self.request_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ApproveAppAuthorizationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ApproveAppAuthorizationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ApproveAppAuthorizationRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ApproveAppAuthorizationRequest";
+            const FULL_NAME: &'static str = "auth.v1.ApproveAppAuthorizationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationRequest";
+        }
+        ::buffa::impl_default_view_instance!(ApproveAppAuthorizationRequestView);
+        ::buffa::impl_view_reborrow!(ApproveAppAuthorizationRequestView);
+        /** Self-contained, `'static` owned view of a `ApproveAppAuthorizationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ApproveAppAuthorizationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ApproveAppAuthorizationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ApproveAppAuthorizationRequestOwnedView(
+            ::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>>,
+        );
+        impl ApproveAppAuthorizationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ApproveAppAuthorizationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ApproveAppAuthorizationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ApproveAppAuthorizationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Request ID the authorization endpoint gave the consent page.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>>,
+        > for ApproveAppAuthorizationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>>,
+            ) -> Self {
+                ApproveAppAuthorizationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ApproveAppAuthorizationRequestOwnedView>
+        for ::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>> {
+            fn from(wrapper: ApproveAppAuthorizationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>>,
+        > for ApproveAppAuthorizationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ApproveAppAuthorizationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ApproveAppAuthorizationRequest {
+            type View<'a> = ApproveAppAuthorizationRequestView<'a>;
+            type ViewHandle = ApproveAppAuthorizationRequestOwnedView;
+        }
+        impl ::serde::Serialize for ApproveAppAuthorizationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// The approved request's answer to the app.
+        #[derive(Clone, Debug, Default)]
+        pub struct ApproveAppAuthorizationResponseView<'a> {
+            /// URL to send the browser to: the app's redirect URL carrying a one-time
+            /// authorization code. It is valid for 60 seconds.
+            ///
+            /// Field 1: `redirect_url`
+            pub redirect_url: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ApproveAppAuthorizationResponseView<'a> {
+            type Owned = super::super::ApproveAppAuthorizationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.redirect_url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ApproveAppAuthorizationResponse {
+                    redirect_url: self.redirect_url.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ApproveAppAuthorizationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.redirect_url.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.redirect_url)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.redirect_url.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.redirect_url, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ApproveAppAuthorizationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.redirect_url) {
+                    __map.serialize_entry("redirectUrl", self.redirect_url)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ApproveAppAuthorizationResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ApproveAppAuthorizationResponse";
+            const FULL_NAME: &'static str = "auth.v1.ApproveAppAuthorizationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ApproveAppAuthorizationResponse";
+        }
+        ::buffa::impl_default_view_instance!(ApproveAppAuthorizationResponseView);
+        ::buffa::impl_view_reborrow!(ApproveAppAuthorizationResponseView);
+        /** Self-contained, `'static` owned view of a `ApproveAppAuthorizationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ApproveAppAuthorizationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ApproveAppAuthorizationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ApproveAppAuthorizationResponseOwnedView(
+            ::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>>,
+        );
+        impl ApproveAppAuthorizationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ApproveAppAuthorizationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ApproveAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ApproveAppAuthorizationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ApproveAppAuthorizationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ApproveAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// URL to send the browser to: the app's redirect URL carrying a one-time
+            /// authorization code. It is valid for 60 seconds.
+            ///
+            /// Field 1: `redirect_url`
+            #[must_use]
+            pub fn redirect_url(&self) -> &'_ str {
+                self.0.reborrow().redirect_url
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>>,
+        > for ApproveAppAuthorizationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>>,
+            ) -> Self {
+                ApproveAppAuthorizationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ApproveAppAuthorizationResponseOwnedView>
+        for ::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>> {
+            fn from(wrapper: ApproveAppAuthorizationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>>,
+        > for ApproveAppAuthorizationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ApproveAppAuthorizationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ApproveAppAuthorizationResponse {
+            type View<'a> = ApproveAppAuthorizationResponseView<'a>;
+            type ViewHandle = ApproveAppAuthorizationResponseOwnedView;
+        }
+        impl ::serde::Serialize for ApproveAppAuthorizationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to deny a pending app connection request.
+        #[derive(Clone, Debug, Default)]
+        pub struct DenyAppAuthorizationRequestView<'a> {
+            /// Request ID the authorization endpoint gave the consent page.
+            ///
+            /// Field 1: `request_id`
+            pub request_id: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DenyAppAuthorizationRequestView<'a> {
+            type Owned = super::super::DenyAppAuthorizationRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.request_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DenyAppAuthorizationRequest {
+                    request_id: self.request_id.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DenyAppAuthorizationRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.request_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.request_id)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.request_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.request_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DenyAppAuthorizationRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
+                    __map.serialize_entry("requestId", self.request_id)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DenyAppAuthorizationRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "DenyAppAuthorizationRequest";
+            const FULL_NAME: &'static str = "auth.v1.DenyAppAuthorizationRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationRequest";
+        }
+        ::buffa::impl_default_view_instance!(DenyAppAuthorizationRequestView);
+        ::buffa::impl_view_reborrow!(DenyAppAuthorizationRequestView);
+        /** Self-contained, `'static` owned view of a `DenyAppAuthorizationRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DenyAppAuthorizationRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DenyAppAuthorizationRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DenyAppAuthorizationRequestOwnedView(
+            ::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>>,
+        );
+        impl DenyAppAuthorizationRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DenyAppAuthorizationRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DenyAppAuthorizationRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DenyAppAuthorizationRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Request ID the authorization endpoint gave the consent page.
+            ///
+            /// Field 1: `request_id`
+            #[must_use]
+            pub fn request_id(&self) -> &'_ str {
+                self.0.reborrow().request_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>>,
+        > for DenyAppAuthorizationRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>>,
+            ) -> Self {
+                DenyAppAuthorizationRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DenyAppAuthorizationRequestOwnedView>
+        for ::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>> {
+            fn from(wrapper: DenyAppAuthorizationRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>>,
+        > for DenyAppAuthorizationRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DenyAppAuthorizationRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DenyAppAuthorizationRequest {
+            type View<'a> = DenyAppAuthorizationRequestView<'a>;
+            type ViewHandle = DenyAppAuthorizationRequestOwnedView;
+        }
+        impl ::serde::Serialize for DenyAppAuthorizationRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// The denied request's answer to the app.
+        #[derive(Clone, Debug, Default)]
+        pub struct DenyAppAuthorizationResponseView<'a> {
+            /// URL to send the browser to: the app's redirect URL carrying the
+            /// `access_denied` error.
+            ///
+            /// Field 1: `redirect_url`
+            pub redirect_url: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for DenyAppAuthorizationResponseView<'a> {
+            type Owned = super::super::DenyAppAuthorizationResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.redirect_url = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::DenyAppAuthorizationResponse {
+                    redirect_url: self.redirect_url.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for DenyAppAuthorizationResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.redirect_url.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.redirect_url)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.redirect_url.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.redirect_url, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for DenyAppAuthorizationResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.redirect_url) {
+                    __map.serialize_entry("redirectUrl", self.redirect_url)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for DenyAppAuthorizationResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "DenyAppAuthorizationResponse";
+            const FULL_NAME: &'static str = "auth.v1.DenyAppAuthorizationResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.DenyAppAuthorizationResponse";
+        }
+        ::buffa::impl_default_view_instance!(DenyAppAuthorizationResponseView);
+        ::buffa::impl_view_reborrow!(DenyAppAuthorizationResponseView);
+        /** Self-contained, `'static` owned view of a `DenyAppAuthorizationResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`DenyAppAuthorizationResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`DenyAppAuthorizationResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct DenyAppAuthorizationResponseOwnedView(
+            ::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>>,
+        );
+        impl DenyAppAuthorizationResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::DenyAppAuthorizationResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    DenyAppAuthorizationResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`DenyAppAuthorizationResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &DenyAppAuthorizationResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::DenyAppAuthorizationResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// URL to send the browser to: the app's redirect URL carrying the
+            /// `access_denied` error.
+            ///
+            /// Field 1: `redirect_url`
+            #[must_use]
+            pub fn redirect_url(&self) -> &'_ str {
+                self.0.reborrow().redirect_url
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>>,
+        > for DenyAppAuthorizationResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>>,
+            ) -> Self {
+                DenyAppAuthorizationResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<DenyAppAuthorizationResponseOwnedView>
+        for ::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>> {
+            fn from(wrapper: DenyAppAuthorizationResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>>,
+        > for DenyAppAuthorizationResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<DenyAppAuthorizationResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::DenyAppAuthorizationResponse {
+            type View<'a> = DenyAppAuthorizationResponseView<'a>;
+            type ViewHandle = DenyAppAuthorizationResponseOwnedView;
+        }
+        impl ::serde::Serialize for DenyAppAuthorizationResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to list the apps connected to the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListConnectedAppsRequestView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListConnectedAppsRequestView<'a> {
+            type Owned = super::super::ListConnectedAppsRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListConnectedAppsRequest {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListConnectedAppsRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListConnectedAppsRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListConnectedAppsRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListConnectedAppsRequest";
+            const FULL_NAME: &'static str = "auth.v1.ListConnectedAppsRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsRequest";
+        }
+        ::buffa::impl_default_view_instance!(ListConnectedAppsRequestView);
+        ::buffa::impl_view_reborrow!(ListConnectedAppsRequestView);
+        /** Self-contained, `'static` owned view of a `ListConnectedAppsRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListConnectedAppsRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListConnectedAppsRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListConnectedAppsRequestOwnedView(
+            ::buffa::OwnedView<ListConnectedAppsRequestView<'static>>,
+        );
+        impl ListConnectedAppsRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListConnectedAppsRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListConnectedAppsRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListConnectedAppsRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListConnectedAppsRequestView<'static>>,
+        > for ListConnectedAppsRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListConnectedAppsRequestView<'static>>,
+            ) -> Self {
+                ListConnectedAppsRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListConnectedAppsRequestOwnedView>
+        for ::buffa::OwnedView<ListConnectedAppsRequestView<'static>> {
+            fn from(wrapper: ListConnectedAppsRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListConnectedAppsRequestView<'static>>,
+        > for ListConnectedAppsRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListConnectedAppsRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListConnectedAppsRequest {
+            type View<'a> = ListConnectedAppsRequestView<'a>;
+            type ViewHandle = ListConnectedAppsRequestOwnedView;
+        }
+        impl ::serde::Serialize for ListConnectedAppsRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// The apps connected to the account.
+        #[derive(Clone, Debug, Default)]
+        pub struct ListConnectedAppsResponseView<'a> {
+            /// Connected apps, newest connection first. An account has at most 20; a
+            /// disconnected or expired connection is not listed.
+            ///
+            /// Field 1: `apps`
+            pub apps: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::ConnectedAppView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for ListConnectedAppsResponseView<'a> {
+            type Owned = super::super::ListConnectedAppsResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.apps
+                            .push(
+                                <super::super::__buffa::view::ConnectedAppView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::ListConnectedAppsResponse {
+                    apps: self
+                        .apps
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for ListConnectedAppsResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.apps {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.apps {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for ListConnectedAppsResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.apps.is_empty() {
+                    __map.serialize_entry("apps", &*self.apps)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for ListConnectedAppsResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "ListConnectedAppsResponse";
+            const FULL_NAME: &'static str = "auth.v1.ListConnectedAppsResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.ListConnectedAppsResponse";
+        }
+        ::buffa::impl_default_view_instance!(ListConnectedAppsResponseView);
+        ::buffa::impl_view_reborrow!(ListConnectedAppsResponseView);
+        /** Self-contained, `'static` owned view of a `ListConnectedAppsResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`ListConnectedAppsResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`ListConnectedAppsResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct ListConnectedAppsResponseOwnedView(
+            ::buffa::OwnedView<ListConnectedAppsResponseView<'static>>,
+        );
+        impl ListConnectedAppsResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::ListConnectedAppsResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    ListConnectedAppsResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`ListConnectedAppsResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &ListConnectedAppsResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::ListConnectedAppsResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Connected apps, newest connection first. An account has at most 20; a
+            /// disconnected or expired connection is not listed.
+            ///
+            /// Field 1: `apps`
+            #[must_use]
+            pub fn apps(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::ConnectedAppView<'_>,
+            > {
+                &self.0.reborrow().apps
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<ListConnectedAppsResponseView<'static>>,
+        > for ListConnectedAppsResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<ListConnectedAppsResponseView<'static>>,
+            ) -> Self {
+                ListConnectedAppsResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<ListConnectedAppsResponseOwnedView>
+        for ::buffa::OwnedView<ListConnectedAppsResponseView<'static>> {
+            fn from(wrapper: ListConnectedAppsResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<ListConnectedAppsResponseView<'static>>,
+        > for ListConnectedAppsResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<ListConnectedAppsResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::ListConnectedAppsResponse {
+            type View<'a> = ListConnectedAppsResponseView<'a>;
+            type ViewHandle = ListConnectedAppsResponseOwnedView;
+        }
+        impl ::serde::Serialize for ListConnectedAppsResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Request to disconnect an app.
+        #[derive(Clone, Debug, Default)]
+        pub struct RevokeConnectedAppRequestView<'a> {
+            /// Connected app ID from ListConnectedApps.
+            ///
+            /// Field 1: `connected_app_id`
+            pub connected_app_id: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RevokeConnectedAppRequestView<'a> {
+            type Owned = super::super::RevokeConnectedAppRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Fixed64,
+                        )?;
+                        view.connected_app_id = ::buffa::types::decode_fixed64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RevokeConnectedAppRequest {
+                    connected_app_id: self.connected_app_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RevokeConnectedAppRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.connected_app_id != 0u64 {
+                    size += 1u32 + ::buffa::types::FIXED64_ENCODED_LEN as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.connected_app_id != 0u64 {
+                    ::buffa::types::put_fixed64_field(1u32, self.connected_app_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RevokeConnectedAppRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.connected_app_id) {
+                    __map
+                        .serialize_entry(
+                            "connectedAppId",
+                            &::buffa::json_helpers::ProtoJson(&self.connected_app_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RevokeConnectedAppRequestView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "RevokeConnectedAppRequest";
+            const FULL_NAME: &'static str = "auth.v1.RevokeConnectedAppRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppRequest";
+        }
+        ::buffa::impl_default_view_instance!(RevokeConnectedAppRequestView);
+        ::buffa::impl_view_reborrow!(RevokeConnectedAppRequestView);
+        /** Self-contained, `'static` owned view of a `RevokeConnectedAppRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RevokeConnectedAppRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RevokeConnectedAppRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RevokeConnectedAppRequestOwnedView(
+            ::buffa::OwnedView<RevokeConnectedAppRequestView<'static>>,
+        );
+        impl RevokeConnectedAppRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RevokeConnectedAppRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RevokeConnectedAppRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RevokeConnectedAppRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Connected app ID from ListConnectedApps.
+            ///
+            /// Field 1: `connected_app_id`
+            #[must_use]
+            pub fn connected_app_id(&self) -> u64 {
+                self.0.reborrow().connected_app_id
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RevokeConnectedAppRequestView<'static>>,
+        > for RevokeConnectedAppRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RevokeConnectedAppRequestView<'static>>,
+            ) -> Self {
+                RevokeConnectedAppRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RevokeConnectedAppRequestOwnedView>
+        for ::buffa::OwnedView<RevokeConnectedAppRequestView<'static>> {
+            fn from(wrapper: RevokeConnectedAppRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RevokeConnectedAppRequestView<'static>>,
+        > for RevokeConnectedAppRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RevokeConnectedAppRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RevokeConnectedAppRequest {
+            type View<'a> = RevokeConnectedAppRequestView<'a>;
+            type ViewHandle = RevokeConnectedAppRequestOwnedView;
+        }
+        impl ::serde::Serialize for RevokeConnectedAppRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// Empty response returned after the app is disconnected.
+        #[derive(Clone, Debug, Default)]
+        pub struct RevokeConnectedAppResponseView<'a> {
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for RevokeConnectedAppResponseView<'a> {
+            type Owned = super::super::RevokeConnectedAppResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::RevokeConnectedAppResponse {
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for RevokeConnectedAppResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for RevokeConnectedAppResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for RevokeConnectedAppResponseView<'a> {
+            const PACKAGE: &'static str = "auth.v1";
+            const NAME: &'static str = "RevokeConnectedAppResponse";
+            const FULL_NAME: &'static str = "auth.v1.RevokeConnectedAppResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/auth.v1.RevokeConnectedAppResponse";
+        }
+        ::buffa::impl_default_view_instance!(RevokeConnectedAppResponseView);
+        ::buffa::impl_view_reborrow!(RevokeConnectedAppResponseView);
+        /** Self-contained, `'static` owned view of a `RevokeConnectedAppResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`RevokeConnectedAppResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`RevokeConnectedAppResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct RevokeConnectedAppResponseOwnedView(
+            ::buffa::OwnedView<RevokeConnectedAppResponseView<'static>>,
+        );
+        impl RevokeConnectedAppResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::RevokeConnectedAppResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    RevokeConnectedAppResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`RevokeConnectedAppResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &RevokeConnectedAppResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::RevokeConnectedAppResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<RevokeConnectedAppResponseView<'static>>,
+        > for RevokeConnectedAppResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<RevokeConnectedAppResponseView<'static>>,
+            ) -> Self {
+                RevokeConnectedAppResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<RevokeConnectedAppResponseOwnedView>
+        for ::buffa::OwnedView<RevokeConnectedAppResponseView<'static>> {
+            fn from(wrapper: RevokeConnectedAppResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<RevokeConnectedAppResponseView<'static>>,
+        > for RevokeConnectedAppResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<RevokeConnectedAppResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::RevokeConnectedAppResponse {
+            type View<'a> = RevokeConnectedAppResponseView<'a>;
+            type ViewHandle = RevokeConnectedAppResponseOwnedView;
+        }
+        impl ::serde::Serialize for RevokeConnectedAppResponseOwnedView {
             fn serialize<__S: ::serde::Serializer>(
                 &self,
                 __s: __S,
@@ -129596,10 +134839,6 @@ pub mod __buffa {
         reg.register_json_any(super::__CONSUME_FRESH_STEP_UP_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__RELEASE_FRESH_STEP_UP_REQUEST_JSON_ANY);
         reg.register_json_any(super::__RELEASE_FRESH_STEP_UP_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__GET_RECENT_MFA_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__GET_RECENT_MFA_RESPONSE_JSON_ANY);
-        reg.register_json_any(super::__END_RECENT_MFA_REQUEST_JSON_ANY);
-        reg.register_json_any(super::__END_RECENT_MFA_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__UPDATE_MFA_FACTOR_REQUEST_JSON_ANY);
         reg.register_json_any(super::__UPDATE_MFA_FACTOR_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__DELETE_MFA_FACTOR_REQUEST_JSON_ANY);
@@ -129616,6 +134855,19 @@ pub mod __buffa {
         reg.register_json_any(super::__TIMESTAMP_WINDOW_JSON_ANY);
         reg.register_json_any(super::__ACCEPT_TERMS_REQUEST_JSON_ANY);
         reg.register_json_any(super::__ACCEPT_TERMS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__CONNECTED_APP_CLIENT_JSON_ANY);
+        reg.register_json_any(super::__APP_AUTHORIZATION_JSON_ANY);
+        reg.register_json_any(super::__CONNECTED_APP_JSON_ANY);
+        reg.register_json_any(super::__GET_APP_AUTHORIZATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_APP_AUTHORIZATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__APPROVE_APP_AUTHORIZATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__APPROVE_APP_AUTHORIZATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__DENY_APP_AUTHORIZATION_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__DENY_APP_AUTHORIZATION_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTED_APPS_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__LIST_CONNECTED_APPS_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__REVOKE_CONNECTED_APP_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__REVOKE_CONNECTED_APP_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__ACCOUNT_IDENTITY_JSON_ANY);
         reg.register_json_any(super::__USER_PROFILE_JSON_ANY);
         reg.register_json_any(super::__USER_PROFILE_PATCH_JSON_ANY);
@@ -130300,22 +135552,6 @@ pub use self::__buffa::view::ReleaseFreshStepUpResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::ReleaseFreshStepUpResponseOwnedView;
 #[doc(inline)]
-pub use self::__buffa::view::GetRecentMFARequestView;
-#[doc(inline)]
-pub use self::__buffa::view::GetRecentMFARequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::GetRecentMFAResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::GetRecentMFAResponseOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::EndRecentMFARequestView;
-#[doc(inline)]
-pub use self::__buffa::view::EndRecentMFARequestOwnedView;
-#[doc(inline)]
-pub use self::__buffa::view::EndRecentMFAResponseView;
-#[doc(inline)]
-pub use self::__buffa::view::EndRecentMFAResponseOwnedView;
-#[doc(inline)]
 pub use self::__buffa::view::UpdateMFAFactorRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::UpdateMFAFactorRequestOwnedView;
@@ -130379,6 +135615,58 @@ pub use self::__buffa::view::AcceptTermsRequestOwnedView;
 pub use self::__buffa::view::AcceptTermsResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::AcceptTermsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectedAppClientView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectedAppClientOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::AppAuthorizationView;
+#[doc(inline)]
+pub use self::__buffa::view::AppAuthorizationOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectedAppView;
+#[doc(inline)]
+pub use self::__buffa::view::ConnectedAppOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAppAuthorizationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAppAuthorizationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAppAuthorizationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetAppAuthorizationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ApproveAppAuthorizationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ApproveAppAuthorizationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ApproveAppAuthorizationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ApproveAppAuthorizationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DenyAppAuthorizationRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::DenyAppAuthorizationRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::DenyAppAuthorizationResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::DenyAppAuthorizationResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectedAppsRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectedAppsRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectedAppsResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::ListConnectedAppsResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeConnectedAppRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeConnectedAppRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeConnectedAppResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::RevokeConnectedAppResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::AccountIdentityView;
 #[doc(inline)]

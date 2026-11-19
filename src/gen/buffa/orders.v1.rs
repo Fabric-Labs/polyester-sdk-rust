@@ -11635,6 +11635,23 @@ pub struct CancelAllOrdersRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
+    /// If true, also stops the account's triggers in the same scope: every
+    /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
+    /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
+    /// trade on the side filter, created before the request was accepted. Each
+    /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
+    /// its reserved funds, its open orders are canceled with the others, and none
+    /// places an order after the response. Defaults to false: only orders are
+    /// canceled and triggers keep running. Part of the criteria a retry must keep.
+    ///
+    /// Field 7: `include_triggers`
+    #[serde(
+        rename = "includeTriggers",
+        alias = "include_triggers",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub include_triggers: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -11647,6 +11664,7 @@ impl ::core::fmt::Debug for CancelAllOrdersRequest {
             .field("side", &self.side)
             .field("dry_run", &self.dry_run)
             .field("request_id", &self.request_id)
+            .field("include_triggers", &self.include_triggers)
             .finish()
     }
 }
@@ -11708,6 +11726,9 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         if !self.request_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
         }
+        if self.include_triggers {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -11743,6 +11764,9 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         }
         if !self.request_id.is_empty() {
             ::buffa::types::put_string_field(6u32, &self.request_id, buf);
+        }
+        if self.include_triggers {
+            ::buffa::types::put_bool_field(7u32, self.include_triggers, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -11818,6 +11842,13 @@ impl ::buffa::Message for CancelAllOrdersRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.request_id, buf)?;
             }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.include_triggers = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -11831,6 +11862,7 @@ impl ::buffa::Message for CancelAllOrdersRequest {
         self.side = ::buffa::EnumValue::from(0);
         self.dry_run = false;
         self.request_id.clear();
+        self.include_triggers = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12144,6 +12176,18 @@ pub struct CancelAllOrdersResponse {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
     )]
     pub listing_status: ::buffa::EnumValue<cancel_all_orders_response::ListingStatus>,
+    /// With `include_triggers`, the number of the account's triggers that matched
+    /// the filters when the request was accepted, each stopped unless `dry_run`
+    /// is set. Zero without `include_triggers`.
+    ///
+    /// Field 11: `matched_triggers`
+    #[serde(
+        rename = "matchedTriggers",
+        alias = "matched_triggers",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub matched_triggers: u32,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12161,6 +12205,7 @@ impl ::core::fmt::Debug for CancelAllOrdersResponse {
             .field("total_cancelled", &self.total_cancelled)
             .field("truncated", &self.truncated)
             .field("listing_status", &self.listing_status)
+            .field("matched_triggers", &self.matched_triggers)
             .finish()
     }
 }
@@ -12241,6 +12286,11 @@ impl ::buffa::Message for CancelAllOrdersResponse {
                 size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
             }
         }
+        if self.matched_triggers != 0u32 {
+            size
+                += 1u32
+                    + ::buffa::types::uint32_encoded_len(self.matched_triggers) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -12288,6 +12338,9 @@ impl ::buffa::Message for CancelAllOrdersResponse {
             if val != 0 {
                 ::buffa::types::put_int32_field(10u32, val, buf);
             }
+        }
+        if self.matched_triggers != 0u32 {
+            ::buffa::types::put_uint32_field(11u32, self.matched_triggers, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12382,6 +12435,13 @@ impl ::buffa::Message for CancelAllOrdersResponse {
                     ::buffa::types::decode_int32(buf)?,
                 );
             }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.matched_triggers = ::buffa::types::decode_uint32(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12400,6 +12460,7 @@ impl ::buffa::Message for CancelAllOrdersResponse {
         self.total_cancelled = 0u32;
         self.truncated = false;
         self.listing_status = ::buffa::EnumValue::from(0);
+        self.matched_triggers = 0u32;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -12805,6 +12866,22 @@ pub struct CancelAllAfterRequest {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub request_id: ::buffa::alloc::string::String,
+    /// If true, the switch's expiry also stops the account's triggers in its
+    /// scope, as CancelAllOrders with `include_triggers` does: those created
+    /// before the expiry time, even when the expiry is processed later, and
+    /// none of them places an order once it is processed. A trigger created at
+    /// or after the expiry time is not stopped. Defaults to false: only orders
+    /// are canceled on expiry. Each arm or refresh sets it again; a disable
+    /// ignores it.
+    ///
+    /// Field 6: `include_triggers`
+    #[serde(
+        rename = "includeTriggers",
+        alias = "include_triggers",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub include_triggers: bool,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -12817,6 +12894,7 @@ impl ::core::fmt::Debug for CancelAllAfterRequest {
             .field("symbol_id", &self.symbol_id)
             .field("side", &self.side)
             .field("request_id", &self.request_id)
+            .field("include_triggers", &self.include_triggers)
             .finish()
     }
 }
@@ -12872,6 +12950,9 @@ impl ::buffa::Message for CancelAllAfterRequest {
         if !self.request_id.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.request_id) as u32;
         }
+        if self.include_triggers {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -12899,6 +12980,9 @@ impl ::buffa::Message for CancelAllAfterRequest {
         }
         if !self.request_id.is_empty() {
             ::buffa::types::put_string_field(5u32, &self.request_id, buf);
+        }
+        if self.include_triggers {
+            ::buffa::types::put_bool_field(6u32, self.include_triggers, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -12950,6 +13034,13 @@ impl ::buffa::Message for CancelAllAfterRequest {
                 )?;
                 ::buffa::types::merge_string(&mut self.request_id, buf)?;
             }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.include_triggers = ::buffa::types::decode_bool(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -12963,6 +13054,7 @@ impl ::buffa::Message for CancelAllAfterRequest {
         self.symbol_id = 0u32;
         self.side = ::buffa::EnumValue::from(0);
         self.request_id.clear();
+        self.include_triggers = false;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -37021,6 +37113,17 @@ pub mod __buffa {
             ///
             /// Field 6: `request_id`
             pub request_id: &'a str,
+            /// If true, also stops the account's triggers in the same scope: every
+            /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
+            /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
+            /// trade on the side filter, created before the request was accepted. Each
+            /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
+            /// its reserved funds, its open orders are canceled with the others, and none
+            /// places an order after the response. Defaults to false: only orders are
+            /// canceled and triggers keep running. Part of the criteria a retry must keep.
+            ///
+            /// Field 7: `include_triggers`
+            pub include_triggers: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllOrdersRequestView<'a> {
@@ -37086,6 +37189,13 @@ pub mod __buffa {
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.include_triggers = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     2u32 => {
                         if tag.wire_type()
                             == ::buffa::encoding::WireType::LengthDelimited
@@ -37145,6 +37255,7 @@ pub mod __buffa {
                     side: self.side,
                     dry_run: self.dry_run,
                     request_id: self.request_id.to_string(),
+                    include_triggers: self.include_triggers,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -37187,6 +37298,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.request_id)
                                 as u32;
                 }
+                if self.include_triggers {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -37223,6 +37337,9 @@ pub mod __buffa {
                 }
                 if !self.request_id.is_empty() {
                     ::buffa::types::put_string_field(6u32, &self.request_id, buf);
+                }
+                if self.include_triggers {
+                    ::buffa::types::put_bool_field(7u32, self.include_triggers, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -37267,6 +37384,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
                     __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if self.include_triggers {
+                    __map.serialize_entry("includeTriggers", &self.include_triggers)?;
                 }
                 __map.end()
             }
@@ -37405,6 +37525,20 @@ pub mod __buffa {
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
+            }
+            /// If true, also stops the account's triggers in the same scope: every
+            /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
+            /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
+            /// trade on the side filter, created before the request was accepted. Each
+            /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
+            /// its reserved funds, its open orders are canceled with the others, and none
+            /// places an order after the response. Defaults to false: only orders are
+            /// canceled and triggers keep running. Part of the criteria a retry must keep.
+            ///
+            /// Field 7: `include_triggers`
+            #[must_use]
+            pub fn include_triggers(&self) -> bool {
+                self.0.reborrow().include_triggers
             }
         }
         impl ::core::convert::From<
@@ -37821,6 +37955,12 @@ pub mod __buffa {
             pub listing_status: ::buffa::EnumValue<
                 super::super::cancel_all_orders_response::ListingStatus,
             >,
+            /// With `include_triggers`, the number of the account's triggers that matched
+            /// the filters when the request was accepted, each stopped unless `dry_run`
+            /// is set. Zero without `include_triggers`.
+            ///
+            /// Field 11: `matched_triggers`
+            pub matched_triggers: u32,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllOrdersResponseView<'a> {
@@ -37941,6 +38081,13 @@ pub mod __buffa {
                             ::buffa::types::decode_int32(&mut cur)?,
                         );
                     }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.matched_triggers = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
                     7u32 => {
                         ::buffa::encoding::check_wire_type(
                             tag,
@@ -38006,6 +38153,7 @@ pub mod __buffa {
                     total_cancelled: self.total_cancelled,
                     truncated: self.truncated,
                     listing_status: self.listing_status,
+                    matched_triggers: self.matched_triggers,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -38078,6 +38226,12 @@ pub mod __buffa {
                         size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
                     }
                 }
+                if self.matched_triggers != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.matched_triggers)
+                                as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -38134,6 +38288,9 @@ pub mod __buffa {
                     if val != 0 {
                         ::buffa::types::put_int32_field(10u32, val, buf);
                     }
+                }
+                if self.matched_triggers != 0u32 {
+                    ::buffa::types::put_uint32_field(11u32, self.matched_triggers, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -38211,6 +38368,13 @@ pub mod __buffa {
                     &self.listing_status,
                 ) {
                     __map.serialize_entry("listingStatus", &self.listing_status)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.matched_triggers) {
+                    __map
+                        .serialize_entry(
+                            "matchedTriggers",
+                            &::buffa::json_helpers::ProtoJson(&self.matched_triggers),
+                        )?;
                 }
                 __map.end()
             }
@@ -38416,6 +38580,15 @@ pub mod __buffa {
             > {
                 self.0.reborrow().listing_status
             }
+            /// With `include_triggers`, the number of the account's triggers that matched
+            /// the filters when the request was accepted, each stopped unless `dry_run`
+            /// is set. Zero without `include_triggers`.
+            ///
+            /// Field 11: `matched_triggers`
+            #[must_use]
+            pub fn matched_triggers(&self) -> u32 {
+                self.0.reborrow().matched_triggers
+            }
         }
         impl ::core::convert::From<
             ::buffa::OwnedView<CancelAllOrdersResponseView<'static>>,
@@ -38489,6 +38662,16 @@ pub mod __buffa {
             ///
             /// Field 5: `request_id`
             pub request_id: &'a str,
+            /// If true, the switch's expiry also stops the account's triggers in its
+            /// scope, as CancelAllOrders with `include_triggers` does: those created
+            /// before the expiry time, even when the expiry is processed later, and
+            /// none of them places an order once it is processed. A trigger created at
+            /// or after the expiry time is not stopped. Defaults to false: only orders
+            /// are canceled on expiry. Each arm or refresh sets it again; a disable
+            /// ignores it.
+            ///
+            /// Field 6: `include_triggers`
+            pub include_triggers: bool,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for CancelAllAfterRequestView<'a> {
@@ -38561,6 +38744,13 @@ pub mod __buffa {
                         )?;
                         view.request_id = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.include_triggers = ::buffa::types::decode_bool(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -38595,6 +38785,7 @@ pub mod __buffa {
                     symbol_id: self.symbol_id,
                     side: self.side,
                     request_id: self.request_id.to_string(),
+                    include_triggers: self.include_triggers,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -38635,6 +38826,9 @@ pub mod __buffa {
                             + ::buffa::types::string_encoded_len(&self.request_id)
                                 as u32;
                 }
+                if self.include_triggers {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -38663,6 +38857,9 @@ pub mod __buffa {
                 }
                 if !self.request_id.is_empty() {
                     ::buffa::types::put_string_field(5u32, &self.request_id, buf);
+                }
+                if self.include_triggers {
+                    ::buffa::types::put_bool_field(6u32, self.include_triggers, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -38711,6 +38908,9 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.request_id) {
                     __map.serialize_entry("requestId", self.request_id)?;
+                }
+                if self.include_triggers {
+                    __map.serialize_entry("includeTriggers", &self.include_triggers)?;
                 }
                 __map.end()
             }
@@ -38849,6 +39049,19 @@ pub mod __buffa {
             #[must_use]
             pub fn request_id(&self) -> &'_ str {
                 self.0.reborrow().request_id
+            }
+            /// If true, the switch's expiry also stops the account's triggers in its
+            /// scope, as CancelAllOrders with `include_triggers` does: those created
+            /// before the expiry time, even when the expiry is processed later, and
+            /// none of them places an order once it is processed. A trigger created at
+            /// or after the expiry time is not stopped. Defaults to false: only orders
+            /// are canceled on expiry. Each arm or refresh sets it again; a disable
+            /// ignores it.
+            ///
+            /// Field 6: `include_triggers`
+            #[must_use]
+            pub fn include_triggers(&self) -> bool {
+                self.0.reborrow().include_triggers
             }
         }
         impl ::core::convert::From<
