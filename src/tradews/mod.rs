@@ -39,7 +39,10 @@
 //! quantities exact integers scaled by the pair's `base_quantity_scale` from
 //! the spot config ([`Quantity`]). The codecs are generated from the published
 //! schema with Real Logic's sbe-tool; a message of another schema or version is
-//! refused ([`TradeError::Schema`]), never misread.
+//! refused ([`TradeError::Schema`]), never misread. The schema adds messages
+//! without changing its version, so a message of a template this client does
+//! not know is skipped: it is logged at debug level, never queued as an event,
+//! and the connection and its commands in flight carry on.
 
 mod codec;
 #[allow(dead_code, unused_imports, unused_mut, clippy::all)]
@@ -205,6 +208,7 @@ pub struct PostOnlyOrder {
 
 /// How a modification changes an order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
 pub enum ModifyBehavior {
     /// Amend in place, keeping the order ID and queue priority, when the price
     /// stays and the quantity does not rise; otherwise replace the order with
@@ -380,6 +384,7 @@ impl BatchCancelOrders {
 
 /// A trading command, as errors name it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Command {
     CreateOrder,
     CancelOrder,
@@ -497,6 +502,7 @@ impl fmt::Debug for RejectCode {
 
 /// Why an order was cancelled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum CancelReason {
     UserRequest,
     IocRemainder,
@@ -598,6 +604,7 @@ impl CancelReason {
 
 /// An order's lifecycle state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum OrderStatus {
     Pending,
     PendingCancel,
@@ -634,6 +641,7 @@ impl OrderStatus {
 /// per order and ignore older or repeated ones; after a gap, read the order's
 /// state from the Orders API.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OrderUpdate {
     pub symbol_id: u32,
     pub order_id: u64,
@@ -653,6 +661,7 @@ pub struct OrderUpdate {
 
 /// The asset an execution's fee is charged in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum FeeAsset {
     Quote,
     Base,
@@ -663,6 +672,7 @@ pub enum FeeAsset {
 /// arrive first unsettled and later settled: identify it by `symbol_id`,
 /// `match_id` and `order_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Execution {
     pub symbol_id: u32,
     pub match_id: u64,
@@ -684,6 +694,7 @@ pub struct Execution {
 
 /// Why a [`MarketResync`] was sent; the recovery is the same for each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ResyncReason {
     Interrupted,
     Discontinuity,
@@ -694,6 +705,7 @@ pub enum ResyncReason {
 /// read the pair's orders and executions from the Orders API, then apply the
 /// later events, which may repeat state the read returned.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct MarketResync {
     pub symbol_id: u32,
     pub reason: ResyncReason,
@@ -701,7 +713,11 @@ pub struct MarketResync {
 }
 
 /// What [`TradeSession::recv`] delivers, in order.
+///
+/// The server adds messages without changing the schema's version, and this
+/// enum grows with them: match it with a `_ =>` arm.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Event {
     /// A connection is open and its subscription requested; commands wait
     /// for [`Event::Ready`].
@@ -739,11 +755,18 @@ pub enum Event {
     Pong {
         round_trip: Duration,
     },
+    /// An `OcoAck`, the server's answer to a CreateOco or CancelOco. This
+    /// client sends neither on the trading WebSocket (create and cancel OCOs
+    /// through the Triggers API), so an `OcoAck` answers no command of this
+    /// session and is reported as it arrives. One that names a command this
+    /// connection has in flight is a wrong answer and ends the connection.
+    OcoAck(OcoAck),
 }
 
 /// A single-order acknowledgement: the server accepted the command, and order
 /// events report what follows.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OrderAck {
     pub correlation_id: u64,
     /// The order the command created, cancelled or modified; for a modify
@@ -755,6 +778,7 @@ pub struct OrderAck {
 
 /// Whether a [`CancelAllAck`] lists the orders it cancelled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum CancelAllListing {
     /// The server did not say.
     Unspecified,
@@ -768,12 +792,14 @@ pub enum CancelAllListing {
 
 /// An order whose cancellation a cancel-all requested.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CancelledOrder {
     pub order_id: u64,
     pub client_order_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CancelAllAck {
     pub correlation_id: u64,
     /// Open orders that matched.
@@ -793,6 +819,7 @@ pub struct CancelAllAck {
 
 /// The account's cancel-all-after timer after a [`TradeSession::cancel_all_after`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TimerAck {
     pub correlation_id: u64,
     pub armed: bool,
@@ -805,6 +832,7 @@ pub struct TimerAck {
 
 /// One batch create or batch cancel item's result, in request order.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchItem {
     pub accepted: bool,
     /// The refusal of an item not accepted.
@@ -826,6 +854,7 @@ impl BatchItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchCreateAck {
     pub correlation_id: u64,
     pub items: Vec<BatchItem>,
@@ -835,6 +864,7 @@ pub struct BatchCreateAck {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchCancelAck {
     pub correlation_id: u64,
     pub items: Vec<BatchItem>,
@@ -844,6 +874,7 @@ pub struct BatchCancelAck {
 
 /// What an admitted replace item did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ReplaceAction {
     /// Changed in place, under the same order ID.
     Amended,
@@ -853,6 +884,7 @@ pub enum ReplaceAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ReplaceItemResult {
     pub accepted: bool,
     pub code: Option<RejectCode>,
@@ -871,6 +903,7 @@ impl ReplaceItemResult {
 
 /// A batch replace's aggregate outcome.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum BatchStatus {
     Admitted,
     PartiallyAdmitted,
@@ -879,6 +912,7 @@ pub enum BatchStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchReplaceAck {
     pub correlation_id: u64,
     pub batch_request_id: u64,
@@ -888,9 +922,39 @@ pub struct BatchReplaceAck {
     pub acked_at: SystemTime,
 }
 
+/// Which command an [`OcoAck`] answers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum OcoCommand {
+    /// A CreateOco: the OCO's quantity is reserved and both legs created.
+    Create,
+    /// A CancelOco: both legs ended canceled and the quantity is released.
+    Cancel,
+    Unknown(u8),
+}
+
+/// An `OcoAck`: the server accepted a CreateOco or a CancelOco. The legs'
+/// state and orders follow through the trigger reads and events.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OcoAck {
+    pub correlation_id: u64,
+    pub command: OcoCommand,
+    /// The OCO, which both legs carry as their order list ID.
+    pub order_list_id: u64,
+    /// Create: the take-profit leg's trigger; `None` for a cancel.
+    pub take_profit_trigger_id: Option<u64>,
+    /// Create: the stop-loss leg's trigger; `None` for a cancel.
+    pub stop_loss_trigger_id: Option<u64>,
+    /// Create: the client OCO ID sent; `None` for a cancel.
+    pub client_list_id: Option<String>,
+    pub acked_at: SystemTime,
+}
+
 /// Why a command was not sent. Nothing of it reached the server, so sending it
 /// again is safe.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum NotSent {
     /// No connection's subscription is confirmed yet.
     NotReady,
@@ -929,6 +993,7 @@ impl fmt::Display for NotSent {
 
 /// The server's refusal of a command.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Reject {
     pub command: Command,
     pub correlation_id: u64,
@@ -969,6 +1034,7 @@ impl fmt::Display for Reject {
 
 /// A trading WebSocket failure.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
+#[non_exhaustive]
 pub enum TradeError {
     /// Refused locally; nothing reached the server.
     #[error("tradews {command} was not sent: {reason}")]

@@ -14,17 +14,17 @@ use super::sbe::{
     cancel_all_after_status, cancel_all_orders_codec, cancel_order_codec, command_ack_codec,
     command_reject_codec, create_order_codec, event_channels, execution_event_codec, fee_asset,
     group_size_encoding_codec, liquidity_role, market_resync_codec, message_header_codec,
-    modify_behavior, modify_order_codec, order_event_codec, order_flags, order_sizing_kind,
-    order_type, ping_codec, pong_codec, settlement_status, side, stp_mode, subscribe_codec,
-    subscription_ack_codec, time_in_force,
+    modify_behavior, modify_order_codec, oco_ack_codec, order_event_codec, order_flags,
+    order_sizing_kind, order_type, ping_codec, pong_codec, settlement_status, side, stp_mode,
+    subscribe_codec, subscription_ack_codec, time_in_force,
 };
 use super::{
     BatchCancelAck, BatchCancelOrders, BatchCreateAck, BatchCreateOrders, BatchItem,
     BatchReplaceAck, BatchReplaceOrders, BatchStatus, CancelAllAck, CancelAllAfterOptions,
     CancelAllListing, CancelAllOrders, CancelReason, CancelledOrder, Deadline, Execution, FeeAsset,
-    MarketResync, ModifyBehavior, ModifyOrder, OrderAck, OrderRef, OrderStatus, OrderUpdate,
-    PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItemResult, ResyncReason, Side, TimerAck,
-    TradeError, from_unix_ns,
+    MarketResync, ModifyBehavior, ModifyOrder, OcoAck, OcoCommand, OrderAck, OrderRef, OrderStatus,
+    OrderUpdate, PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItemResult, ResyncReason, Side,
+    TimerAck, TradeError, from_unix_ns,
 };
 use crate::errors::{Error, Result};
 use crate::types::{Price, Quantity, QuantityDomain};
@@ -66,6 +66,7 @@ pub(crate) const RESYNC_REASON: usize = 4;
 pub(crate) const REPLACE_ACK_STATUS: usize = 32;
 pub(crate) const ITEM_CODE: usize = 1;
 pub(crate) const REPLACE_ITEM_ACTION: usize = 3;
+pub(crate) const OCO_ACK_COMMAND: usize = 16;
 
 /// A frame's `seq`: the first field of every client message's block.
 const SEQ: usize = HEADER;
@@ -412,6 +413,15 @@ pub(crate) enum Msg {
     Order(OrderUpdate),
     Execution(Execution),
     MarketResync(MarketResync),
+    /// An `OcoAck`; this client sends no command it answers.
+    OcoAck {
+        seq: u64,
+        ack: OcoAck,
+    },
+    /// A message of a template this client does not know, skipped whole.
+    Unknown {
+        template_id: u16,
+    },
 }
 
 /// The server's answer to a command.
@@ -608,8 +618,16 @@ fn utf8(template_id: u16, bytes: &[u8]) -> Result<String> {
 }
 
 /// Decodes one server frame. A frame shorter or longer than its header,
-/// block, groups and data declare, of another schema or version, or of a
-/// template this client does not know is an error.
+/// block, groups and data declare, or of another schema or version, is an
+/// error.
+///
+/// The schema adds templates without changing its version, so a frame of a
+/// template this client does not know is [`Msg::Unknown`], skipped rather
+/// than refused. Every WebSocket binary message carries exactly one SBE
+/// message, so skipping the frame skips the message whole and the next one
+/// starts at the next frame: only the header and the fixed block it declares
+/// are checked, since the groups and data after that block follow a layout
+/// only that template's schema defines.
 pub(crate) fn decode(frame: &[u8]) -> Result<Msg> {
     let h = header(frame)?;
     let t = h.template_id;
@@ -940,10 +958,40 @@ pub(crate) fn decode(frame: &[u8]) -> Result<Msg> {
                 }),
             })
         }
-        other => Err(TradeError::frame(
-            other,
-            "a template this client does not know",
-        )),
+        oco_ack_codec::SBE_TEMPLATE_ID => {
+            check_layout(frame, &h, oco_ack_codec::SBE_BLOCK_LENGTH, &[], 1)?;
+            let command = raw_u8(OCO_ACK_COMMAND);
+            let mut d = oco_ack_codec::OcoAckDecoder::default().header(header_decoder(frame), 0);
+            let (seq, correlation_id, ts_ns) = (d.seq(), d.correlation_id(), d.ts_ns());
+            let order_list_id = d.order_list_id();
+            let take_profit_trigger_id = d.take_profit_trigger_id();
+            let stop_loss_trigger_id = d.stop_loss_trigger_id();
+            let coordinates = d.client_list_id_decoder();
+            let client = utf8(t, d.client_list_id_slice(coordinates))?;
+            Ok(Msg::OcoAck {
+                seq,
+                ack: OcoAck {
+                    correlation_id,
+                    command: match command {
+                        11 => OcoCommand::Create,
+                        12 => OcoCommand::Cancel,
+                        other => OcoCommand::Unknown(other),
+                    },
+                    order_list_id,
+                    take_profit_trigger_id,
+                    stop_loss_trigger_id,
+                    client_list_id: (!client.is_empty()).then_some(client),
+                    acked_at: from_unix_ns(ts_ns),
+                },
+            })
+        }
+        template_id => {
+            let end = HEADER + h.block_length as usize;
+            if frame.len() < end {
+                return Err(short(template_id, end, frame.len()));
+            }
+            Ok(Msg::Unknown { template_id })
+        }
     }
 }
 
