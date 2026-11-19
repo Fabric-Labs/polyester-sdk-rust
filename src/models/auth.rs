@@ -17,6 +17,27 @@ pub struct MeResult {
     /// sends none, as for an API key.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session: Option<MeSession>,
+    /// The account scope of the API key that authenticated the call, as its
+    /// proto name: `"SCOPE_ROOT"` for a key of the main account,
+    /// `"SCOPE_SUBACCOUNT"` for a key bound to one sub-account, or
+    /// `"UNKNOWN(n)"` for a scope this version does not know. `None` for a
+    /// session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key_scope: Option<String>,
+    /// The sub-account a `"SCOPE_SUBACCOUNT"` key is bound to, as a base58
+    /// ID; `None` otherwise. The key's private channels and account reads
+    /// name this sub-account.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subaccount_id: Option<String>,
+}
+
+impl MeResult {
+    /// The account whose private channels and account reads the caller
+    /// names: the bound sub-account of a sub-account key, else
+    /// `account_id`.
+    pub fn account_channel_target(&self) -> &str {
+        self.subaccount_id.as_deref().unwrap_or(&self.account_id)
+    }
 }
 
 /// The assurance of a session, as `auth.me` reads it.

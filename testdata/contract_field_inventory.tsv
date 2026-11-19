@@ -1,5 +1,5 @@
 # Every field of the messages the 0.93.3 contract (1945423), the 0.93.4
-# contract (5c2119f) and the 0.93.5 contract added or changed that this SDK
+# contract (5c2119f), the 0.93.5 and the 0.93.6 contracts added or changed that this SDK
 # wraps: the request fields its calls set, and the reply fields its models
 # expose. A guard test walks the generated messages and fails when a field
 # is missing here or listed but gone.
@@ -13,6 +13,13 @@ auth.v1.AuthErrorDetail.code	covered	Error::Api.code / Error::auth_error_code
 auth.v1.AuthErrorDetail.message	covered	Error::Api.message
 auth.v1.AuthErrorDetail.retry_after	covered	Error::retry_at
 auth.v1.AuthErrorDetail.timestamp_window	covered	Error::TimestampSkew.window / Error::timestamp_window
+auth.v1.MeResponse.account_id	covered	MeResult.account_id
+auth.v1.MeResponse.api_key_id	covered	MeResult.api_key_id
+auth.v1.MeResponse.api_key_scope	covered	MeResult.api_key_scope
+auth.v1.MeResponse.root_smart_account_address	covered	MeResult.root_smart_account_address
+auth.v1.MeResponse.session	covered	MeResult.session
+auth.v1.MeResponse.subaccount_id	covered	MeResult.subaccount_id
+auth.v1.MeResponse.username	covered	MeResult.username
 chain.lifecycle.v1.GetAccountFlowRequest.flow_id	covered	get_account_flow(flow_id)
 chain.lifecycle.v1.GetAccountFlowRequest.subaccount_id	covered	get_account_flow(subaccount_id: SubAccountScope)
 chain.lifecycle.v1.GetAccountFlowResponse.flow	covered	LifecycleFlowSummary (from flow.summary, as get_flow)
@@ -75,16 +82,39 @@ ledger.read.v1.StatementExport.ready_at	covered	StatementExport.ready_at
 ledger.read.v1.StatementExport.start_time	covered	StatementExport.start_time
 ledger.read.v1.StatementExport.status	covered	StatementExport.status
 ledger.read.v1.StatementExport.subaccount_id	covered	StatementExport.subaccount_id
-orderbook.v1.GetOrderBookRequest.depth	covered	OrderbookService::get depth (sent as given; None sends 0, the default 50)
+orderbook.v1.GetOrderBookRequest.depth	covered	OrderbookService::get depth (sent as its DepthTier; None sends DEPTH_UNSPECIFIED, the default 50)
 orderbook.v1.GetOrderBookRequest.symbol_id	covered	OrderbookService::get symbol (resolved from the catalog)
 orderbook.v1.GetOrderBookResponse.asks	covered	OrderbookData.asks
 orderbook.v1.GetOrderBookResponse.available	covered	OrderbookData.available
 orderbook.v1.GetOrderBookResponse.bids	covered	OrderbookData.bids
 orderbook.v1.GetOrderBookResponse.book_epoch	covered	OrderbookData.book_epoch
 orderbook.v1.GetOrderBookResponse.book_seq	covered	OrderbookData.book_seq
-orderbook.v1.GetOrderBookResponse.max_depth	covered	OrderbookData.max_depth
+orderbook.v1.GetOrderBookResponse.depth	covered	OrderbookData.depth (the tier served)
 orderbook.v1.GetOrderBookResponse.symbol_id	covered	OrderbookData.symbol (the symbol the caller passed)
 orderbook.v1.GetOrderBookResponse.ts	omitted	a best-effort snapshot time, unchanged by this contract and not exposed; order snapshots by (book_epoch, book_seq)
+orders.v1.CancelAllAfterRequest.include_triggers	covered	CancelAllAfterOpts.include_triggers
+orders.v1.CancelAllAfterRequest.request_id	covered	CancelAllAfterOpts.request_id (generated when None)
+orders.v1.CancelAllAfterRequest.side	covered	CancelAllAfterOpts.side
+orders.v1.CancelAllAfterRequest.subaccount_id	covered	CancelAllAfterOpts.subaccount_id
+orders.v1.CancelAllAfterRequest.symbol_id	covered	CancelAllAfterOpts.symbol (resolved from the catalog)
+orders.v1.CancelAllAfterRequest.timeout_sec	covered	CancelAllAfterOpts.timeout_sec
+orders.v1.CancelAllOrdersRequest.dry_run	covered	CancelAllOpts.dry_run
+orders.v1.CancelAllOrdersRequest.include_triggers	covered	CancelAllOpts.include_triggers
+orders.v1.CancelAllOrdersRequest.request_id	covered	CancelAllOpts.request_id (generated when None)
+orders.v1.CancelAllOrdersRequest.side	covered	CancelAllOpts.side
+orders.v1.CancelAllOrdersRequest.subaccount_id	covered	CancelAllOpts.subaccount_id
+orders.v1.CancelAllOrdersRequest.symbol_ids	covered	CancelAllOpts.symbol / symbols / symbol_id / symbol_ids
+orders.v1.CancelAllOrdersResponse.cancelled_orders	covered	CancelAllOrdersResult.cancelled_orders
+orders.v1.CancelAllOrdersResponse.failed_cancels	covered	CancelAllOrdersResult.failed_cancels
+orders.v1.CancelAllOrdersResponse.listing_status	covered	CancelAllOrdersResult.listing_status
+orders.v1.CancelAllOrdersResponse.matched_orders	covered	CancelAllOrdersResult.matched_orders
+orders.v1.CancelAllOrdersResponse.matched_triggers	covered	CancelAllOrdersResult.matched_triggers
+orders.v1.CancelAllOrdersResponse.status	covered	CancelAllOrdersResult.status
+orders.v1.CancelAllOrdersResponse.submitted_cancels	covered	CancelAllOrdersResult.submitted_cancels
+orders.v1.CancelAllOrdersResponse.total_cancelled	covered	CancelAllOrdersResult.total_cancelled
+orders.v1.CancelAllOrdersResponse.truncated	covered	CancelAllOrdersResult.truncated
+orders.v1.CancelAllOrdersResponse.ts	omitted	the answer's time, unchanged by this contract and not exposed; each order's final state arrives on the order stream
+orders.v1.CancelAllOrdersResponse.ts_ns	omitted	the answer's time, unchanged by this contract and not exposed; each order's final state arrives on the order stream
 orders.v1.ErrorDetail.cause_code	covered	Error::cause_code
 orders.v1.ErrorDetail.code	covered	Error::Api.code / Error::RateLimit.code
 orders.v1.ErrorDetail.existing_order_id	covered	Error::existing_order_id
@@ -92,6 +122,8 @@ orders.v1.ErrorDetail.level_index	covered	Error::level_index
 orders.v1.ErrorDetail.price_band_limit_ticks	covered	OrderErrorDetail::price_band_limit (preview rejection)
 orders.v1.ErrorDetail.rate_limit	covered	Error::RateLimit.detail
 orders.v1.ErrorDetail.violations	covered	Error::violations
+polyester.api.v1.RequestErrorDetail.code	covered	Error::is_request_too_large
+polyester.api.v1.RequestErrorDetail.limit_bytes	covered	Error::request_limit_bytes
 system.v1.GetTimeResponse.server_time_ms	covered	ServerTime.server_time_ms (Client::get_time)
 transfer.v1.BatchCreateInternalTransfersRequest.idempotency_key	covered	BatchCreateInternalTransfersParams.idempotency_key
 transfer.v1.BatchCreateInternalTransfersRequest.legs	covered	BatchCreateInternalTransfersParams.legs

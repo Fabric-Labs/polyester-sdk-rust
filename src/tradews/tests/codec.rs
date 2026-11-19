@@ -17,10 +17,10 @@ use crate::tradews::sbe::{
     market_resync_reason, order_event_codec, order_status, reject_code, replace_action, side,
 };
 use crate::tradews::{
-    BatchCancelOrders, BatchCreateOrders, BatchReplaceOrders, BatchStatus, CancelAllListing,
-    CancelAllOrders, CancelItem, CancelReason, CancelledOrder, Deadline, FeeAsset, ModifyBehavior,
-    ModifyOrder, OrderRef, OrderStatus, PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItem,
-    ResyncReason, Side, TradeError,
+    BatchCancelOrders, BatchCreateOrders, BatchReplaceOrders, BatchStatus, CancelAllAfterOptions,
+    CancelAllListing, CancelAllOrders, CancelItem, CancelReason, CancelledOrder, Deadline,
+    FeeAsset, ModifyBehavior, ModifyOrder, OrderRef, OrderStatus, PostOnlyOrder, RejectCode,
+    ReplaceAction, ReplaceItem, ResyncReason, Side, TradeError,
 };
 use crate::types::{Price, Quantity, QuantityDomain};
 
@@ -276,11 +276,12 @@ fn resyncs_timer_acks_and_cancel_all_listings_decode() {
     assert_eq!(
         (
             c.matched_orders,
+            c.matched_triggers,
             c.submitted_cancels,
             c.failed_cancels,
             c.truncated
         ),
-        (2, 2, 0, false)
+        (2, 3, 2, 0, false)
     );
     assert_eq!(c.listing, CancelAllListing::Unspecified);
     assert_eq!(
@@ -323,8 +324,8 @@ fn every_short_long_or_foreign_frame_is_refused_before_a_read() {
         codec::decode(&other_version),
         Err(Error::TradeSession(TradeError::Schema {
             schema_id: 7,
-            version: 50
-        }))
+            version
+        })) if version == codec::SCHEMA_VERSION + 1
     ));
     let mut other_schema = server()[0].clone();
     other_schema[4] = 20;
@@ -448,7 +449,13 @@ fn client_frames() -> Vec<(&'static str, Vec<u8>)> {
         ),
         (
             "CancelAllAfter 10 s, every pair, 1000 ms window",
-            codec::encode_cancel_all_after(Duration::from_secs(10), 9, &deadline(1_000)).unwrap(),
+            codec::encode_cancel_all_after(
+                Duration::from_secs(10),
+                9,
+                Default::default(),
+                &deadline(1_000),
+            )
+            .unwrap(),
         ),
         ("Ping", codec::encode_ping(0)),
     ];
@@ -505,6 +512,44 @@ fn client_frames_carry_the_schema_and_the_set_seq() {
             i as u64 + 1
         );
     }
+}
+
+/// Cancel-all and the dead-man switch send includeTriggers: 0 unless the
+/// caller asks to stop triggers too, so today's behaviour is the default.
+#[test]
+fn cancel_all_and_the_switch_send_include_triggers() {
+    for include in [false, true] {
+        let mut cancel = CancelAllOrders::new(vec![PAIR]);
+        cancel.include_triggers = include;
+        let frame = codec::encode_cancel_all(&cancel, &deadline(500)).unwrap();
+        let header = sbe::message_header_codec::MessageHeaderDecoder::default()
+            .wrap(sbe::ReadBuf::new(&frame), 0);
+        let d = sbe::cancel_all_orders_codec::CancelAllOrdersDecoder::default().header(header, 0);
+        assert_eq!(
+            d.include_triggers(),
+            u8::from(include),
+            "cancel-all {include}"
+        );
+
+        let options = if include {
+            CancelAllAfterOptions::with_triggers()
+        } else {
+            CancelAllAfterOptions::default()
+        };
+        let frame =
+            codec::encode_cancel_all_after(Duration::from_secs(30), 7, options, &deadline(500))
+                .unwrap();
+        let header = sbe::message_header_codec::MessageHeaderDecoder::default()
+            .wrap(sbe::ReadBuf::new(&frame), 0);
+        let d = sbe::cancel_all_after_codec::CancelAllAfterDecoder::default().header(header, 0);
+        assert_eq!(d.include_triggers(), u8::from(include), "switch {include}");
+    }
+    assert!(!CancelAllOrders::new(vec![]).include_triggers);
+    assert!(
+        CancelAllOrders::new(vec![])
+            .with_triggers()
+            .include_triggers
+    );
 }
 
 #[test]
@@ -797,9 +842,14 @@ fn commands_the_server_would_refuse_are_refused_here() {
         Duration::from_secs(121),
         Duration::from_millis(10_500),
     ] {
-        assert!(validation(codec::encode_cancel_all_after(timeout, 1, &d)));
+        assert!(validation(codec::encode_cancel_all_after(
+            timeout,
+            1,
+            Default::default(),
+            &d
+        )));
     }
-    assert!(codec::encode_cancel_all_after(Duration::ZERO, 1, &d).is_ok());
+    assert!(codec::encode_cancel_all_after(Duration::ZERO, 1, Default::default(), &d).is_ok());
     let unchanged = ModifyOrder::new(PAIR, OrderRef::Id(ORDER));
     assert!(validation(codec::encode_modify(&unchanged, &d)));
     let mut zero_price = ModifyOrder::new(PAIR, OrderRef::Id(ORDER));

@@ -952,6 +952,7 @@ async fn managed_orderbook_overflow_terminates_receiver_callback_task_and_socket
     let http = MockHttpServer::spawn(|request| {
         if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 ..Default::default()
@@ -1053,6 +1054,7 @@ async fn orderbook_view_after_delta(
     let http = MockHttpServer::spawn(move |request| {
         if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 available: snapshot_available,
@@ -3070,6 +3072,124 @@ async fn l2_cancel_all_after_refuses_timeouts_outside_the_contract_before_sendin
             .await;
     }
     assert_eq!(*sent.lock().unwrap(), vec![0, 10, 11, 119, 120]);
+}
+
+/// Cancel-all and the dead-man switch send `include_triggers` only when
+/// asked, and cancel-all reports how many triggers matched.
+#[tokio::test]
+async fn l2_cancel_all_and_the_switch_send_include_triggers() {
+    use polyester::models::{CancelAllAfterOpts, CancelAllOpts};
+    use polyester::proto::orders::v1::{
+        CancelAllAfterRequest, CancelAllAfterResponse, CancelAllOrdersRequest,
+        CancelAllOrdersResponse, cancel_all_after_response, cancel_all_orders_response,
+    };
+
+    let sent = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
+        "/orders.v1.OrdersService/CancelAllOrders" => {
+            let request = CancelAllOrdersRequest::decode_from_slice(&req.body).unwrap();
+            seen.lock()
+                .unwrap()
+                .push(("cancel_all", request.include_triggers));
+            connect_proto_ok(&CancelAllOrdersResponse {
+                status: cancel_all_orders_response::Status::Submitted.into(),
+                matched_triggers: if request.include_triggers { 4 } else { 0 },
+                ..Default::default()
+            })
+        }
+        "/orders.v1.OrdersService/CancelAllAfter" => {
+            let request = CancelAllAfterRequest::decode_from_slice(&req.body).unwrap();
+            seen.lock().unwrap().push((
+                if request.side.as_known() == Some(polyester::proto::orders::v1::Side::SELL) {
+                    "switch sell"
+                } else {
+                    "switch"
+                },
+                request.include_triggers,
+            ));
+            connect_proto_ok(&CancelAllAfterResponse {
+                status: cancel_all_after_response::Status::Armed.into(),
+                effective_timeout_sec: request.timeout_sec,
+                ..Default::default()
+            })
+        }
+        _ => hardening_support::HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        api_key_id: Some("ak_test".into()),
+        api_private_key: Some(TEST_KEY.into()),
+        hydrate_catalogs: false,
+        ..Default::default()
+    })
+    .expect("client");
+
+    let orders_only = client
+        .orders
+        .cancel_all(None, false, SubAccountScope::Default)
+        .await
+        .expect("cancel all");
+    assert_eq!(orders_only.matched_triggers, 0);
+    let with_triggers = client
+        .orders
+        .cancel_all_with(CancelAllOpts {
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+        .expect("cancel all with triggers");
+    assert_eq!(with_triggers.matched_triggers, 4);
+
+    client
+        .orders
+        .cancel_all_after(15, None, SubAccountScope::Default, None)
+        .await
+        .expect("arm");
+    client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 15,
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+        .expect("arm with triggers");
+    client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 15,
+            side: Some("sell".into()),
+            ..Default::default()
+        })
+        .await
+        .expect("arm for one side");
+    match client
+        .orders
+        .cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec: 9,
+            include_triggers: true,
+            ..Default::default()
+        })
+        .await
+    {
+        Err(polyester::Error::Validation(message)) => {
+            assert!(message.contains("timeout_sec"), "{message}")
+        }
+        other => panic!("expected a validation error, got {other:?}"),
+    }
+
+    assert_eq!(
+        *sent.lock().unwrap(),
+        vec![
+            ("cancel_all", false),
+            ("cancel_all", true),
+            ("switch", false),
+            ("switch", true),
+            ("switch sell", false),
+        ]
+    );
 }
 
 #[tokio::test]
@@ -6565,10 +6685,12 @@ async fn l2_heatmap_paging_keeps_filters_without_a_new_window() {
                 } else {
                     GetOrderbookHeatmapRequest::decode_from_slice(&req.body).unwrap()
                 };
+                let depth = request.depth;
                 let mut seen = observed.lock().unwrap();
                 seen.push(request);
                 let response = GetOrderbookHeatmapResponse {
                     symbol_id: 1,
+                    depth,
                     last_persisted_ts_sec: 100,
                     next_page_token: if seen.len() == 1 {
                         "eyJoZWF0bWFwIjoxfQ==".into()
@@ -7419,6 +7541,7 @@ async fn ticket_8510_zero_sequence_and_availability_are_independent() {
         for available in [false, true] {
             let http = MockHttpServer::spawn(move |_| {
                 connect_proto_ok(&GetOrderBookResponse {
+                    depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                     symbol_id: 1,
                     book_seq: seq,
                     available,
@@ -7493,6 +7616,7 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
                 id
             );
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: id,
                 book_seq: 1,
                 available: true,
@@ -7552,6 +7676,7 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
     let http = MockHttpServer::spawn(move |_| {
         if count.fetch_add(1, Ordering::SeqCst) == 0 {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 // An unavailable book is requested again; every later
@@ -7611,6 +7736,7 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
         let http = MockHttpServer::spawn(move |_| {
             count.fetch_add(1, Ordering::SeqCst);
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 0,
                 available: true,
@@ -7720,6 +7846,7 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
     let http = MockHttpServer::spawn(move |_| {
         if count.fetch_add(1, Ordering::SeqCst) == 0 {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 0,
                 available: true,
@@ -8411,6 +8538,7 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
             let http = MockHttpServer::spawn(move |request| {
                 if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
                     connect_proto_ok(&GetOrderBookResponse {
+                        depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                         symbol_id: 1,
                         book_seq: 1,
                         available: true,
@@ -8546,6 +8674,7 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
                 status: 200,
                 headers: vec![("Content-Type".into(), "application/proto".into())],
                 body: GetOrderBookResponse {
+                    depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                     symbol_id: 1,
                     book_seq: 1,
                     available: true,
@@ -8652,6 +8781,7 @@ async fn l2_orderbook_reports_time_since_last_publication() {
         };
         let http = MockHttpServer::spawn(move |_| {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 available: true,
@@ -8767,6 +8897,12 @@ async fn raw_zero_delta_subscription(
         let first = reads.fetch_add(1, Ordering::SeqCst) == 0;
         let (book_seq, bid_qty, ask_qty) = if first { (1, 3, 4) } else { (2, 5, 6) };
         let body = GetOrderBookResponse {
+            // The tier the managed book rides, as asked.
+            depth: polyester::proto::orderbook::v1::GetOrderBookRequest::decode_from_slice(
+                &request.body,
+            )
+            .unwrap()
+            .depth,
             symbol_id: 1,
             book_seq,
             available: true,

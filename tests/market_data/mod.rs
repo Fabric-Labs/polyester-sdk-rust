@@ -444,3 +444,43 @@ async fn overview_subscribe_enriches_live_rows() {
         Some("0.0000025")
     );
 }
+
+// A heatmap names the depth it was read at: a reply with no tier, another
+// tier, a tier this SDK does not know, or 5000, which the heatmap refuses,
+// breaks the contract and is refused.
+#[tokio::test]
+async fn heatmap_get_refuses_a_reply_of_another_or_no_depth() {
+    use polyester::proto::polyester::r#type::v1::DepthTier;
+    for served in [
+        DepthTier::DEPTH_UNSPECIFIED.into(),
+        DepthTier::DEPTH_20.into(),
+        DepthTier::DEPTH_5000.into(),
+        buffa::EnumValue::<DepthTier>::from(99),
+    ] {
+        let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+            SPOT_CONFIG => connect_proto_ok(&spot_config()),
+            ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+            HEATMAP => connect_proto_ok(&GetOrderbookHeatmapResponse {
+                symbol_id: 1,
+                depth: served,
+                ..Default::default()
+            }),
+            _ => HttpScript::NotFound,
+        })
+        .await;
+        let client = Client::new(Config {
+            api_url: http.base_url(),
+            ws_url: "ws://127.0.0.1:9".into(),
+            hydrate_catalogs: true,
+            timeout: Duration::from_secs(2),
+            ..Default::default()
+        })
+        .unwrap();
+        client.wait_for_catalogs().await.unwrap();
+        let got = client.heatmap.get("BTC-USDT", "1m", 50, 1, "close").await;
+        assert!(
+            matches!(&got, Err(Error::ResponseContract { .. })),
+            "served {served:?}: {got:?}"
+        );
+    }
+}

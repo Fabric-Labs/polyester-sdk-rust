@@ -20,13 +20,13 @@ use crate::errors::{Error, Result};
 use crate::models::SubAccountScope;
 use crate::models::{
     AttachedRisk, BatchCancelItem, BatchCancelOrdersResult, BatchCreateOrdersResult,
-    BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterResult,
-    CancelAllOpts, CancelAllOrdersResult, CancelOrderParams, CreateOrderParams, CreateOrderType,
-    CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts, GetOrderResult, ListOpenOrdersOpts,
-    ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage, ModifyOrderParams, ModifyOrderResult,
-    Order, OrderKey, OrderMutationResult, OrderSelfTradePrevention, OrdersList, PegReference,
-    PreviewOrderParams, PreviewOrderResult, RiskLeg, TrailingDistance, TrailingStop,
-    TriggerPriceSourceKind, UserTrade, UserTradesList,
+    BatchReplaceItem, BatchReplaceOrdersResult, BatchReplaceStatusResult, CancelAllAfterOpts,
+    CancelAllAfterResult, CancelAllOpts, CancelAllOrdersResult, CancelOrderParams,
+    CreateOrderParams, CreateOrderType, CreateSide, CreateTimeInForce, FeeAsset, GetOrderOpts,
+    GetOrderResult, ListOpenOrdersOpts, ListOrderHistoryOpts, ListUserTradesOpts, MaxSlippage,
+    ModifyOrderParams, ModifyOrderResult, Order, OrderKey, OrderMutationResult,
+    OrderSelfTradePrevention, OrdersList, PegReference, PreviewOrderParams, PreviewOrderResult,
+    RiskLeg, TrailingDistance, TrailingStop, TriggerPriceSourceKind, UserTrade, UserTradesList,
 };
 use crate::proto::orders::v1::{
     BatchCancelItem as ProtoBatchCancelItem, BatchCancelOrdersRequest, BatchCreateOrdersRequest,
@@ -1735,10 +1735,10 @@ impl OrdersService {
     /// TWAPs stay live and can place new orders; a ladder stops once its
     /// levels are canceled. An attached stop-loss, take-profit or trailing leg
     /// whose working exit order is canceled ends, and with `oco` so do the
-    /// parent's other legs, so the position loses that protection. Cancel
-    /// triggers first with
-    /// [`crate::services::TriggersService::cancel`], or stop everything with
-    /// [`crate::Client::stop_all_trading`].
+    /// parent's other legs, so the position loses that protection. To stop
+    /// triggers on expiry too, arm it with
+    /// [`CancelAllAfterOpts::include_triggers`] through
+    /// [`Self::cancel_all_after_with`].
     ///
     /// `timeout_sec` is 10 to 120, or 0 to disarm the switch; any other value
     /// is a validation error before sending.
@@ -1752,6 +1752,29 @@ impl OrdersService {
         subaccount_id: SubAccountScope,
         request_id: Option<String>,
     ) -> Result<CancelAllAfterResult> {
+        self.cancel_all_after_with(CancelAllAfterOpts {
+            timeout_sec,
+            symbol: symbol.map(str::to_owned),
+            subaccount_id,
+            side: None,
+            include_triggers: false,
+            request_id,
+        })
+        .await
+    }
+
+    /// Arms, refreshes or disarms the dead-man switch, as
+    /// [`Self::cancel_all_after`] does, with every option of
+    /// [`CancelAllAfterOpts`]. With `include_triggers` the expiry also stops
+    /// the account's triggers in the switch's scope.
+    ///
+    /// `timeout_sec` is 10 to 120, or 0 to disarm the switch; any other value
+    /// is a validation error before sending.
+    pub async fn cancel_all_after_with(
+        &self,
+        opts: CancelAllAfterOpts,
+    ) -> Result<CancelAllAfterResult> {
+        let timeout_sec = opts.timeout_sec;
         if timeout_sec != 0
             && !(Self::CANCEL_ALL_AFTER_MIN_TIMEOUT_SEC..=Self::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC)
                 .contains(&timeout_sec)
@@ -1762,16 +1785,23 @@ impl OrdersService {
                 Self::CANCEL_ALL_AFTER_MAX_TIMEOUT_SEC,
             )));
         }
-        if symbol.is_some() {
+        if opts.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
-        let req = CancelAllAfterRequest {
-            subaccount_id: scope::resolve_subaccount(&self.ctx, subaccount_id)?,
+        let mut req = CancelAllAfterRequest {
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
             timeout_sec,
-            symbol_id: self.ctx.catalogs.optional_symbol_id(symbol, None)?,
-            request_id: Self::coalesce_request_id(request_id, "cancel-after")?,
+            symbol_id: self
+                .ctx
+                .catalogs
+                .optional_symbol_id(opts.symbol.as_deref(), None)?,
+            include_triggers: opts.include_triggers,
+            request_id: Self::coalesce_request_id(opts.request_id, "cancel-after")?,
             ..Default::default()
         };
+        if let Some(side) = opts.side.as_deref() {
+            req.side = Self::parse_side(side)?.into();
+        }
         let client = self.write_client();
         let resp = unary::await_auth(
             &self.ctx.factory,
@@ -1882,8 +1912,9 @@ impl OrdersService {
     /// leg whose working exit order is canceled ends, with its OCO siblings,
     /// so the position loses that protection; other attached legs keep
     /// protecting the parent's filled quantity. `matched_orders` counts
-    /// orders, never triggers. To stop all automated trading use
-    /// [`crate::Client::stop_all_trading`], which cancels the triggers first.
+    /// orders, never triggers. To stop triggers in the same request, set
+    /// [`CancelAllOpts::include_triggers`] through [`Self::cancel_all_with`];
+    /// [`crate::Client::stop_all_trading`] also stops them.
     ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value via [`Self::cancel_all_with`] when retrying the same logical bulk cancellation.
@@ -1903,6 +1934,11 @@ impl OrdersService {
     }
 
     /// Cancels all matching open orders with full options.
+    ///
+    /// With [`CancelAllOpts::include_triggers`] it also stops the account's
+    /// triggers in the same scope that were created before the request was
+    /// accepted, each ending canceled with cancel reason `cancel_all`;
+    /// [`CancelAllOrdersResult::matched_triggers`] counts them.
     ///
     /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
     /// retrying the same logical bulk cancellation.
@@ -1925,6 +1961,7 @@ impl OrdersService {
                 )?
             },
             dry_run: opts.dry_run,
+            include_triggers: opts.include_triggers,
             request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
             ..Default::default()
         };

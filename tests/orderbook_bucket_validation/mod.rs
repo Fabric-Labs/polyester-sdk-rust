@@ -52,6 +52,7 @@ async fn book_client() -> (MockHttpServer, MockWsServer, Client) {
     let http = MockHttpServer::spawn(move |request| {
         if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 available: true,

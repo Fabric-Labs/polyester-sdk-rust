@@ -3,7 +3,8 @@
 use buffa::Enumeration;
 
 use crate::errors::{Error, Result};
-use crate::proto::marketdata::v1::{HeatmapDepth, HeatmapInterval, HeatmapQuantityMode};
+use crate::proto::marketdata::v1::{HeatmapInterval, HeatmapQuantityMode};
+use crate::proto::polyester::r#type::v1::DepthTier;
 
 /// The heatmap interval for `value`: an alias (`1s`, `1m`, `5m`, `1h`) or an
 /// interval name such as `INTERVAL_1S`, in any case. Any other value, including
@@ -38,13 +39,14 @@ pub fn heatmap_interval_channel_name(value: &str) -> Result<&'static str> {
     })
 }
 
-/// Depths a heatmap can request, ascending: the `HeatmapDepth` values.
+/// Depths a heatmap can request, ascending: every depth tier but 5000, which
+/// the heatmap refuses.
 pub const HEATMAP_DEPTHS: [u32; 9] = [1, 5, 10, 20, 50, 100, 200, 500, 1000];
 
 /// The heatmap depth requested for `depth`: `depth` itself when it is a
 /// supported depth (1, 5, 10, 20, 50, 100, 200, 500, 1000), else the smallest
 /// one covering it. 0 is the default 50. A depth above 1000 is a validation error.
-pub fn heatmap_depth_for_levels(depth: u32) -> Result<HeatmapDepth> {
+pub fn heatmap_depth_for_levels(depth: u32) -> Result<DepthTier> {
     let depth = if depth == 0 { 50 } else { depth };
     let covering = HEATMAP_DEPTHS
         .into_iter()
@@ -56,15 +58,15 @@ pub fn heatmap_depth_for_levels(depth: u32) -> Result<HeatmapDepth> {
             ))
         })?;
     Ok(match covering {
-        1 => HeatmapDepth::DEPTH_1,
-        5 => HeatmapDepth::DEPTH_5,
-        10 => HeatmapDepth::DEPTH_10,
-        20 => HeatmapDepth::DEPTH_20,
-        50 => HeatmapDepth::DEPTH_50,
-        100 => HeatmapDepth::DEPTH_100,
-        200 => HeatmapDepth::DEPTH_200,
-        500 => HeatmapDepth::DEPTH_500,
-        _ => HeatmapDepth::DEPTH_1000,
+        1 => DepthTier::DEPTH_1,
+        5 => DepthTier::DEPTH_5,
+        10 => DepthTier::DEPTH_10,
+        20 => DepthTier::DEPTH_20,
+        50 => DepthTier::DEPTH_50,
+        100 => DepthTier::DEPTH_100,
+        200 => DepthTier::DEPTH_200,
+        500 => DepthTier::DEPTH_500,
+        _ => DepthTier::DEPTH_1000,
     })
 }
 
@@ -101,16 +103,13 @@ mod tests {
 
     #[test]
     fn depth_buckets() {
-        assert_eq!(heatmap_depth_for_levels(1).unwrap(), HeatmapDepth::Depth1);
-        assert_eq!(heatmap_depth_for_levels(5).unwrap(), HeatmapDepth::Depth5);
-        assert_eq!(heatmap_depth_for_levels(50).unwrap(), HeatmapDepth::Depth50);
-        assert_eq!(
-            heatmap_depth_for_levels(200).unwrap(),
-            HeatmapDepth::Depth200
-        );
+        assert_eq!(heatmap_depth_for_levels(1).unwrap(), DepthTier::Depth1);
+        assert_eq!(heatmap_depth_for_levels(5).unwrap(), DepthTier::Depth5);
+        assert_eq!(heatmap_depth_for_levels(50).unwrap(), DepthTier::Depth50);
+        assert_eq!(heatmap_depth_for_levels(200).unwrap(), DepthTier::Depth200);
         assert_eq!(
             heatmap_depth_for_levels(1000).unwrap(),
-            HeatmapDepth::Depth1000
+            DepthTier::Depth1000
         );
         assert!(heatmap_depth_for_levels(1001).is_err());
     }

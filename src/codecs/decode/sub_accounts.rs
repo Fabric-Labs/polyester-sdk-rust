@@ -137,7 +137,7 @@ pub fn get_subaccount_from_proto(msg: &GetSubaccountResponse) -> SdkResult<GetSu
             .as_option()
             .map(|policy| {
                 require_id(OPERATION, "policy.id", policy.id)?;
-                Ok(subaccount_policy_from_proto(policy))
+                subaccount_policy_from_proto(policy)
             })
             .transpose()?,
         balances: msg.balances.as_option().map(balances_list_from_proto),
@@ -315,6 +315,51 @@ mod tests {
     use super::*;
     use crate::proto::auth::v1::{ActivityEntityKind, ActivityEvent, ActivityEventAction};
     use buffa_types::google::protobuf::Timestamp;
+
+    /// The policy a sub-account read expands keeps its template lineage, and
+    /// one that names only half of it is refused.
+    #[test]
+    fn expanded_policy_keeps_and_checks_template_lineage() {
+        use crate::proto::auth::v1::{Subaccount, SubaccountPolicyView};
+        let read = |source_template_id, source_template_revision| {
+            get_subaccount_from_proto(&GetSubaccountResponse {
+                subaccount: Subaccount {
+                    id: 5,
+                    ..Default::default()
+                }
+                .into(),
+                policy: SubaccountPolicyView {
+                    id: 7,
+                    source_template_id,
+                    source_template_revision,
+                    ..Default::default()
+                }
+                .into(),
+                ..Default::default()
+            })
+        };
+        let copy = read(60, 2).unwrap().policy.unwrap();
+        let source = copy.source_template.unwrap();
+        assert_eq!(source.template_id, format_uint64_id(60));
+        assert_eq!(source.template_revision, 2);
+        assert!(
+            read(0, 0)
+                .unwrap()
+                .policy
+                .unwrap()
+                .source_template
+                .is_none()
+        );
+        for (id, revision) in [(60, 0), (0, 2)] {
+            assert!(
+                matches!(
+                    read(id, revision),
+                    Err(crate::Error::ResponseContract { .. })
+                ),
+                "{id}/{revision}"
+            );
+        }
+    }
 
     /// The account feed names each event's sub-account, actor and API key as
     /// base58 IDs, and reads 0 as absent: the main account's own event, or an

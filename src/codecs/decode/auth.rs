@@ -3,13 +3,13 @@
 use crate::codecs::decode::common::{require_id, require_str_id};
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::codecs::scalars::{format_id, format_uint64_id};
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::models::{
     AccountIdentity, MeResult, MeSession, UserProfile, UsernameHistoryEntry, UsernameHistoryList,
 };
 use crate::proto::auth::v1::{
-    AccountIdentity as ProtoAccountIdentity, GetUsernameHistoryResponse, MeResponse,
-    UserProfile as ProtoUserProfile,
+    AccountIdentity as ProtoAccountIdentity, AccountScopeType, GetUsernameHistoryResponse,
+    MeResponse, UserProfile as ProtoUserProfile,
 };
 
 fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option<i64> {
@@ -17,11 +17,24 @@ fn timestamp_ms(ts: Option<&buffa_types::google::protobuf::Timestamp>) -> Option
 }
 
 /// Decode a `Me` answer, refused with `Error::ResponseContract` without its
-/// account ID or with a session without its ID.
+/// account ID, with a session without its ID, with a sub-account key without
+/// its sub-account ID, or with a sub-account ID for any other caller.
 pub fn me_from_proto(msg: &MeResponse) -> Result<MeResult> {
     require_id("Me", "account_id", msg.account_id)?;
     if let Some(session) = msg.session.as_option() {
         require_str_id("Me", "session.session_id", &session.session_id)?;
+    }
+    let subaccount_key = msg.api_key_scope.as_known() == Some(AccountScopeType::SCOPE_SUBACCOUNT);
+    match msg.subaccount_id {
+        Some(id) if subaccount_key => require_id("Me", "subaccount_id", id)?,
+        None if subaccount_key => require_id("Me", "subaccount_id", 0)?,
+        Some(_) => {
+            return Err(Error::response_contract(
+                "Me",
+                "subaccount_id sent for a caller that is not a sub-account key",
+            ));
+        }
+        None => {}
     }
     Ok(MeResult {
         account_id: format_uint64_id(msg.account_id),
@@ -47,6 +60,9 @@ pub fn me_from_proto(msg: &MeResponse) -> Result<MeResult> {
             authentication_methods: session.authentication_methods.clone(),
             auth_time_ms: timestamp_ms(session.auth_time.as_option()),
         }),
+        api_key_scope: (msg.api_key_scope.as_known() != Some(AccountScopeType::SCOPE_UNSPECIFIED))
+            .then(|| enum_proto_name(&msg.api_key_scope)),
+        subaccount_id: msg.subaccount_id.map(format_uint64_id),
     })
 }
 
@@ -112,6 +128,74 @@ mod tests {
         );
         assert_eq!(me.username.as_deref(), Some("alice"));
         assert_eq!(me.root_smart_account_address.as_deref(), Some("0xabc"));
+    }
+
+    /// A key's scope and bound sub-account; the channel target is the
+    /// sub-account for a sub-account key and the account otherwise.
+    #[test]
+    fn me_names_the_scope_and_sub_account_of_the_key() {
+        use crate::proto::auth::v1::AccountScopeType;
+        let sub = me_from_proto(&MeResponse {
+            account_id: 42,
+            api_key_scope: AccountScopeType::SCOPE_SUBACCOUNT.into(),
+            subaccount_id: Some(60),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(sub.api_key_scope.as_deref(), Some("SCOPE_SUBACCOUNT"));
+        assert_eq!(sub.subaccount_id.as_deref(), Some("23"));
+        assert_eq!(sub.account_channel_target(), "23");
+
+        let root = me_from_proto(&MeResponse {
+            account_id: 42,
+            api_key_scope: AccountScopeType::SCOPE_ROOT.into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(root.api_key_scope.as_deref(), Some("SCOPE_ROOT"));
+        assert_eq!(root.subaccount_id, None);
+        assert_eq!(root.account_channel_target(), format_uint64_id(42));
+
+        let session = me_from_proto(&MeResponse {
+            account_id: 42,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(session.api_key_scope, None);
+        assert_eq!(session.account_channel_target(), format_uint64_id(42));
+
+        let future = me_from_proto(&MeResponse {
+            account_id: 42,
+            api_key_scope: buffa::EnumValue::from(9),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(future.api_key_scope.as_deref(), Some("UNKNOWN(9)"));
+    }
+
+    /// A sub-account key without its sub-account, a zero sub-account, or a
+    /// sub-account for any other caller breaks the contract.
+    #[test]
+    fn me_refuses_an_inconsistent_key_scope() {
+        use crate::proto::auth::v1::AccountScopeType;
+        for (scope, subaccount_id) in [
+            (AccountScopeType::SCOPE_SUBACCOUNT, None),
+            (AccountScopeType::SCOPE_SUBACCOUNT, Some(0)),
+            (AccountScopeType::SCOPE_ROOT, Some(60)),
+            (AccountScopeType::SCOPE_UNSPECIFIED, Some(60)),
+        ] {
+            let err = me_from_proto(&MeResponse {
+                account_id: 42,
+                api_key_scope: scope.into(),
+                subaccount_id,
+                ..Default::default()
+            })
+            .unwrap_err();
+            assert!(
+                matches!(err, crate::Error::ResponseContract { .. }),
+                "{scope:?} {subaccount_id:?}: {err:?}"
+            );
+        }
     }
 
     #[test]

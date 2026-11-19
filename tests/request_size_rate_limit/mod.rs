@@ -6,6 +6,7 @@ use base64::Engine as _;
 use buffa::Message as _;
 use polyester::models::RateLimitDetail;
 use polyester::proto::auth::v1::{AuthErrorCode, AuthErrorDetail};
+use polyester::proto::polyester::api::v1::{RequestErrorCode, RequestErrorDetail};
 use polyester::proto::polyester::ratelimit::v1::{
     FailureReason, LimiterScope, PolicyClass, RateLimitDetail as ProtoRateLimitDetail,
 };
@@ -100,6 +101,8 @@ fn assert_request_too_large(err: &Error) {
     // refused again.
     assert!(!err.is_retryable(), "{err:?}");
     assert!(!err.mutation_outcome_unknown(), "{err:?}");
+    // A REST 413 names no limit.
+    assert_eq!(err.request_limit_bytes(), None);
 }
 
 #[tokio::test]
@@ -397,6 +400,260 @@ async fn connect_rate_limit_detail_is_typed_retry_information() {
     assert_eq!(detail.scope, "AUTH_SUBJECT");
     assert_eq!(detail.operation_id, "auth.wallet_challenge");
     assert_eq!(err.retry_after(), Some(1.409));
+}
+
+fn connect_request_error(detail: &RequestErrorDetail) -> String {
+    json!({
+        "code": "resource_exhausted",
+        "message": "request too large",
+        "details": [{
+            "type": "polyester.api.v1.RequestErrorDetail",
+            "value": base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec()),
+        }],
+    })
+    .to_string()
+}
+
+/// A ConnectRPC `resource_exhausted` with `RequestErrorDetail`
+/// `REQUEST_TOO_LARGE` is the final size refusal, never a rate limit: it
+/// names the limit, is sent once, and a Retry-After on it changes nothing.
+#[tokio::test]
+async fn connect_request_too_large_detail_is_the_final_size_refusal() {
+    for (limit_bytes, want) in [(4_194_304, Some(4_194_304)), (1, Some(1))] {
+        let body = connect_request_error(&RequestErrorDetail {
+            code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+            limit_bytes,
+            ..Default::default()
+        });
+        let sent = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let seen = sent.clone();
+        let http = MockHttpServer::spawn(move |_| {
+            seen.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            response(429, JSON, &body, &[("Retry-After", "1")])
+        })
+        .await;
+        let err = api_key_client(&http).auth.me().await.expect_err("refused");
+        assert!(
+            matches!(&err, Error::Api { code, .. } if code == polyester::problem_codes::REQUEST_TOO_LARGE),
+            "{err:?}"
+        );
+        assert!(err.is_request_too_large());
+        assert_eq!(err.request_limit_bytes(), want);
+        assert!(!err.is_retryable(), "{err:?}");
+        assert!(!err.mutation_outcome_unknown(), "{err:?}");
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+}
+
+/// A size refusal without the limit it is over breaks the contract, which
+/// sets `limit_bytes` for `REQUEST_TOO_LARGE`: it fails closed as a contract
+/// error, never as a plain final size refusal.
+#[tokio::test]
+async fn connect_request_too_large_without_its_limit_fails_closed() {
+    let body = connect_request_error(&RequestErrorDetail {
+        code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+        ..Default::default()
+    });
+    let err = me_error(move || response(429, JSON, &body, &[])).await;
+    assert!(matches!(&err, Error::ResponseContract { .. }), "{err:?}");
+    assert!(!err.is_request_too_large());
+    assert!(!err.is_retryable());
+}
+
+/// Only the exact `polyester.api.v1.RequestErrorDetail` type (bare, or with
+/// the standard `type.googleapis.com/` prefix) is the size detail: a type
+/// whose name merely ends the same way is not.
+#[tokio::test]
+async fn only_the_exact_size_detail_type_is_read() {
+    let detail = RequestErrorDetail {
+        code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+        limit_bytes: 1024,
+        ..Default::default()
+    };
+    let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec());
+    for (type_name, sized) in [
+        ("polyester.api.v1.RequestErrorDetail", true),
+        (
+            "type.googleapis.com/polyester.api.v1.RequestErrorDetail",
+            true,
+        ),
+        ("evilpolyester.api.v1.RequestErrorDetail", false),
+        ("other.polyester.api.v1.RequestErrorDetail", false),
+        ("example.com/x/polyester.api.v1.RequestErrorDetail", false),
+    ] {
+        let body = json!({
+            "code": "resource_exhausted",
+            "message": "request too large",
+            "details": [{"type": type_name, "value": value}],
+        })
+        .to_string();
+        let err = me_error(move || response(429, JSON, &body, &[])).await;
+        assert_eq!(err.is_request_too_large(), sized, "{type_name}: {err:?}");
+        if !sized {
+            assert!(
+                matches!(&err, Error::RateLimit { .. }),
+                "{type_name}: {err:?}"
+            );
+        }
+    }
+}
+
+/// Only the typed detail makes `resource_exhausted` a size refusal: without
+/// it, or with a code that is not `REQUEST_TOO_LARGE`, it stays a rate limit,
+/// whatever the message says.
+#[tokio::test]
+async fn resource_exhausted_without_the_size_detail_stays_a_rate_limit() {
+    let bodies = [
+        connect_request_error(&RequestErrorDetail {
+            code: RequestErrorCode::CODE_UNSPECIFIED.into(),
+            limit_bytes: 1024,
+            ..Default::default()
+        }),
+        connect_request_error(&RequestErrorDetail {
+            code: buffa::EnumValue::from(99),
+            ..Default::default()
+        }),
+        r#"{"code":"resource_exhausted","message":"REQUEST_TOO_LARGE"}"#.to_owned(),
+    ];
+    for body in bodies {
+        let err = me_error(move || response(429, JSON, &body, &[])).await;
+        assert!(matches!(&err, Error::RateLimit { .. }), "{err:?}");
+        assert!(!err.is_request_too_large());
+        assert_eq!(err.request_limit_bytes(), None);
+    }
+}
+
+/// Trading reads share the root account's `TRADING_READ` limit: a refusal is
+/// the same `Error::RateLimit` an order placement raises, with its detail and
+/// delay, and the SDK sends the read once, leaving the wait to the caller.
+#[tokio::test]
+async fn trading_reads_over_the_read_limit_are_rate_limits() {
+    use polyester::models::SubAccountScope;
+    use polyester::proto::triggers::v1::GetTriggerRequest;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let detail = ProtoRateLimitDetail {
+        reason: FailureReason::QUOTA_EXCEEDED.into(),
+        limit: Some(200),
+        remaining: Some(0),
+        retry_after_ms: Some(250),
+        policy_version: Some(7),
+        operation_id: "orders.read".into(),
+        policy_class: PolicyClass::TRADING_READ.into(),
+        scope: LimiterScope::ACCOUNT.into(),
+        ..Default::default()
+    };
+    let body = json!({
+        "code": "resource_exhausted",
+        "message": "rate limit exceeded",
+        "details": [{
+            "type": "polyester.ratelimit.v1.RateLimitDetail",
+            "value": base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec()),
+        }],
+    })
+    .to_string();
+    let sent = std::sync::Arc::new(AtomicUsize::new(0));
+    let seen = sent.clone();
+    let http = MockHttpServer::spawn(move |_| {
+        seen.fetch_add(1, Ordering::SeqCst);
+        response(429, JSON, &body, &[("Retry-After", "1")])
+    })
+    .await;
+    let client = api_key_client(&http);
+
+    let refusals: Vec<(&str, Error)> = vec![
+        (
+            "GetOpenOrders",
+            client
+                .orders
+                .list_open(SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetOrderHistory",
+            client
+                .orders
+                .list_history_with(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetUserTrades",
+            client
+                .trades
+                .list_with(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetBatchReplaceStatus",
+            client
+                .orders
+                .get_batch_replace_status("23", SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetTrigger",
+            client
+                .triggers
+                .get(GetTriggerRequest {
+                    trigger_id: 7,
+                    ..Default::default()
+                })
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "ListTriggers",
+            client
+                .triggers
+                .list(Default::default())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetTradingRateLimits",
+            client
+                .rate_limits
+                .get_trading_rate_limits(SubAccountScope::Default)
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+        (
+            "GetSpotFeeRates",
+            client
+                .fees
+                .get_spot_fee_rates(SubAccountScope::Default, Vec::new())
+                .await
+                .map(drop)
+                .unwrap_err(),
+        ),
+    ];
+    for (read, err) in &refusals {
+        let Error::RateLimit {
+            detail: Some(detail),
+            ..
+        } = err
+        else {
+            panic!("{read}: {err:?}");
+        };
+        assert_eq!(detail.policy_class, "TRADING_READ", "{read}");
+        assert_eq!(detail.scope, "ACCOUNT", "{read}");
+        assert_eq!(detail.policy_version, Some(7), "{read}");
+        assert_eq!(err.retry_after(), Some(0.25), "{read}");
+        assert!(err.is_retryable(), "{read}");
+        assert!(!err.is_request_too_large(), "{read}");
+    }
+    assert_eq!(sent.load(Ordering::SeqCst), refusals.len());
 }
 
 const WALLET_LINKED: &str = "this wallet is already linked to another account; log in with the account address it already uses";

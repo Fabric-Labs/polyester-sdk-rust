@@ -189,12 +189,12 @@ pub fn subaccount_from_bytes(payload: &[u8]) -> Result<SubAccount> {
 
 pub fn subaccount_policy_from_bytes(payload: &[u8]) -> Result<SubaccountPolicy> {
     let msg = decode_proto::<SubaccountPolicyView>(payload)?;
-    Ok(subaccount_policy_from_proto(&msg))
+    subaccount_policy_from_proto(&msg)
 }
 
 pub fn api_policy_from_bytes(payload: &[u8]) -> Result<ApiPolicy> {
     let msg = decode_proto::<ApiPolicyView>(payload)?;
-    Ok(api_policy_from_proto(&msg))
+    api_policy_from_proto(&msg)
 }
 
 pub fn address_book_invalidation_from_bytes(payload: &[u8]) -> Result<AddressBookViewInvalidation> {
@@ -465,6 +465,71 @@ mod tests {
         assert_eq!(policy.policy_id, format_uint64_id(7));
         assert_eq!(policy.name, "trader");
         assert_eq!(policy.revision, 3);
+    }
+
+    /// Both policy streams keep a template's flag and a copy's lineage, the
+    /// template and its revision; one without the other breaks the contract.
+    #[test]
+    fn policy_streams_keep_and_check_template_lineage() {
+        use crate::models::PolicyTemplateSource;
+        use crate::proto::auth::v1::{ApiPolicyView, SubaccountPolicyView};
+
+        let copy = PolicyTemplateSource {
+            template_id: format_uint64_id(60),
+            template_revision: 3,
+        };
+        let api = |is_template, source_template_id, source_template_revision| {
+            api_policy_from_bytes(
+                &ApiPolicyView {
+                    id: 9,
+                    is_template,
+                    source_template_id,
+                    source_template_revision,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )
+        };
+        let sub = |is_template, source_template_id, source_template_revision| {
+            subaccount_policy_from_bytes(
+                &SubaccountPolicyView {
+                    id: 7,
+                    is_template,
+                    source_template_id,
+                    source_template_revision,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )
+        };
+
+        let api_copy = api(false, 60, 3).unwrap();
+        assert_eq!(api_copy.source_template, Some(copy.clone()));
+        assert!(!api_copy.is_template);
+        let api_template = api(true, 0, 0).unwrap();
+        assert!(api_template.is_template);
+        assert_eq!(api_template.source_template, None);
+        let sub_copy = sub(false, 60, 3).unwrap();
+        assert_eq!(sub_copy.source_template, Some(copy));
+        assert!(sub(true, 0, 0).unwrap().is_template);
+        assert_eq!(sub(false, 0, 0).unwrap().source_template, None);
+
+        for (id, revision) in [(60, 0), (0, 3)] {
+            assert!(
+                matches!(
+                    api(false, id, revision),
+                    Err(Error::ResponseContract { .. })
+                ),
+                "api {id}/{revision}"
+            );
+            assert!(
+                matches!(
+                    sub(false, id, revision),
+                    Err(Error::ResponseContract { .. })
+                ),
+                "sub {id}/{revision}"
+            );
+        }
     }
 
     #[test]

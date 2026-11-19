@@ -4,7 +4,8 @@ use crate::codecs::decode::common::require_id;
 use crate::codecs::scalars::format_uint64_id;
 use crate::errors::{Error, Result};
 use crate::models::{
-    ApiPoliciesList, ApiPolicy, SpotMarketRule, SubaccountPoliciesList, SubaccountPolicy,
+    ApiPoliciesList, ApiPolicy, PolicyTemplateSource, SpotMarketRule, SubaccountPoliciesList,
+    SubaccountPolicy,
 };
 use crate::proto::auth::v1::{
     ApiPolicyView, CreateApiPolicyResponse, CreateSubaccountPolicyResponse, GetApiPolicyResponse,
@@ -41,8 +42,33 @@ fn spot_market_rule_from_proto(msg: &ProtoSpotMarketRule) -> SpotMarketRule {
     }
 }
 
-pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPolicy {
-    SubaccountPolicy {
+/// A copy's template lineage: `None` when the policy is no copy (both 0),
+/// refused with `Error::ResponseContract` when only one half is set.
+fn template_source(
+    operation: &str,
+    template_id: u64,
+    template_revision: u64,
+) -> Result<Option<PolicyTemplateSource>> {
+    match (template_id, template_revision) {
+        (0, 0) => Ok(None),
+        (0, _) | (_, 0) => Err(Error::response_contract(
+            operation,
+            format!(
+                "incomplete template lineage: source_template_id {template_id}, \
+                 source_template_revision {template_revision}"
+            ),
+        )),
+        (id, revision) => Ok(Some(PolicyTemplateSource {
+            template_id: format_uint64_id(id),
+            template_revision: revision,
+        })),
+    }
+}
+
+/// Decode a sub-account policy, refused with `Error::ResponseContract` when
+/// its template lineage names a template without its revision or the reverse.
+pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> Result<SubaccountPolicy> {
+    Ok(SubaccountPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
@@ -57,7 +83,13 @@ pub fn subaccount_policy_from_proto(msg: &SubaccountPolicyView) -> SubaccountPol
         trading_halted: msg.trading_halted,
         revision: msg.revision,
         actions: policy_actions(&msg.actions),
-    }
+        is_template: msg.is_template,
+        source_template: template_source(
+            "SubaccountPolicy",
+            msg.source_template_id,
+            msg.source_template_revision,
+        )?,
+    })
 }
 
 /// A sub-account policy read or written, refused with `Error::ResponseContract`
@@ -68,7 +100,7 @@ fn required_subaccount_policy(
 ) -> Result<SubaccountPolicy> {
     let policy = policy.ok_or_else(|| Error::response_contract(operation, "missing policy"))?;
     require_id(operation, "policy id", policy.id)?;
-    Ok(subaccount_policy_from_proto(policy))
+    subaccount_policy_from_proto(policy)
 }
 
 pub fn subaccount_policies_list_from_proto(
@@ -101,8 +133,10 @@ pub fn update_subaccount_policy_from_proto(
     required_subaccount_policy("UpdateSubaccountPolicy", msg.policy.as_option())
 }
 
-pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
-    ApiPolicy {
+/// Decode an API key policy, refused with `Error::ResponseContract` when its
+/// template lineage names a template without its revision or the reverse.
+pub fn api_policy_from_proto(msg: &ApiPolicyView) -> Result<ApiPolicy> {
+    Ok(ApiPolicy {
         policy_id: format_uint64_id(msg.id),
         name: msg.name.clone(),
         description: msg.description.clone(),
@@ -114,7 +148,13 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
         spot_market_scope: market_scope_label(&msg.spot_market_scope),
         revision: msg.revision,
         actions: policy_actions(&msg.actions),
-    }
+        is_template: msg.is_template,
+        source_template: template_source(
+            "ApiPolicy",
+            msg.source_template_id,
+            msg.source_template_revision,
+        )?,
+    })
 }
 
 /// An API policy read or written, refused with `Error::ResponseContract` when
@@ -122,7 +162,7 @@ pub fn api_policy_from_proto(msg: &ApiPolicyView) -> ApiPolicy {
 fn required_api_policy(operation: &str, policy: Option<&ApiPolicyView>) -> Result<ApiPolicy> {
     let policy = policy.ok_or_else(|| Error::response_contract(operation, "missing policy"))?;
     require_id(operation, "policy id", policy.id)?;
-    Ok(api_policy_from_proto(policy))
+    api_policy_from_proto(policy)
 }
 
 pub fn api_policies_list_from_proto(msg: &ListApiPoliciesResponse) -> Result<ApiPoliciesList> {
@@ -243,7 +283,8 @@ mod tests {
                 .map(|(action, _, _)| (*action).into())
                 .collect(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let names: Vec<&str> = added.iter().map(|(_, name, _)| *name).collect();
         assert_eq!(api.actions, names);
         for (action, name, number) in added {
@@ -268,11 +309,13 @@ mod tests {
         let api = api_policy_from_proto(&ApiPolicyView {
             actions: actions.clone(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
             actions,
             ..Default::default()
-        });
+        })
+        .unwrap();
         for decoded in [&api.actions, &sub.actions] {
             assert_eq!(decoded, &["READ_PRICE_ALERTS", "MANAGE_PRICE_ALERTS"]);
         }
@@ -293,7 +336,8 @@ mod tests {
                 PolicyAction::READ_ACCOUNT_ACTIVITY.into(),
             ],
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(api.actions, ["READ_NOTIFICATIONS", "READ_ACCOUNT_ACTIVITY"]);
         assert_eq!(PolicyAction::READ_NOTIFICATIONS.to_i32(), 41);
         assert_eq!(PolicyAction::READ_ACCOUNT_ACTIVITY.to_i32(), 42);
@@ -313,11 +357,13 @@ mod tests {
         let api = api_policy_from_proto(&ApiPolicyView {
             actions: actions.clone(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
             actions,
             ..Default::default()
-        });
+        })
+        .unwrap();
         for decoded in [&api.actions, &sub.actions] {
             assert_eq!(decoded, &["READ_BALANCES", "READ_STATEMENTS"]);
         }
@@ -342,11 +388,13 @@ mod tests {
         let api = api_policy_from_proto(&ApiPolicyView {
             actions: actions.clone(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
             actions,
             ..Default::default()
-        });
+        })
+        .unwrap();
         for decoded in [&api.actions, &sub.actions] {
             assert_eq!(decoded, &["CONVERT_DUST", "READ_FUNDING_FLOWS"]);
         }
@@ -393,11 +441,13 @@ mod tests {
         let api = api_policy_from_proto(&ApiPolicyView {
             actions: actions.clone(),
             ..Default::default()
-        });
+        })
+        .unwrap();
         let sub = subaccount_policy_from_proto(&SubaccountPolicyView {
             actions,
             ..Default::default()
-        });
+        })
+        .unwrap();
         for decoded in [&api.actions, &sub.actions] {
             assert_eq!(decoded.len(), known.len() + 1, "{decoded:?}");
             for (name, action) in decoded.iter().zip(&known) {

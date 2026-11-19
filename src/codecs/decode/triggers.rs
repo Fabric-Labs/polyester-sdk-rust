@@ -1853,6 +1853,32 @@ mod tests {
     }
 
     #[test]
+    fn trigger_stops_from_cancel_all_carry_their_reasons() {
+        let canceled = trigger_from_proto(&ProtoTrigger {
+            trigger_id: 5,
+            terminal_reason: Some(trigger::TerminalReason::CancelReason(
+                TriggerCancelReason::TRIGGER_CANCEL_REASON_CANCEL_ALL.into(),
+            )),
+            ..Default::default()
+        });
+        assert_eq!(canceled.cancel_reason, "cancel_all");
+        // A fire refused while the trigger was being stopped placed nothing;
+        // the trigger then ends canceled `cancel_all`.
+        let refused = trigger_event_from_proto(&ProtoTriggerEvent {
+            trigger_id: 6,
+            trigger_type: TriggerType::StopLoss.into(),
+            event_type: TriggerEventType::EventFireRefused.into(),
+            fire_refusal_reason: Some(
+                TriggerFailureReason::TRIGGER_FAILURE_REASON_TRIGGER_STOPPING.into(),
+            ),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(refused.fire_refusal_reason, "trigger_stopping");
+        assert!(refused.cancel_reason.is_empty() && refused.failure_reason.is_empty());
+    }
+
+    #[test]
     fn trigger_terminal_reasons_map_oneof_and_unspecified_is_empty() {
         let canceled = trigger_from_proto(&ProtoTrigger {
             trigger_id: 5,

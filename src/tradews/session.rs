@@ -47,10 +47,10 @@ use tokio_tungstenite::{WebSocketStream, client_async_with_config};
 use super::codec::{self, Answer, CHANNELS, Msg};
 use super::{
     BatchCancelAck, BatchCancelOrders, BatchCreateAck, BatchCreateOrders, BatchReplaceAck,
-    BatchReplaceOrders, CancelAllAck, CancelAllOrders, Command, Deadline, Event,
-    MAX_CANCEL_ON_DISCONNECT_GRACE, MIN_CANCEL_ON_DISCONNECT_GRACE, ModifyOrder, NotSent, OrderAck,
-    OrderRef, PATH, PostOnlyOrder, Reject, RejectCode, TimerAck, TradeError, from_unix_ns,
-    new_correlation_id, not_sent, unix_ms,
+    BatchReplaceOrders, CancelAllAck, CancelAllAfterOptions, CancelAllOrders, Command, Deadline,
+    Event, MAX_CANCEL_ON_DISCONNECT_GRACE, MIN_CANCEL_ON_DISCONNECT_GRACE, ModifyOrder, NotSent,
+    OrderAck, OrderRef, PATH, PostOnlyOrder, Reject, RejectCode, TimerAck, TradeError,
+    from_unix_ns, new_correlation_id, not_sent, unix_ms,
 };
 use crate::auth::Credentials;
 use crate::errors::{Error, Result};
@@ -467,6 +467,18 @@ impl TradeSession {
         self.sender.cancel_all_after(timeout, deadline).await
     }
 
+    /// [`TradeSender::cancel_all_after_with`].
+    pub async fn cancel_all_after_with(
+        &self,
+        timeout: Duration,
+        options: CancelAllAfterOptions,
+        deadline: Deadline,
+    ) -> Result<TimerAck> {
+        self.sender
+            .cancel_all_after_with(timeout, options, deadline)
+            .await
+    }
+
     /// [`TradeSender::batch_create_orders`].
     pub async fn batch_create_orders(
         &self,
@@ -722,8 +734,21 @@ impl TradeSender {
         timeout: Duration,
         deadline: Deadline,
     ) -> Result<TimerAck> {
+        self.cancel_all_after_with(timeout, CancelAllAfterOptions::default(), deadline)
+            .await
+    }
+
+    /// [`Self::cancel_all_after`] with options: with
+    /// [`CancelAllAfterOptions::include_triggers`], an expiry also stops the
+    /// account's waiting triggers created before it.
+    pub async fn cancel_all_after_with(
+        &self,
+        timeout: Duration,
+        options: CancelAllAfterOptions,
+        deadline: Deadline,
+    ) -> Result<TimerAck> {
         let correlation_id = new_correlation_id();
-        let frame = codec::encode_cancel_all_after(timeout, correlation_id, &deadline)?;
+        let frame = codec::encode_cancel_all_after(timeout, correlation_id, options, &deadline)?;
         match self
             .call_timer(
                 Command::CancelAllAfter,

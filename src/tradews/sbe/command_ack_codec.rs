@@ -7,7 +7,7 @@ pub use super::SBE_SCHEMA_ID;
 pub use super::SBE_SCHEMA_VERSION;
 pub use super::SBE_SEMANTIC_VERSION;
 
-pub const SBE_BLOCK_LENGTH: u16 = 67;
+pub const SBE_BLOCK_LENGTH: u16 = 71;
 pub const SBE_TEMPLATE_ID: u16 = 20;
 
 pub mod encoder {
@@ -242,6 +242,21 @@ pub mod encoder {
         pub fn listing_status(&mut self, value: cancel_all_listing_status::CancelAllListingStatus) {
             let offset = self.offset + 66;
             self.get_buf_mut().put_u8_at(offset, value as u8)
+        }
+
+        /// primitive field 'matchedTriggers'
+        /// - min value: 1
+        /// - max value: 4294967294
+        /// - null value: 0x0_u32
+        /// - characterEncoding: null
+        /// - semanticType: null
+        /// - encodedOffset: 67
+        /// - encodedLength: 4
+        /// - version: 50
+        #[inline]
+        pub fn matched_triggers(&mut self, value: u32) {
+            let offset = self.offset + 67;
+            self.get_buf_mut().put_u32_at(offset, value);
         }
 
         /// GROUP ENCODER (id=13, description='For non-dry-run CANCEL_ALL_ORDERS, the orders whose cancellation was requested, at most 200, oldest first (the order in which they were created); when more were cancelled, the 200 oldest. Each order reports its final state in order events; empty for other commands and for a dry run. Resending the same correlationId and criteria within 120 seconds returns the original counts and timestamp without a listing, with listingStatus NOT_RETAINED_READ_OPEN_ORDERS, and requests no new cancellations')
@@ -555,6 +570,17 @@ pub mod decoder {
             self.get_buf().get_u8_at(self.offset + 66).into()
         }
 
+        /// primitive field - 'OPTIONAL' { null_value: '0x0_u32' }
+        #[inline]
+        pub fn matched_triggers(&self) -> Option<u32> {
+            if self.acting_version() < 50 {
+                return None;
+            }
+
+            let value = self.get_buf().get_u32_at(self.offset + 67);
+            if value == 0x0_u32 { None } else { Some(value) }
+        }
+
         /// GROUP DECODER (id=13, description='For non-dry-run CANCEL_ALL_ORDERS, the orders whose cancellation was requested, at most 200, oldest first (the order in which they were created); when more were cancelled, the 200 oldest. Each order reports its final state in order events; empty for other commands and for a dry run. Resending the same correlationId and criteria within 120 seconds returns the original counts and timestamp without a listing, with listingStatus NOT_RETAINED_READ_OPEN_ORDERS, and requests no new cancellations')
         #[inline]
         pub fn cancelled_orders_decoder(self) -> Option<CancelledOrdersDecoder<Self>> {
@@ -630,7 +656,7 @@ pub mod decoder {
             self
         }
 
-        /// group token - Token{signal=BEGIN_GROUP, name='cancelledOrders', referencedName='null', description='For non-dry-run CANCEL_ALL_ORDERS, the orders whose cancellation was requested, at most 200, oldest first (the order in which they were created); when more were cancelled, the 200 oldest. Each order reports its final state in order events; empty for other commands and for a dry run. Resending the same correlationId and criteria within 120 seconds returns the original counts and timestamp without a listing, with listingStatus NOT_RETAINED_READ_OPEN_ORDERS, and requests no new cancellations', packageName='null', id=13, version=27, deprecated=0, encodedLength=8, offset=67, componentTokenCount=15, encoding=Encoding{presence=REQUIRED, primitiveType=null, byteOrder=LITTLE_ENDIAN, minValue=null, maxValue=null, nullValue=null, constValue=null, characterEncoding='null', epoch='null', timeUnit=null, semanticType='null'}}
+        /// group token - Token{signal=BEGIN_GROUP, name='cancelledOrders', referencedName='null', description='For non-dry-run CANCEL_ALL_ORDERS, the orders whose cancellation was requested, at most 200, oldest first (the order in which they were created); when more were cancelled, the 200 oldest. Each order reports its final state in order events; empty for other commands and for a dry run. Resending the same correlationId and criteria within 120 seconds returns the original counts and timestamp without a listing, with listingStatus NOT_RETAINED_READ_OPEN_ORDERS, and requests no new cancellations', packageName='null', id=13, version=27, deprecated=0, encodedLength=8, offset=71, componentTokenCount=15, encoding=Encoding{presence=REQUIRED, primitiveType=null, byteOrder=LITTLE_ENDIAN, minValue=null, maxValue=null, nullValue=null, constValue=null, characterEncoding='null', epoch='null', timeUnit=null, semanticType='null'}}
         #[inline]
         pub fn parent(&mut self) -> SbeResult<P> {
             self.parent.take().ok_or(SbeErr::ParentNotSet)
