@@ -1612,12 +1612,15 @@ fn on_message(
             emit_or_exit(events, Event::OcoAck(ack))
         }
         Msg::Unknown { template_id } => {
+            // Logged only, never queued: a skipped message takes none of the
+            // bounded event queue, so however many arrive they cannot
+            // overflow it and end the session.
             tracing::debug!(
                 template_id,
                 connection = conn.number,
                 "tradews skipped a message of a template this client does not know"
             );
-            emit_or_exit(events, Event::Unknown { template_id })
+            None
         }
     }
 }

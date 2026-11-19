@@ -2638,9 +2638,11 @@ good-till-cancelled limit orders.
   and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
   (reconcile the pair through the Orders API). The schema adds messages
   without changing its version: a message of a template this client does not
-  know is skipped and reported as `Event::Unknown { template_id }`, and the
+  know is skipped and logged at debug level, never queued as an event, and the
   connection carries on. `Event` and the other `tradews` enums that grow are
-  `#[non_exhaustive]`, so match them with a `_ =>` arm.
+  `#[non_exhaustive]`, so match them with a `_ =>` arm; the acks, refusals and
+  event payloads the session decodes are `#[non_exhaustive]` structs, so
+  destructure them with `..`.
 
 - **Concurrency.** `TradeSession::split` divides a session into a
   `TradeSender` and a `TradeEvents`, as a WebSocket stream splits into its

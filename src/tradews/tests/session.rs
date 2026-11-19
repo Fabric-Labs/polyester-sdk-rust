@@ -1573,7 +1573,7 @@ async fn unknown_templates_and_oco_acks_keep_the_connection_and_its_commands() {
         .expect("answered");
 
     let mut seen = Vec::new();
-    while seen.len() < 3 + 4 * 3 {
+    while seen.len() < 2 + 4 {
         let event = wait(&mut session, |e| {
             (!matches!(e, Event::Pong { .. })).then(|| e.clone())
         })
@@ -1583,7 +1583,6 @@ async fn unknown_templates_and_oco_acks_keep_the_connection_and_its_commands() {
             "{event:?}"
         );
         seen.push(match event {
-            Event::Unknown { template_id } => format!("unknown {template_id}"),
             Event::Order(o) => format!("order {}", o.order_id),
             Event::OcoAck(ack) => {
                 assert_eq!(ack.order_list_id, super::codec::ORDER);
@@ -1592,22 +1591,47 @@ async fn unknown_templates_and_oco_acks_keep_the_connection_and_its_commands() {
             other => panic!("{other:?}"),
         });
     }
-    let mut want = vec![
-        "unknown 32".to_string(),
-        "order 11".into(),
-        "oco 77 Cancel".into(),
-    ];
-    for _ in 0..4 {
-        want.extend([
-            "unknown 32".into(),
-            "oco 78 Create".into(),
-            "unknown 99".into(),
-        ]);
-    }
+    // The unknown messages are skipped without an event.
+    let mut want = vec!["order 11".to_string(), "oco 77 Cancel".into()];
+    want.extend(std::iter::repeat_n("oco 78 Create".to_string(), 4));
     assert_eq!(seen, want);
     let all = record.lock().unwrap().clone();
     assert_eq!(all.len(), 1, "one connection");
     assert!(session.is_alive());
+}
+
+#[tokio::test]
+async fn unknown_templates_never_fill_the_event_queue() {
+    use super::codec::unknown;
+    // More unknown messages than the queue holds, while a cancel waits for
+    // its answer and nothing reads the events.
+    let script = Script {
+        before_answer: (0..5).map(|i| unknown(32 + i)).collect(),
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![script]).await;
+    let mut config = config(url);
+    config.queue_size = 2;
+    // No pongs to fill the queue meanwhile.
+    config.ping_interval = Duration::from_secs(30);
+    let mut session = connect(config).await.unwrap();
+    ready_on(&mut session, 1).await;
+    for id in [1, 2] {
+        let ack = tokio::time::timeout(
+            WAIT,
+            session.cancel_order(7, &OrderRef::Id(id), within(1_000)),
+        )
+        .await
+        .expect("answered in time")
+        .expect("answered");
+        assert!(ack.order_id.is_some());
+    }
+    assert!(session.is_alive(), "{:?}", session.err());
+    assert!(session.err().is_none(), "{:?}", session.err());
+    assert_eq!(record.lock().unwrap().len(), 1, "one connection");
+    // Nothing of the skipped messages was queued.
+    let queued = tokio::time::timeout(Duration::from_millis(200), session.recv()).await;
+    assert!(queued.is_err(), "{queued:?}");
 }
 
 #[tokio::test]

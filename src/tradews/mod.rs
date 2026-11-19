@@ -41,8 +41,8 @@
 //! schema with Real Logic's sbe-tool; a message of another schema or version is
 //! refused ([`TradeError::Schema`]), never misread. The schema adds messages
 //! without changing its version, so a message of a template this client does
-//! not know is skipped and reported ([`Event::Unknown`]), and the connection
-//! carries on.
+//! not know is skipped: it is logged at debug level, never queued as an event,
+//! and the connection and its commands in flight carry on.
 
 mod codec;
 #[allow(dead_code, unused_imports, unused_mut, clippy::all)]
@@ -641,6 +641,7 @@ impl OrderStatus {
 /// per order and ignore older or repeated ones; after a gap, read the order's
 /// state from the Orders API.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OrderUpdate {
     pub symbol_id: u32,
     pub order_id: u64,
@@ -671,6 +672,7 @@ pub enum FeeAsset {
 /// arrive first unsettled and later settled: identify it by `symbol_id`,
 /// `match_id` and `order_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Execution {
     pub symbol_id: u32,
     pub match_id: u64,
@@ -703,6 +705,7 @@ pub enum ResyncReason {
 /// read the pair's orders and executions from the Orders API, then apply the
 /// later events, which may repeat state the read returned.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct MarketResync {
     pub symbol_id: u32,
     pub reason: ResyncReason,
@@ -758,20 +761,12 @@ pub enum Event {
     /// session and is reported as it arrives. One that names a command this
     /// connection has in flight is a wrong answer and ends the connection.
     OcoAck(OcoAck),
-    /// A message of a template this client does not know, skipped. A newer
-    /// server may send one, as the schema adds templates without changing its
-    /// version; the connection carries on and the commands in flight keep
-    /// waiting for their answers. A command answered only by such a message
-    /// is left unanswered, and ends the connection with an unknown outcome
-    /// after [`Config::answer_timeout`].
-    Unknown {
-        template_id: u16,
-    },
 }
 
 /// A single-order acknowledgement: the server accepted the command, and order
 /// events report what follows.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OrderAck {
     pub correlation_id: u64,
     /// The order the command created, cancelled or modified; for a modify
@@ -797,12 +792,14 @@ pub enum CancelAllListing {
 
 /// An order whose cancellation a cancel-all requested.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CancelledOrder {
     pub order_id: u64,
     pub client_order_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CancelAllAck {
     pub correlation_id: u64,
     /// Open orders that matched.
@@ -822,6 +819,7 @@ pub struct CancelAllAck {
 
 /// The account's cancel-all-after timer after a [`TradeSession::cancel_all_after`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TimerAck {
     pub correlation_id: u64,
     pub armed: bool,
@@ -834,6 +832,7 @@ pub struct TimerAck {
 
 /// One batch create or batch cancel item's result, in request order.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchItem {
     pub accepted: bool,
     /// The refusal of an item not accepted.
@@ -855,6 +854,7 @@ impl BatchItem {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchCreateAck {
     pub correlation_id: u64,
     pub items: Vec<BatchItem>,
@@ -864,6 +864,7 @@ pub struct BatchCreateAck {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchCancelAck {
     pub correlation_id: u64,
     pub items: Vec<BatchItem>,
@@ -883,6 +884,7 @@ pub enum ReplaceAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ReplaceItemResult {
     pub accepted: bool,
     pub code: Option<RejectCode>,
@@ -910,6 +912,7 @@ pub enum BatchStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct BatchReplaceAck {
     pub correlation_id: u64,
     pub batch_request_id: u64,
@@ -933,6 +936,7 @@ pub enum OcoCommand {
 /// An `OcoAck`: the server accepted a CreateOco or a CancelOco. The legs'
 /// state and orders follow through the trigger reads and events.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct OcoAck {
     pub correlation_id: u64,
     pub command: OcoCommand,
@@ -989,6 +993,7 @@ impl fmt::Display for NotSent {
 
 /// The server's refusal of a command.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Reject {
     pub command: Command,
     pub correlation_id: u64,
