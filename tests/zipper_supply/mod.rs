@@ -220,6 +220,11 @@ async fn deposit_withdraw_config_keeps_variant_supply() {
         assert_eq!(seen, want.len() + MISSING.len(), "{wire_format:?}");
 
         client.wait_for_catalogs().await.expect("hydrated");
+        // Supply comes from the funding config, which loads apart from spot.
+        client
+            .wait_for_funding_catalog()
+            .await
+            .expect("funding config hydrated");
         for (id, expected) in &want {
             let got = client.catalogs.supply_for_zipped_asset_id(*id);
             if got.as_deref() != Some(*expected) {

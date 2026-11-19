@@ -2814,6 +2814,10 @@ async fn l2_wait_for_catalogs_hydrates_spot_and_zipper_then_formats() {
     })
     .expect("client");
     client.wait_for_catalogs().await.expect("hydrate");
+    client
+        .wait_for_funding_catalog()
+        .await
+        .expect("hydrate funding");
     assert_eq!(
         client.catalogs.base_quantity_scale_for_symbol("BTC-USDT"),
         Some(8)
