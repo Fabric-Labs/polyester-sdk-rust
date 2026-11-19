@@ -23,9 +23,9 @@ use crate::tradews::sbe::{
     order_status, pong_codec, reject_code, subscription_ack_codec,
 };
 use crate::tradews::{
-    BatchCancelOrders, BatchCreateOrders, CancelAllOrders, CancelItem, CancelReason, Command,
-    Config, Deadline, Event, NotSent, OrderRef, OrderStatus, PATH, PostOnlyOrder, RejectCode, Side,
-    TradeError, TradeSession, connect,
+    BatchCancelOrders, BatchCreateOrders, BatchReplaceOrders, CancelAllOrders, CancelItem,
+    CancelReason, Command, Config, Deadline, Event, ModifyOrder, NotSent, OrderRef, OrderStatus,
+    PATH, PostOnlyOrder, RejectCode, ReplaceItem, Side, TradeError, TradeSession, connect,
 };
 use crate::types::{Price, Quantity, QuantityDomain};
 
@@ -108,6 +108,8 @@ struct Seen {
     headers: Vec<(String, String)>,
     path: String,
     frames: Vec<(u16, u64, u64)>,
+    /// Each client frame, whole, in the order it arrived.
+    bodies: Vec<Vec<u8>>,
     /// When the upgrade request arrived.
     at: Option<std::time::Instant>,
 }
@@ -623,9 +625,11 @@ async fn stand_in(scripts: Vec<Script>) -> (String, Record) {
                 let template = u16::from_le_bytes([frame[2], frame[3]]);
                 let seq = u64::from_le_bytes(frame[8..16].try_into().unwrap());
                 let corr = u64::from_le_bytes(frame[16..24].try_into().unwrap());
-                seen.lock().unwrap()[index]
-                    .frames
-                    .push((template, seq, corr));
+                {
+                    let mut all = seen.lock().unwrap();
+                    all[index].frames.push((template, seq, corr));
+                    all[index].bodies.push(frame.to_vec());
+                }
                 if current.close_on == Some(template) {
                     let _ = ws.close(None).await;
                     break;
@@ -682,7 +686,7 @@ pub(super) fn credentials() -> Credentials {
 }
 
 fn config(url: String) -> Config {
-    let mut config = Config::new(url, credentials());
+    let mut config = Config::new(url, credentials(), super::pairs());
     config.ping_interval = Duration::from_millis(100);
     config.answer_timeout = Duration::from_millis(600);
     config
@@ -2543,4 +2547,187 @@ async fn probes_before_the_upgrade_neither_take_nor_block_the_hold() {
     assert_eq!(seen.len(), 1, "{seen:?}");
     assert_eq!(seen[0].path, PATH);
     drop(probes);
+}
+
+/// The `baseQtyScaled` and `priceTicks` of every CreateOrder (template 2)
+/// and ModifyOrder (template 4) one connection received, as the server
+/// reads them.
+fn sent_sizes(seen: &Seen) -> Vec<(u16, i64, i64)> {
+    let at = |body: &[u8], offset: usize| {
+        i64::from_le_bytes(
+            body[HEADER + offset..HEADER + offset + 8]
+                .try_into()
+                .unwrap(),
+        )
+    };
+    seen.bodies
+        .iter()
+        .filter_map(|body| match u16::from_le_bytes([body[2], body[3]]) {
+            2 => Some((2, at(body, 23), at(body, 31))),
+            4 => Some((4, at(body, 28), at(body, 36))),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The commands one connection received, without its subscription and pings.
+fn commands_seen(record: &Record) -> Vec<u16> {
+    record.lock().unwrap()[0]
+        .frames
+        .iter()
+        .map(|(template, ..)| *template)
+        .filter(|t| !matches!(t, 1 | 6))
+        .collect()
+}
+
+fn refused_as(result: crate::errors::Result<impl std::fmt::Debug>, message: &str) {
+    match result {
+        Err(Error::Validation(m)) => assert_eq!(m, message),
+        other => panic!("not refused before sending ({message}): {other:?}"),
+    }
+}
+
+/// Pair 7, BTC-USDT, has a base quantity scale of 6 in the session's catalog
+/// (`config`). A quantity built at scale 8 is refused before sending, as the
+/// Orders API refuses it: sent as it is, 1.5 at scale 8 (150000000) would be
+/// read as 150 at the pair's scale 6.
+#[tokio::test]
+async fn a_quantity_at_another_scale_than_the_pairs_is_refused_not_sent() {
+    let (url, record) = stand_in(vec![serve()]).await;
+    let mut config = config(url);
+    config.timer_gate = None;
+    let session = connect(config).await.unwrap();
+    ready(&session).await;
+    let mismatch = "quantity scale mismatch: value scale is 8, destination is 6";
+    let at_8 = Quantity::from_decimal_str("1.5", 8, None, Some(7)).unwrap();
+
+    let wrong = PostOnlyOrder {
+        qty: at_8.clone(),
+        ..order("scale-8")
+    };
+    refused_as(session.create_order(&wrong, within(500)).await, mismatch);
+    let mut modify = ModifyOrder::new(7, OrderRef::Id(1));
+    modify.qty = Some(at_8.clone());
+    refused_as(session.modify_order(&modify, within(500)).await, mismatch);
+    let batch = BatchCreateOrders::new(vec![order("fine"), wrong.clone()]);
+    refused_as(
+        session.batch_create_orders(&batch, within(500)).await,
+        mismatch,
+    );
+    let replace = BatchReplaceOrders::new(
+        7,
+        vec![ReplaceItem {
+            order: OrderRef::Id(1),
+            qty: Some(at_8),
+            price: None,
+        }],
+    );
+    refused_as(
+        session.batch_replace_orders(&replace, within(500)).await,
+        mismatch,
+    );
+    assert_eq!(
+        commands_seen(&record),
+        Vec::<u16>::new(),
+        "nothing was sent"
+    );
+
+    // A quantity at the pair's scale and a scale-less one, an integer already
+    // in the pair's units, go out unchanged, as the Orders API sends them.
+    let at_6 = Quantity::from_decimal_str("1.5", 6, Some("BTC-USDT".into()), Some(7)).unwrap();
+    let scale_less =
+        Quantity::from_scaled(1_500_000, None, QuantityDomain::OrderBase, None, Some(7)).unwrap();
+    for qty in [at_6, scale_less.clone()] {
+        let order = PostOnlyOrder {
+            qty,
+            ..order("in-units")
+        };
+        session.create_order(&order, within(500)).await.unwrap();
+    }
+    let mut modify = ModifyOrder::new(7, OrderRef::Id(1));
+    modify.qty = Some(scale_less);
+    session.modify_order(&modify, within(500)).await.unwrap();
+    let seen = record.lock().unwrap()[0].clone();
+    assert_eq!(
+        sent_sizes(&seen),
+        vec![
+            (2, 1_500_000, 1_000_000_000),
+            (2, 1_500_000, 1_000_000_000),
+            (4, 1_500_000, i64::MIN),
+        ]
+    );
+}
+
+/// A quantity or price tagged with another pair's symbol is refused before
+/// sending, as the Orders API refuses it, and so is an order on a pair the
+/// catalog does not have. A price is integer ticks at the fixed scale of
+/// 1e9, so it has no scale or tick size of its own to mismatch: a price
+/// without a symbol, or with the pair's, goes out unchanged.
+#[tokio::test]
+async fn a_value_for_another_pair_or_an_unknown_pair_is_refused_not_sent() {
+    let (url, record) = stand_in(vec![serve()]).await;
+    let mut config = config(url);
+    config.timer_gate = None;
+    let session = connect(config).await.unwrap();
+    ready(&session).await;
+
+    let eth_price = PostOnlyOrder {
+        price: Price::from_ticks(2_000_000_000, Some("ETH-USDT".into())).unwrap(),
+        ..order("eth-price")
+    };
+    refused_as(
+        session.create_order(&eth_price, within(500)).await,
+        "price symbol mismatch: value is for ETH-USDT, destination is BTC-USDT",
+    );
+    let mut modify = ModifyOrder::new(7, OrderRef::Id(1));
+    modify.price = Some(eth_price.price.clone());
+    refused_as(
+        session.modify_order(&modify, within(500)).await,
+        "price symbol mismatch: value is for ETH-USDT, destination is BTC-USDT",
+    );
+    let eth_qty = PostOnlyOrder {
+        qty: Quantity::from_decimal_str("1", 6, Some("ETH-USDT".into()), Some(7)).unwrap(),
+        ..order("eth-qty")
+    };
+    refused_as(
+        session.create_order(&eth_qty, within(500)).await,
+        "quantity symbol mismatch: value is for ETH-USDT, destination is BTC-USDT",
+    );
+    let unknown = PostOnlyOrder {
+        symbol_id: 9,
+        qty: Quantity::from_scaled(1, None, QuantityDomain::OrderBase, None, None).unwrap(),
+        ..order("unknown-pair")
+    };
+    refused_as(
+        session.create_order(&unknown, within(500)).await,
+        "quantity scale for pair 9 is unavailable; await client.wait_for_catalogs() before placing orders",
+    );
+    assert_eq!(
+        commands_seen(&record),
+        Vec::<u16>::new(),
+        "nothing was sent"
+    );
+
+    for price in [
+        Price::from_ticks(2_000_000_000, None).unwrap(),
+        Price::from_ticks(2_000_000_000, Some("BTC-USDT".into())).unwrap(),
+    ] {
+        let order = PostOnlyOrder {
+            price,
+            ..order("btc-price")
+        };
+        session.create_order(&order, within(500)).await.unwrap();
+    }
+    let mut modify = ModifyOrder::new(7, OrderRef::Id(1));
+    modify.price = Some(Price::from_ticks(3_000_000_000, None).unwrap());
+    session.modify_order(&modify, within(500)).await.unwrap();
+    let seen = record.lock().unwrap()[0].clone();
+    assert_eq!(
+        sent_sizes(&seen),
+        vec![
+            (2, 1, 2_000_000_000),
+            (2, 1, 2_000_000_000),
+            (4, i64::MIN, 3_000_000_000),
+        ]
+    );
 }

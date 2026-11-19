@@ -34,7 +34,8 @@ type Ws = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 /// What the client needs to know about a trading pair: its base quantity
 /// scale, which every quantity on the stream is scaled by, and its symbol.
-/// [`crate::catalogs::Manager`] implements it.
+/// [`crate::catalogs::Manager`] implements it. The trading WebSocket checks
+/// every order against it too ([`crate::tradews::Config::pairs`]).
 pub trait Pairs: Send + Sync {
     fn base_quantity_scale(&self, symbol_id: u32) -> Option<u32>;
     fn symbol(&self, symbol_id: u32) -> Option<String>;
