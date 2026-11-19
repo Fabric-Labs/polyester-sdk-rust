@@ -397,6 +397,12 @@ pub(crate) const PERMISSION_REFUSAL_TYPE: &str = "polyester.sdk.PermissionRefusa
 /// Connect error. The error's HTTP status is the response's.
 pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 
+/// Type URL of the SDK-local Connect error detail that keeps, for diagnosis
+/// only, the code a typed detail of a plain 504 named (in `debug.code`). The
+/// 504 stays an unknown outcome whatever it says; see
+/// [`crate::errors::answer_error_code`].
+pub(crate) const DIAGNOSTIC_CODE_TYPE: &str = "polyester.sdk.diagnostic_code";
+
 /// Type URL of the SDK-local Connect error detail that carries the
 /// `rateLimit` object of a REST rate-limit problem, as sent, in `debug`.
 /// [`crate::errors::map_connect_error`] reads it into the error's detail.
@@ -745,12 +751,24 @@ fn classify_failed_response_inner(
                 .with_http_status(status),
             );
         }
-        return Some(sdk_marked_error(
+        let mut err = sdk_marked_error(
             ErrorCode::Unavailable,
             message,
             status,
             BARE_HTTP_ERROR_TYPE,
-        ));
+        );
+        // The typed reason the body named, kept for diagnosis only.
+        if let Some(code) = body_details
+            .iter()
+            .find_map(crate::errors::typed_detail_code)
+        {
+            err = err.with_detail(ErrorDetail {
+                type_url: DIAGNOSTIC_CODE_TYPE.to_owned(),
+                value: None,
+                debug: Some(serde_json::json!({ "code": code })),
+            });
+        }
+        return Some(err);
     }
     if let Some(code) = code {
         // Connect error codes are lowercase names such as `unimplemented`.

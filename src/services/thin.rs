@@ -375,8 +375,9 @@ impl InternalTransfersService {
     /// that is empty or over 128 characters, a leg without an asset ID or
     /// without exactly one destination, and an amount that is not exact at
     /// 18 decimals. A reply that breaks the contract is an
-    /// [`crate::errors::Error::ResponseContract`]: the batch may have moved
-    /// funds, so retry it with the same key.
+    /// [`crate::errors::Error::Server`] with an unknown outcome that keeps the
+    /// answer's status and Retry-After: the batch may have moved funds, so
+    /// retry it with the same key and legs.
     ///
     /// A `refused` batch is final for its key: fix the cause and submit under
     /// a new key. Every failure of the call, whatever the server answered, is
@@ -399,10 +400,19 @@ impl InternalTransfersService {
         })
         .await?
         {
-            Ok(resp) => resp.into_owned(),
+            Ok(resp) => resp,
             Err(err) => return Err(batch_create_failure(err).for_procedure(PROCEDURE)),
         };
-        internal_transfer_batch_from_proto(&resp, requested)
+        // A decoded reply that breaks the contract is an unknown outcome too,
+        // keeping the answer's status and Retry-After.
+        let answer = crate::errors::answer_from_headers(200, resp.headers());
+        internal_transfer_batch_from_proto(&resp.into_owned(), requested).map_err(|err| {
+            crate::errors::Error::Server {
+                message: err.to_string(),
+                code: None,
+                answer: Some(Box::new(answer)),
+            }
+        })
     }
 
     /// Read a batch's current outcome and the state of every leg by the
@@ -2009,9 +2019,15 @@ fn batch_create_failure(err: connectrpc::ConnectError) -> crate::errors::Error {
         | Error::GatewayTimeout { code, .. } => code.clone(),
         other => other.auth_error_code().map(str::to_owned),
     };
+    // A structured code (`ERROR_CODE_...`, `AUTH_...`) is kept as mapped; a
+    // bare ConnectRPC code name such as `unavailable` gives way to the
+    // structured code the answer names, when it names one.
+    let structured = |code: &String| code.bytes().any(|b| b.is_ascii_uppercase());
     let code = mapped_code
-        .filter(|code| !code.is_empty())
-        .or_else(|| crate::errors::answer_error_code(&err));
+        .clone()
+        .filter(structured)
+        .or_else(|| crate::errors::answer_error_code(&err))
+        .or_else(|| mapped_code.filter(|code| !code.is_empty()));
     let answer = mapped
         .answer()
         .cloned()
