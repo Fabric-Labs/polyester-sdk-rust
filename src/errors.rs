@@ -1906,24 +1906,20 @@ pub(crate) fn answer_meta(err: &ConnectError) -> Option<AnswerMeta> {
         })
 }
 
-/// The structured code a failed answer names: the first typed service
-/// detail's code (auth, orders, transfer, withdraw, ledger or alerts), else a
-/// REST problem's own `code`. `None` when it names none.
+/// The structured code a failed answer names: the first typed detail's code
+/// (auth, orders, transfer, withdraw, ledger, alerts or the request-size
+/// detail, read as given even when the detail is otherwise malformed), else
+/// a REST problem's own `code`. `None` when it names none. Diagnostic only:
+/// it never makes a refusal of the code it names.
 pub(crate) fn answer_error_code(err: &ConnectError) -> Option<String> {
-    fn label<T: Enumeration>(code: &buffa::EnumValue<T>) -> Option<String> {
-        (code.to_i32() != 0)
-            .then(|| known_or_unknown_code(code.as_known().map(|c| c.proto_name()), code.to_i32()))
-    }
     err.details
         .iter()
-        .find_map(|detail| {
-            decode_auth_error_detail(detail)
-                .and_then(|d| label(&d.code))
-                .or_else(|| decode_order_error_detail(detail).and_then(|d| label(&d.code)))
-                .or_else(|| decode_transfer_error_detail(detail).and_then(|d| label(&d.code)))
-                .or_else(|| decode_withdraw_error_detail(detail).and_then(|d| label(&d.code)))
-                .or_else(|| decode_ledger_error_detail(detail).and_then(|d| label(&d.code)))
-                .or_else(|| decode_alert_error_detail(detail).and_then(|d| label(&d.code)))
+        .find_map(typed_detail_code)
+        .or_else(|| {
+            err.details
+                .iter()
+                .find(|d| d.type_url == crate::transport::DIAGNOSTIC_CODE_TYPE)
+                .and_then(|d| d.debug.as_ref()?.get("code")?.as_str().map(str::to_owned))
         })
         .or_else(|| {
             err.details
@@ -1932,6 +1928,24 @@ pub(crate) fn answer_error_code(err: &ConnectError) -> Option<String> {
                 .and_then(|d| d.debug.as_ref()?.get("code")?.as_str().map(str::to_owned))
                 .filter(|code| !code.is_empty())
         })
+}
+
+/// The code one typed detail names (auth, orders, transfer, withdraw,
+/// ledger, alerts or the request-size detail), as its proto name; `None` for
+/// another detail or an unset code.
+pub(crate) fn typed_detail_code(detail: &ErrorDetail) -> Option<String> {
+    fn label<T: Enumeration>(code: &buffa::EnumValue<T>) -> Option<String> {
+        (code.to_i32() != 0)
+            .then(|| known_or_unknown_code(code.as_known().map(|c| c.proto_name()), code.to_i32()))
+    }
+    decode_auth_error_detail(detail)
+        .and_then(|d| label(&d.code))
+        .or_else(|| decode_order_error_detail(detail).and_then(|d| label(&d.code)))
+        .or_else(|| decode_transfer_error_detail(detail).and_then(|d| label(&d.code)))
+        .or_else(|| decode_withdraw_error_detail(detail).and_then(|d| label(&d.code)))
+        .or_else(|| decode_ledger_error_detail(detail).and_then(|d| label(&d.code)))
+        .or_else(|| decode_alert_error_detail(detail).and_then(|d| label(&d.code)))
+        .or_else(|| decode_request_error_detail(detail).and_then(|d| label(&d.code)))
 }
 
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {

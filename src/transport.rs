@@ -397,6 +397,12 @@ pub(crate) const PERMISSION_REFUSAL_TYPE: &str = "polyester.sdk.PermissionRefusa
 /// Connect error. The error's HTTP status is the response's.
 pub(crate) const BARE_HTTP_ERROR_TYPE: &str = "polyester.sdk.BareHttpError";
 
+/// Type URL of the SDK-local Connect error detail that keeps, for diagnosis
+/// only, the code a typed detail of a plain 504 named (in `debug.code`). The
+/// 504 stays an unknown outcome whatever it says; see
+/// [`crate::errors::answer_error_code`].
+pub(crate) const DIAGNOSTIC_CODE_TYPE: &str = "polyester.sdk.diagnostic_code";
+
 /// Type URL of the SDK-local Connect error detail that carries the
 /// `rateLimit` object of a REST rate-limit problem, as sent, in `debug`.
 /// [`crate::errors::map_connect_error`] reads it into the error's detail.
@@ -737,19 +743,23 @@ fn classify_failed_response_inner(
             // ([`crate::Error::Transport`], an unknown outcome that reads
             // retry), whatever its message or detail says. The prefix keeps
             // a code-like message from reading as a refusal.
-            return Some(
+            return Some(with_diagnostic_code(
                 ConnectError::new(
                     ErrorCode::DeadlineExceeded,
                     format!("deadline exceeded: {message}"),
                 )
                 .with_http_status(status),
-            );
+                &body_details,
+            ));
         }
-        return Some(sdk_marked_error(
-            ErrorCode::Unavailable,
-            message,
-            status,
-            BARE_HTTP_ERROR_TYPE,
+        return Some(with_diagnostic_code(
+            sdk_marked_error(
+                ErrorCode::Unavailable,
+                message,
+                status,
+                BARE_HTTP_ERROR_TYPE,
+            ),
+            &body_details,
         ));
     }
     if let Some(code) = code {
@@ -1069,6 +1079,19 @@ fn auth_problem(
         ))
 }
 
+/// `err` with the typed reason `details` name, if any, kept for diagnosis
+/// only ([`DIAGNOSTIC_CODE_TYPE`]): it never changes how `err` is classified.
+fn with_diagnostic_code(err: ConnectError, details: &[ErrorDetail]) -> ConnectError {
+    match details.iter().find_map(crate::errors::typed_detail_code) {
+        Some(code) => err.with_detail(ErrorDetail {
+            type_url: DIAGNOSTIC_CODE_TYPE.to_owned(),
+            value: None,
+            debug: Some(serde_json::json!({ "code": code })),
+        }),
+        None => err,
+    }
+}
+
 fn sdk_marked_error(
     code: ErrorCode,
     message: String,
@@ -1248,6 +1271,56 @@ pub(crate) const HTTP_PROBLEM_TYPE: &str = "polyester.sdk.http_problem";
 mod tests {
     use super::*;
     use crate::user_agent::user_agent;
+
+    /// A 504 with a typed detail keeps the detail's code for diagnosis only,
+    /// whichever 504 branch reads it, and its classification does not move:
+    /// `deadline_exceeded` stays the transport deadline it was, and any other
+    /// 504 the gateway timeout.
+    #[test]
+    fn a_504_keeps_its_typed_reason_for_diagnosis_only() {
+        use crate::proto::transfer::v1::{ErrorCode as TransferCode, ErrorDetail as Detail};
+        use base64::Engine as _;
+        let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(
+            Detail {
+                code: TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        );
+        for (connect, deadline) in [("deadline_exceeded", true), ("unavailable", false)] {
+            let body = serde_json::json!({
+                "code": connect,
+                "message": "try again",
+                "details": [{"type": "transfer.v1.ErrorDetail", "value": value}],
+            })
+            .to_string();
+            let err = classify_failed_response(
+                StatusCode::GATEWAY_TIMEOUT,
+                true,
+                body.as_bytes(),
+                "/transfer.v1.InternalTransferService/BatchCreateInternalTransfers",
+            )
+            .expect("a 504 is classified");
+            assert_eq!(
+                crate::errors::answer_error_code(&err).as_deref(),
+                Some("ERROR_CODE_SERVICE_UNAVAILABLE"),
+                "{connect}"
+            );
+            let mapped = crate::errors::map_connect_error(err);
+            if deadline {
+                assert!(
+                    matches!(mapped, Error::Transport { .. }),
+                    "{connect}: {mapped:?}"
+                );
+            } else {
+                assert!(
+                    matches!(mapped, Error::GatewayTimeout { .. }),
+                    "{connect}: {mapped:?}"
+                );
+            }
+            assert!(mapped.mutation_outcome_unknown(), "{connect}: {mapped:?}");
+        }
+    }
 
     #[test]
     fn failed_responses_keep_their_status_and_gateway_code() {

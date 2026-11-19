@@ -768,6 +768,44 @@ async fn batch_transfer_failures_keep_their_code_and_answer() {
             Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
         ),
         (
+            "typed reason on a 504 deadline_exceeded",
+            504,
+            "application/json",
+            json!({
+                "code": "deadline_exceeded",
+                "message": "try again",
+                "details": [{
+                    "type": "transfer.v1.ErrorDetail",
+                    "value": b64(ErrorDetail {
+                        code: TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            Some("ERROR_CODE_SERVICE_UNAVAILABLE"),
+        ),
+        (
+            "typed reason on a 504",
+            504,
+            "application/json",
+            json!({
+                "code": "unavailable",
+                "message": "try again",
+                "details": [{
+                    "type": "transfer.v1.ErrorDetail",
+                    "value": b64(ErrorDetail {
+                        code: TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            Some("ERROR_CODE_SERVICE_UNAVAILABLE"),
+        ),
+        (
             "size refusal without its limit",
             429,
             "application/json",
@@ -784,7 +822,8 @@ async fn batch_transfer_failures_keep_their_code_and_answer() {
                 }],
             })
             .to_string(),
-            None,
+            // Kept as a diagnostic code, never as a final size refusal.
+            Some("REQUEST_TOO_LARGE"),
         ),
     ];
     for (case, status, content_type, body, code) in cases {
@@ -821,7 +860,43 @@ async fn batch_transfer_failures_keep_their_code_and_answer() {
                 "{case}: {err:?}"
             );
         }
+        assert!(!err.is_request_too_large(), "{case}: {err:?}");
     }
+}
+
+/// A decoded batch reply that breaks the contract (here, without its leg
+/// results) is an unknown outcome that keeps the answer's status and
+/// Retry-After, like every other failure of the call.
+#[tokio::test]
+async fn batch_transfer_contract_breaking_reply_keeps_its_answer() {
+    let body = BatchCreateInternalTransfersResponse {
+        request_id: BATCH_ID.into(),
+        status: InternalTransferBatchStatus::BATCH_ACCEPTED.into(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let (client, _) = server(move |_| HttpScript::Raw {
+        status: 200,
+        headers: vec![
+            ("Content-Type".into(), "application/proto".into()),
+            ("Content-Length".into(), body.len().to_string()),
+            ("Retry-After".into(), "2".into()),
+        ],
+        body: body.clone(),
+    })
+    .await;
+    let err = client
+        .internal_transfers
+        .batch_create(BatchCreateInternalTransfersParams {
+            legs: vec![leg(1, "0.5")],
+            idempotency_key: "rebalance-4".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(err.mutation_outcome_unknown(), "{err:?}");
+    assert!(!err.is_retryable(), "{err:?}");
+    assert_eq!(err.answer().map(|a| a.status), Some(200), "{err:?}");
+    assert_eq!(err.retry_after(), Some(2.0), "{err:?}");
 }
 
 #[tokio::test]
