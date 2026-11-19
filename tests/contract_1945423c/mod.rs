@@ -768,6 +768,25 @@ async fn batch_transfer_failures_keep_their_code_and_answer() {
             Some("ERROR_CODE_RATE_LIMIT_EXCEEDED"),
         ),
         (
+            "typed reason on a 504 deadline_exceeded",
+            504,
+            "application/json",
+            json!({
+                "code": "deadline_exceeded",
+                "message": "try again",
+                "details": [{
+                    "type": "transfer.v1.ErrorDetail",
+                    "value": b64(ErrorDetail {
+                        code: TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec()),
+                }],
+            })
+            .to_string(),
+            Some("ERROR_CODE_SERVICE_UNAVAILABLE"),
+        ),
+        (
             "typed reason on a 504",
             504,
             "application/json",
