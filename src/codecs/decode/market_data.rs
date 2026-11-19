@@ -207,6 +207,7 @@ pub fn candle_point_from_proto(
         quote_volume: msg.quote_volume.clone(),
         symbol_id,
         timeframe: timeframe.to_owned(),
+        is_closed: msg.is_closed,
     })
 }
 
@@ -278,12 +279,19 @@ fn reference_candles_from_points(
             quote_volume: point.quote_volume.clone(),
             symbol_id,
             timeframe: timeframe.to_owned(),
+            is_closed: point.is_closed,
         });
     }
     Ok(out)
 }
 
 /// Decode columnar OHLCV into row-oriented [`CandlesResult`] (Go `CandlesColumnsFromProto`).
+///
+/// The columnar reply carries no closed flag, so every row reads
+/// `is_closed: true`, which is exact for a page requested without
+/// `include_incomplete`. For a page requested with it, the newest row of each
+/// series may be the open bucket: set its `is_closed` to `false`, as
+/// `MarketDataService::get_candles_columns` does.
 pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
@@ -327,6 +335,7 @@ pub fn candles_columns_from_proto(
             quote_volume: msg.quote_volume.get(i).cloned().unwrap_or_default(),
             symbol_id,
             timeframe: timeframe.clone(),
+            is_closed: true,
         });
     }
     let reference_candles = reference_candles_from_columns(
@@ -403,6 +412,7 @@ fn reference_candles_from_columns(
             quote_volume: String::new(),
             symbol_id,
             timeframe: timeframe.to_owned(),
+            is_closed: true,
         });
     }
     Ok(out)
@@ -828,6 +838,38 @@ mod tests {
         assert_eq!(result.candles[0].volume, "1");
         assert_eq!(result.reference_candles[0].open, "1");
         assert_eq!(result.reference_candles[0].volume, "1");
+    }
+
+    // A candle says whether its bucket is closed: `false` for the open bucket
+    // `include_incomplete` prepends, `true` for every finished one, in the
+    // primary and the reference series alike.
+    #[test]
+    fn candles_keep_whether_each_bucket_is_closed() {
+        let point = |ts_sec, is_closed| CandlePoint {
+            ts_sec,
+            open: 1_000_000_000,
+            high: 1_000_000_000,
+            low: 1_000_000_000,
+            close: 1_000_000_000,
+            volume: 100_000_000,
+            is_closed,
+            ..Default::default()
+        };
+        let msg = GetCandlesResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            candles: vec![point(120, false), point(60, true)],
+            reference_candles: vec![point(120, false), point(60, true)],
+            ..Default::default()
+        };
+        let result = candles_from_proto(&msg, 8, Some(9)).expect("candles");
+        let flags = |rows: &[Candle]| {
+            rows.iter()
+                .map(|c| (c.ts_sec, c.is_closed))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(flags(&result.candles), [(120, false), (60, true)]);
+        assert_eq!(flags(&result.reference_candles), [(120, false), (60, true)]);
     }
 
     #[test]

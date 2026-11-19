@@ -632,6 +632,25 @@ mod tests {
         );
     }
 
+    // A live candle update is `false` while its bucket is open and `true` on
+    // the bucket's terminal update.
+    #[test]
+    fn live_candle_keeps_whether_its_bucket_is_closed() {
+        let decode = candle_point_from_bytes(1, "1m".into(), 8);
+        for is_closed in [false, true] {
+            let point = CandlePoint {
+                ts_sec: 60,
+                close: 1_000_000_000,
+                volume: 100_000_000,
+                is_closed,
+                ..Default::default()
+            };
+            let candle = decode(&point.encode_to_vec()).expect("decode");
+            assert_eq!(candle.is_closed, is_closed);
+            assert_eq!((candle.ts_sec, candle.close.as_str()), (60, "1"));
+        }
+    }
+
     #[test]
     fn flow_detail_without_required_summary_fails_closed() {
         let msg = FlowDetailView {
