@@ -1094,15 +1094,19 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
     let mut reconnect = false;
     loop {
         let err = session(&shared, ws, out_rx, reconnect).await;
+        // A server this client cannot read stops the stream before its
+        // connection ends, so the requests the connection carried get that
+        // error rather than the promise to apply once it reconnects.
+        if let Some(err @ Error::MarketStream(StreamError::Schema { .. })) = err {
+            shared.shutdown(Some(err));
+            shared.detach();
+            break;
+        }
         shared.detach();
         if shared.stopped() {
             break;
         }
         let Some(err) = err else { break };
-        if matches!(err, Error::MarketStream(StreamError::Schema { .. })) {
-            shared.shutdown(Some(err));
-            break;
-        }
         if shared.healthy.swap(false, Ordering::SeqCst) {
             backoff.reset();
         }

@@ -633,6 +633,106 @@ async fn requests_a_failed_stream_never_answered_return_its_error() {
     );
 }
 
+/// A server this client cannot read stops the stream: the requests its
+/// connection carried, and requests made after, return the schema error.
+#[tokio::test]
+async fn requests_pending_when_another_schema_stops_the_stream_return_its_error() {
+    let mut server = FakeServer::start().await;
+    let stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    let (wanted, unwanted) = ([t(7, Stream::Bbo)], [t(9, Stream::Depth20)]);
+    let mut subscribe = std::pin::pin!(stream.subscribe(&wanted));
+    let mut unsubscribe = std::pin::pin!(stream.unsubscribe(&unwanted));
+    assert!(
+        subscribe.as_mut().now_or_never().is_none(),
+        "subscribe sent"
+    );
+    assert!(
+        unsubscribe.as_mut().now_or_never().is_none(),
+        "unsubscribe sent"
+    );
+    conn.request().await;
+    conn.request().await;
+    conn.send(&[with_header(
+        &pong(1),
+        16,
+        crate::marketstream::sbe::pong_codec::SBE_TEMPLATE_ID,
+        21,
+        0,
+    )]);
+    stops(&stream).await;
+    let schema = |r: crate::Result<Vec<TopicResult>>| {
+        matches!(
+            r,
+            Err(Error::MarketStream(StreamError::Schema {
+                schema_id: 21,
+                version: 0
+            }))
+        )
+    };
+    let r = subscribe.await;
+    assert!(schema(r.clone()), "pending subscribe: {r:?}");
+    let r = unsubscribe.await;
+    assert!(schema(r.clone()), "pending unsubscribe: {r:?}");
+    let r = stream.subscribe(&wanted).await;
+    assert!(schema(r.clone()), "subscribe after the stop: {r:?}");
+    let r = stream.unsubscribe(&unwanted).await;
+    assert!(schema(r.clone()), "unsubscribe after the stop: {r:?}");
+    assert!(
+        matches!(
+            stream.err(),
+            Some(Error::MarketStream(StreamError::Schema {
+                schema_id: 21,
+                ..
+            }))
+        ),
+        "{:?}",
+        stream.err()
+    );
+}
+
+/// A lost connection is no terminal error: the requests it carried are told
+/// they apply once the stream reconnects, and the stream does.
+#[tokio::test]
+async fn requests_pending_when_the_connection_is_lost_apply_on_reconnect() {
+    let mut server = FakeServer::start().await;
+    let stream = dial(&server, |_| {}).await;
+    let mut conn = server.accept().await;
+    let (wanted, unwanted) = ([t(7, Stream::Bbo)], [t(9, Stream::Depth20)]);
+    let mut subscribe = std::pin::pin!(stream.subscribe(&wanted));
+    let mut unsubscribe = std::pin::pin!(stream.unsubscribe(&unwanted));
+    assert!(
+        subscribe.as_mut().now_or_never().is_none(),
+        "subscribe sent"
+    );
+    assert!(
+        unsubscribe.as_mut().now_or_never().is_none(),
+        "unsubscribe sent"
+    );
+    conn.request().await;
+    conn.request().await;
+    conn.close();
+    let lost = |r: crate::Result<Vec<TopicResult>>| match r {
+        Err(Error::Realtime { message, .. }) => {
+            message.starts_with("market stream connection lost before the response")
+        }
+        _ => false,
+    };
+    let r = tokio::time::timeout(Duration::from_secs(5), subscribe)
+        .await
+        .expect("answered");
+    assert!(lost(r.clone()), "pending subscribe: {r:?}");
+    let r = tokio::time::timeout(Duration::from_secs(5), unsubscribe)
+        .await
+        .expect("answered");
+    assert!(lost(r.clone()), "pending unsubscribe: {r:?}");
+    let mut conn = server.accept().await;
+    let m = conn.request().await;
+    assert_eq!(m.topics, wanted, "the wanted topic is subscribed again");
+    assert!(stream.is_alive());
+    assert!(stream.err().is_none(), "{:?}", stream.err());
+}
+
 /// Without a terminal error, a closed stream says it is closed.
 #[tokio::test]
 async fn requests_a_closed_stream_never_answered_say_it_is_closed() {
