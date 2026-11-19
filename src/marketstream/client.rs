@@ -477,6 +477,11 @@ fn closed() -> Error {
     Error::realtime("market stream client is closed")
 }
 
+/// The terminal error the stream recorded, or that it is closed.
+fn terminal(inner: &Inner) -> Error {
+    inner.err.clone().unwrap_or_else(closed)
+}
+
 impl MarketStream {
     /// The next message, in order. `None` once the stream has stopped: after
     /// [`Self::close`], or a terminal error that [`Self::err`] reports.
@@ -504,7 +509,8 @@ impl MarketStream {
     /// Subscribes to topics and returns one result per topic, in order. Topics
     /// the server accepts are resubscribed on every reconnect; those it
     /// refuses are dropped. Each topic's pair must be known to
-    /// [`Config::pairs`].
+    /// [`Config::pairs`]. Once the stream has stopped, a request it did not
+    /// answer returns the error [`Self::err`] reports, or that it is closed.
     pub async fn subscribe(&self, topics: &[Topic]) -> Result<Vec<TopicResult>> {
         if topics.is_empty() {
             return Err(Error::validation(
@@ -531,7 +537,8 @@ impl MarketStream {
     /// [`SubscribeResult::NotSubscribed`] when the connection did not hold it.
     /// From the moment the request is sent, the topics are not resubscribed
     /// on reconnect and their books, quotes and trade accounting are dropped,
-    /// so subscribing again starts afresh.
+    /// so subscribing again starts afresh. A stopped stream answers as
+    /// [`Self::subscribe`] does.
     pub async fn unsubscribe(&self, topics: &[Topic]) -> Result<Vec<TopicResult>> {
         if topics.is_empty() {
             return Err(Error::validation(
@@ -919,13 +926,20 @@ impl Shared {
         }
     }
 
+    /// Waits for the request's answer. Every waiter is answered, and only
+    /// once: by its response, by the end of its connection, or by the stop,
+    /// which answers each waiter it finds with the error that stopped the
+    /// stream. A response the client received therefore wins over a stop
+    /// that follows it, even one its own event causes.
     async fn request(&self, topics: &[Topic], unsubscribe: bool) -> Result<SubscribeResponse> {
         let rx = self.issue(topics, unsubscribe)?;
-        let mut stop = self.stop.subscribe();
-        tokio::select! {
-            res = rx => res.unwrap_or_else(|_| Err(closed())),
-            _ = stop.wait_for(|s| *s) => Err(closed()),
-        }
+        rx.await.unwrap_or_else(|_| Err(self.terminal()))
+    }
+
+    /// The error a request of a stopped stream returns: the terminal error
+    /// that stopped it, or that it is closed.
+    fn terminal(&self) -> Error {
+        terminal(&lock_unpoisoned(&self.inner))
     }
 
     /// Records the caller's intent for topics and sends the request that moves
@@ -939,7 +953,7 @@ impl Shared {
     ) -> Result<oneshot::Receiver<Result<SubscribeResponse>>> {
         let mut inner = lock_unpoisoned(&self.inner);
         if inner.closed || inner.err.is_some() {
-            return Err(closed());
+            return Err(terminal(&inner));
         }
         for t in topics {
             if unsubscribe {
@@ -1038,8 +1052,9 @@ impl Shared {
         for b in inner.backfills.drain(..) {
             b.abort();
         }
+        let err = terminal(&inner);
         for (_, waiter) in inner.waiting.drain() {
-            let _ = waiter.send(Err(closed()));
+            let _ = waiter.send(Err(err.clone()));
         }
         drop(inner);
         self.stop.send_replace(true);
