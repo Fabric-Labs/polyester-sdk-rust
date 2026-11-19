@@ -1,15 +1,17 @@
-//! Heatmap and market overview reads and streams, through public paths against
-//! real local sockets.
+//! Heatmap, market overview and candle reads and streams, through public paths
+//! against real local sockets.
 
 use super::centrifugo::{Centrifugo, centrifugo_publication};
 use super::hardening_support::{HttpScript, MockHttpServer, connect_proto_ok};
 use buffa::{Enumeration as _, Message as _};
+use polyester::models::GetCandlesOpts;
 use polyester::proto::chain::zipper::v1::{
     AssetConfig as ZipperAsset, GetDepositWithdrawConfigResponse,
 };
 use polyester::proto::marketdata::v1::{
-    AssetConfig, GetOrderbookHeatmapRequest, GetOrderbookHeatmapResponse, GetSpotConfigResponse,
-    HeatmapInterval, HeatmapLiveBucket, PairConfig, PairMarketdataConfig,
+    AssetConfig, CandlePoint, GetCandlesResponse, GetOrderbookHeatmapRequest,
+    GetOrderbookHeatmapResponse, GetSpotConfigResponse, HeatmapInterval, HeatmapLiveBucket,
+    PairConfig, PairMarketdataConfig, Timeframe,
 };
 use polyester::proto::marketoverview::v1::{
     ListMarketOverviewRequest, ListMarketOverviewResponse, MarketOverview, MarketOverviewBatch,
@@ -481,6 +483,191 @@ async fn heatmap_get_refuses_a_reply_of_another_or_no_depth() {
         assert!(
             matches!(&got, Err(Error::ResponseContract { .. })),
             "served {served:?}: {got:?}"
+        );
+    }
+}
+
+const CANDLES: &str = "/marketdata.v1.MarketDataService/GetCandles";
+
+fn candle_point(ts_sec: u64, is_closed: bool) -> CandlePoint {
+    CandlePoint {
+        ts_sec,
+        open: 1_000_000_000,
+        high: 1_000_000_000,
+        low: 1_000_000_000,
+        close: 1_000_000_000,
+        volume: 100_000_000,
+        is_closed,
+        ..Default::default()
+    }
+}
+
+async fn candles_client(rows: Vec<CandlePoint>) -> (MockHttpServer, Client) {
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        SPOT_CONFIG => connect_proto_ok(&spot_config()),
+        ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+        CANDLES => connect_proto_ok(&GetCandlesResponse {
+            symbol_id: 1,
+            timeframe: Timeframe::Min1.into(),
+            candles: rows.clone(),
+            reference_candles: rows.clone(),
+            ..Default::default()
+        }),
+        _ => HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: "ws://127.0.0.1:9".into(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    client.wait_for_catalogs().await.unwrap();
+    (http, client)
+}
+
+// A candle row says whether its bucket is closed, as the server sends it: the
+// open bucket `include_incomplete` prepends reads `false`, finished ones `true`.
+#[tokio::test]
+async fn candles_say_which_rows_are_closed() {
+    let (_http, client) =
+        candles_client(vec![candle_point(120, false), candle_point(60, true)]).await;
+    let got = client
+        .market_data
+        .get_candles_with(GetCandlesOpts {
+            symbol: Some("BTC-USDT".into()),
+            timeframe: "1m".into(),
+            include_incomplete: true,
+            include_reference: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let flags = |rows: &[polyester::models::Candle]| {
+        rows.iter()
+            .map(|c| (c.ts_sec, c.is_closed))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(flags(&got.candles), [(120, false), (60, true)]);
+    assert_eq!(flags(&got.reference_candles), [(120, false), (60, true)]);
+}
+
+// The current candle is `false` while its bucket is still open and `true` once
+// the newest row the server answers is closed.
+#[tokio::test]
+async fn current_candle_says_whether_it_is_closed() {
+    for is_closed in [false, true] {
+        let (_http, client) = candles_client(vec![candle_point(120, is_closed)]).await;
+        let current = client
+            .market_data
+            .get_current_candle("BTC-USDT", "1m")
+            .await
+            .unwrap()
+            .expect("current candle");
+        assert_eq!((current.ts_sec, current.is_closed), (120, is_closed));
+    }
+}
+
+// A live candle update is `false` while its bucket is open and `true` on the
+// bucket's terminal update.
+#[tokio::test]
+async fn candle_stream_says_when_a_bucket_closes() {
+    let api = Api::spawn(ListMarketOverviewResponse::default()).await;
+    let ws = Centrifugo::spawn().await;
+    let client = api.client(ws.url.clone()).await;
+    let mut sub = client
+        .market_data
+        .subscribe_candles("BTC-USDT", "1m")
+        .await
+        .unwrap();
+    ws.await_subscribes(1).await;
+    let channel = "public:spot:market:candles:1m:1:proto";
+    for is_closed in [false, true] {
+        let point = candle_point(120, is_closed);
+        assert!(
+            ws.try_push(channel, centrifugo_publication(&point.encode_to_vec())),
+            "the SDK did not subscribe to {channel}"
+        );
+        let got = tokio::time::timeout(WAIT, sub.recv())
+            .await
+            .expect("no live candle")
+            .expect("subscription open");
+        assert_eq!((got.ts_sec, got.is_closed), (120, is_closed));
+    }
+}
+
+const CANDLES_COLUMNS: &str = "/marketdata.v1.MarketDataService/GetCandlesColumns";
+
+// The columnar reply has no closed flag. Without `include_incomplete` every
+// row is a closed candle. With it, the newest primary and reference rows read
+// `false`, not known to be closed: the open bucket comes last when one is in
+// range, but nothing says whether it was. Earlier rows read `true`.
+#[tokio::test]
+async fn candle_columns_never_call_a_possibly_open_row_closed() {
+    use polyester::proto::marketdata::v1::GetCandlesColumnsResponse;
+
+    let columns = GetCandlesColumnsResponse {
+        symbol_id: 1,
+        timeframe: Timeframe::Min1.into(),
+        ts_sec: vec![60, 120],
+        open: vec![1, 1],
+        high: vec![1, 1],
+        low: vec![1, 1],
+        close: vec![1, 1],
+        volume: vec![1, 1],
+        reference_ts_sec: vec![60, 120],
+        reference_open: vec![1, 1],
+        reference_high: vec![1, 1],
+        reference_low: vec![1, 1],
+        reference_close: vec![1, 1],
+        reference_volume: vec![1, 1],
+        ..Default::default()
+    };
+    let http = MockHttpServer::spawn(move |request| match request.path.as_str() {
+        SPOT_CONFIG => connect_proto_ok(&spot_config()),
+        ZIPPER_CONFIG => connect_proto_ok(&zipper_config()),
+        CANDLES_COLUMNS => connect_proto_ok(&columns),
+        _ => HttpScript::NotFound,
+    })
+    .await;
+    let client = Client::new(Config {
+        api_url: http.base_url(),
+        ws_url: "ws://127.0.0.1:9".into(),
+        hydrate_catalogs: true,
+        timeout: Duration::from_secs(2),
+        ..Default::default()
+    })
+    .unwrap();
+    client.wait_for_catalogs().await.unwrap();
+    let flags = |rows: &[polyester::models::Candle]| {
+        rows.iter()
+            .map(|c| (c.ts_sec, c.is_closed))
+            .collect::<Vec<_>>()
+    };
+    for (include_incomplete, newest_closed) in [(false, true), (true, false)] {
+        let got = client
+            .market_data
+            .get_candles_columns(GetCandlesOpts {
+                symbol: Some("BTC-USDT".into()),
+                timeframe: "1m".into(),
+                include_incomplete,
+                include_reference: true,
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let want = [(60, true), (120, newest_closed)];
+        assert_eq!(
+            flags(&got.candles),
+            want,
+            "include_incomplete={include_incomplete}"
+        );
+        assert_eq!(
+            flags(&got.reference_candles),
+            want,
+            "include_incomplete={include_incomplete}"
         );
     }
 }

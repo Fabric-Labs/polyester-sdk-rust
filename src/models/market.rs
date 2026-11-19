@@ -151,6 +151,14 @@ pub struct Candle {
     pub quote_volume: String,
     pub symbol_id: u32,
     pub timeframe: String,
+    /// Whether the bucket is closed: `true` for a closed bucket, including
+    /// historical rows and a live stream's terminal update, `false` only while
+    /// the bucket is still open and its values can still change.
+    ///
+    /// The columnar reply carries no closed flag; see
+    /// [`MarketDataService::get_candles_columns`](crate::services::MarketDataService::get_candles_columns)
+    /// for how its rows read.
+    pub is_closed: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

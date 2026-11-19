@@ -271,6 +271,13 @@ impl MarketDataService {
     }
 
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
+    ///
+    /// The columnar reply carries no closed flag, so [`Candle::is_closed`] is
+    /// derived from the request. With `include_incomplete` false every columnar
+    /// row is closed. With `include_incomplete` true the newest primary row (and
+    /// the newest reference row) reads `false`, meaning "not known to be
+    /// closed": it may be the open bucket, or a closed one when no open candle
+    /// was in range. Earlier rows read `true`.
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         check_limit(
             "get_candles_columns",
@@ -294,13 +301,17 @@ impl MarketDataService {
         let resp = unary::await_public(self.client().get_candles_columns(req))
             .await?
             .into_owned();
-        candles_columns_from_proto(
+        let mut result = candles_columns_from_proto(
             &resp,
             volume_scale,
             self.ctx
                 .catalogs
                 .reference_price_scale_for_symbol_id(base.symbol_id),
-        )
+        )?;
+        if base.include_incomplete {
+            mark_newest_columns_not_known_closed(&mut result);
+        }
+        Ok(result)
     }
 
     fn build_candles_request(&self, opts: &GetCandlesOpts) -> Result<(GetCandlesRequest, u32)> {
@@ -443,6 +454,17 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
         }
     };
     Ok(tf)
+}
+
+/// The columnar reply puts the open candle, when one is in range, last in each
+/// oldest-first series and does not flag it: the newest row of each series is
+/// not known to be closed.
+fn mark_newest_columns_not_known_closed(result: &mut CandlesResult) {
+    for series in [&mut result.candles, &mut result.reference_candles] {
+        if let Some(newest) = series.last_mut() {
+            newest.is_closed = false;
+        }
+    }
 }
 
 fn newest_candle(result: CandlesResult) -> Option<Candle> {
@@ -1454,6 +1476,7 @@ mod tests {
             quote_volume: String::new(),
             symbol_id: 1,
             timeframe: "1m".into(),
+            is_closed: true,
         };
         let newest = newest_candle(CandlesResult {
             symbol_id: 1,
