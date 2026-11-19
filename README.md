@@ -1683,9 +1683,13 @@ SDK notes:
   `refused` again even once the leg would pass, and one with other legs is
   refused `IDEMPOTENCY_CONFLICT`; fix the cause and submit under a new key. A
   check that cannot be decided right now fails the whole call `unavailable`
-  instead (`Error::Server` with `ERROR_CODE_SERVICE_UNAVAILABLE` or
-  `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`): nothing is recorded under the key,
-  so retry with the same key and legs. A batch debits at most 10 distinct source accounts
+  instead (HTTP 503 with `ERROR_CODE_SERVICE_UNAVAILABLE` or
+  `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`, the retryable
+  `Error::AdmissionUnavailable` with the answer's status and `Retry-After`):
+  nothing is recorded under the key, so retry with the same key and legs after
+  `retry_after()`. Any other failure of the call, a 502 or 504 included, has an
+  unknown outcome: the batch may have moved funds, so send it again only under
+  the same key and legs, which answers the original outcome. A batch debits at most 10 distinct source accounts
   (`ERROR_CODE_BATCH_TOO_MANY_SOURCES`) and 50 distinct source account and
   asset pairs. It counts once against the internal transfer rate limit, with a
   weight of `max(ceil(legs / 50), distinct source accounts)`: a
@@ -2184,7 +2188,8 @@ reduce it to fit the limit. Over ConnectRPC the same refusal is `resource_exhaus
 `Error::Api`, final and never retried (not a rate limit), and `Error::request_limit_bytes()`
 returns the limit it names (`None` on REST, which names none). Only that typed detail makes a
 `resource_exhausted` a size refusal: without it, one stays an `Error::RateLimit`, whatever its
-message says.
+message says. A typed refusal that names no limit breaks the contract and is an
+`Error::ResponseContract`.
 
 Preview and batch rejections expose the same
 payload on `OrderErrorDetail.rate_limit` / batch item `rate_limit`. That error payload is
@@ -2909,9 +2914,11 @@ println!("epoch {} seq {}", newest.book_epoch, newest.book_seq);
 ```
 
 The delta stream is published at fewer depths, 1, 20, 50, 200 and 500
-(`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server accepts a
-subscribe at any other depth and then sends nothing on it, so the SDK does not
-subscribe there:
+(`polyester::codecs::decode::ORDERBOOK_STREAM_DEPTHS`), and the server refuses a
+subscribe at any other depth (Centrifugo error 107), so the SDK does not subscribe
+there. A managed book stitches its stream only onto a snapshot of exactly the tier
+it rides: a snapshot of another tier, or of none, fails the subscription with
+`Error::ResponseContract`:
 
 - `orderbook.create_subscription` with `depth: Some(10)` takes any depth from 1 to
   500. It rides the smallest published depth that covers it, 20 here, with its

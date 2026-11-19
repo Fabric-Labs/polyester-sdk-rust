@@ -952,6 +952,7 @@ async fn managed_orderbook_overflow_terminates_receiver_callback_task_and_socket
     let http = MockHttpServer::spawn(|request| {
         if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 ..Default::default()
@@ -1053,6 +1054,7 @@ async fn orderbook_view_after_delta(
     let http = MockHttpServer::spawn(move |request| {
         if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 available: snapshot_available,
@@ -6683,10 +6685,12 @@ async fn l2_heatmap_paging_keeps_filters_without_a_new_window() {
                 } else {
                     GetOrderbookHeatmapRequest::decode_from_slice(&req.body).unwrap()
                 };
+                let depth = request.depth;
                 let mut seen = observed.lock().unwrap();
                 seen.push(request);
                 let response = GetOrderbookHeatmapResponse {
                     symbol_id: 1,
+                    depth,
                     last_persisted_ts_sec: 100,
                     next_page_token: if seen.len() == 1 {
                         "eyJoZWF0bWFwIjoxfQ==".into()
@@ -7537,6 +7541,7 @@ async fn ticket_8510_zero_sequence_and_availability_are_independent() {
         for available in [false, true] {
             let http = MockHttpServer::spawn(move |_| {
                 connect_proto_ok(&GetOrderBookResponse {
+                    depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                     symbol_id: 1,
                     book_seq: seq,
                     available,
@@ -7611,6 +7616,7 @@ async fn ticket_8512_selector_controls_keep_reset_identity_and_scale() {
                 id
             );
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: id,
                 book_seq: 1,
                 available: true,
@@ -7670,6 +7676,7 @@ async fn ticket_8511_refresh_exhaustion_closes_receiver_with_typed_error() {
     let http = MockHttpServer::spawn(move |_| {
         if count.fetch_add(1, Ordering::SeqCst) == 0 {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 // An unavailable book is requested again; every later
@@ -7729,6 +7736,7 @@ async fn ticket_8510_zero_sequence_keeps_ordering() {
         let http = MockHttpServer::spawn(move |_| {
             count.fetch_add(1, Ordering::SeqCst);
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 0,
                 available: true,
@@ -7838,6 +7846,7 @@ async fn ticket_8511_zero_sequence_disconnect_then_503_releases_receiver() {
     let http = MockHttpServer::spawn(move |_| {
         if count.fetch_add(1, Ordering::SeqCst) == 0 {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 0,
                 available: true,
@@ -8529,6 +8538,7 @@ async fn l2_orderbook_coarse_buckets_preserve_zero_bid_and_round_asks_up() {
             let http = MockHttpServer::spawn(move |request| {
                 if request.path == "/orderbook.v1.OrderbookService/GetOrderBook" {
                     connect_proto_ok(&GetOrderBookResponse {
+                        depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                         symbol_id: 1,
                         book_seq: 1,
                         available: true,
@@ -8664,6 +8674,7 @@ async fn l2_orderbook_snapshot_with_buffered_delta_emits_one_view() {
                 status: 200,
                 headers: vec![("Content-Type".into(), "application/proto".into())],
                 body: GetOrderBookResponse {
+                    depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                     symbol_id: 1,
                     book_seq: 1,
                     available: true,
@@ -8770,6 +8781,7 @@ async fn l2_orderbook_reports_time_since_last_publication() {
         };
         let http = MockHttpServer::spawn(move |_| {
             connect_proto_ok(&GetOrderBookResponse {
+                depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_50.into(),
                 symbol_id: 1,
                 book_seq: 1,
                 available: true,
@@ -8885,6 +8897,12 @@ async fn raw_zero_delta_subscription(
         let first = reads.fetch_add(1, Ordering::SeqCst) == 0;
         let (book_seq, bid_qty, ask_qty) = if first { (1, 3, 4) } else { (2, 5, 6) };
         let body = GetOrderBookResponse {
+            // The tier the managed book rides, as asked.
+            depth: polyester::proto::orderbook::v1::GetOrderBookRequest::decode_from_slice(
+                &request.body,
+            )
+            .unwrap()
+            .depth,
             symbol_id: 1,
             book_seq,
             available: true,

@@ -266,6 +266,269 @@ const BATCH_ID: &str = "92640625967207661803151833376978068587";
 /// A batch sends every leg exactly, in order, with the source sub-account of
 /// each leg and one idempotency key; the reply reads leg by leg, and the
 /// batch reads back by its request ID.
+/// A batch whose checks could not be decided yet is refused `unavailable`
+/// before anything is recorded under its key: only an HTTP 503 ConnectRPC
+/// `unavailable` with a typed `transfer.v1.ErrorDetail` naming one of the
+/// documented codes is retryable with the same key and legs, and it keeps the
+/// answer's status and Retry-After. A 502 or 504, another detail type,
+/// generic JSON, the code in the message only, or another transfer code stays
+/// an unknown outcome that is not retried.
+#[tokio::test]
+async fn batch_transfer_pre_admission_unavailable_is_retryable() {
+    use polyester::proto::chain::withdraw::v1::{
+        ErrorCode as WithdrawCode, ErrorDetail as WithdrawDetail,
+    };
+    use polyester::proto::transfer::v1::{ErrorCode as TransferCode, ErrorDetail};
+    let b64 = |bytes: Vec<u8>| base64::engine::general_purpose::STANDARD_NO_PAD.encode(bytes);
+    let typed = |connect: &str, code: TransferCode| {
+        json!({
+            "code": connect,
+            "message": "refused",
+            "details": [{
+                "type": "transfer.v1.ErrorDetail",
+                "value": b64(ErrorDetail { code: code.into(), ..Default::default() }.encode_to_vec()),
+            }],
+        })
+        .to_string()
+    };
+    let problem = r#"{"type":"https://polyester.dev/problems/service-unavailable","title":"Service Unavailable","status":503,"code":"SERVICE_UNAVAILABLE"}"#;
+    let transfer = |code: TransferCode| {
+        json!({
+            "code": "unavailable",
+            "message": "try again",
+            "details": [{
+                "type": "transfer.v1.ErrorDetail",
+                "value": b64(ErrorDetail { code: code.into(), ..Default::default() }.encode_to_vec()),
+            }],
+        })
+        .to_string()
+    };
+    let withdraw = json!({
+        "code": "unavailable",
+        "message": "try again",
+        "details": [{
+            "type": "chain.withdraw.v1.ErrorDetail",
+            "value": b64(WithdrawDetail {
+                code: WithdrawCode::ERROR_CODE_SERVICE_UNAVAILABLE.into(),
+                ..Default::default()
+            }
+            .encode_to_vec()),
+        }],
+    })
+    .to_string();
+    let json = "application/json";
+    let cases: Vec<(&str, u16, &str, String, bool)> = vec![
+        (
+            "typed service",
+            503,
+            json,
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed shard",
+            503,
+            json,
+            transfer(TransferCode::ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE),
+            true,
+        ),
+        (
+            "other transfer code",
+            503,
+            json,
+            transfer(TransferCode::ERROR_CODE_CAPITAL_VIEW_UNAVAILABLE),
+            false,
+        ),
+        (
+            "504",
+            504,
+            json,
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            false,
+        ),
+        (
+            "502",
+            502,
+            json,
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            false,
+        ),
+        ("foreign detail type", 503, json, withdraw, false),
+        (
+            "generic JSON",
+            503,
+            json,
+            r#"{"error":"ERROR_CODE_SERVICE_UNAVAILABLE"}"#.to_owned(),
+            false,
+        ),
+        (
+            "code in the message only",
+            503,
+            json,
+            r#"{"code":"unavailable","message":"ERROR_CODE_SERVICE_UNAVAILABLE"}"#.to_owned(),
+            false,
+        ),
+        // The typed ConnectRPC refusal is read from its body alone: the
+        // answer's Content-Type plays no part.
+        (
+            "typed, json with charset",
+            503,
+            "application/json; charset=utf-8",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, JSON in capitals",
+            503,
+            "Application/JSON",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, problem+json",
+            503,
+            "application/problem+json",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, jsonx",
+            503,
+            "application/jsonx",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, text/plain",
+            503,
+            "text/plain",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, vendor JSON",
+            503,
+            "application/vnd.polyester+json",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, proto",
+            503,
+            "application/proto",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        (
+            "typed, combined Content-Type",
+            503,
+            "application/json, application/problem+json",
+            transfer(TransferCode::ERROR_CODE_SERVICE_UNAVAILABLE),
+            true,
+        ),
+        // Every other failure is an unknown outcome, whatever it maps to.
+        (
+            "rate limit",
+            429,
+            json,
+            typed(
+                "resource_exhausted",
+                TransferCode::ERROR_CODE_RATE_LIMIT_EXCEEDED,
+            ),
+            false,
+        ),
+        (
+            "typed refusal",
+            400,
+            json,
+            typed("invalid_argument", TransferCode::ERROR_CODE_INVALID_REQUEST),
+            false,
+        ),
+        (
+            "idempotency conflict",
+            409,
+            json,
+            typed(
+                "already_exists",
+                TransferCode::ERROR_CODE_IDEMPOTENCY_CONFLICT,
+            ),
+            false,
+        ),
+        // A REST problem never counts as the pre-admission refusal, whatever
+        // its media type.
+        (
+            "problem+json",
+            503,
+            "application/problem+json",
+            problem.to_owned(),
+            false,
+        ),
+        (
+            "problem+json with parameters",
+            503,
+            "Application/Problem+JSON; charset=utf-8",
+            problem.to_owned(),
+            false,
+        ),
+        (
+            "problem+json-gateway",
+            503,
+            "application/problem+json-gateway",
+            problem.to_owned(),
+            false,
+        ),
+        ("plain JSON problem", 503, json, problem.to_owned(), false),
+        (
+            "vendor JSON",
+            503,
+            "application/vnd.polyester+json",
+            problem.to_owned(),
+            false,
+        ),
+    ];
+    for (case, status, content_type, body, retryable) in cases {
+        let content_type = content_type.to_owned();
+        let (client, seen) = server(move |_| HttpScript::Raw {
+            status,
+            headers: vec![
+                ("Content-Type".into(), content_type.clone()),
+                ("Content-Length".into(), body.len().to_string()),
+                ("Retry-After".into(), "2".into()),
+            ],
+            body: body.as_bytes().to_vec(),
+        })
+        .await;
+        let err = client
+            .internal_transfers
+            .batch_create(BatchCreateInternalTransfersParams {
+                legs: vec![leg(1, "0.5")],
+                idempotency_key: "rebalance-2".into(),
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(err.is_retryable(), retryable, "{case}: {err:?}");
+        assert_eq!(
+            err.mutation_outcome_unknown(),
+            !retryable,
+            "{case}: {err:?}"
+        );
+        if retryable {
+            assert!(
+                matches!(&err, Error::AdmissionUnavailable { .. }),
+                "{case}: {err:?}"
+            );
+            assert_eq!(err.answer().expect("the answer").status, 503, "{case}");
+            assert_eq!(err.retry_after(), Some(2.0), "{case}");
+        } else {
+            assert!(
+                !matches!(&err, Error::AdmissionUnavailable { .. }),
+                "{case}: {err:?}"
+            );
+        }
+        assert_eq!(seen.lock().unwrap().len(), 1, "{case}: sent once");
+    }
+}
+
 #[tokio::test]
 async fn batch_transfer_sends_exact_legs_and_reads_each_outcome() {
     let leg_result = |index: u32, status: InternalTransferBatchLegStatus, flow: &str| {

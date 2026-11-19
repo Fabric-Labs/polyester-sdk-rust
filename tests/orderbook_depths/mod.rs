@@ -1,8 +1,8 @@
 //! Managed order books at any depth, through public paths against real local sockets.
 //!
-//! The server here behaves like the public stream contract: it accepts a subscribe
-//! at any depth, but publishes only on the tiers 1, 20, 50, 200 and 500, each as a
-//! SET diff of that tier's own top-N view. Snapshots answer at every depth tier,
+//! The server here behaves like the public stream contract: it publishes only on
+//! the tiers 1, 20, 50, 200 and 500, each as a SET diff of that tier's own top-N
+//! view, and refuses a subscribe at any other depth with Centrifugo error 107. Snapshots answer at every depth tier,
 //! no tier meaning 50, and name the tier they served.
 
 use super::centrifugo::{Centrifugo, centrifugo_publication};
@@ -14,6 +14,7 @@ use polyester::orderbook::Subscription;
 use polyester::proto::orderbook::v1::{
     GetOrderBookRequest, GetOrderBookResponse, OrderBookDelta, PriceLevel,
 };
+use polyester::proto::polyester::r#type::v1::DepthTier;
 use polyester::services::CreateSubscriptionOptions;
 use polyester::{Client, Config, Error};
 use serde_json::json;
@@ -96,6 +97,8 @@ struct Book {
     wire_depths: Vec<u32>,
     epoch: u64,
     published: HashMap<u32, Published>,
+    /// When set, every snapshot names this tier instead of the one served.
+    served_tier: Option<buffa::EnumValue<DepthTier>>,
 }
 
 impl Book {
@@ -122,6 +125,7 @@ impl Book {
             wire_depths: Vec::new(),
             epoch: 3,
             published,
+            served_tier: None,
         }
     }
 
@@ -150,7 +154,9 @@ impl Book {
             symbol_id: 1,
             book_seq: self.seq,
             book_epoch: if self.available { self.epoch } else { 0 },
-            depth: depth_tier_for_levels(depth).expect("a tier").into(),
+            depth: self
+                .served_tier
+                .unwrap_or_else(|| depth_tier_for_levels(depth).expect("a tier").into()),
             available: self.available,
             bids,
             asks,
@@ -190,9 +196,19 @@ impl Market {
             }
         })
         .await;
+        let ws = Centrifugo::spawn().await;
+        ws.refuse_subscribes(|channel| {
+            let depth: u32 = channel
+                .strip_prefix("public:spot:orderbook:deltas:depth:")?
+                .split(':')
+                .next()?
+                .parse()
+                .ok()?;
+            (!TIERS.contains(&depth)).then_some(107)
+        });
         Self {
             book,
-            ws: Centrifugo::spawn().await,
+            ws,
             http,
             delivered: Mutex::default(),
         }
@@ -335,17 +351,15 @@ fn ladder(from: i64, step: i64, count: u32) -> Vec<i64> {
     (0..i64::from(count)).map(|i| from + i * step).collect()
 }
 
-// Without this, a server that publishes everywhere would make every test here pass.
+// Without this, a server that publishes everywhere would make every test here
+// pass: a raw subscribe at an unpublished depth is refused (107), and one at a
+// published tier delivers.
 #[tokio::test]
-async fn control_an_unpublished_channel_is_accepted_and_silent() {
+async fn control_an_unpublished_channel_is_refused() {
     let market = Market::spawn(600).await;
     let client = market.client();
-    let mut silent = client
-        .realtime
-        .subscribe_raw(&channel_for(10))
-        .await
-        .unwrap();
-    market.await_subscribed(10).await;
+    let refused = client.realtime.subscribe_raw(&channel_for(10)).await;
+    assert!(refused.is_err(), "the unpublished channel was accepted");
     let mut live = client
         .realtime
         .subscribe_raw(&channel_for(20))
@@ -359,12 +373,6 @@ async fn control_an_unpublished_channel_is_accepted_and_silent() {
 
     let row = tokio::time::timeout(WAIT, live.recv()).await.unwrap();
     assert!(row.is_some(), "the published tier delivered nothing");
-    let quiet = tokio::time::timeout(Duration::from_millis(300), silent.recv()).await;
-    assert!(
-        quiet.is_err(),
-        "the unpublished channel delivered {quiet:?}"
-    );
-    assert!(silent.err().is_none(), "the server accepted the subscribe");
     assert_eq!(market.delivered(10), 0);
     assert_eq!(market.delivered(20), 1);
 }
@@ -881,4 +889,67 @@ async fn unavailable_snapshot_reports_epoch_zero() {
     assert!(!snapshot.available);
     assert_eq!(snapshot.book_epoch, "0");
     assert_eq!(snapshot.depth, 20);
+}
+
+// A snapshot that names no tier, a tier this SDK does not know, or another
+// tier than the one asked for breaks the contract: it is refused, never read
+// as the depth requested.
+#[tokio::test]
+async fn a_snapshot_of_another_or_no_tier_is_refused() {
+    for (asked, served) in [
+        (Some(20), DepthTier::DEPTH_UNSPECIFIED.into()),
+        (Some(20), buffa::EnumValue::from(99)),
+        (Some(20), DepthTier::DEPTH_50.into()),
+        (None, DepthTier::DEPTH_20.into()),
+        (Some(5000), DepthTier::DEPTH_1000.into()),
+    ] {
+        let market = Market::spawn(10).await;
+        market.update(|book| book.served_tier = Some(served));
+        let got = market.client().orderbook.get("BTC-USDT", asked).await;
+        assert!(
+            matches!(&got, Err(Error::ResponseContract { .. })),
+            "asked {asked:?}, served {served:?}: {got:?}"
+        );
+    }
+}
+
+// A managed book stitches its stream only onto a snapshot of the tier it
+// rides: a snapshot of another tier, at the start or on a refresh, fails the
+// subscription, and no view is built from it.
+#[tokio::test]
+async fn a_managed_book_refuses_a_snapshot_of_another_tier() {
+    let market = Market::spawn(30).await;
+    market.update(|book| book.served_tier = Some(DepthTier::DEPTH_50.into()));
+    let started = market
+        .client()
+        .orderbook
+        .create_subscription(CreateSubscriptionOptions {
+            symbol: "BTC-USDT".into(),
+            depth: Some(10),
+            ..Default::default()
+        })
+        .await;
+    assert!(
+        matches!(&started, Err(Error::ResponseContract { .. })),
+        "{:?}",
+        started.as_ref().err()
+    );
+
+    let market = Market::spawn(600).await;
+    let client = market.client();
+    let mut sub = book(&client, Some(10), None).await;
+    market.await_subscribed(20).await;
+    next_view(&mut sub, "first view").await;
+    market.update(|book| book.served_tier = Some(DepthTier::DEPTH_500.into()));
+    market.ws.drop_connection(&channel_for(20));
+    match tokio::time::timeout(WAIT, sub.updates().recv()).await {
+        Ok(None) => {}
+        Ok(Some(view)) => panic!("a view was built from the refreshed wrong tier: {view:?}"),
+        Err(_) => panic!("the subscription neither failed nor delivered within {WAIT:?}"),
+    }
+    assert!(
+        matches!(sub.err(), Some(Error::ResponseContract { .. })),
+        "{:?}",
+        sub.err()
+    );
 }

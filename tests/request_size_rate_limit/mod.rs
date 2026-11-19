@@ -419,7 +419,7 @@ fn connect_request_error(detail: &RequestErrorDetail) -> String {
 /// names the limit, is sent once, and a Retry-After on it changes nothing.
 #[tokio::test]
 async fn connect_request_too_large_detail_is_the_final_size_refusal() {
-    for (limit_bytes, want) in [(4_194_304, Some(4_194_304)), (0, None)] {
+    for (limit_bytes, want) in [(4_194_304, Some(4_194_304)), (1, Some(1))] {
         let body = connect_request_error(&RequestErrorDetail {
             code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
             limit_bytes,
@@ -442,6 +442,59 @@ async fn connect_request_too_large_detail_is_the_final_size_refusal() {
         assert!(!err.is_retryable(), "{err:?}");
         assert!(!err.mutation_outcome_unknown(), "{err:?}");
         assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+}
+
+/// A size refusal without the limit it is over breaks the contract, which
+/// sets `limit_bytes` for `REQUEST_TOO_LARGE`: it fails closed as a contract
+/// error, never as a plain final size refusal.
+#[tokio::test]
+async fn connect_request_too_large_without_its_limit_fails_closed() {
+    let body = connect_request_error(&RequestErrorDetail {
+        code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+        ..Default::default()
+    });
+    let err = me_error(move || response(429, JSON, &body, &[])).await;
+    assert!(matches!(&err, Error::ResponseContract { .. }), "{err:?}");
+    assert!(!err.is_request_too_large());
+    assert!(!err.is_retryable());
+}
+
+/// Only the exact `polyester.api.v1.RequestErrorDetail` type (bare, or with
+/// the standard `type.googleapis.com/` prefix) is the size detail: a type
+/// whose name merely ends the same way is not.
+#[tokio::test]
+async fn only_the_exact_size_detail_type_is_read() {
+    let detail = RequestErrorDetail {
+        code: RequestErrorCode::REQUEST_TOO_LARGE.into(),
+        limit_bytes: 1024,
+        ..Default::default()
+    };
+    let value = base64::engine::general_purpose::STANDARD_NO_PAD.encode(detail.encode_to_vec());
+    for (type_name, sized) in [
+        ("polyester.api.v1.RequestErrorDetail", true),
+        (
+            "type.googleapis.com/polyester.api.v1.RequestErrorDetail",
+            true,
+        ),
+        ("evilpolyester.api.v1.RequestErrorDetail", false),
+        ("other.polyester.api.v1.RequestErrorDetail", false),
+        ("example.com/x/polyester.api.v1.RequestErrorDetail", false),
+    ] {
+        let body = json!({
+            "code": "resource_exhausted",
+            "message": "request too large",
+            "details": [{"type": type_name, "value": value}],
+        })
+        .to_string();
+        let err = me_error(move || response(429, JSON, &body, &[])).await;
+        assert_eq!(err.is_request_too_large(), sized, "{type_name}: {err:?}");
+        if !sized {
+            assert!(
+                matches!(&err, Error::RateLimit { .. }),
+                "{type_name}: {err:?}"
+            );
+        }
     }
 }
 

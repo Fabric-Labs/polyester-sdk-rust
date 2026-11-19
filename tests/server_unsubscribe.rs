@@ -42,6 +42,7 @@ fn test_client(api_url: String, ws_url: String) -> Client {
 
 fn available_book(seq: u64) -> GetOrderBookResponse {
     GetOrderBookResponse {
+        depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_20.into(),
         symbol_id: 1,
         book_seq: seq,
         available: true,
@@ -56,6 +57,7 @@ fn available_book(seq: u64) -> GetOrderBookResponse {
 
 fn unavailable_book() -> GetOrderBookResponse {
     GetOrderBookResponse {
+        depth: polyester::proto::polyester::r#type::v1::DepthTier::DEPTH_20.into(),
         symbol_id: 1,
         ..Default::default()
     }

@@ -1894,6 +1894,36 @@ fn decode_alert_error_detail(detail: &ErrorDetail) -> Option<AlertErrorDetail> {
     AlertErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
 }
 
+/// Whether `err` is the batch transfer refusal the contract documents as
+/// made before anything is recorded under the key: a ConnectRPC
+/// `unavailable` answered with HTTP 503 whose typed `transfer.v1.ErrorDetail`
+/// (exactly that type) names `ERROR_CODE_SERVICE_UNAVAILABLE` or
+/// `ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE`. Any other status, detail type or
+/// place the code appears in is not.
+pub(crate) fn is_transfer_pre_admission_unavailable(
+    err: &ConnectError,
+    status: Option<u16>,
+) -> bool {
+    const NAME: &str = "transfer.v1.ErrorDetail";
+    err.code == ErrorCode::Unavailable
+        && status == Some(503)
+        && err.details.iter().any(|detail| {
+            let url = detail.type_url.as_str();
+            (url == NAME || url.strip_prefix("type.googleapis.com/") == Some(NAME))
+                && decode_detail_bytes(detail)
+                    .and_then(|bytes| TransferErrorDetail::decode_from_slice(&bytes).ok())
+                    .is_some_and(|d| {
+                        matches!(
+                            d.code.as_known(),
+                            Some(
+                                TransferErrorCode::ERROR_CODE_SERVICE_UNAVAILABLE
+                                    | TransferErrorCode::ERROR_CODE_ACCOUNT_SHARD_UNAVAILABLE
+                            )
+                        )
+                    })
+        })
+}
+
 fn decode_transfer_error_detail(detail: &ErrorDetail) -> Option<TransferErrorDetail> {
     if !detail.type_url.ends_with("transfer.v1.ErrorDetail") {
         return None;
@@ -1916,11 +1946,12 @@ fn is_auth_like_error_code(code: &str) -> bool {
         || code.contains("POLICY")
 }
 
+/// The request-size detail, read only under its exact type name: bare, as
+/// the Connect protocol sends it, or as the standard `Any` type URL.
 fn decode_request_error_detail(detail: &ErrorDetail) -> Option<RequestErrorDetail> {
-    if !detail
-        .type_url
-        .ends_with("polyester.api.v1.RequestErrorDetail")
-    {
+    const NAME: &str = "polyester.api.v1.RequestErrorDetail";
+    let url = detail.type_url.as_str();
+    if url != NAME && url.strip_prefix("type.googleapis.com/") != Some(NAME) {
         return None;
     }
     RequestErrorDetail::decode_from_slice(&decode_detail_bytes(detail)?).ok()
@@ -2289,17 +2320,22 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         decode_request_error_detail(detail)
             .filter(|d| d.code.as_known() == Some(RequestErrorCode::REQUEST_TOO_LARGE))
     }) {
+        // The contract sets the limit for this code: a refusal without it is
+        // malformed, and fails closed rather than reading as a plain final
+        // size refusal.
+        if too_large.limit_bytes == 0 {
+            return Error::response_contract(
+                "polyester.api.v1.RequestErrorDetail",
+                "REQUEST_TOO_LARGE without limit_bytes",
+            );
+        }
         return Error::Api {
             message: fallback_message,
             code: problem_codes::REQUEST_TOO_LARGE.to_owned(),
-            metadata: if too_large.limit_bytes == 0 {
-                Vec::new()
-            } else {
-                vec![(
-                    REQUEST_LIMIT_BYTES_METADATA.to_owned(),
-                    too_large.limit_bytes.to_string(),
-                )]
-            },
+            metadata: vec![(
+                REQUEST_LIMIT_BYTES_METADATA.to_owned(),
+                too_large.limit_bytes.to_string(),
+            )],
             violations: Vec::new(),
             answer: None,
         };
@@ -2664,15 +2700,19 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             };
         }
     }
-    let named_code = err
+    let problem_code = err
         .details
         .iter()
         .find(|d| d.type_url == crate::transport::HTTP_PROBLEM_TYPE)
         .and_then(|d| d.debug.as_ref())
         .and_then(|d| d.get("code"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or(raw_message);
-    let named_code = if is_placeholder_code(named_code) {
+        .and_then(serde_json::Value::as_str);
+    let named_code = problem_code.unwrap_or(raw_message);
+    // The size refusal is read from its typed detail (above) or a REST
+    // problem's own code, never from message text alone.
+    let untyped_size_text =
+        named_code == problem_codes::REQUEST_TOO_LARGE && problem_code != Some(named_code);
+    let named_code = if is_placeholder_code(named_code) || untyped_size_text {
         ""
     } else {
         named_code
@@ -2697,11 +2737,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         || (err.code == ErrorCode::ResourceExhausted
             && (OrderErrorCode::from_proto_name(&normalized_code).is_some()
                 || is_service_code_message(named_code))
-            && !retryable_resource_code(&normalized_code)
-            // The size refusal is read from its typed detail (above) or a
-            // REST problem, never from message text alone.
-            && (named_code != problem_codes::REQUEST_TOO_LARGE
-                || has_marker(crate::transport::HTTP_PROBLEM_TYPE)))
+            && !retryable_resource_code(&normalized_code))
     {
         return Error::Api {
             message: fallback_message,
@@ -2745,7 +2781,7 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
         },
         _ => Error::Api {
             message,
-            code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) {
+            code: if has_marker(crate::transport::HTTP_PROBLEM_TYPE) && !untyped_size_text {
                 error_code_from_name(named_code)
             } else {
                 format!("{code:?}")
@@ -3033,6 +3069,30 @@ mod tests {
             assert!(!mapped.is_retryable(), "{name}: {mapped:?}");
             assert!(mapped.mutation_outcome_unknown());
         }
+    }
+
+    /// A REST problem names the size refusal only by its own `code`: one
+    /// without a code whose message text reads `REQUEST_TOO_LARGE` is not one.
+    #[test]
+    fn only_a_problem_code_names_the_rest_size_refusal() {
+        let problem = |debug: serde_json::Value| ErrorDetail {
+            type_url: crate::transport::HTTP_PROBLEM_TYPE.into(),
+            value: None,
+            debug: Some(debug),
+        };
+        for code in [ErrorCode::ResourceExhausted, ErrorCode::InvalidArgument] {
+            let err = map_connect_error(
+                ConnectError::new(code, "REQUEST_TOO_LARGE")
+                    .with_detail(problem(serde_json::json!({"status": 413}))),
+            );
+            assert!(!err.is_request_too_large(), "{code:?}: {err:?}");
+        }
+        let err = map_connect_error(
+            ConnectError::new(ErrorCode::InvalidArgument, "request too large").with_detail(
+                problem(serde_json::json!({"status": 413, "code": "REQUEST_TOO_LARGE"})),
+            ),
+        );
+        assert!(err.is_request_too_large(), "{err:?}");
     }
 
     #[test]

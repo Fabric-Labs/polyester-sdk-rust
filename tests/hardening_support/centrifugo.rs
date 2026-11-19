@@ -23,8 +23,12 @@ pub struct Centrifugo {
     pub connects: Arc<AtomicUsize>,
     on_subscribed: Arc<Mutex<Option<Vec<u8>>>>,
     silent: Arc<std::sync::atomic::AtomicBool>,
+    refuse: Refusals,
     task: tokio::task::JoinHandle<()>,
 }
+
+/// Picks the Centrifugo error code a subscribe to a channel is refused with.
+type Refusals = Arc<Mutex<Option<Box<dyn Fn(&str) -> Option<u32> + Send + Sync>>>>;
 
 impl Drop for Centrifugo {
     fn drop(&mut self) {
@@ -56,6 +60,8 @@ impl Centrifugo {
         let accept_hook = on_subscribed.clone();
         let silent = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let accept_silent = silent.clone();
+        let refuse: Refusals = Arc::default();
+        let accept_refuse = refuse.clone();
         let task = tokio::spawn(async move {
             while let Ok((socket, _)) = listener.accept().await {
                 let conns = accept_conns.clone();
@@ -63,6 +69,7 @@ impl Centrifugo {
                 let connects = accept_connects.clone();
                 let on_subscribed = accept_hook.clone();
                 let silent = accept_silent.clone();
+                let refuse = accept_refuse.clone();
                 tokio::spawn(async move {
                     let accepted = tokio_tungstenite::accept_hdr_async(
                         socket,
@@ -89,6 +96,16 @@ impl Centrifugo {
                         };
                         if id == 2 {
                             channel = channel_in(&command.into_data());
+                            let refused = refuse.lock().unwrap().as_ref().and_then(|f| f(&channel));
+                            if let Some(code) = refused {
+                                let _ = ws
+                                    .send(WsMessage::Binary(
+                                        centrifugo_error_reply(id, code).into(),
+                                    ))
+                                    .await;
+                                while let Some(Ok(_)) = ws.next().await {}
+                                return;
+                            }
                         }
                         if ws
                             .send(WsMessage::Binary(centrifugo_ok_reply(id).into()))
@@ -134,8 +151,18 @@ impl Centrifugo {
             connects,
             on_subscribed,
             silent,
+            refuse,
             task,
         }
+    }
+
+    /// Refuses every later subscribe for which `code_for` names a code, with
+    /// a Centrifugo error reply of that code.
+    pub fn refuse_subscribes(
+        &self,
+        code_for: impl Fn(&str) -> Option<u32> + Send + Sync + 'static,
+    ) {
+        *self.refuse.lock().unwrap() = Some(Box::new(code_for));
     }
 
     /// Later connections are accepted but never confirmed.
@@ -244,6 +271,22 @@ pub fn unsubscribe_frame(channel: &str, code: u64, reason: &str) -> Vec<u8> {
     put_field(&mut push, 7, &body);
     let mut reply = Vec::new();
     put_field(&mut reply, 4, &push);
+    let mut frame = Vec::new();
+    put_varint(&mut frame, reply.len() as u64);
+    frame.extend_from_slice(&reply);
+    frame
+}
+
+/// `Reply { id, error = 2 { code = 1, message = 2 } }`.
+pub fn centrifugo_error_reply(id: u32, code: u32) -> Vec<u8> {
+    let mut error = Vec::new();
+    put_varint(&mut error, 1 << 3);
+    put_varint(&mut error, u64::from(code));
+    put_field(&mut error, 2, b"bad request");
+    let mut reply = Vec::new();
+    put_varint(&mut reply, 1 << 3);
+    put_varint(&mut reply, u64::from(id));
+    put_field(&mut reply, 2, &error);
     let mut frame = Vec::new();
     put_varint(&mut frame, reply.len() as u64);
     frame.extend_from_slice(&reply);
