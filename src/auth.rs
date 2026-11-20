@@ -846,33 +846,74 @@ mod tests {
         assert!(after_drop > before_drop);
     }
 
+    /// How often this thread has blocked: a sleep or any other wait counts,
+    /// being preempted by the scheduler does not.
+    #[cfg(target_os = "linux")]
+    fn voluntary_context_switches() -> Option<u64> {
+        let status = std::fs::read_to_string("/proc/thread-self/status").unwrap();
+        let count = status
+            .lines()
+            .find_map(|line| line.strip_prefix("voluntary_ctxt_switches:"))
+            .unwrap();
+        Some(count.trim().parse().unwrap())
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn voluntary_context_switches() -> Option<u64> {
+        None
+    }
+
     #[test]
     fn synchronous_signing_capacity_returns_retryable_error_without_sleeping() {
-        // A fixed clock, so nothing here depends on wall time or scheduling.
+        // A fixed clock, so no assertion here depends on wall time.
         const NOW_MS: u64 = 1_700_000_000_000;
         let ceiling = NOW_MS + MAX_SIGNING_FUTURE_SKEW_MS;
         for (seed, wait_ms) in [(ceiling, 1), (ceiling + 41, 42)] {
             let allocator = SigningTimestampAllocator::default();
             allocator.last_timestamp_ms.store(seed, Ordering::Release);
-            let clock_reads = std::cell::Cell::new(0_u32);
-            let error = allocator
-                .next_with_clock(|| {
-                    clock_reads.set(clock_reads.get() + 1);
-                    // Capacity reopens only as the clock advances, so waiting
-                    // for it means reading the clock again.
-                    assert_eq!(
-                        clock_reads.get(),
-                        1,
-                        "full capacity waited for the clock instead of returning"
-                    );
-                    Ok(NOW_MS)
-                })
-                .unwrap_err();
-            assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
-            assert!(error.is_retryable());
-            assert_eq!(error.retry_after(), Some(wait_ms as f64 / 1_000.0));
-            assert_eq!(clock_reads.get(), 1);
-            assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
+            let refuse = || {
+                let clock_reads = std::cell::Cell::new(0_u32);
+                let error = allocator
+                    .next_with_clock(|| {
+                        clock_reads.set(clock_reads.get() + 1);
+                        // Capacity reopens only as the clock advances, so
+                        // waiting for it means reading the clock again.
+                        assert_eq!(
+                            clock_reads.get(),
+                            1,
+                            "full capacity waited for the clock instead of returning"
+                        );
+                        Ok(NOW_MS)
+                    })
+                    .unwrap_err();
+                (error, clock_reads.get())
+            };
+            // A sleep or any other wait blocks this thread, which the kernel
+            // counts as a voluntary context switch. Preemption on a busy
+            // machine is counted apart, so load cannot fail this. A wait
+            // blocks on every call; a block from outside the call, such as a
+            // page-in, is rare, so the fewest over three calls must be zero.
+            let mut fewest_blocks: Option<u64> = None;
+            for _ in 0..3 {
+                let before = voluntary_context_switches();
+                let (error, clock_reads) = refuse();
+                let after = voluntary_context_switches();
+                if let (Some(before), Some(after)) = (before, after) {
+                    let blocks = after - before;
+                    fewest_blocks = Some(fewest_blocks.map_or(blocks, |fewest| fewest.min(blocks)));
+                }
+                assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
+                assert!(error.is_retryable());
+                assert_eq!(error.retry_after(), Some(wait_ms as f64 / 1_000.0));
+                assert_eq!(clock_reads, 1);
+                assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
+            }
+            if let Some(blocks) = fewest_blocks {
+                assert_eq!(
+                    blocks, 0,
+                    "full capacity blocked the thread before returning"
+                );
+            }
         }
 
         // The wall-clock entry point takes the same path: a seed far beyond
