@@ -2103,6 +2103,16 @@ pub trait OrdersReadService: Send + Sync + 'static {
     /// Retrieve order state and a bounded page of its lineage executions by order or client order ID.
     /// Use GetUserTrades for paginated execution history and optional settlement legs.
     /// Recent accepted orders may wait briefly for read availability; retry UNAVAILABLE with the same lookup key.
+    /// The successor of a BatchReplaceOrders item refused when it applied reads
+    /// REJECTED with the refusal's code, at version 1, for 60 seconds from the
+    /// batch's acceptance: its order ID, batch_request_id, the batch's admission
+    /// as its created time, and its own lineage at generation 1. It has no
+    /// terminal time: the refusal's own time is its BatchReplaceItemReject's
+    /// eventTsNs on the trading WebSocket. It never existed as an order, so it
+    /// carries no order terms: its pair, side, type, time in force, self-trade
+    /// prevention mode and fee asset are unset, and its price and quantities read
+    /// 0 as placeholders. The client takes its terms from the batch it sent.
+    /// After that window it is not found: see BatchReplaceOrdersRequest.
     /// Costs one unit of the root account's trading read limit.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).

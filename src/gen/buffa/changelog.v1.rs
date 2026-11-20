@@ -2140,7 +2140,15 @@ pub struct PostSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub introduction: ::buffa::alloc::string::String,
-    /// Time of first publication. It never changes when the post is republished.
+    /// Publication time of the post in this environment. For a release post,
+    /// the time its release went live here, the same value as this
+    /// environment's live_at in environments (releases that went live together
+    /// share it), or the time the post was first published while the release is
+    /// still pending here. It follows that live_at, without a new revision:
+    /// it changes when the release goes live here and whenever that live_at
+    /// changes later. For other posts, the time of first publication. It never
+    /// changes when the post is republished. Post lists are ordered by it,
+    /// newest first, then by release version descending at equal times.
     ///
     /// Field 4: `published_at`
     #[serde(
@@ -2220,7 +2228,9 @@ pub struct PostSummary {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
     )]
     pub bug_fix_count: u32,
-    /// When the current revision was published; equals published_at for revision 1.
+    /// When the current revision was published. For a post other than a release
+    /// post, it equals published_at for revision 1. For a release post, it is
+    /// independent of published_at and can be earlier or later.
     ///
     /// Field 12: `updated_at`
     #[serde(
@@ -3984,7 +3994,8 @@ pub struct ChangeEntry {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub post_slug: ::buffa::alloc::string::String,
-    /// Time of first publication of the announcing post.
+    /// Publication time of the announcing post in this environment, as its
+    /// PostSummary.published_at.
     ///
     /// Field 3: `published_at`
     #[serde(
@@ -4379,7 +4390,8 @@ pub struct DeploymentGroupPost {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub title: ::buffa::alloc::string::String,
-    /// Time of first publication of the post.
+    /// Publication time of the post in this environment, as its
+    /// PostSummary.published_at: the time its release went live here.
     ///
     /// Field 4: `published_at`
     #[serde(
@@ -7945,7 +7957,15 @@ pub mod __buffa {
             ///
             /// Field 3: `introduction`
             pub introduction: &'a str,
-            /// Time of first publication. It never changes when the post is republished.
+            /// Publication time of the post in this environment. For a release post,
+            /// the time its release went live here, the same value as this
+            /// environment's live_at in environments (releases that went live together
+            /// share it), or the time the post was first published while the release is
+            /// still pending here. It follows that live_at, without a new revision:
+            /// it changes when the release goes live here and whenever that live_at
+            /// changes later. For other posts, the time of first publication. It never
+            /// changes when the post is republished. Post lists are ordered by it,
+            /// newest first, then by release version descending at equal times.
             ///
             /// Field 4: `published_at`
             pub published_at: ::buffa::MessageFieldView<
@@ -7981,7 +8001,9 @@ pub mod __buffa {
             ///
             /// Field 11: `bug_fix_count`
             pub bug_fix_count: u32,
-            /// When the current revision was published; equals published_at for revision 1.
+            /// When the current revision was published. For a post other than a release
+            /// post, it equals published_at for revision 1. For a release post, it is
+            /// independent of published_at and can be earlier or later.
             ///
             /// Field 12: `updated_at`
             pub updated_at: ::buffa::MessageFieldView<
@@ -8741,7 +8763,15 @@ pub mod __buffa {
             pub fn introduction(&self) -> &'_ str {
                 self.0.reborrow().introduction
             }
-            /// Time of first publication. It never changes when the post is republished.
+            /// Publication time of the post in this environment. For a release post,
+            /// the time its release went live here, the same value as this
+            /// environment's live_at in environments (releases that went live together
+            /// share it), or the time the post was first published while the release is
+            /// still pending here. It follows that live_at, without a new revision:
+            /// it changes when the release goes live here and whenever that live_at
+            /// changes later. For other posts, the time of first publication. It never
+            /// changes when the post is republished. Post lists are ordered by it,
+            /// newest first, then by release version descending at equal times.
             ///
             /// Field 4: `published_at`
             #[must_use]
@@ -8805,7 +8835,9 @@ pub mod __buffa {
             pub fn bug_fix_count(&self) -> u32 {
                 self.0.reborrow().bug_fix_count
             }
-            /// When the current revision was published; equals published_at for revision 1.
+            /// When the current revision was published. For a post other than a release
+            /// post, it equals published_at for revision 1. For a release post, it is
+            /// independent of published_at and can be earlier or later.
             ///
             /// Field 12: `updated_at`
             #[must_use]
@@ -11258,7 +11290,8 @@ pub mod __buffa {
             ///
             /// Field 2: `post_slug`
             pub post_slug: &'a str,
-            /// Time of first publication of the announcing post.
+            /// Publication time of the announcing post in this environment, as its
+            /// PostSummary.published_at.
             ///
             /// Field 3: `published_at`
             pub published_at: ::buffa::MessageFieldView<
@@ -11638,7 +11671,8 @@ pub mod __buffa {
             pub fn post_slug(&self) -> &'_ str {
                 self.0.reborrow().post_slug
             }
-            /// Time of first publication of the announcing post.
+            /// Publication time of the announcing post in this environment, as its
+            /// PostSummary.published_at.
             ///
             /// Field 3: `published_at`
             #[must_use]
@@ -12032,7 +12066,8 @@ pub mod __buffa {
             ///
             /// Field 3: `title`
             pub title: &'a str,
-            /// Time of first publication of the post.
+            /// Publication time of the post in this environment, as its
+            /// PostSummary.published_at: the time its release went live here.
             ///
             /// Field 4: `published_at`
             pub published_at: ::buffa::MessageFieldView<
@@ -12465,7 +12500,8 @@ pub mod __buffa {
             pub fn title(&self) -> &'_ str {
                 self.0.reborrow().title
             }
-            /// Time of first publication of the post.
+            /// Publication time of the post in this environment, as its
+            /// PostSummary.published_at: the time its release went live here.
             ///
             /// Field 4: `published_at`
             #[must_use]

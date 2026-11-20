@@ -13500,29 +13500,33 @@ where
     }
 }
 
-///Shorthand for `OwnedView<GetAppAuthorizationRequestView<'static>>`.
-pub type OwnedGetAppAuthorizationRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<'static>,
+///Shorthand for `OwnedView<GetAppConnectionRequestRequestView<'static>>`.
+pub type OwnedGetAppConnectionRequestRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestRequestView<'static>,
 >;
-///Shorthand for `OwnedView<GetAppAuthorizationResponseView<'static>>`.
-pub type OwnedGetAppAuthorizationResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'static>,
+///Shorthand for `OwnedView<GetAppConnectionRequestResponseView<'static>>`.
+pub type OwnedGetAppConnectionRequestResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestResponseView<'static>,
 >;
-///Shorthand for `OwnedView<ApproveAppAuthorizationRequestView<'static>>`.
-pub type OwnedApproveAppAuthorizationRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<'static>,
+///Shorthand for `OwnedView<ApproveAppConnectionRequestRequestView<'static>>`.
+pub type OwnedApproveAppConnectionRequestRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestRequestView<
+        'static,
+    >,
 >;
-///Shorthand for `OwnedView<ApproveAppAuthorizationResponseView<'static>>`.
-pub type OwnedApproveAppAuthorizationResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'static>,
+///Shorthand for `OwnedView<ApproveAppConnectionRequestResponseView<'static>>`.
+pub type OwnedApproveAppConnectionRequestResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestResponseView<
+        'static,
+    >,
 >;
-///Shorthand for `OwnedView<DenyAppAuthorizationRequestView<'static>>`.
-pub type OwnedDenyAppAuthorizationRequestView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<'static>,
+///Shorthand for `OwnedView<DenyAppConnectionRequestRequestView<'static>>`.
+pub type OwnedDenyAppConnectionRequestRequestView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestRequestView<'static>,
 >;
-///Shorthand for `OwnedView<DenyAppAuthorizationResponseView<'static>>`.
-pub type OwnedDenyAppAuthorizationResponseView = ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'static>,
+///Shorthand for `OwnedView<DenyAppConnectionRequestResponseView<'static>>`.
+pub type OwnedDenyAppConnectionRequestResponseView = ::buffa::view::OwnedView<
+    crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestResponseView<'static>,
 >;
 ///Shorthand for `OwnedView<ListConnectedAppsRequestView<'static>>`.
 pub type OwnedListConnectedAppsRequestView = ::buffa::view::OwnedView<
@@ -13540,8 +13544,8 @@ pub type OwnedRevokeConnectedAppRequestView = ::buffa::view::OwnedView<
 pub type OwnedRevokeConnectedAppResponseView = ::buffa::view::OwnedView<
     crate::proto::auth::v1::__buffa::view::RevokeConnectedAppResponseView<'static>,
 >;
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppAuthorizationResponse>
-for crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppConnectionRequestResponse>
+for crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -13549,9 +13553,9 @@ for crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'_> {
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppAuthorizationResponse>
+impl ::connectrpc::Encodable<crate::proto::auth::v1::GetAppConnectionRequestResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<'static>,
+    crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -13560,8 +13564,8 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppAuthorizationResponse>
-for crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppConnectionRequestResponse>
+for crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -13569,9 +13573,11 @@ for crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppAuthorizationResponse>
+impl ::connectrpc::Encodable<crate::proto::auth::v1::ApproveAppConnectionRequestResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<'static>,
+    crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestResponseView<
+        'static,
+    >,
 > {
     fn encode(
         &self,
@@ -13580,8 +13586,8 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppAuthorizationResponse>
-for crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'_> {
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppConnectionRequestResponse>
+for crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestResponseView<'_> {
     fn encode(
         &self,
         codec: ::connectrpc::CodecFormat,
@@ -13589,9 +13595,9 @@ for crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'_> 
         ::connectrpc::__codegen::encode_view_body(self, codec)
     }
 }
-impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppAuthorizationResponse>
+impl ::connectrpc::Encodable<crate::proto::auth::v1::DenyAppConnectionRequestResponse>
 for ::buffa::view::OwnedView<
-    crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<'static>,
+    crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestResponseView<'static>,
 > {
     fn encode(
         &self,
@@ -13642,30 +13648,30 @@ for ::buffa::view::OwnedView<
 }
 /// Full service name for this service.
 pub const CONNECTED_APP_SERVICE_SERVICE_NAME: &str = "auth.v1.ConnectedAppService";
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetAppAuthorization` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetAppConnectionRequest` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.ConnectedAppService/GetAppAuthorization",
+pub const CONNECTED_APP_SERVICE_GET_APP_CONNECTION_REQUEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/GetAppConnectionRequest",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::NoSideEffects);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `ApproveAppAuthorization` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ApproveAppConnectionRequest` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.ConnectedAppService/ApproveAppAuthorization",
+pub const CONNECTED_APP_SERVICE_APPROVE_APP_CONNECTION_REQUEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/ApproveAppConnectionRequest",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
-/// Static [`Spec`](::connectrpc::Spec) for the server-side `DenyAppAuthorization` RPC.
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `DenyAppConnectionRequest` RPC.
 ///
 /// The dispatcher surfaces this on
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
-pub const CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
-        "/auth.v1.ConnectedAppService/DenyAppAuthorization",
+pub const CONNECTED_APP_SERVICE_DENY_APP_CONNECTION_REQUEST_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/auth.v1.ConnectedAppService/DenyAppConnectionRequest",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -13687,13 +13693,14 @@ pub const CONNECTED_APP_SERVICE_REVOKE_CONNECTED_APP_SPEC: ::connectrpc::Spec = 
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Idempotent);
-/// ConnectedAppService connects outside apps, such as an AI assistant, to the
-/// account with OAuth ("Sign in with Polyester"), and lists and disconnects
-/// them. A connected app uses the account as the signed-in website does, for
-/// the scopes the account granted; it never moves money out of the account
-/// and never changes its security settings. A connection lasts until the
-/// account or the app disconnects it, or until it expires; signing out of the
-/// website does not end it.
+/// ConnectedAppService connects outside apps, such as an AI assistant, a
+/// spreadsheet, a portfolio tracker or another tool, to the account with OAuth
+/// ("Sign in with Polyester"), and lists and disconnects them. A connected app
+/// uses the account as the signed-in website does, for the scopes the account
+/// granted; it never moves money out of the account and never changes its
+/// security settings. A connection lasts until the account or the app
+/// disconnects it, or until it expires; signing out of the website does not
+/// end it.
 ///
 /// # Implementing handlers
 ///
@@ -13754,17 +13761,17 @@ pub trait ConnectedAppService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn get_app_authorization<'a>(
+    fn get_app_connection_request<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::auth::v1::GetAppAuthorizationRequest,
+            crate::proto::auth::v1::GetAppConnectionRequestRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::GetAppAuthorizationResponse,
+                crate::proto::auth::v1::GetAppConnectionRequestResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -13782,17 +13789,17 @@ pub trait ConnectedAppService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn approve_app_authorization<'a>(
+    fn approve_app_connection_request<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+            crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+                crate::proto::auth::v1::ApproveAppConnectionRequestResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -13807,17 +13814,17 @@ pub trait ConnectedAppService: Send + Sync + 'static {
     /// (zero-copy). The response cannot borrow from `request` — use
     /// `.to_owned_message()` (or copy the specific fields) for anything
     /// returned, stored, or moved into `tokio::spawn`.
-    fn deny_app_authorization<'a>(
+    fn deny_app_connection_request<'a>(
         &'a self,
         ctx: ::connectrpc::RequestContext,
         request: ::connectrpc::ServiceRequest<
             '_,
-            crate::proto::auth::v1::DenyAppAuthorizationRequest,
+            crate::proto::auth::v1::DenyAppConnectionRequestRequest,
         >,
     ) -> impl ::std::future::Future<
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
-                crate::proto::auth::v1::DenyAppAuthorizationResponse,
+                crate::proto::auth::v1::DenyAppConnectionRequestResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -13903,13 +13910,13 @@ impl<S: ConnectedAppService> ConnectedAppServiceExt for S {
         router
             .route_view_idempotent(
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "GetAppAuthorization",
+                "GetAppConnectionRequest",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<
+                            crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestRequestView<
                                 'static,
                             >,
                         >,
@@ -13918,27 +13925,27 @@ impl<S: ConnectedAppService> ConnectedAppServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::GetAppAuthorizationRequest,
+                                crate::proto::auth::v1::GetAppConnectionRequestRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.get_app_authorization(ctx, sreq)
+                            svc.get_app_connection_request(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::auth::v1::GetAppAuthorizationResponse,
+                                    crate::proto::auth::v1::GetAppConnectionRequestResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC)
+            .with_spec(CONNECTED_APP_SERVICE_GET_APP_CONNECTION_REQUEST_SPEC)
             .route_view(
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "ApproveAppAuthorization",
+                "ApproveAppConnectionRequest",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<
+                            crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestRequestView<
                                 'static,
                             >,
                         >,
@@ -13947,27 +13954,27 @@ impl<S: ConnectedAppService> ConnectedAppServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                                crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.approve_app_authorization(ctx, sreq)
+                            svc.approve_app_connection_request(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+                                    crate::proto::auth::v1::ApproveAppConnectionRequestResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC)
+            .with_spec(CONNECTED_APP_SERVICE_APPROVE_APP_CONNECTION_REQUEST_SPEC)
             .route_view(
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "DenyAppAuthorization",
+                "DenyAppConnectionRequest",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
                     ::connectrpc::view_handler_fn(move |
                         ctx,
                         req: ::buffa::view::OwnedView<
-                            crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<
+                            crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestRequestView<
                                 'static,
                             >,
                         >,
@@ -13976,18 +13983,18 @@ impl<S: ConnectedAppService> ConnectedAppServiceExt for S {
                         let svc = ::std::sync::Arc::clone(&svc);
                         async move {
                             let sreq = ::connectrpc::ServiceRequest::<
-                                crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                                crate::proto::auth::v1::DenyAppConnectionRequestRequest,
                             >::from_parts(req.reborrow(), req.bytes());
-                            svc.deny_app_authorization(ctx, sreq)
+                            svc.deny_app_connection_request(ctx, sreq)
                                 .await?
                                 .encode::<
-                                    crate::proto::auth::v1::DenyAppAuthorizationResponse,
+                                    crate::proto::auth::v1::DenyAppConnectionRequestResponse,
                                 >(format)
                         }
                     })
                 },
             )
-            .with_spec(CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC)
+            .with_spec(CONNECTED_APP_SERVICE_DENY_APP_CONNECTION_REQUEST_SPEC)
             .route_view_idempotent(
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
                 "ListConnectedApps",
@@ -14102,22 +14109,26 @@ impl<T: ConnectedAppService> ::connectrpc::Dispatcher for ConnectedAppServiceSer
     ) -> Option<::connectrpc::dispatcher::codegen::MethodDescriptor> {
         let method = path.strip_prefix("auth.v1.ConnectedAppService/")?;
         match method {
-            "GetAppAuthorization" => {
+            "GetAppConnectionRequest" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(true)
-                        .with_spec(CONNECTED_APP_SERVICE_GET_APP_AUTHORIZATION_SPEC),
+                        .with_spec(CONNECTED_APP_SERVICE_GET_APP_CONNECTION_REQUEST_SPEC),
                 )
             }
-            "ApproveAppAuthorization" => {
+            "ApproveAppConnectionRequest" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(CONNECTED_APP_SERVICE_APPROVE_APP_AUTHORIZATION_SPEC),
+                        .with_spec(
+                            CONNECTED_APP_SERVICE_APPROVE_APP_CONNECTION_REQUEST_SPEC,
+                        ),
                 )
             }
-            "DenyAppAuthorization" => {
+            "DenyAppConnectionRequest" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
-                        .with_spec(CONNECTED_APP_SERVICE_DENY_APP_AUTHORIZATION_SPEC),
+                        .with_spec(
+                            CONNECTED_APP_SERVICE_DENY_APP_CONNECTION_REQUEST_SPEC,
+                        ),
                 )
             }
             "ListConnectedApps" => {
@@ -14147,66 +14158,66 @@ impl<T: ConnectedAppService> ::connectrpc::Dispatcher for ConnectedAppServiceSer
         };
         let _ = (&ctx, &request, &format);
         match method {
-            "GetAppAuthorization" => {
+            "GetAppConnectionRequest" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::GetAppAuthorizationRequest,
+                        crate::proto::auth::v1::GetAppConnectionRequestRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::GetAppAuthorizationRequestView<
+                    let req: crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::GetAppAuthorizationRequest,
+                        crate::proto::auth::v1::GetAppConnectionRequestRequest,
                     >::from_parts(&req, &body);
-                    svc.get_app_authorization(ctx, req)
+                    svc.get_app_connection_request(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::auth::v1::GetAppAuthorizationResponse,
+                            crate::proto::auth::v1::GetAppConnectionRequestResponse,
                         >(format)
                 })
             }
-            "ApproveAppAuthorization" => {
+            "ApproveAppConnectionRequest" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                        crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationRequestView<
+                    let req: crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+                        crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
                     >::from_parts(&req, &body);
-                    svc.approve_app_authorization(ctx, req)
+                    svc.approve_app_connection_request(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::auth::v1::ApproveAppAuthorizationResponse,
+                            crate::proto::auth::v1::ApproveAppConnectionRequestResponse,
                         >(format)
                 })
             }
-            "DenyAppAuthorization" => {
+            "DenyAppConnectionRequest" => {
                 let svc = ::std::sync::Arc::clone(&self.inner);
                 Box::pin(async move {
                     let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
-                        crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                        crate::proto::auth::v1::DenyAppConnectionRequestRequest,
                     >(request.encoded()?, format)?;
-                    let req: crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationRequestView<
+                    let req: crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestRequestView<
                         '_,
                     > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
                         &body,
                     )?;
                     let req = ::connectrpc::ServiceRequest::<
-                        crate::proto::auth::v1::DenyAppAuthorizationRequest,
+                        crate::proto::auth::v1::DenyAppConnectionRequestRequest,
                     >::from_parts(&req, &body);
-                    svc.deny_app_authorization(ctx, req)
+                    svc.deny_app_connection_request(ctx, req)
                         .await?
                         .encode::<
-                            crate::proto::auth::v1::DenyAppAuthorizationResponse,
+                            crate::proto::auth::v1::DenyAppConnectionRequestResponse,
                         >(format)
                 })
             }
@@ -14315,7 +14326,7 @@ impl<T: ConnectedAppService> ::connectrpc::Dispatcher for ConnectedAppServiceSer
 /// message, so field access is zero-copy:
 ///
 /// ```rust,ignore
-/// let resp = client.get_app_authorization(request).await?;
+/// let resp = client.get_app_connection_request(request).await?;
 /// let name: &str = resp.view().name;  // borrow into the response buffer
 /// ```
 ///
@@ -14323,7 +14334,7 @@ impl<T: ConnectedAppService> ::connectrpc::Dispatcher for ConnectedAppServiceSer
 /// [`into_owned()`](::connectrpc::client::UnaryResponse::into_owned):
 ///
 /// ```rust,ignore
-/// let owned = client.get_app_authorization(request).await?.into_owned();
+/// let owned = client.get_app_connection_request(request).await?.into_owned();
 /// ```
 ///
 /// [`into_view()`](::connectrpc::client::UnaryResponse::into_view) keeps the
@@ -14354,35 +14365,35 @@ where
     pub fn config_mut(&mut self) -> &mut ::connectrpc::client::ClientConfig {
         &mut self.config
     }
-    /// Call the GetAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/GetAppAuthorization.
-    pub async fn get_app_authorization(
+    /// Call the GetAppConnectionRequest RPC. Sends a request to /auth.v1.ConnectedAppService/GetAppConnectionRequest.
+    pub async fn get_app_connection_request(
         &self,
-        request: crate::proto::auth::v1::GetAppAuthorizationRequest,
+        request: crate::proto::auth::v1::GetAppConnectionRequestRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.get_app_authorization_with_options(
+        self.get_app_connection_request_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the GetAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn get_app_authorization_with_options(
+    /// Call the GetAppConnectionRequest RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_app_connection_request_with_options(
         &self,
-        request: crate::proto::auth::v1::GetAppAuthorizationRequest,
+        request: crate::proto::auth::v1::GetAppConnectionRequestRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::GetAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::GetAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
@@ -14393,41 +14404,41 @@ where
                 &self.transport,
                 &self.config,
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "GetAppAuthorization",
+                "GetAppConnectionRequest",
                 request,
                 options,
             )
             .await
     }
-    /// Call the ApproveAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/ApproveAppAuthorization.
-    pub async fn approve_app_authorization(
+    /// Call the ApproveAppConnectionRequest RPC. Sends a request to /auth.v1.ConnectedAppService/ApproveAppConnectionRequest.
+    pub async fn approve_app_connection_request(
         &self,
-        request: crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+        request: crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.approve_app_authorization_with_options(
+        self.approve_app_connection_request_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the ApproveAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn approve_app_authorization_with_options(
+    /// Call the ApproveAppConnectionRequest RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn approve_app_connection_request_with_options(
         &self,
-        request: crate::proto::auth::v1::ApproveAppAuthorizationRequest,
+        request: crate::proto::auth::v1::ApproveAppConnectionRequestRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::ApproveAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::ApproveAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
@@ -14438,41 +14449,41 @@ where
                 &self.transport,
                 &self.config,
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "ApproveAppAuthorization",
+                "ApproveAppConnectionRequest",
                 request,
                 options,
             )
             .await
     }
-    /// Call the DenyAppAuthorization RPC. Sends a request to /auth.v1.ConnectedAppService/DenyAppAuthorization.
-    pub async fn deny_app_authorization(
+    /// Call the DenyAppConnectionRequest RPC. Sends a request to /auth.v1.ConnectedAppService/DenyAppConnectionRequest.
+    pub async fn deny_app_connection_request(
         &self,
-        request: crate::proto::auth::v1::DenyAppAuthorizationRequest,
+        request: crate::proto::auth::v1::DenyAppConnectionRequestRequest,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
         >,
         ::connectrpc::ConnectError,
     > {
-        self.deny_app_authorization_with_options(
+        self.deny_app_connection_request_with_options(
                 request,
                 ::connectrpc::client::CallOptions::default(),
             )
             .await
     }
-    /// Call the DenyAppAuthorization RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
-    pub async fn deny_app_authorization_with_options(
+    /// Call the DenyAppConnectionRequest RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn deny_app_connection_request_with_options(
         &self,
-        request: crate::proto::auth::v1::DenyAppAuthorizationRequest,
+        request: crate::proto::auth::v1::DenyAppConnectionRequestRequest,
         options: ::connectrpc::client::CallOptions,
     ) -> Result<
         ::connectrpc::client::UnaryResponse<
             ::buffa::view::OwnedView<
-                crate::proto::auth::v1::__buffa::view::DenyAppAuthorizationResponseView<
+                crate::proto::auth::v1::__buffa::view::DenyAppConnectionRequestResponseView<
                     'static,
                 >,
             >,
@@ -14483,7 +14494,7 @@ where
                 &self.transport,
                 &self.config,
                 CONNECTED_APP_SERVICE_SERVICE_NAME,
-                "DenyAppAuthorization",
+                "DenyAppConnectionRequest",
                 request,
                 options,
             )

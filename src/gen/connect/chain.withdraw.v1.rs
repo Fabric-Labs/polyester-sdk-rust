@@ -1230,6 +1230,18 @@ pub type OwnedCreateWalletTradingWithdrawResponseView = ::buffa::view::OwnedView
         'static,
     >,
 >;
+///Shorthand for `OwnedView<CreateWalletTradingToFundingBatchRequestView<'static>>`.
+pub type OwnedCreateWalletTradingToFundingBatchRequestView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<CreateWalletTradingToFundingBatchResponseView<'static>>`.
+pub type OwnedCreateWalletTradingToFundingBatchResponseView = ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchResponseView<
+        'static,
+    >,
+>;
 impl ::connectrpc::Encodable<
     crate::proto::chain::withdraw::v1::GetWalletBalancesResponse,
 >
@@ -1340,6 +1352,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchResponse,
+>
+for crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const WITHDRAW_SERVICE_SERVICE_NAME: &str = "chain.withdraw.v1.WithdrawService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetWalletBalances` RPC.
@@ -1375,6 +1415,15 @@ pub const WITHDRAW_SERVICE_CREATE_TRADING_WITHDRAW_SPEC: ::connectrpc::Spec = ::
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const WITHDRAW_SERVICE_CREATE_WALLET_TRADING_WITHDRAW_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/chain.withdraw.v1.WithdrawService/CreateWalletTradingWithdraw",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `CreateWalletTradingToFundingBatch` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const WITHDRAW_SERVICE_CREATE_WALLET_TRADING_TO_FUNDING_BATCH_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -1531,6 +1580,37 @@ pub trait WithdrawService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Move up to 10 amounts from one Trading account to Funding accounts with
+    /// one wallet signature and one MFA check. All legs are accepted or none:
+    /// a leg refused for any reason, for example insufficient funds, refuses the
+    /// whole batch, and nothing moves. An accepted batch is paid as one, and if
+    /// the payment fails every leg is refunded. When every leg goes to the
+    /// caller's own accounts, a recent MFA is enough; any other leg needs one
+    /// fresh single-use step-up for the whole batch. A session without recent
+    /// MFA is refused with the auth error AUTH_MFA_ELEVATION_REQUIRED, and a
+    /// missing or spent step-up with AUTH_STEP_UP_REQUIRED.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn create_wallet_trading_to_funding_batch<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -1679,6 +1759,35 @@ impl<S: WithdrawService> WithdrawServiceExt for S {
                 },
             )
             .with_spec(WITHDRAW_SERVICE_CREATE_WALLET_TRADING_WITHDRAW_SPEC)
+            .route_view(
+                WITHDRAW_SERVICE_SERVICE_NAME,
+                "CreateWalletTradingToFundingBatch",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.create_wallet_trading_to_funding_batch(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(WITHDRAW_SERVICE_CREATE_WALLET_TRADING_TO_FUNDING_BATCH_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -1755,6 +1864,14 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(WITHDRAW_SERVICE_CREATE_WALLET_TRADING_WITHDRAW_SPEC),
+                )
+            }
+            "CreateWalletTradingToFundingBatch" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            WITHDRAW_SERVICE_CREATE_WALLET_TRADING_TO_FUNDING_BATCH_SPEC,
+                        ),
                 )
             }
             _ => None,
@@ -1853,6 +1970,27 @@ impl<T: WithdrawService> ::connectrpc::Dispatcher for WithdrawServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::chain::withdraw::v1::CreateWalletTradingWithdrawResponse,
+                        >(format)
+                })
+            }
+            "CreateWalletTradingToFundingBatch" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+                    >::from_parts(&req, &body);
+                    svc.create_wallet_trading_to_funding_batch(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchResponse,
                         >(format)
                 })
             }
@@ -2133,6 +2271,51 @@ where
                 &self.config,
                 WITHDRAW_SERVICE_SERVICE_NAME,
                 "CreateWalletTradingWithdraw",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the CreateWalletTradingToFundingBatch RPC. Sends a request to /chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch.
+    pub async fn create_wallet_trading_to_funding_batch(
+        &self,
+        request: crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.create_wallet_trading_to_funding_batch_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the CreateWalletTradingToFundingBatch RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn create_wallet_trading_to_funding_batch_with_options(
+        &self,
+        request: crate::proto::chain::withdraw::v1::CreateWalletTradingToFundingBatchRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::chain::withdraw::v1::__buffa::view::CreateWalletTradingToFundingBatchResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                WITHDRAW_SERVICE_SERVICE_NAME,
+                "CreateWalletTradingToFundingBatch",
                 request,
                 options,
             )
