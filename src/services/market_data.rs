@@ -273,11 +273,13 @@ impl MarketDataService {
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
     ///
     /// The columnar reply carries no closed flag, so [`Candle::is_closed`] is
-    /// derived from the request. With `include_incomplete` false every columnar
-    /// row is closed. With `include_incomplete` true the newest primary row (and
-    /// the newest reference row) reads `false`, meaning "not known to be
-    /// closed": it may be the open bucket, or a closed one when no open candle
-    /// was in range. Earlier rows read `true`.
+    /// derived from the request. With `include_incomplete` false every row is
+    /// closed and reads `true`. With `include_incomplete` true, on a first page
+    /// (no `page_token`), the newest primary row reads `false`, meaning "not
+    /// known to be closed": it may be the open bucket, or a closed one when no
+    /// open candle was in range; earlier rows read `true`. A continuation page
+    /// (a `page_token` set) holds only older, closed candles, so every row
+    /// reads `true`. Reference rows are always closed buckets and read `true`.
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         check_limit(
             "get_candles_columns",
@@ -287,6 +289,9 @@ impl MarketDataService {
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (base, volume_scale) = self.build_candles_request(&opts)?;
+        // Only a first page can hold the open candle: a continuation page
+        // holds only older, closed candles.
+        let may_hold_open_candle = base.include_incomplete && base.page_token.is_empty();
         let req = GetCandlesColumnsRequest {
             symbol_id: base.symbol_id,
             timeframe: base.timeframe,
@@ -308,8 +313,10 @@ impl MarketDataService {
                 .catalogs
                 .reference_price_scale_for_symbol_id(base.symbol_id),
         )?;
-        if base.include_incomplete {
-            mark_newest_columns_not_known_closed(&mut result);
+        if may_hold_open_candle && let Some(newest) = result.candles.last_mut() {
+            // The open candle, when one is in range, comes last in the
+            // oldest-first primary series, unflagged.
+            newest.is_closed = false;
         }
         Ok(result)
     }
@@ -454,17 +461,6 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
         }
     };
     Ok(tf)
-}
-
-/// The columnar reply puts the open candle, when one is in range, last in each
-/// oldest-first series and does not flag it: the newest row of each series is
-/// not known to be closed.
-fn mark_newest_columns_not_known_closed(result: &mut CandlesResult) {
-    for series in [&mut result.candles, &mut result.reference_candles] {
-        if let Some(newest) = series.last_mut() {
-            newest.is_closed = false;
-        }
-    }
 }
 
 fn newest_candle(result: CandlesResult) -> Option<Candle> {

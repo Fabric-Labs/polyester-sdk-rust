@@ -289,9 +289,10 @@ fn reference_candles_from_points(
 ///
 /// The columnar reply carries no closed flag, so every row reads
 /// `is_closed: true`, which is exact for a page requested without
-/// `include_incomplete`. For a page requested with it, the newest row of each
-/// series may be the open bucket: set its `is_closed` to `false`, as
-/// `MarketDataService::get_candles_columns` does.
+/// `include_incomplete`, for a continuation page (a page token set) and for
+/// every reference row. For a first page requested with `include_incomplete`,
+/// the newest primary row may be the open bucket: set its `is_closed` to
+/// `false`, as `MarketDataService::get_candles_columns` does.
 pub fn candles_columns_from_proto(
     msg: &GetCandlesColumnsResponse,
     volume_scale: u32,
