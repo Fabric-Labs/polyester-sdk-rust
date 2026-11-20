@@ -53,40 +53,55 @@ struct SigningTimestampAllocator {
     async_gate: tokio::sync::Mutex<()>,
 }
 
+/// One allocation attempt: a timestamp, or a full window and how long until
+/// the clock gives it room again.
+#[derive(Debug, PartialEq, Eq)]
+enum Allocation {
+    Granted(u64),
+    Full { wait_ms: u64 },
+}
+
 impl SigningTimestampAllocator {
     fn next(&self) -> Result<u64> {
-        self.next_with_clock(|| timestamp_ms_from(SystemTime::now()))
+        self.next_at(timestamp_ms_from(SystemTime::now())?)
     }
 
-    /// Allocate against `now_ms`, read once per attempt. This never waits:
-    /// a full window returns a retryable capacity error at once.
-    fn next_with_clock(&self, mut now_ms: impl FnMut() -> Result<u64>) -> Result<u64> {
+    /// The synchronous path: a full window is refused with a retryable
+    /// capacity error at once. Only [`Self::next_async`] waits for room.
+    fn next_at(&self, now_ms: u64) -> Result<u64> {
+        match self.allocate_at(now_ms)? {
+            Allocation::Granted(timestamp) => Ok(timestamp),
+            Allocation::Full { wait_ms } => Err(signing_capacity_error(wait_ms)),
+        }
+    }
+
+    /// Allocate against `now_ms` without waiting. A full window consumes
+    /// nothing.
+    fn allocate_at(&self, now_ms: u64) -> Result<Allocation> {
+        let ceiling = now_ms
+            .checked_add(MAX_SIGNING_FUTURE_SKEW_MS)
+            .ok_or_else(|| Error::transport("signing timestamp ceiling overflow"))?;
         loop {
-            let now = now_ms()?;
-            let ceiling = now
-                .checked_add(MAX_SIGNING_FUTURE_SKEW_MS)
-                .ok_or_else(|| Error::transport("signing timestamp ceiling overflow"))?;
             let observed = self.last_timestamp_ms.load(Ordering::Acquire);
-            let candidate = if observed < now {
-                now
+            let candidate = if observed < now_ms {
+                now_ms
             } else {
                 observed
                     .checked_add(1)
                     .ok_or_else(|| Error::transport("signing timestamp sequence exhausted"))?
             };
-
-            if candidate <= ceiling {
-                if self
-                    .last_timestamp_ms
-                    .compare_exchange_weak(observed, candidate, Ordering::AcqRel, Ordering::Acquire)
-                    .is_ok()
-                {
-                    return Ok(candidate);
-                }
-                continue;
+            if candidate > ceiling {
+                return Ok(Allocation::Full {
+                    wait_ms: candidate - ceiling,
+                });
             }
-
-            return Err(signing_capacity_error(candidate - ceiling));
+            if self
+                .last_timestamp_ms
+                .compare_exchange_weak(observed, candidate, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                return Ok(Allocation::Granted(candidate));
+            }
         }
     }
 
@@ -98,16 +113,15 @@ impl SigningTimestampAllocator {
             .await
             .map_err(|_| signing_capacity_error(1))?;
         loop {
-            match self.next() {
-                Ok(timestamp) => return Ok(timestamp),
-                Err(Error::RateLimit { retry_after, .. })
-                    if started.elapsed() < MAX_SIGNING_BACKPRESSURE =>
-                {
-                    let wait = Duration::from_secs_f64(retry_after.unwrap_or(0.001).max(0.001));
+            match self.allocate_at(timestamp_ms_from(SystemTime::now())?)? {
+                Allocation::Granted(timestamp) => return Ok(timestamp),
+                Allocation::Full { wait_ms } => {
                     let remaining = MAX_SIGNING_BACKPRESSURE.saturating_sub(started.elapsed());
-                    tokio::time::sleep(wait.min(remaining)).await;
+                    if remaining.is_zero() {
+                        return Err(signing_capacity_error(wait_ms));
+                    }
+                    tokio::time::sleep(Duration::from_millis(wait_ms).min(remaining)).await;
                 }
-                Err(error) => return Err(error),
             }
         }
     }
@@ -846,75 +860,35 @@ mod tests {
         assert!(after_drop > before_drop);
     }
 
-    /// How often this thread has blocked: a sleep or any other wait counts,
-    /// being preempted by the scheduler does not.
-    #[cfg(target_os = "linux")]
-    fn voluntary_context_switches() -> Option<u64> {
-        let status = std::fs::read_to_string("/proc/thread-self/status").unwrap();
-        let count = status
-            .lines()
-            .find_map(|line| line.strip_prefix("voluntary_ctxt_switches:"))
-            .unwrap();
-        Some(count.trim().parse().unwrap())
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    fn voluntary_context_switches() -> Option<u64> {
-        None
-    }
-
     #[test]
     fn synchronous_signing_capacity_returns_retryable_error_without_sleeping() {
-        // A fixed clock, so no assertion here depends on wall time.
+        // A fixed clock, so nothing here depends on wall time or scheduling.
         const NOW_MS: u64 = 1_700_000_000_000;
         let ceiling = NOW_MS + MAX_SIGNING_FUTURE_SKEW_MS;
         for (seed, wait_ms) in [(ceiling, 1), (ceiling + 41, 42)] {
             let allocator = SigningTimestampAllocator::default();
             allocator.last_timestamp_ms.store(seed, Ordering::Release);
-            let refuse = || {
-                let clock_reads = std::cell::Cell::new(0_u32);
-                let error = allocator
-                    .next_with_clock(|| {
-                        clock_reads.set(clock_reads.get() + 1);
-                        // Capacity reopens only as the clock advances, so
-                        // waiting for it means reading the clock again.
-                        assert_eq!(
-                            clock_reads.get(),
-                            1,
-                            "full capacity waited for the clock instead of returning"
-                        );
-                        Ok(NOW_MS)
-                    })
-                    .unwrap_err();
-                (error, clock_reads.get())
-            };
-            // A sleep or any other wait blocks this thread, which the kernel
-            // counts as a voluntary context switch. Preemption on a busy
-            // machine is counted apart, so load cannot fail this. A wait
-            // blocks on every call; a block from outside the call, such as a
-            // page-in, is rare, so the fewest over three calls must be zero.
-            let mut fewest_blocks: Option<u64> = None;
-            for _ in 0..3 {
-                let before = voluntary_context_switches();
-                let (error, clock_reads) = refuse();
-                let after = voluntary_context_switches();
-                if let (Some(before), Some(after)) = (before, after) {
-                    let blocks = after - before;
-                    fewest_blocks = Some(fewest_blocks.map_or(blocks, |fewest| fewest.min(blocks)));
-                }
-                assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
-                assert!(error.is_retryable());
-                assert_eq!(error.retry_after(), Some(wait_ms as f64 / 1_000.0));
-                assert_eq!(clock_reads, 1);
-                assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
-            }
-            if let Some(blocks) = fewest_blocks {
-                assert_eq!(
-                    blocks, 0,
-                    "full capacity blocked the thread before returning"
-                );
-            }
+            // The decision: the window is full and has room in `wait_ms`.
+            assert_eq!(
+                allocator.allocate_at(NOW_MS).unwrap(),
+                Allocation::Full { wait_ms }
+            );
+            assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
+            // The synchronous path turns that decision into a retryable
+            // refusal carrying the same wait, without waiting it out.
+            let error = allocator.next_at(NOW_MS).unwrap_err();
+            assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
+            assert!(error.is_retryable());
+            assert_eq!(error.retry_after(), Some(wait_ms as f64 / 1_000.0));
+            assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
         }
+        // Room at the ceiling is granted, so the refusals above came from
+        // the window being full and nothing else.
+        let allocator = SigningTimestampAllocator::default();
+        allocator
+            .last_timestamp_ms
+            .store(ceiling - 1, Ordering::Release);
+        assert_eq!(allocator.next_at(NOW_MS).unwrap(), ceiling);
 
         // The wall-clock entry point takes the same path: a seed far beyond
         // any ceiling stays refused however much time passes.
