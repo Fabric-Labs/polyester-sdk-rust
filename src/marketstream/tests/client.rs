@@ -35,6 +35,9 @@ impl Pairs for TestPairs {
     fn symbol(&self, symbol_id: u32) -> Option<String> {
         (symbol_id == 7).then(|| "BTC-USDC".to_owned())
     }
+    fn base_quantity_scale_and_symbol(&self, symbol_id: u32) -> Option<(u32, Option<String>)> {
+        Some((self.base_quantity_scale(symbol_id)?, self.symbol(symbol_id)))
+    }
     fn symbol_id(&self, symbol: &str) -> Option<u32> {
         (symbol == "BTC-USDC").then_some(7)
     }

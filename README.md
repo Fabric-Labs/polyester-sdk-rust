@@ -2595,6 +2595,11 @@ good-till-cancelled limit orders.
   echoing the opt-in is refused (`TradeError::NotProtected`). Every reconnect
   opts in again, which renews the account's cancel-on-disconnect, until
   `disable_cancel_on_disconnect` turns it off (see the kill sequence below).
+- **Pairs.** `tradews::Config::new(url, credentials, pairs)` takes the pair
+  scales and symbols every order is checked against, usually the client's
+  catalogs: `client.catalogs.clone()` after `client.wait_for_catalogs()`, as
+  `marketstream::Config::new` takes them. The session reads a pair's row when
+  it sends, so a catalog the client reloads applies to the next command.
 - **Ready.** The session subscribes to executions, orders and marketResync and
   sends no command until the server confirms it: wait for
   `TradeSession::ready` or `Event::Ready`. It pings the server; a ping or
@@ -2624,6 +2629,26 @@ good-till-cancelled limit orders.
   process it after the deadline, and the session does not send it once the
   deadline has passed. Prices are `types::Price` ticks and quantities
   `types::Quantity` at the pair's base quantity scale, exact integers.
+- **Checked as the Orders API checks them.** Before a create, modify, batch
+  create or batch replace is sent, each quantity and price is checked against
+  its pair's catalog row with the same rules as `orders.create`, and the same
+  wording for a scale or symbol mismatch. Any mismatch is refused with
+  `Error::Validation`, and nothing is sent:
+  - A quantity that carries a scale must carry the pair's base quantity
+    scale: `Quantity::from_decimal_str("1.5", 8, ..)` on a pair of scale 6
+    is refused with `quantity scale mismatch: value scale is 8, destination is 6`.
+    A quantity without a scale (`Quantity::from_scaled(n, None, ..)`) is
+    already in the pair's units and is sent as `n`.
+  - A symbol or `symbol_id` that a quantity carries must be the pair's, and
+    a symbol that a price carries must be the pair's. A value without one is
+    taken as the pair's. A value tagged with a symbol is refused when the
+    pairs do not know the pair's symbol, since the tag cannot be checked.
+  - A price has no scale or tick size of its own: its ticks are always quote
+    units times 1e9. `Price::from_ticks(t, None)` is sent as `t`. The venue
+    refuses a price that is not on the pair's tick size, as it does for the
+    Orders API.
+  - A pair missing from the catalog is refused (`quantity scale for pair 9 is
+    unavailable; ...`).
 - **Answers.** Each command returns its acknowledgement, or an
   `Error::TradeSession`: `TradeError::Rejected` with a typed `RejectCode`,
   `TradeError::NotSent` when nothing reached the server, or
@@ -2687,7 +2712,7 @@ This example connects, splits the session, arms the dead-man switch and reads
 events; `quote` shows how an order is placed from any task and is not called.
 
 ```rust,no_run
-# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use std::time::Duration;
 
 use polyester::auth::Credentials;
@@ -2695,7 +2720,10 @@ use polyester::tradews::{self, Deadline, Event, PostOnlyOrder, TradeSender};
 
 let credentials = Credentials::load(None, None, true)?.expect("POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY");
 let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
-let session = tradews::connect(tradews::Config::new(url, credentials)).await?;
+// Orders are checked against the pair scales of the client's catalogs.
+client.wait_for_catalogs().await?;
+let config = tradews::Config::new(url, credentials, client.catalogs.clone());
+let session = tradews::connect(config).await?;
 session.ready().await?;
 // Commands from any number of tasks, events drained by this one.
 let (sender, mut events) = session.split();
@@ -2783,8 +2811,9 @@ let limiter = ReconnectLimiter::new(32)?;
 
 let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
 let mut sessions = Vec::new();
+client.wait_for_catalogs().await?;
 for credentials in keys {
-    let mut config = tradews::Config::new(url.clone(), credentials);
+    let mut config = tradews::Config::new(url.clone(), credentials, client.catalogs.clone());
     config.reconnect_limiter = Some(limiter.clone());
     sessions.push(tradews::connect(config).await?);
 }
