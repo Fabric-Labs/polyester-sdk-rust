@@ -130,8 +130,9 @@ pub fn levels_from_proto(
 
 /// The order book time the server sent, `None` when it sent none. A sent
 /// time is kept as it is, the epoch included, with its nanoseconds carried
-/// into the seconds as protobuf defines; one `SystemTime` cannot hold reads
-/// `None`.
+/// into the seconds as protobuf defines, to the precision of the platform's
+/// `SystemTime` (100 ns intervals on Windows); one `SystemTime` cannot hold
+/// reads `None`.
 pub(crate) fn book_time(ts: &buffa::MessageField<Timestamp>) -> Option<SystemTime> {
     const NANOS_PER_SEC: i128 = 1_000_000_000;
     let ts = ts.as_option()?;
@@ -254,8 +255,9 @@ mod tests {
         );
     }
 
-    /// The snapshot's timestamp is kept at nanosecond precision when sent,
-    /// even the epoch itself, and is `None` when the server sends none.
+    /// The snapshot's timestamp is kept to the precision `SystemTime` holds
+    /// when sent, even the epoch itself, and is `None` when the server sends
+    /// none.
     #[test]
     fn orderbook_maps_the_snapshot_timestamp_or_none() {
         use buffa_types::google::protobuf::Timestamp;

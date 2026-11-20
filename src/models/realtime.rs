@@ -14,9 +14,10 @@ pub struct OrderBookDeltaUpdate {
     pub reset: bool,
     pub bids: Vec<PriceQtyPair>,
     pub asks: Vec<PriceQtyPair>,
-    /// The server's best-effort time of this update, at nanosecond
-    /// precision; `None` when the server sent none, never the local receipt
-    /// time.
+    /// The server's best-effort time of this update; `None` when the server
+    /// sent none, never the local receipt time. Its precision is the
+    /// platform's `SystemTime`: the server's nanoseconds on Unix-like targets,
+    /// truncated to 100 ns intervals on Windows.
     pub ts: Option<std::time::SystemTime>,
 }
 

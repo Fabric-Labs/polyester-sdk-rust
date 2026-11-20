@@ -2362,7 +2362,9 @@ an update until the next reset. A server that predates the field reports false.
 Its `ts` is the server's best-effort snapshot time (`Option<SystemTime>`), `None`
 when the server sends none, never the local receipt time. A raw delta's `ts`, and a
 managed view's `ts` (that of the latest snapshot or delta applied to the book), follow
-the same rule. Order snapshots by `(book_epoch, book_seq)`, not by `ts`.
+the same rule. Its precision is the platform's `SystemTime`: the server's nanoseconds
+on Unix-like targets, truncated to 100 ns intervals on Windows. Order snapshots by
+`(book_epoch, book_seq)`, not by `ts`.
 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.

@@ -294,8 +294,8 @@ fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
 mod tests {
     use super::*;
 
-    /// An update's timestamp is kept at nanosecond precision when sent, and
-    /// is `None` when the server sends none.
+    /// An update's timestamp is kept to the precision `SystemTime` holds when
+    /// sent, and is `None` when the server sends none.
     #[test]
     fn orderbook_delta_maps_the_update_timestamp_or_none() {
         use buffa::Message as _;
