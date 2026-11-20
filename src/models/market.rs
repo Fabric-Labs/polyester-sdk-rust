@@ -358,4 +358,11 @@ pub struct OrderbookData {
     /// and after a gap. A server that predates this field always reports
     /// false.
     pub available: bool,
+    /// The server's best-effort time of this book state, at nanosecond
+    /// precision: the snapshot's time on `orderbook.get`, and on a managed
+    /// [`crate::orderbook::Subscription`] view the time of the latest
+    /// snapshot or update applied to the book. `None` when the server sent
+    /// none; never the local receipt time. Order snapshots by
+    /// `(book_epoch, book_seq)`, not by `ts`.
+    pub ts: Option<std::time::SystemTime>,
 }

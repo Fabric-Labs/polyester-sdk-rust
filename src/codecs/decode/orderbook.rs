@@ -5,6 +5,8 @@ use crate::errors::{Error, Result};
 use crate::models::{OrderbookData, OrderbookLevel};
 use crate::proto::orderbook::v1::{GetOrderBookResponse, PriceLevel};
 use crate::proto::polyester::r#type::v1::DepthTier;
+use buffa_types::google::protobuf::Timestamp;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Depths the server publishes on the delta stream. A subscribe at any other
 /// depth is refused (Centrifugo error 107), so the SDK never subscribes there.
@@ -126,11 +128,32 @@ pub fn levels_from_proto(
         .collect()
 }
 
+/// The order book time the server sent, `None` when it sent none. A sent
+/// time is kept as it is, the epoch included, with its nanoseconds carried
+/// into the seconds as protobuf defines; one `SystemTime` cannot hold reads
+/// `None`.
+pub(crate) fn book_time(ts: &buffa::MessageField<Timestamp>) -> Option<SystemTime> {
+    const NANOS_PER_SEC: i128 = 1_000_000_000;
+    let ts = ts.as_option()?;
+    let nanos = i128::from(ts.seconds) * NANOS_PER_SEC + i128::from(ts.nanos);
+    let magnitude = nanos.unsigned_abs();
+    let offset = Duration::new(
+        u64::try_from(magnitude / NANOS_PER_SEC.unsigned_abs()).ok()?,
+        u32::try_from(magnitude % NANOS_PER_SEC.unsigned_abs()).ok()?,
+    );
+    if nanos < 0 {
+        UNIX_EPOCH.checked_sub(offset)
+    } else {
+        UNIX_EPOCH.checked_add(offset)
+    }
+}
+
 /// Decode a snapshot asked at `depth` levels per side (0 for no tier, which
 /// the server serves at 50). The contract serves every tier as asked, so a
 /// snapshot that names no tier, a tier this SDK does not know, or another
 /// tier than the one asked for is refused with `Error::ResponseContract`,
-/// never read as the depth asked for.
+/// never read as the depth asked for. Its `ts` is the snapshot's time, `None`
+/// when the reply has none.
 pub fn orderbook_from_proto(
     msg: &GetOrderBookResponse,
     symbol: &str,
@@ -161,6 +184,7 @@ pub fn orderbook_from_proto(
         bids: levels_from_proto(&msg.bids, symbol, quantity_scale)?,
         asks: levels_from_proto(&msg.asks, symbol, quantity_scale)?,
         available: msg.available,
+        ts: book_time(&msg.ts),
     })
 }
 
@@ -228,6 +252,46 @@ mod tests {
             !book.available,
             "a response without `available` reads false"
         );
+    }
+
+    /// The snapshot's timestamp is kept at nanosecond precision when sent,
+    /// even the epoch itself, and is `None` when the server sends none.
+    #[test]
+    fn orderbook_maps_the_snapshot_timestamp_or_none() {
+        use buffa_types::google::protobuf::Timestamp;
+        use std::time::{Duration, UNIX_EPOCH};
+        let read = |ts: buffa::MessageField<Timestamp>| {
+            orderbook_from_proto(
+                &GetOrderBookResponse {
+                    depth: DepthTier::DEPTH_1.into(),
+                    book_seq: 7,
+                    ts,
+                    ..Default::default()
+                },
+                "BTC-USDT",
+                1,
+                8,
+            )
+            .unwrap()
+            .ts
+        };
+        let at = |seconds, nanos| {
+            buffa::MessageField::some(Timestamp {
+                seconds,
+                nanos,
+                ..Default::default()
+            })
+        };
+        assert_eq!(
+            read(at(1_795_113_633, 60_385_485)),
+            Some(UNIX_EPOCH + Duration::new(1_795_113_633, 60_385_485))
+        );
+        assert_eq!(read(at(0, 0)), Some(UNIX_EPOCH), "a sent epoch is kept");
+        assert_eq!(
+            read(at(-1, 500_000_000)),
+            Some(UNIX_EPOCH - Duration::from_millis(500))
+        );
+        assert_eq!(read(buffa::MessageField::none()), None);
     }
 
     #[test]
@@ -326,6 +390,7 @@ mod tests {
             bids: vec![],
             asks: vec![],
             available: true,
+            ts: None,
         }
     }
 

@@ -14,6 +14,10 @@ pub struct OrderBookDeltaUpdate {
     pub reset: bool,
     pub bids: Vec<PriceQtyPair>,
     pub asks: Vec<PriceQtyPair>,
+    /// The server's best-effort time of this update, at nanosecond
+    /// precision; `None` when the server sent none, never the local receipt
+    /// time.
+    pub ts: Option<std::time::SystemTime>,
 }
 
 /// One delivery of an account's live order stream
