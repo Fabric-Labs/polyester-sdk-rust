@@ -141,7 +141,9 @@ pub struct Config {
     /// 0: 1000.
     pub queue_size: usize,
     /// How often the client pings the server; a pong must answer within
-    /// `pong_timeout` or the client reconnects. Zero: 15 and 10 seconds.
+    /// `pong_timeout` or the connection counts as lost, and the client
+    /// reconnects by default ([`Self::auto_reconnect`]). Zero: 15 and 10
+    /// seconds.
     pub ping_interval: Duration,
     pub pong_timeout: Duration,
     /// Permit a `ws://` URL on a host that is not loopback.
@@ -152,6 +154,11 @@ pub struct Config {
     /// `Retry-After` have run out, and holds it only until the upgrade ends.
     /// `None`, the default, connects as soon as the stream's own wait ends.
     pub reconnect_limiter: Option<ReconnectLimiter>,
+    /// Reconnects after a lost connection, the default. `false`: a lost
+    /// connection stops the stream with the loss as its terminal error
+    /// ([`MarketStream::err`]), which requests still in flight return too;
+    /// [`MarketStream::recv`] returns the queued events, then `None`.
+    pub auto_reconnect: bool,
     pub(crate) pacing: Pacing,
     /// How long an upgrade may take before it fails and is retried.
     #[cfg(test)]
@@ -173,6 +180,7 @@ impl Config {
             pong_timeout: Duration::ZERO,
             allow_insecure_http: false,
             reconnect_limiter: None,
+            auto_reconnect: true,
             pacing: Pacing::default(),
             #[cfg(test)]
             connect_timeout: CONNECT_TIMEOUT,
@@ -202,6 +210,7 @@ impl std::fmt::Debug for Config {
             .field("ping_interval", &self.ping_interval)
             .field("pong_timeout", &self.pong_timeout)
             .field("reconnect_limiter", &self.reconnect_limiter)
+            .field("auto_reconnect", &self.auto_reconnect)
             .finish_non_exhaustive()
     }
 }
@@ -377,7 +386,9 @@ struct State {
 }
 
 /// Connects to the market-data stream. A failure of this first connection is
-/// returned; once connected, the stream reconnects on its own until closed.
+/// returned; once connected, the stream by default reconnects on its own until
+/// closed, and without [`Config::auto_reconnect`] stops at the first lost
+/// connection.
 /// Subscribe with [`MarketStream::subscribe`].
 pub async fn connect(mut config: Config) -> Result<MarketStream> {
     if config.url.is_empty() {
@@ -498,8 +509,9 @@ impl MarketStream {
     }
 
     /// The terminal error that stopped the stream: [`Error::QueueOverflow`],
-    /// or [`Error::MarketStream`] with [`StreamError::Schema`] for a server
-    /// this client cannot read.
+    /// [`Error::MarketStream`] with [`StreamError::Schema`] for a server
+    /// this client cannot read, or, without [`Config::auto_reconnect`], why
+    /// the connection was lost.
     pub fn err(&self) -> Option<Error> {
         lock_unpoisoned(&self.shared.inner).err.clone()
     }
@@ -1102,11 +1114,17 @@ async fn run(shared: Arc<Shared>, mut ws: Ws, mut out_rx: mpsc::UnboundedReceive
     let mut reconnect = false;
     loop {
         let err = session(&shared, ws, out_rx, reconnect).await;
-        // A server this client cannot read stops the stream before its
-        // connection ends, so the requests the connection carried get that
-        // error rather than the promise to apply once it reconnects.
-        if let Some(err @ Error::MarketStream(StreamError::Schema { .. })) = err {
-            shared.shutdown(Some(err));
+        // A server this client cannot read, or a lost connection without
+        // [`Config::auto_reconnect`], stops the stream before its connection
+        // ends, so the requests the connection carried get that error rather
+        // than the promise to apply once it reconnects.
+        let ends = match &err {
+            Some(Error::MarketStream(StreamError::Schema { .. })) => true,
+            Some(_) => !shared.cfg.auto_reconnect,
+            None => false,
+        };
+        if ends {
+            shared.shutdown(err);
             shared.detach();
             break;
         }
@@ -1449,6 +1467,7 @@ pub(crate) fn handle(shared: &Arc<Shared>, frame: &[u8]) -> Result<()> {
                     price: level.price,
                     qty: level.qty,
                     taker_side,
+                    transact_ts_ns: transact_ns,
                 });
             }
             shared.emit(Event::Trades(Trades {

@@ -2525,7 +2525,10 @@ replaces it.
 The client pings every 15 seconds and reconnects when a pong is late or the
 connection drops, with jittered backoff, and resubscribes every topic the
 server accepted. Topics it refused (an unknown or disabled pair, or more
-subscriptions than one connection may hold) are not resubscribed. Events are
+subscriptions than one connection may hold) are not resubscribed. With
+`Config::auto_reconnect` set to `false`, a lost connection stops the stream
+instead: `MarketStream::err` reports the loss, requests in flight return it,
+and `recv` returns the queued events, then `None`. Events are
 queued up to `Config::queue_size`: a consumer that falls behind fails the
 stream with `Error::QueueOverflow` instead of losing messages.
 

@@ -97,7 +97,7 @@ impl TradeHistory for MarketDataService {
     }
 }
 
-fn history_page(res: crate::models::MarketTradesResult) -> Result<HistoryPage> {
+pub(super) fn history_page(res: crate::models::MarketTradesResult) -> Result<HistoryPage> {
     let mut page = HistoryPage {
         complete_through_trade_id: res.complete_through_trade_id,
         next_after_trade_id: res.next_after_trade_id,
@@ -124,6 +124,20 @@ fn history_page(res: crate::models::MarketTradesResult) -> Result<HistoryPage> {
                 format!("trade {trade_id} without a price or quantity"),
             ));
         };
+        // The history leaves the time empty when it does not report it.
+        let transact_ts_ns = if t.ts_ns.is_empty() {
+            0
+        } else {
+            t.ts_ns.parse::<u64>().map_err(|_| {
+                Error::response_contract(
+                    "get_trades",
+                    format!(
+                        "trade {trade_id} time {:?} is not Unix nanoseconds",
+                        t.ts_ns
+                    ),
+                )
+            })?
+        };
         let taker_side = match t.side.as_str() {
             "buy" => Side::Buy,
             "sell" => Side::Sell,
@@ -134,6 +148,7 @@ fn history_page(res: crate::models::MarketTradesResult) -> Result<HistoryPage> {
             price,
             qty,
             taker_side,
+            transact_ts_ns,
         });
     }
     Ok(page)
