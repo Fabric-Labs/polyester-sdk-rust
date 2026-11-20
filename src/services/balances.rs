@@ -1,5 +1,5 @@
 use super::ServiceContext;
-use super::limits::{LIST_TRANSFERS_LIMIT_MAX, check_limit};
+use super::limits::{LIST_TRANSFERS_LIMIT_MAX, check_limit, check_transfer_code};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
@@ -78,6 +78,18 @@ impl BalancesService {
         Ok(equity_history_from_proto(&resp))
     }
 
+    /// Read a page of ledger transfers (`ListTransfers`).
+    ///
+    /// `reversed` lists newest first; `false` lists oldest first.
+    /// `transfer_code` lists only transfers with that reason: a
+    /// `ledger.v1.TransferCode`, the number a row carries in
+    /// [`crate::models::LedgerTransfer::transfer_type`] (for example 1000 for
+    /// `DEPOSIT`); unset (0) lists every reason. A value this SDK does not
+    /// name is sent as given, but a negative one is refused with
+    /// [`crate::Error::Validation`] before sending. A page token is bound to
+    /// the filters it was returned for: continue with the same subaccount,
+    /// `transfer_code`, time bounds and `reversed`. An empty
+    /// `next_page_token` ends paging.
     pub async fn list_transfers(
         &self,
         mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
@@ -87,6 +99,7 @@ impl BalancesService {
             req.limit,
             LIST_TRANSFERS_LIMIT_MAX,
         )?;
+        check_transfer_code("balances.list_transfers", req.transfer_code)?;
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
         let resp = unary::await_auth(

@@ -468,6 +468,11 @@ impl RejectCode {
     pub const ACCOUNT_REPAIRING: Self = Self(300);
     pub const ORDER_CREATE_OUTCOME_UNKNOWN: Self = Self(303);
     pub const REQUEST_DEADLINE_EXCEEDED: Self = Self(308);
+    /// An admitted [`BatchReplaceOrders`] item had not applied 2 seconds
+    /// after its admission, so it was refused when it applied
+    /// ([`BatchReplaceItemReject`]). Nothing changed: send a new batch with
+    /// the current quote.
+    pub const MODIFY_APPLY_EXPIRED: Self = Self(319);
     pub const SEQUENCE_OUT_OF_ORDER: Self = Self(1001);
 
     pub const fn from_raw(raw: u16) -> Self {
@@ -722,6 +727,47 @@ pub struct MarketResync {
     pub gateway_time: SystemTime,
 }
 
+/// An item of a [`BatchReplaceOrders`], admitted in its [`BatchReplaceAck`],
+/// that was refused when it applied (`BatchReplaceItemReject`, template 32).
+///
+/// The item changed nothing: the order is as it was, at its old price,
+/// quantity and client order ID unless it had ended, and a refused
+/// replacement's successor (`replacement_order_id`) never exists as an
+/// order. It is sent once per refused item to every connection of the
+/// account: on the connection that sent the batch it follows the batch's
+/// acknowledgement, and on the account's other connections it can arrive
+/// before that acknowledgement does. A refusal at admission is reported in
+/// the [`BatchReplaceAck`] alone, so this always means the item was admitted,
+/// then refused. `batch_request_id` and `order_id` together name the item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BatchReplaceItemReject {
+    /// The batch's pair.
+    pub symbol_id: u32,
+    /// The order the item targeted, the item's `old_order_id` in the
+    /// [`BatchReplaceAck`]; the item changed nothing of it.
+    pub order_id: u64,
+    /// The order's version when the item was refused, the counter of
+    /// [`OrderUpdate::version`]: the refusal changed nothing, so the order's
+    /// state at this version still holds. `None` when the order had already
+    /// ended: its terminal order event is the newer state.
+    pub version: Option<u32>,
+    /// The batch, as its [`BatchReplaceAck::batch_request_id`] names it.
+    pub batch_request_id: u64,
+    /// For an item that would have replaced the order, the successor the
+    /// [`BatchReplaceAck`] named, which never exists as an order; `None` for
+    /// an item that would have amended the order in place.
+    pub replacement_order_id: Option<u64>,
+    /// Why the item was refused when it applied, for example
+    /// [`RejectCode::MODIFY_APPLY_EXPIRED`]: the code the same cause has in
+    /// every other answer.
+    pub code: RejectCode,
+    /// When the item was refused.
+    pub event_time: SystemTime,
+    /// When the server sent it.
+    pub gateway_time: SystemTime,
+}
+
 /// What [`TradeSession::recv`] delivers, in order.
 ///
 /// The server adds messages without changing the schema's version, and this
@@ -771,6 +817,10 @@ pub enum Event {
     /// session and is reported as it arrives. One that names a command this
     /// connection has in flight is a wrong answer and ends the connection.
     OcoAck(OcoAck),
+    /// An admitted [`BatchReplaceOrders`] item refused when it applied: it
+    /// changed nothing, and a replacement's successor never exists. Settle
+    /// the item by `batch_request_id` and `order_id`.
+    BatchReplaceItemReject(BatchReplaceItemReject),
 }
 
 /// A single-order acknowledgement: the server accepted the command, and order
@@ -901,7 +951,9 @@ pub struct ReplaceItemResult {
     pub action: Option<ReplaceAction>,
     /// The order the item named.
     pub order_id: Option<u64>,
-    /// Its successor, when replaced.
+    /// Its successor, when replaced. If an
+    /// [`Event::BatchReplaceItemReject`] reports the item, this successor
+    /// never exists as an order.
     pub replacement_order_id: Option<u64>,
 }
 
@@ -921,6 +973,10 @@ pub enum BatchStatus {
     Unknown(u8),
 }
 
+/// A [`BatchReplaceOrders`]'s admission receipt, one result per item in
+/// request order. An accepted item was admitted, not yet applied: order
+/// events report what applied, and an [`Event::BatchReplaceItemReject`]
+/// reports each admitted item refused when it applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BatchReplaceAck {

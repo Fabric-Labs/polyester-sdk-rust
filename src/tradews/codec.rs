@@ -10,21 +10,21 @@ use std::time::Duration;
 use super::sbe::{
     self, ReadBuf, WriteBuf, batch_cancel_ack_codec, batch_cancel_orders_codec,
     batch_create_ack_codec, batch_create_orders_codec, batch_replace_ack_codec,
-    batch_replace_orders_codec, cancel_all_after_ack_codec, cancel_all_after_codec,
-    cancel_all_after_status, cancel_all_orders_codec, cancel_order_codec, command_ack_codec,
-    command_reject_codec, create_order_codec, event_channels, execution_event_codec, fee_asset,
-    group_size_encoding_codec, liquidity_role, market_resync_codec, message_header_codec,
-    modify_behavior, modify_order_codec, oco_ack_codec, order_event_codec, order_flags,
-    order_sizing_kind, order_type, ping_codec, pong_codec, settlement_status, side, stp_mode,
-    subscribe_codec, subscription_ack_codec, time_in_force,
+    batch_replace_item_reject_codec, batch_replace_orders_codec, cancel_all_after_ack_codec,
+    cancel_all_after_codec, cancel_all_after_status, cancel_all_orders_codec, cancel_order_codec,
+    command_ack_codec, command_reject_codec, create_order_codec, event_channels,
+    execution_event_codec, fee_asset, group_size_encoding_codec, liquidity_role,
+    market_resync_codec, message_header_codec, modify_behavior, modify_order_codec, oco_ack_codec,
+    order_event_codec, order_flags, order_sizing_kind, order_type, ping_codec, pong_codec,
+    settlement_status, side, stp_mode, subscribe_codec, subscription_ack_codec, time_in_force,
 };
 use super::{
     BatchCancelAck, BatchCancelOrders, BatchCreateAck, BatchCreateOrders, BatchItem,
-    BatchReplaceAck, BatchReplaceOrders, BatchStatus, CancelAllAck, CancelAllAfterOptions,
-    CancelAllListing, CancelAllOrders, CancelReason, CancelledOrder, Deadline, Execution, FeeAsset,
-    MarketResync, ModifyBehavior, ModifyOrder, OcoAck, OcoCommand, OrderAck, OrderRef, OrderStatus,
-    OrderUpdate, PostOnlyOrder, RejectCode, ReplaceAction, ReplaceItemResult, ResyncReason, Side,
-    TimerAck, TradeError, from_unix_ns,
+    BatchReplaceAck, BatchReplaceItemReject, BatchReplaceOrders, BatchStatus, CancelAllAck,
+    CancelAllAfterOptions, CancelAllListing, CancelAllOrders, CancelReason, CancelledOrder,
+    Deadline, Execution, FeeAsset, MarketResync, ModifyBehavior, ModifyOrder, OcoAck, OcoCommand,
+    OrderAck, OrderRef, OrderStatus, OrderUpdate, PostOnlyOrder, RejectCode, ReplaceAction,
+    ReplaceItemResult, ResyncReason, Side, TimerAck, TradeError, from_unix_ns,
 };
 use crate::errors::{Error, Result};
 use crate::marketstream::Pairs;
@@ -68,6 +68,7 @@ pub(crate) const REPLACE_ACK_STATUS: usize = 32;
 pub(crate) const ITEM_CODE: usize = 1;
 pub(crate) const REPLACE_ITEM_ACTION: usize = 3;
 pub(crate) const OCO_ACK_COMMAND: usize = 16;
+pub(crate) const ITEM_REJECT_CODE: usize = 32;
 
 /// A frame's `seq`: the first field of every client message's block.
 const SEQ: usize = HEADER;
@@ -421,6 +422,7 @@ pub(crate) enum Msg {
     Order(OrderUpdate),
     Execution(Execution),
     MarketResync(MarketResync),
+    BatchReplaceItemReject(BatchReplaceItemReject),
     /// An `OcoAck`; this client sends no command it answers.
     OcoAck {
         seq: u64,
@@ -992,6 +994,29 @@ pub(crate) fn decode(frame: &[u8]) -> Result<Msg> {
                     acked_at: from_unix_ns(ts_ns),
                 },
             })
+        }
+        batch_replace_item_reject_codec::SBE_TEMPLATE_ID => {
+            check_layout(
+                frame,
+                &h,
+                batch_replace_item_reject_codec::SBE_BLOCK_LENGTH,
+                &[],
+                0,
+            )?;
+            // Read raw, so a code this client does not name keeps its number.
+            let code = RejectCode::from_raw(u16_at(frame, HEADER + ITEM_REJECT_CODE));
+            let d = batch_replace_item_reject_codec::BatchReplaceItemRejectDecoder::default()
+                .header(header_decoder(frame), 0);
+            Ok(Msg::BatchReplaceItemReject(BatchReplaceItemReject {
+                symbol_id: d.symbol_id(),
+                order_id: d.order_id(),
+                version: d.version(),
+                batch_request_id: d.batch_request_id(),
+                replacement_order_id: d.replacement_order_id(),
+                code,
+                event_time: from_unix_ns(d.event_ts_ns()),
+                gateway_time: from_unix_ns(d.gateway_ts_ns()),
+            }))
         }
         template_id => {
             let end = HEADER + h.block_length as usize;

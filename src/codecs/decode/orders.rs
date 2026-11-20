@@ -38,21 +38,22 @@ use crate::proto::orders::v1::{
 use crate::proto::polyester::r#type::v1::U128;
 use buffa::Enumeration;
 
+/// A read order. A refused batch replacement, which `GetOrder` answers for
+/// 60 seconds without order terms, decodes with no pair, side, order type,
+/// time in force, self-trade prevention mode or fee asset, and with 0
+/// quantities that name no pair.
 pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
-    let symbol_id = msg.symbol_id;
-    let symbol_id_opt = if symbol_id == 0 {
-        None
-    } else {
-        Some(symbol_id)
-    };
+    // Quantities name the order's pair, so the catalogs can scale them; an
+    // order without one leaves them unnamed rather than naming pair 0.
+    let symbol_id_opt = (msg.symbol_id != 0).then_some(msg.symbol_id);
     Ok(Order {
         order_id: format_uint64_id(msg.order_id),
-        symbol_id,
+        symbol_id: symbol_id_opt,
         client_order_id: msg.client_order_id.clone(),
-        side: enum_value_side(msg.side).to_owned(),
+        side: reported_term(enum_value_side(msg.side)),
         status: enum_value_order_status(msg.status).to_owned(),
-        order_type: enum_value_order_type(msg.order_type).to_owned(),
-        tif: enum_value_time_in_force(msg.time_in_force).to_owned(),
+        order_type: reported_term(enum_value_order_type(msg.order_type)),
+        tif: reported_term(enum_value_time_in_force(msg.time_in_force)),
         orig_qty: decode_qty_scaled(msg.orig_qty_scaled, None, None, symbol_id_opt),
         cum_qty: decode_qty_scaled_allow_zero(msg.cum_qty_scaled, None, None, symbol_id_opt),
         leaves_qty: decode_qty_scaled_allow_zero(msg.leaves_qty_scaled, None, None, symbol_id_opt),
@@ -83,10 +84,10 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
             .optional_string(),
         version: msg.version,
         post_only: msg.post_only,
-        fee_asset: enum_value_fee_asset(msg.fee_asset),
-        self_trade_prevention_mode: enum_value_self_trade_prevention_mode(
+        fee_asset: reported_term(enum_value_fee_asset(msg.fee_asset)),
+        self_trade_prevention_mode: reported_term(enum_value_self_trade_prevention_mode(
             msg.self_trade_prevention_mode,
-        ),
+        )),
         submitted_max_quote_debit_scaled: msg.submitted_max_quote_debit_scaled,
         submitted_quote_proceeds_scaled: msg.submitted_quote_proceeds_scaled,
         attached_risk: msg
@@ -105,6 +106,12 @@ pub fn order_from_proto(msg: &ProtoOrder) -> Result<Order> {
         reject_reason: order_reject_reason(msg.reject_reason),
         cancel_reason: order_cancel_reason(msg.cancel_reason),
     })
+}
+
+/// An order term's label, `None` when the server did not report it (its
+/// enum is unset).
+fn reported_term(label: String) -> Option<String> {
+    (!label.is_empty()).then_some(label)
 }
 
 /// Gives a read order's quantities the pair's base quantity scale
@@ -1209,10 +1216,10 @@ mod tests {
         };
         let order = order_from_proto(&msg).unwrap();
         assert_eq!(order.order_id, format_uint64_id(42));
-        assert_eq!(order.side, "buy");
+        assert_eq!(order.side.as_deref(), Some("buy"));
         assert_eq!(order.status, "working");
-        assert_eq!(order.order_type, "limit");
-        assert_eq!(order.tif, "gtc");
+        assert_eq!(order.order_type.as_deref(), Some("limit"));
+        assert_eq!(order.tif.as_deref(), Some("gtc"));
         assert!(order.expire_at.is_none());
         assert!(order.post_only);
         assert!(order.attached_risk.is_none());
@@ -1285,10 +1292,10 @@ mod tests {
         rebate.fee_total.as_mut().unwrap().is_rebate = true;
         assert_eq!(rebate.quote_used(8), Some(dec("3214.61627888684816")));
         let mut base_fee = order.clone();
-        base_fee.fee_asset = "base".into();
+        base_fee.fee_asset = Some("base".into());
         assert_eq!(base_fee.quote_used(8), Some(dec("3215.5809531728")));
         let mut unknown_fee = order.clone();
-        unknown_fee.fee_asset = "UNKNOWN(9)".into();
+        unknown_fee.fee_asset = Some("UNKNOWN(9)".into());
         assert_eq!(unknown_fee.quote_used(8), None);
 
         // Until the fee of every fill is recorded the total trails cum_qty.
@@ -1330,7 +1337,7 @@ mod tests {
         use std::str::FromStr;
 
         let order = |cum_notional: &str, fee_e18: &str, submitted: Option<i64>| Order {
-            fee_asset: "quote".into(),
+            fee_asset: Some("quote".into()),
             cum_notional: cum_notional.into(),
             submitted_max_quote_debit_scaled: submitted,
             fee_total: Some(OrderFeeTotal {
@@ -1531,6 +1538,7 @@ mod tests {
             })
             .unwrap()
             .self_trade_prevention_mode
+            .unwrap_or_default()
         };
         assert_eq!(
             mode(SelfTradePreventionMode::ExpireTaker.into()),
@@ -1566,7 +1574,7 @@ mod tests {
             ..Default::default()
         };
         let order = order_from_proto(&msg).unwrap();
-        assert_eq!(order.tif, "gtd");
+        assert_eq!(order.tif.as_deref(), Some("gtd"));
         assert_eq!(order.expire_at.as_deref(), Some("2023-11-14T22:13:20Z"));
     }
 
@@ -2229,7 +2237,7 @@ mod tests {
         let result = orders_list_from_open(&msg).unwrap();
         assert_eq!(result.orders.len(), 1);
         assert_eq!(result.next_page_token, "tok");
-        assert_eq!(result.orders[0].side, "sell");
+        assert_eq!(result.orders[0].side.as_deref(), Some("sell"));
     }
 
     #[test]
@@ -3097,7 +3105,10 @@ mod tests {
                 })
                 .unwrap();
                 assert_eq!(order.cancel_reason.as_deref(), Some(want));
-                assert_eq!(order.self_trade_prevention_mode, "decrement");
+                assert_eq!(
+                    order.self_trade_prevention_mode.as_deref(),
+                    Some("decrement")
+                );
             }
         }
     }

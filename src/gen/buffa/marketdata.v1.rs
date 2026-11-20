@@ -2533,6 +2533,351 @@ impl ::buffa::Enumeration for PairStatus {
         ]
     }
 }
+/// PriceBandState is a pair's price band state.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum PriceBandState {
+    /// Never returned.
+    BAND_STATE_UNSPECIFIED = 0i32,
+    /// The band is on and at least one price lies inside it.
+    ACTIVE = 1i32,
+    /// The pair applies no price band.
+    OFF = 2i32,
+    /// The band is on and no price lies inside it: every order that adds
+    /// exposure, market orders included, is rejected with PRICE_BAND_VIOLATION
+    /// until the reference price or the band's settings change. This is not a
+    /// trading halt.
+    EMPTY = 3i32,
+    /// No band was confirmed current within the last 5 seconds: do not rely on
+    /// the band received before. Only the price band streams send it, once, when
+    /// the band lapses; GetPriceBand answers PRICE_BAND_STALE or
+    /// PRICE_BAND_UNKNOWN instead, which means the same. An UNKNOWN band has no
+    /// prices, reference source or settings. Its epoch, update ID and as-of time
+    /// are those of the last confirmation of the band it replaces, 0 when there
+    /// was none, and its update and valid-until times equal its as-of time. Keep
+    /// the band with the greatest epoch, then update ID, then as-of time; at an
+    /// equal one, UNKNOWN replaces the band, and a later confirmation replaces
+    /// UNKNOWN.
+    UNKNOWN = 4i32,
+}
+impl PriceBandState {
+    ///Idiomatic alias for [`Self::BAND_STATE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const BandStateUnspecified: Self = Self::BAND_STATE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::ACTIVE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Active: Self = Self::ACTIVE;
+    ///Idiomatic alias for [`Self::OFF`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Off: Self = Self::OFF;
+    ///Idiomatic alias for [`Self::EMPTY`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Empty: Self = Self::EMPTY;
+    ///Idiomatic alias for [`Self::UNKNOWN`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Unknown: Self = Self::UNKNOWN;
+}
+impl ::core::default::Default for PriceBandState {
+    fn default() -> Self {
+        Self::BAND_STATE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for PriceBandState {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for PriceBandState {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = PriceBandState;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ", stringify!(PriceBandState)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<PriceBandState, E> {
+                <PriceBandState as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<PriceBandState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PriceBandState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<PriceBandState, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PriceBandState as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<PriceBandState, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PriceBandState {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for PriceBandState {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::BAND_STATE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::ACTIVE),
+            2i32 => ::core::option::Option::Some(Self::OFF),
+            3i32 => ::core::option::Option::Some(Self::EMPTY),
+            4i32 => ::core::option::Option::Some(Self::UNKNOWN),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::BAND_STATE_UNSPECIFIED => "BAND_STATE_UNSPECIFIED",
+            Self::ACTIVE => "ACTIVE",
+            Self::OFF => "OFF",
+            Self::EMPTY => "EMPTY",
+            Self::UNKNOWN => "UNKNOWN",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "BAND_STATE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::BAND_STATE_UNSPECIFIED)
+            }
+            "ACTIVE" => ::core::option::Option::Some(Self::ACTIVE),
+            "OFF" => ::core::option::Option::Some(Self::OFF),
+            "EMPTY" => ::core::option::Option::Some(Self::EMPTY),
+            "UNKNOWN" => ::core::option::Option::Some(Self::UNKNOWN),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::BAND_STATE_UNSPECIFIED,
+            Self::ACTIVE,
+            Self::OFF,
+            Self::EMPTY,
+            Self::UNKNOWN,
+        ]
+    }
+}
+/// PriceBandReferenceSource is where a band's reference price came from.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[repr(i32)]
+pub enum PriceBandReferenceSource {
+    /// No reference price: the band is OFF.
+    REFERENCE_SOURCE_UNSPECIFIED = 0i32,
+    /// The price of the pair's last trade.
+    LAST_TRADE = 1i32,
+    /// The pair's listing reference price, on a pair that has not traded yet.
+    LISTING_REFERENCE = 2i32,
+    /// The pair's index price, on the tick grid: the reference moves there when
+    /// the candidate reference lies outside the band around the index price.
+    INDEX_PRICE = 3i32,
+}
+impl PriceBandReferenceSource {
+    ///Idiomatic alias for [`Self::REFERENCE_SOURCE_UNSPECIFIED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ReferenceSourceUnspecified: Self = Self::REFERENCE_SOURCE_UNSPECIFIED;
+    ///Idiomatic alias for [`Self::LAST_TRADE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const LastTrade: Self = Self::LAST_TRADE;
+    ///Idiomatic alias for [`Self::LISTING_REFERENCE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ListingReference: Self = Self::LISTING_REFERENCE;
+    ///Idiomatic alias for [`Self::INDEX_PRICE`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const IndexPrice: Self = Self::INDEX_PRICE;
+}
+impl ::core::default::Default for PriceBandReferenceSource {
+    fn default() -> Self {
+        Self::REFERENCE_SOURCE_UNSPECIFIED
+    }
+}
+impl ::serde::Serialize for PriceBandReferenceSource {
+    fn serialize<S: ::serde::Serializer>(
+        &self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        s.serialize_str(::buffa::Enumeration::proto_name(self))
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for PriceBandReferenceSource {
+    fn deserialize<D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        struct _V;
+        impl ::serde::de::Visitor<'_> for _V {
+            type Value = PriceBandReferenceSource;
+            fn expecting(
+                &self,
+                f: &mut ::core::fmt::Formatter<'_>,
+            ) -> ::core::fmt::Result {
+                f.write_str(
+                    concat!(
+                        "a string, integer, or null for ",
+                        stringify!(PriceBandReferenceSource)
+                    ),
+                )
+            }
+            fn visit_str<E: ::serde::de::Error>(
+                self,
+                v: &str,
+            ) -> ::core::result::Result<PriceBandReferenceSource, E> {
+                <PriceBandReferenceSource as ::buffa::Enumeration>::from_proto_name(v)
+                    .ok_or_else(|| { ::serde::de::Error::unknown_variant(v, &[]) })
+            }
+            fn visit_i64<E: ::serde::de::Error>(
+                self,
+                v: i64,
+            ) -> ::core::result::Result<PriceBandReferenceSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PriceBandReferenceSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_u64<E: ::serde::de::Error>(
+                self,
+                v: u64,
+            ) -> ::core::result::Result<PriceBandReferenceSource, E> {
+                let v32 = i32::try_from(v)
+                    .map_err(|_| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("enum value {v} out of i32 range"),
+                        )
+                    })?;
+                <PriceBandReferenceSource as ::buffa::Enumeration>::from_i32(v32)
+                    .ok_or_else(|| {
+                        ::serde::de::Error::custom(
+                            ::buffa::alloc::format!("unknown enum value {v32}"),
+                        )
+                    })
+            }
+            fn visit_unit<E: ::serde::de::Error>(
+                self,
+            ) -> ::core::result::Result<PriceBandReferenceSource, E> {
+                ::core::result::Result::Ok(::core::default::Default::default())
+            }
+        }
+        d.deserialize_any(_V)
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for PriceBandReferenceSource {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+impl ::buffa::Enumeration for PriceBandReferenceSource {
+    fn from_i32(value: i32) -> ::core::option::Option<Self> {
+        match value {
+            0i32 => ::core::option::Option::Some(Self::REFERENCE_SOURCE_UNSPECIFIED),
+            1i32 => ::core::option::Option::Some(Self::LAST_TRADE),
+            2i32 => ::core::option::Option::Some(Self::LISTING_REFERENCE),
+            3i32 => ::core::option::Option::Some(Self::INDEX_PRICE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn to_i32(&self) -> i32 {
+        *self as i32
+    }
+    fn proto_name(&self) -> &'static str {
+        match self {
+            Self::REFERENCE_SOURCE_UNSPECIFIED => "REFERENCE_SOURCE_UNSPECIFIED",
+            Self::LAST_TRADE => "LAST_TRADE",
+            Self::LISTING_REFERENCE => "LISTING_REFERENCE",
+            Self::INDEX_PRICE => "INDEX_PRICE",
+        }
+    }
+    fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
+        match name {
+            "REFERENCE_SOURCE_UNSPECIFIED" => {
+                ::core::option::Option::Some(Self::REFERENCE_SOURCE_UNSPECIFIED)
+            }
+            "LAST_TRADE" => ::core::option::Option::Some(Self::LAST_TRADE),
+            "LISTING_REFERENCE" => ::core::option::Option::Some(Self::LISTING_REFERENCE),
+            "INDEX_PRICE" => ::core::option::Option::Some(Self::INDEX_PRICE),
+            _ => ::core::option::Option::None,
+        }
+    }
+    fn values() -> &'static [Self] {
+        &[
+            Self::REFERENCE_SOURCE_UNSPECIFIED,
+            Self::LAST_TRADE,
+            Self::LISTING_REFERENCE,
+            Self::INDEX_PRICE,
+        ]
+    }
+}
 /// ---------------------------------------------------------------------------
 /// GetTrades: Binary (protobuf) request/response with scaled integers.
 /// REST responses expose decimal strings.
@@ -8146,6 +8491,888 @@ pub const __GET_SPOT_CONFIG_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEn
     type_url: "type.googleapis.com/marketdata.v1.GetSpotConfigResponse",
     to_json: ::buffa::type_registry::any_to_json::<GetSpotConfigResponse>,
     from_json: ::buffa::type_registry::any_from_json::<GetSpotConfigResponse>,
+    is_wkt: false,
+};
+/// LivePriceBand is one pair's price band as of as_of_ts_ns: the reference
+/// price and the limit prices the pair admits. It is advisory: the pair checks
+/// every order against its own band when the order arrives, and the band may
+/// have moved by then.
+///
+/// Limits are inclusive and side-specific. A buy limit order is checked
+/// against max_buy_price_ticks, and a sell limit order against
+/// min_sell_price_ticks; min_buy_price_ticks and max_sell_price_ticks apply
+/// only when present. REST responses render prices as decimal strings and
+/// times as RFC 3339 timestamps.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct LivePriceBand {
+    /// Stable numeric pair id from GetSpotConfig.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    /// The band's state.
+    ///
+    /// Field 2: `state`
+    #[serde(
+        rename = "state",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub state: ::buffa::EnumValue<PriceBandState>,
+    /// The band's reference price in quote-asset units scaled by 1e9. Present
+    /// when the state is ACTIVE or EMPTY.
+    ///
+    /// Field 3: `reference_price_ticks`
+    #[serde(
+        rename = "referencePriceTicks",
+        alias = "reference_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub reference_price_ticks: ::core::option::Option<i64>,
+    /// Where the reference price came from. REFERENCE_SOURCE_UNSPECIFIED when
+    /// the state is OFF or UNKNOWN.
+    ///
+    /// Field 4: `reference_source`
+    #[serde(
+        rename = "referenceSource",
+        alias = "reference_source",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub reference_source: ::buffa::EnumValue<PriceBandReferenceSource>,
+    /// The highest buy limit price admitted, inclusive, in quote-asset units
+    /// scaled by 1e9. Present only when the state is ACTIVE.
+    ///
+    /// Field 5: `max_buy_price_ticks`
+    #[serde(
+        rename = "maxBuyPriceTicks",
+        alias = "max_buy_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_buy_price_ticks: ::core::option::Option<i64>,
+    /// The lowest sell limit price admitted, inclusive, in quote-asset units
+    /// scaled by 1e9. Present only when the state is ACTIVE.
+    ///
+    /// Field 6: `min_sell_price_ticks`
+    #[serde(
+        rename = "minSellPriceTicks",
+        alias = "min_sell_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub min_sell_price_ticks: ::core::option::Option<i64>,
+    /// The lowest buy limit price admitted, inclusive, in quote-asset units
+    /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+    /// passive prices too; absent otherwise, when any buy price below
+    /// max_buy_price_ticks is admitted.
+    ///
+    /// Field 7: `min_buy_price_ticks`
+    #[serde(
+        rename = "minBuyPriceTicks",
+        alias = "min_buy_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub min_buy_price_ticks: ::core::option::Option<i64>,
+    /// The highest sell limit price admitted, inclusive, in quote-asset units
+    /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+    /// passive prices too; absent otherwise, when any sell price above
+    /// min_sell_price_ticks is admitted.
+    ///
+    /// Field 8: `max_sell_price_ticks`
+    #[serde(
+        rename = "maxSellPriceTicks",
+        alias = "max_sell_price_ticks",
+        with = "::buffa::json_helpers::opt_int64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub max_sell_price_ticks: ::core::option::Option<i64>,
+    /// When the band last changed, in nanoseconds since the Unix epoch (UTC): its
+    /// first setting, OFF included, a change of its settings, or a move of its
+    /// reference price, to the same price included.
+    ///
+    /// Field 9: `updated_ts_ns`
+    #[serde(
+        rename = "updatedTsNs",
+        alias = "updated_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub updated_ts_ns: u64,
+    /// From when the next order operation on the pair may move the reference
+    /// price, in nanoseconds since the Unix epoch (UTC). Nothing moves at that
+    /// time by itself: from then on, an order, modification, cancellation or
+    /// trigger on the pair can move the reference to a newer trade's price, or to
+    /// the index price. Present when the state is ACTIVE or EMPTY.
+    ///
+    /// Field 10: `reanchor_eligible_ts_ns`
+    #[serde(
+        rename = "reanchorEligibleTsNs",
+        alias = "reanchor_eligible_ts_ns",
+        with = "::buffa::json_helpers::opt_uint64",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub reanchor_eligible_ts_ns: ::core::option::Option<u64>,
+    /// True when a trade newer than the reference price is waiting: once the
+    /// re-anchor eligibility time has passed, the next order operation moves the
+    /// reference to it, unless the index price moves it instead. False does not
+    /// promise that the band stays: a move to the index price needs no trade.
+    ///
+    /// Field 11: `reanchor_pending`
+    #[serde(
+        rename = "reanchorPending",
+        alias = "reanchor_pending",
+        with = "::buffa::json_helpers::proto_bool",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_false"
+    )]
+    pub reanchor_pending: bool,
+    /// The band's settings, as GetSpotConfig returns them. Absent when the state
+    /// is OFF, or when the settings in effect cannot be expressed exactly in
+    /// basis points and milliseconds; the limits above are authoritative either
+    /// way.
+    ///
+    /// Field 12: `parameters`
+    #[serde(
+        rename = "parameters",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub parameters: ::buffa::MessageField<PriceBand>,
+    /// The band's epoch. It never decreases, and a band of a greater epoch is
+    /// newer. Compare update_id only within one epoch.
+    ///
+    /// Field 13: `epoch`
+    #[serde(
+        rename = "epoch",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub epoch: u64,
+    /// Increases with each band update within an epoch, and may increase without
+    /// one. Compare it only within one epoch: a greater value is newer.
+    ///
+    /// Field 14: `update_id`
+    #[serde(
+        rename = "updateId",
+        alias = "update_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub update_id: u64,
+    /// When the band was last confirmed current, in nanoseconds since the Unix
+    /// epoch (UTC).
+    ///
+    /// Field 15: `as_of_ts_ns`
+    #[serde(
+        rename = "asOfTsNs",
+        alias = "as_of_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub as_of_ts_ns: u64,
+    /// as_of_ts_ns plus 5 seconds. After it, treat the band as unknown and read
+    /// it again.
+    ///
+    /// Field 16: `valid_until_ts_ns`
+    #[serde(
+        rename = "validUntilTsNs",
+        alias = "valid_until_ts_ns",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub valid_until_ts_ns: u64,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for LivePriceBand {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("LivePriceBand")
+            .field("symbol_id", &self.symbol_id)
+            .field("state", &self.state)
+            .field("reference_price_ticks", &self.reference_price_ticks)
+            .field("reference_source", &self.reference_source)
+            .field("max_buy_price_ticks", &self.max_buy_price_ticks)
+            .field("min_sell_price_ticks", &self.min_sell_price_ticks)
+            .field("min_buy_price_ticks", &self.min_buy_price_ticks)
+            .field("max_sell_price_ticks", &self.max_sell_price_ticks)
+            .field("updated_ts_ns", &self.updated_ts_ns)
+            .field("reanchor_eligible_ts_ns", &self.reanchor_eligible_ts_ns)
+            .field("reanchor_pending", &self.reanchor_pending)
+            .field("parameters", &self.parameters)
+            .field("epoch", &self.epoch)
+            .field("update_id", &self.update_id)
+            .field("as_of_ts_ns", &self.as_of_ts_ns)
+            .field("valid_until_ts_ns", &self.valid_until_ts_ns)
+            .finish()
+    }
+}
+impl LivePriceBand {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.LivePriceBand";
+}
+impl LivePriceBand {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::reference_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_reference_price_ticks(mut self, value: i64) -> Self {
+        self.reference_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_buy_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_buy_price_ticks(mut self, value: i64) -> Self {
+        self.max_buy_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::min_sell_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_min_sell_price_ticks(mut self, value: i64) -> Self {
+        self.min_sell_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::min_buy_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_min_buy_price_ticks(mut self, value: i64) -> Self {
+        self.min_buy_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::max_sell_price_ticks`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_max_sell_price_ticks(mut self, value: i64) -> Self {
+        self.max_sell_price_ticks = Some(value);
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::reanchor_eligible_ts_ns`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_reanchor_eligible_ts_ns(mut self, value: u64) -> Self {
+        self.reanchor_eligible_ts_ns = Some(value);
+        self
+    }
+}
+::buffa::impl_default_instance!(LivePriceBand);
+impl ::buffa::MessageName for LivePriceBand {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "LivePriceBand";
+    const FULL_NAME: &'static str = "marketdata.v1.LivePriceBand";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.LivePriceBand";
+}
+impl ::buffa::Message for LivePriceBand {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(v) = self.reference_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        {
+            let val = self.reference_source.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if let Some(v) = self.max_buy_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if let Some(v) = self.min_sell_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if let Some(v) = self.min_buy_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if let Some(v) = self.max_sell_price_ticks {
+            size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+        }
+        if self.updated_ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.updated_ts_ns) as u32;
+        }
+        if let Some(v) = self.reanchor_eligible_ts_ns {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+        }
+        if self.reanchor_pending {
+            size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+        }
+        if self.parameters.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.parameters.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.epoch != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.epoch) as u32;
+        }
+        if self.update_id != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.update_id) as u32;
+        }
+        if self.as_of_ts_ns != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.as_of_ts_ns) as u32;
+        }
+        if self.valid_until_ts_ns != 0u64 {
+            size
+                += 2u32
+                    + ::buffa::types::uint64_encoded_len(self.valid_until_ts_ns) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        {
+            let val = self.state.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(2u32, val, buf);
+            }
+        }
+        if let Some(v) = self.reference_price_ticks {
+            ::buffa::types::put_int64_field(3u32, v, buf);
+        }
+        {
+            let val = self.reference_source.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(4u32, val, buf);
+            }
+        }
+        if let Some(v) = self.max_buy_price_ticks {
+            ::buffa::types::put_int64_field(5u32, v, buf);
+        }
+        if let Some(v) = self.min_sell_price_ticks {
+            ::buffa::types::put_int64_field(6u32, v, buf);
+        }
+        if let Some(v) = self.min_buy_price_ticks {
+            ::buffa::types::put_int64_field(7u32, v, buf);
+        }
+        if let Some(v) = self.max_sell_price_ticks {
+            ::buffa::types::put_int64_field(8u32, v, buf);
+        }
+        if self.updated_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(9u32, self.updated_ts_ns, buf);
+        }
+        if let Some(v) = self.reanchor_eligible_ts_ns {
+            ::buffa::types::put_uint64_field(10u32, v, buf);
+        }
+        if self.reanchor_pending {
+            ::buffa::types::put_bool_field(11u32, self.reanchor_pending, buf);
+        }
+        if self.parameters.is_set() {
+            ::buffa::types::put_len_delimited_header(12u32, __cache.consume_next(), buf);
+            self.parameters.write_to(__cache, buf);
+        }
+        if self.epoch != 0u64 {
+            ::buffa::types::put_uint64_field(13u32, self.epoch, buf);
+        }
+        if self.update_id != 0u64 {
+            ::buffa::types::put_uint64_field(14u32, self.update_id, buf);
+        }
+        if self.as_of_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(15u32, self.as_of_ts_ns, buf);
+        }
+        if self.valid_until_ts_ns != 0u64 {
+            ::buffa::types::put_uint64_field(16u32, self.valid_until_ts_ns, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.state = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reference_source = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_buy_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.min_sell_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.min_buy_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            8u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.max_sell_price_ticks = ::core::option::Option::Some(
+                    ::buffa::types::decode_int64(buf)?,
+                );
+            }
+            9u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.updated_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            10u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reanchor_eligible_ts_ns = ::core::option::Option::Some(
+                    ::buffa::types::decode_uint64(buf)?,
+                );
+            }
+            11u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.reanchor_pending = ::buffa::types::decode_bool(buf)?;
+            }
+            12u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.parameters.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            13u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.epoch = ::buffa::types::decode_uint64(buf)?;
+            }
+            14u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.update_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            15u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.as_of_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            16u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.valid_until_ts_ns = ::buffa::types::decode_uint64(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.state = ::buffa::EnumValue::from(0);
+        self.reference_price_ticks = ::core::option::Option::None;
+        self.reference_source = ::buffa::EnumValue::from(0);
+        self.max_buy_price_ticks = ::core::option::Option::None;
+        self.min_sell_price_ticks = ::core::option::Option::None;
+        self.min_buy_price_ticks = ::core::option::Option::None;
+        self.max_sell_price_ticks = ::core::option::Option::None;
+        self.updated_ts_ns = 0u64;
+        self.reanchor_eligible_ts_ns = ::core::option::Option::None;
+        self.reanchor_pending = false;
+        self.parameters = ::buffa::MessageField::none();
+        self.epoch = 0u64;
+        self.update_id = 0u64;
+        self.as_of_ts_ns = 0u64;
+        self.valid_until_ts_ns = 0u64;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for LivePriceBand {
+    const PROTO_FQN: &'static str = "marketdata.v1.LivePriceBand";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for LivePriceBand {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __LIVE_PRICE_BAND_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.LivePriceBand",
+    to_json: ::buffa::type_registry::any_to_json::<LivePriceBand>,
+    from_json: ::buffa::type_registry::any_from_json::<LivePriceBand>,
+    is_wkt: false,
+};
+/// GetPriceBandRequest selects one spot pair.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPriceBandRequest {
+    /// Stable numeric pair id from GetSpotConfig.
+    ///
+    /// Field 1: `symbol_id`
+    #[serde(
+        rename = "symbolId",
+        alias = "symbol_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub symbol_id: u32,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPriceBandRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPriceBandRequest")
+            .field("symbol_id", &self.symbol_id)
+            .finish()
+    }
+}
+impl GetPriceBandRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandRequest";
+}
+::buffa::impl_default_instance!(GetPriceBandRequest);
+impl ::buffa::MessageName for GetPriceBandRequest {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "GetPriceBandRequest";
+    const FULL_NAME: &'static str = "marketdata.v1.GetPriceBandRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandRequest";
+}
+impl ::buffa::Message for GetPriceBandRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.symbol_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        _cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.symbol_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.symbol_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.symbol_id = 0u32;
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPriceBandRequest {
+    const PROTO_FQN: &'static str = "marketdata.v1.GetPriceBandRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPriceBandRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PRICE_BAND_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.GetPriceBandRequest",
+    to_json: ::buffa::type_registry::any_to_json::<GetPriceBandRequest>,
+    from_json: ::buffa::type_registry::any_from_json::<GetPriceBandRequest>,
+    is_wkt: false,
+};
+/// GetPriceBandResponse carries the pair's live price band.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct GetPriceBandResponse {
+    /// The pair's price band, confirmed current within the last 5 seconds.
+    /// GetPriceBand never returns an UNKNOWN band: it refuses one. The price
+    /// band streams send this message with an UNKNOWN band too.
+    ///
+    /// Field 1: `band`
+    #[serde(
+        rename = "band",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub band: ::buffa::MessageField<LivePriceBand>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for GetPriceBandResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("GetPriceBandResponse").field("band", &self.band).finish()
+    }
+}
+impl GetPriceBandResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandResponse";
+}
+::buffa::impl_default_instance!(GetPriceBandResponse);
+impl ::buffa::MessageName for GetPriceBandResponse {
+    const PACKAGE: &'static str = "marketdata.v1";
+    const NAME: &'static str = "GetPriceBandResponse";
+    const FULL_NAME: &'static str = "marketdata.v1.GetPriceBandResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandResponse";
+}
+impl ::buffa::Message for GetPriceBandResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.band.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.band.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.band.is_set() {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            self.band.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.band.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.band = ::buffa::MessageField::none();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for GetPriceBandResponse {
+    const PROTO_FQN: &'static str = "marketdata.v1.GetPriceBandResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for GetPriceBandResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __GET_PRICE_BAND_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/marketdata.v1.GetPriceBandResponse",
+    to_json: ::buffa::type_registry::any_to_json::<GetPriceBandResponse>,
+    from_json: ::buffa::type_registry::any_from_json::<GetPriceBandResponse>,
     is_wkt: false,
 };
 /// HeatmapInterval controls bucket resolution for historical orderbook heatmap.
@@ -23739,6 +24966,1488 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// LivePriceBand is one pair's price band as of as_of_ts_ns: the reference
+        /// price and the limit prices the pair admits. It is advisory: the pair checks
+        /// every order against its own band when the order arrives, and the band may
+        /// have moved by then.
+        ///
+        /// Limits are inclusive and side-specific. A buy limit order is checked
+        /// against max_buy_price_ticks, and a sell limit order against
+        /// min_sell_price_ticks; min_buy_price_ticks and max_sell_price_ticks apply
+        /// only when present. REST responses render prices as decimal strings and
+        /// times as RFC 3339 timestamps.
+        #[derive(Clone, Debug, Default)]
+        pub struct LivePriceBandView<'a> {
+            /// Stable numeric pair id from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            /// The band's state.
+            ///
+            /// Field 2: `state`
+            pub state: ::buffa::EnumValue<super::super::PriceBandState>,
+            /// The band's reference price in quote-asset units scaled by 1e9. Present
+            /// when the state is ACTIVE or EMPTY.
+            ///
+            /// Field 3: `reference_price_ticks`
+            pub reference_price_ticks: ::core::option::Option<i64>,
+            /// Where the reference price came from. REFERENCE_SOURCE_UNSPECIFIED when
+            /// the state is OFF or UNKNOWN.
+            ///
+            /// Field 4: `reference_source`
+            pub reference_source: ::buffa::EnumValue<
+                super::super::PriceBandReferenceSource,
+            >,
+            /// The highest buy limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE.
+            ///
+            /// Field 5: `max_buy_price_ticks`
+            pub max_buy_price_ticks: ::core::option::Option<i64>,
+            /// The lowest sell limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE.
+            ///
+            /// Field 6: `min_sell_price_ticks`
+            pub min_sell_price_ticks: ::core::option::Option<i64>,
+            /// The lowest buy limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+            /// passive prices too; absent otherwise, when any buy price below
+            /// max_buy_price_ticks is admitted.
+            ///
+            /// Field 7: `min_buy_price_ticks`
+            pub min_buy_price_ticks: ::core::option::Option<i64>,
+            /// The highest sell limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+            /// passive prices too; absent otherwise, when any sell price above
+            /// min_sell_price_ticks is admitted.
+            ///
+            /// Field 8: `max_sell_price_ticks`
+            pub max_sell_price_ticks: ::core::option::Option<i64>,
+            /// When the band last changed, in nanoseconds since the Unix epoch (UTC): its
+            /// first setting, OFF included, a change of its settings, or a move of its
+            /// reference price, to the same price included.
+            ///
+            /// Field 9: `updated_ts_ns`
+            pub updated_ts_ns: u64,
+            /// From when the next order operation on the pair may move the reference
+            /// price, in nanoseconds since the Unix epoch (UTC). Nothing moves at that
+            /// time by itself: from then on, an order, modification, cancellation or
+            /// trigger on the pair can move the reference to a newer trade's price, or to
+            /// the index price. Present when the state is ACTIVE or EMPTY.
+            ///
+            /// Field 10: `reanchor_eligible_ts_ns`
+            pub reanchor_eligible_ts_ns: ::core::option::Option<u64>,
+            /// True when a trade newer than the reference price is waiting: once the
+            /// re-anchor eligibility time has passed, the next order operation moves the
+            /// reference to it, unless the index price moves it instead. False does not
+            /// promise that the band stays: a move to the index price needs no trade.
+            ///
+            /// Field 11: `reanchor_pending`
+            pub reanchor_pending: bool,
+            /// The band's settings, as GetSpotConfig returns them. Absent when the state
+            /// is OFF, or when the settings in effect cannot be expressed exactly in
+            /// basis points and milliseconds; the limits above are authoritative either
+            /// way.
+            ///
+            /// Field 12: `parameters`
+            pub parameters: ::buffa::MessageFieldView<
+                super::super::__buffa::view::PriceBandView<'a>,
+            >,
+            /// The band's epoch. It never decreases, and a band of a greater epoch is
+            /// newer. Compare update_id only within one epoch.
+            ///
+            /// Field 13: `epoch`
+            pub epoch: u64,
+            /// Increases with each band update within an epoch, and may increase without
+            /// one. Compare it only within one epoch: a greater value is newer.
+            ///
+            /// Field 14: `update_id`
+            pub update_id: u64,
+            /// When the band was last confirmed current, in nanoseconds since the Unix
+            /// epoch (UTC).
+            ///
+            /// Field 15: `as_of_ts_ns`
+            pub as_of_ts_ns: u64,
+            /// as_of_ts_ns plus 5 seconds. After it, treat the band as unknown and read
+            /// it again.
+            ///
+            /// Field 16: `valid_until_ts_ns`
+            pub valid_until_ts_ns: u64,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for LivePriceBandView<'a> {
+            type Owned = super::super::LivePriceBand;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.state = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reference_source = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_buy_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.min_sell_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.min_buy_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    8u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.max_sell_price_ticks = Some(
+                            ::buffa::types::decode_int64(&mut cur)?,
+                        );
+                    }
+                    9u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.updated_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    10u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reanchor_eligible_ts_ns = Some(
+                            ::buffa::types::decode_uint64(&mut cur)?,
+                        );
+                    }
+                    11u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.reanchor_pending = ::buffa::types::decode_bool(&mut cur)?;
+                    }
+                    12u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.parameters.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.parameters = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::PriceBandView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    13u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.epoch = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    14u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.update_id = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    15u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.as_of_ts_ns = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    16u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.valid_until_ts_ns = ::buffa::types::decode_uint64(
+                            &mut cur,
+                        )?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LivePriceBand,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::LivePriceBand,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::LivePriceBand {
+                    symbol_id: self.symbol_id,
+                    state: self.state,
+                    reference_price_ticks: self.reference_price_ticks,
+                    reference_source: self.reference_source,
+                    max_buy_price_ticks: self.max_buy_price_ticks,
+                    min_sell_price_ticks: self.min_sell_price_ticks,
+                    min_buy_price_ticks: self.min_buy_price_ticks,
+                    max_sell_price_ticks: self.max_sell_price_ticks,
+                    updated_ts_ns: self.updated_ts_ns,
+                    reanchor_eligible_ts_ns: self.reanchor_eligible_ts_ns,
+                    reanchor_pending: self.reanchor_pending,
+                    parameters: match self.parameters.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::PriceBand,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    epoch: self.epoch,
+                    update_id: self.update_id,
+                    as_of_ts_ns: self.as_of_ts_ns,
+                    valid_until_ts_ns: self.valid_until_ts_ns,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for LivePriceBandView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(v) = self.reference_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                {
+                    let val = self.reference_source.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if let Some(v) = self.max_buy_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.min_sell_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.min_buy_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if let Some(v) = self.max_sell_price_ticks {
+                    size += 1u32 + ::buffa::types::int64_encoded_len(v) as u32;
+                }
+                if self.updated_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.updated_ts_ns)
+                                as u32;
+                }
+                if let Some(v) = self.reanchor_eligible_ts_ns {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(v) as u32;
+                }
+                if self.reanchor_pending {
+                    size += 1u32 + ::buffa::types::BOOL_ENCODED_LEN as u32;
+                }
+                if self.parameters.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.parameters.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.epoch != 0u64 {
+                    size += 1u32 + ::buffa::types::uint64_encoded_len(self.epoch) as u32;
+                }
+                if self.update_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.update_id) as u32;
+                }
+                if self.as_of_ts_ns != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.as_of_ts_ns)
+                                as u32;
+                }
+                if self.valid_until_ts_ns != 0u64 {
+                    size
+                        += 2u32
+                            + ::buffa::types::uint64_encoded_len(self.valid_until_ts_ns)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                {
+                    let val = self.state.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(2u32, val, buf);
+                    }
+                }
+                if let Some(v) = self.reference_price_ticks {
+                    ::buffa::types::put_int64_field(3u32, v, buf);
+                }
+                {
+                    let val = self.reference_source.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(4u32, val, buf);
+                    }
+                }
+                if let Some(v) = self.max_buy_price_ticks {
+                    ::buffa::types::put_int64_field(5u32, v, buf);
+                }
+                if let Some(v) = self.min_sell_price_ticks {
+                    ::buffa::types::put_int64_field(6u32, v, buf);
+                }
+                if let Some(v) = self.min_buy_price_ticks {
+                    ::buffa::types::put_int64_field(7u32, v, buf);
+                }
+                if let Some(v) = self.max_sell_price_ticks {
+                    ::buffa::types::put_int64_field(8u32, v, buf);
+                }
+                if self.updated_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(9u32, self.updated_ts_ns, buf);
+                }
+                if let Some(v) = self.reanchor_eligible_ts_ns {
+                    ::buffa::types::put_uint64_field(10u32, v, buf);
+                }
+                if self.reanchor_pending {
+                    ::buffa::types::put_bool_field(11u32, self.reanchor_pending, buf);
+                }
+                if self.parameters.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        12u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.parameters.write_to(__cache, buf);
+                }
+                if self.epoch != 0u64 {
+                    ::buffa::types::put_uint64_field(13u32, self.epoch, buf);
+                }
+                if self.update_id != 0u64 {
+                    ::buffa::types::put_uint64_field(14u32, self.update_id, buf);
+                }
+                if self.as_of_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(15u32, self.as_of_ts_ns, buf);
+                }
+                if self.valid_until_ts_ns != 0u64 {
+                    ::buffa::types::put_uint64_field(16u32, self.valid_until_ts_ns, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for LivePriceBandView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(&self.state) {
+                    __map.serialize_entry("state", &self.state)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.reference_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "referencePriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.reference_source,
+                ) {
+                    __map.serialize_entry("referenceSource", &self.reference_source)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_buy_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "maxBuyPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.min_sell_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "minSellPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.min_buy_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "minBuyPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.max_sell_price_ticks {
+                    __map
+                        .serialize_entry(
+                            "maxSellPriceTicks",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.updated_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "updatedTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.updated_ts_ns),
+                        )?;
+                }
+                if let ::core::option::Option::Some(__v) = self.reanchor_eligible_ts_ns {
+                    __map
+                        .serialize_entry(
+                            "reanchorEligibleTsNs",
+                            &::buffa::json_helpers::ProtoJson(&__v),
+                        )?;
+                }
+                if self.reanchor_pending {
+                    __map.serialize_entry("reanchorPending", &self.reanchor_pending)?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .parameters
+                        .as_option()
+                    {
+                        __map.serialize_entry("parameters", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.epoch) {
+                    __map
+                        .serialize_entry(
+                            "epoch",
+                            &::buffa::json_helpers::ProtoJson(&self.epoch),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.update_id) {
+                    __map
+                        .serialize_entry(
+                            "updateId",
+                            &::buffa::json_helpers::ProtoJson(&self.update_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.as_of_ts_ns) {
+                    __map
+                        .serialize_entry(
+                            "asOfTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.as_of_ts_ns),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(
+                    &self.valid_until_ts_ns,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "validUntilTsNs",
+                            &::buffa::json_helpers::ProtoJson(&self.valid_until_ts_ns),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for LivePriceBandView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "LivePriceBand";
+            const FULL_NAME: &'static str = "marketdata.v1.LivePriceBand";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.LivePriceBand";
+        }
+        ::buffa::impl_default_view_instance!(LivePriceBandView);
+        ::buffa::impl_view_reborrow!(LivePriceBandView);
+        /** Self-contained, `'static` owned view of a `LivePriceBand` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`LivePriceBandView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`LivePriceBandView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct LivePriceBandOwnedView(
+            ::buffa::OwnedView<LivePriceBandView<'static>>,
+        );
+        impl LivePriceBandOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LivePriceBandOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LivePriceBandOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::LivePriceBand,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    LivePriceBandOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`LivePriceBandView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &LivePriceBandView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::LivePriceBand,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable numeric pair id from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+            /// The band's state.
+            ///
+            /// Field 2: `state`
+            #[must_use]
+            pub fn state(&self) -> ::buffa::EnumValue<super::super::PriceBandState> {
+                self.0.reborrow().state
+            }
+            /// The band's reference price in quote-asset units scaled by 1e9. Present
+            /// when the state is ACTIVE or EMPTY.
+            ///
+            /// Field 3: `reference_price_ticks`
+            #[must_use]
+            pub fn reference_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().reference_price_ticks
+            }
+            /// Where the reference price came from. REFERENCE_SOURCE_UNSPECIFIED when
+            /// the state is OFF or UNKNOWN.
+            ///
+            /// Field 4: `reference_source`
+            #[must_use]
+            pub fn reference_source(
+                &self,
+            ) -> ::buffa::EnumValue<super::super::PriceBandReferenceSource> {
+                self.0.reborrow().reference_source
+            }
+            /// The highest buy limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE.
+            ///
+            /// Field 5: `max_buy_price_ticks`
+            #[must_use]
+            pub fn max_buy_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().max_buy_price_ticks
+            }
+            /// The lowest sell limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE.
+            ///
+            /// Field 6: `min_sell_price_ticks`
+            #[must_use]
+            pub fn min_sell_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().min_sell_price_ticks
+            }
+            /// The lowest buy limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+            /// passive prices too; absent otherwise, when any buy price below
+            /// max_buy_price_ticks is admitted.
+            ///
+            /// Field 7: `min_buy_price_ticks`
+            #[must_use]
+            pub fn min_buy_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().min_buy_price_ticks
+            }
+            /// The highest sell limit price admitted, inclusive, in quote-asset units
+            /// scaled by 1e9. Present only when the state is ACTIVE and the band limits
+            /// passive prices too; absent otherwise, when any sell price above
+            /// min_sell_price_ticks is admitted.
+            ///
+            /// Field 8: `max_sell_price_ticks`
+            #[must_use]
+            pub fn max_sell_price_ticks(&self) -> ::core::option::Option<i64> {
+                self.0.reborrow().max_sell_price_ticks
+            }
+            /// When the band last changed, in nanoseconds since the Unix epoch (UTC): its
+            /// first setting, OFF included, a change of its settings, or a move of its
+            /// reference price, to the same price included.
+            ///
+            /// Field 9: `updated_ts_ns`
+            #[must_use]
+            pub fn updated_ts_ns(&self) -> u64 {
+                self.0.reborrow().updated_ts_ns
+            }
+            /// From when the next order operation on the pair may move the reference
+            /// price, in nanoseconds since the Unix epoch (UTC). Nothing moves at that
+            /// time by itself: from then on, an order, modification, cancellation or
+            /// trigger on the pair can move the reference to a newer trade's price, or to
+            /// the index price. Present when the state is ACTIVE or EMPTY.
+            ///
+            /// Field 10: `reanchor_eligible_ts_ns`
+            #[must_use]
+            pub fn reanchor_eligible_ts_ns(&self) -> ::core::option::Option<u64> {
+                self.0.reborrow().reanchor_eligible_ts_ns
+            }
+            /// True when a trade newer than the reference price is waiting: once the
+            /// re-anchor eligibility time has passed, the next order operation moves the
+            /// reference to it, unless the index price moves it instead. False does not
+            /// promise that the band stays: a move to the index price needs no trade.
+            ///
+            /// Field 11: `reanchor_pending`
+            #[must_use]
+            pub fn reanchor_pending(&self) -> bool {
+                self.0.reborrow().reanchor_pending
+            }
+            /// The band's settings, as GetSpotConfig returns them. Absent when the state
+            /// is OFF, or when the settings in effect cannot be expressed exactly in
+            /// basis points and milliseconds; the limits above are authoritative either
+            /// way.
+            ///
+            /// Field 12: `parameters`
+            #[must_use]
+            pub fn parameters(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::PriceBandView<'_>,
+            > {
+                &self.0.reborrow().parameters
+            }
+            /// The band's epoch. It never decreases, and a band of a greater epoch is
+            /// newer. Compare update_id only within one epoch.
+            ///
+            /// Field 13: `epoch`
+            #[must_use]
+            pub fn epoch(&self) -> u64 {
+                self.0.reborrow().epoch
+            }
+            /// Increases with each band update within an epoch, and may increase without
+            /// one. Compare it only within one epoch: a greater value is newer.
+            ///
+            /// Field 14: `update_id`
+            #[must_use]
+            pub fn update_id(&self) -> u64 {
+                self.0.reborrow().update_id
+            }
+            /// When the band was last confirmed current, in nanoseconds since the Unix
+            /// epoch (UTC).
+            ///
+            /// Field 15: `as_of_ts_ns`
+            #[must_use]
+            pub fn as_of_ts_ns(&self) -> u64 {
+                self.0.reborrow().as_of_ts_ns
+            }
+            /// as_of_ts_ns plus 5 seconds. After it, treat the band as unknown and read
+            /// it again.
+            ///
+            /// Field 16: `valid_until_ts_ns`
+            #[must_use]
+            pub fn valid_until_ts_ns(&self) -> u64 {
+                self.0.reborrow().valid_until_ts_ns
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<LivePriceBandView<'static>>>
+        for LivePriceBandOwnedView {
+            fn from(inner: ::buffa::OwnedView<LivePriceBandView<'static>>) -> Self {
+                LivePriceBandOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<LivePriceBandOwnedView>
+        for ::buffa::OwnedView<LivePriceBandView<'static>> {
+            fn from(wrapper: LivePriceBandOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<LivePriceBandView<'static>>>
+        for LivePriceBandOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<LivePriceBandView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::LivePriceBand {
+            type View<'a> = LivePriceBandView<'a>;
+            type ViewHandle = LivePriceBandOwnedView;
+        }
+        impl ::serde::Serialize for LivePriceBandOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetPriceBandRequest selects one spot pair.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPriceBandRequestView<'a> {
+            /// Stable numeric pair id from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            pub symbol_id: u32,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetPriceBandRequestView<'a> {
+            type Owned = super::super::GetPriceBandRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.symbol_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPriceBandRequest {
+                    symbol_id: self.symbol_id,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetPriceBandRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, _cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.symbol_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.symbol_id) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                _cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.symbol_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.symbol_id, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetPriceBandRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.symbol_id) {
+                    __map
+                        .serialize_entry(
+                            "symbolId",
+                            &::buffa::json_helpers::ProtoJson(&self.symbol_id),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetPriceBandRequestView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "GetPriceBandRequest";
+            const FULL_NAME: &'static str = "marketdata.v1.GetPriceBandRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandRequest";
+        }
+        ::buffa::impl_default_view_instance!(GetPriceBandRequestView);
+        ::buffa::impl_view_reborrow!(GetPriceBandRequestView);
+        /** Self-contained, `'static` owned view of a `GetPriceBandRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPriceBandRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPriceBandRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPriceBandRequestOwnedView(
+            ::buffa::OwnedView<GetPriceBandRequestView<'static>>,
+        );
+        impl GetPriceBandRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandRequestOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPriceBandRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandRequestOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetPriceBandRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPriceBandRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable numeric pair id from GetSpotConfig.
+            ///
+            /// Field 1: `symbol_id`
+            #[must_use]
+            pub fn symbol_id(&self) -> u32 {
+                self.0.reborrow().symbol_id
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetPriceBandRequestView<'static>>>
+        for GetPriceBandRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetPriceBandRequestView<'static>>,
+            ) -> Self {
+                GetPriceBandRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPriceBandRequestOwnedView>
+        for ::buffa::OwnedView<GetPriceBandRequestView<'static>> {
+            fn from(wrapper: GetPriceBandRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<::buffa::OwnedView<GetPriceBandRequestView<'static>>>
+        for GetPriceBandRequestOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetPriceBandRequestView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetPriceBandRequest {
+            type View<'a> = GetPriceBandRequestView<'a>;
+            type ViewHandle = GetPriceBandRequestOwnedView;
+        }
+        impl ::serde::Serialize for GetPriceBandRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// GetPriceBandResponse carries the pair's live price band.
+        #[derive(Clone, Debug, Default)]
+        pub struct GetPriceBandResponseView<'a> {
+            /// The pair's price band, confirmed current within the last 5 seconds.
+            /// GetPriceBand never returns an UNKNOWN band: it refuses one. The price
+            /// band streams send this message with an UNKNOWN band too.
+            ///
+            /// Field 1: `band`
+            pub band: ::buffa::MessageFieldView<
+                super::super::__buffa::view::LivePriceBandView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for GetPriceBandResponseView<'a> {
+            type Owned = super::super::GetPriceBandResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.band.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.band = ::buffa::MessageFieldView::set(
+                                    <super::super::__buffa::view::LivePriceBandView as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::GetPriceBandResponse {
+                    band: match self.band.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::LivePriceBand,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for GetPriceBandResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.band.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.band.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.band.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.band.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for GetPriceBandResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                {
+                    if let ::core::option::Option::Some(__v) = self.band.as_option() {
+                        __map.serialize_entry("band", __v)?;
+                    }
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for GetPriceBandResponseView<'a> {
+            const PACKAGE: &'static str = "marketdata.v1";
+            const NAME: &'static str = "GetPriceBandResponse";
+            const FULL_NAME: &'static str = "marketdata.v1.GetPriceBandResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/marketdata.v1.GetPriceBandResponse";
+        }
+        ::buffa::impl_default_view_instance!(GetPriceBandResponseView);
+        ::buffa::impl_view_reborrow!(GetPriceBandResponseView);
+        /** Self-contained, `'static` owned view of a `GetPriceBandResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`GetPriceBandResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`GetPriceBandResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct GetPriceBandResponseOwnedView(
+            ::buffa::OwnedView<GetPriceBandResponseView<'static>>,
+        );
+        impl GetPriceBandResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandResponseOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::GetPriceBandResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    GetPriceBandResponseOwnedView(::buffa::OwnedView::from_owned(msg)?),
+                )
+            }
+            /// Borrow the full [`GetPriceBandResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &GetPriceBandResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::GetPriceBandResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// The pair's price band, confirmed current within the last 5 seconds.
+            /// GetPriceBand never returns an UNKNOWN band: it refuses one. The price
+            /// band streams send this message with an UNKNOWN band too.
+            ///
+            /// Field 1: `band`
+            #[must_use]
+            pub fn band(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::__buffa::view::LivePriceBandView<'_>,
+            > {
+                &self.0.reborrow().band
+            }
+        }
+        impl ::core::convert::From<::buffa::OwnedView<GetPriceBandResponseView<'static>>>
+        for GetPriceBandResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<GetPriceBandResponseView<'static>>,
+            ) -> Self {
+                GetPriceBandResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<GetPriceBandResponseOwnedView>
+        for ::buffa::OwnedView<GetPriceBandResponseView<'static>> {
+            fn from(wrapper: GetPriceBandResponseOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<GetPriceBandResponseView<'static>>,
+        > for GetPriceBandResponseOwnedView {
+            fn as_ref(&self) -> &::buffa::OwnedView<GetPriceBandResponseView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::GetPriceBandResponse {
+            type View<'a> = GetPriceBandResponseView<'a>;
+            type ViewHandle = GetPriceBandResponseOwnedView;
+        }
+        impl ::serde::Serialize for GetPriceBandResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// HeatmapTimeRange selects historical buckets by \[start_time, end_time\] (UTC).
         /// At least one bound is required.
         #[derive(Clone, Debug, Default)]
@@ -28347,6 +31056,9 @@ pub mod __buffa {
         reg.register_json_any(super::__PRICE_BAND_JSON_ANY);
         reg.register_json_any(super::__GET_SPOT_CONFIG_REQUEST_JSON_ANY);
         reg.register_json_any(super::__GET_SPOT_CONFIG_RESPONSE_JSON_ANY);
+        reg.register_json_any(super::__LIVE_PRICE_BAND_JSON_ANY);
+        reg.register_json_any(super::__GET_PRICE_BAND_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__GET_PRICE_BAND_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__HEATMAP_TIME_RANGE_JSON_ANY);
         reg.register_json_any(super::__GET_ORDERBOOK_HEATMAP_REQUEST_JSON_ANY);
         reg.register_json_any(super::__HEATMAP_LEVELS_JSON_ANY);
@@ -28458,6 +31170,18 @@ pub use self::__buffa::view::GetSpotConfigRequestOwnedView;
 pub use self::__buffa::view::GetSpotConfigResponseView;
 #[doc(inline)]
 pub use self::__buffa::view::GetSpotConfigResponseOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::LivePriceBandView;
+#[doc(inline)]
+pub use self::__buffa::view::LivePriceBandOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPriceBandRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPriceBandRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPriceBandResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::GetPriceBandResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::HeatmapTimeRangeView;
 #[doc(inline)]

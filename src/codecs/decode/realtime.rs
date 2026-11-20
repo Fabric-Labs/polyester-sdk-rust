@@ -431,7 +431,7 @@ mod tests {
         let order = &decoded.orders[0];
         assert_eq!(order, &order_from_proto(&unit.orders[0]).unwrap());
         assert_eq!(order.order_id, format_uint64_id(42));
-        assert_eq!(order.side, "buy");
+        assert_eq!(order.side.as_deref(), Some("buy"));
         assert_eq!(order.status, "working");
         assert_eq!(order.price.as_ref().unwrap().format(), "2420");
         assert_eq!(decoded.removed_order_ids, vec![format_uint64_id(7)]);

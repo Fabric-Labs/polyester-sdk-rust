@@ -1257,9 +1257,10 @@ pub enum ErrorCode {
     ERROR_CODE_ORDER_MODIFY_IN_PROGRESS = 226i32,
     /// The placement of the order, or of the replacement an earlier replace
     /// created, has not been confirmed yet, so it cannot be modified. It may already
-    /// rest on the book. A refresh that names the replacement order ID from a batch
-    /// whose replace has not been confirmed yet gets this code. Retry after a short
-    /// backoff, as for ORDER_MODIFY_IN_PROGRESS.
+    /// rest on the book. An order event may already report the order WORKING before
+    /// it can be modified; retry after a short backoff. A refresh that names the
+    /// replacement order ID from a batch whose replace has not been confirmed yet
+    /// gets this code. Retry as for ORDER_MODIFY_IN_PROGRESS.
     ERROR_CODE_ORDER_PLACEMENT_PENDING = 227i32,
     /// The modify behavior is not a known behavior.
     ERROR_CODE_INVALID_MODIFY_BEHAVIOR = 228i32,
@@ -1569,6 +1570,11 @@ pub enum ErrorCode {
     /// hyphen. Answered by CreateOco and by the ListTriggers client_list_id
     /// filter. Nothing changed.
     ERROR_CODE_CLIENT_LIST_ID_INVALID = 318i32,
+    /// An admitted item of a batch replace had not applied 2 seconds after its
+    /// admission, so it was refused when it applied. Nothing changed: the item
+    /// left the order as it was, and a replacement's successor never exists.
+    /// Send a new batch with the current quote.
+    ERROR_CODE_MODIFY_APPLY_EXPIRED = 319i32,
 }
 impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -2192,6 +2198,9 @@ impl ErrorCode {
     ///Idiomatic alias for [`Self::ERROR_CODE_CLIENT_LIST_ID_INVALID`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const ClientListIdInvalid: Self = Self::ERROR_CODE_CLIENT_LIST_ID_INVALID;
+    ///Idiomatic alias for [`Self::ERROR_CODE_MODIFY_APPLY_EXPIRED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const ModifyApplyExpired: Self = Self::ERROR_CODE_MODIFY_APPLY_EXPIRED;
 }
 impl ::core::default::Default for ErrorCode {
     fn default() -> Self {
@@ -2840,6 +2849,7 @@ impl ::buffa::Enumeration for ErrorCode {
             318i32 => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_LIST_ID_INVALID)
             }
+            319i32 => ::core::option::Option::Some(Self::ERROR_CODE_MODIFY_APPLY_EXPIRED),
             _ => ::core::option::Option::None,
         }
     }
@@ -3281,6 +3291,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_CLIENT_LIST_ID_INVALID => {
                 "ERROR_CODE_CLIENT_LIST_ID_INVALID"
             }
+            Self::ERROR_CODE_MODIFY_APPLY_EXPIRED => "ERROR_CODE_MODIFY_APPLY_EXPIRED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -4008,6 +4019,9 @@ impl ::buffa::Enumeration for ErrorCode {
             "ERROR_CODE_CLIENT_LIST_ID_INVALID" => {
                 ::core::option::Option::Some(Self::ERROR_CODE_CLIENT_LIST_ID_INVALID)
             }
+            "ERROR_CODE_MODIFY_APPLY_EXPIRED" => {
+                ::core::option::Option::Some(Self::ERROR_CODE_MODIFY_APPLY_EXPIRED)
+            }
             _ => ::core::option::Option::None,
         }
     }
@@ -4220,6 +4234,7 @@ impl ::buffa::Enumeration for ErrorCode {
             Self::ERROR_CODE_INVALID_PEG,
             Self::ERROR_CODE_TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
             Self::ERROR_CODE_CLIENT_LIST_ID_INVALID,
+            Self::ERROR_CODE_MODIFY_APPLY_EXPIRED,
         ]
     }
 }
@@ -4546,16 +4561,35 @@ impl ::buffa::Enumeration for TriggerDirection {
 }
 /// ModifyBehavior controls how ModifyOrder should handle amend-vs-replace paths.
 /// MODIFY_BEHAVIOR_UNSPECIFIED is treated as AMEND_OR_REPLACE by server logic.
+///
+/// An amend keeps the order in place, under the same order ID and with its
+/// queue priority kept; a replace ends it and creates a successor under a new
+/// order ID, with its queue priority reset. Either way, a new total quantity at
+/// or below the order's filled quantity when the change applies, fills after
+/// the request was sent included, ends the order at its filled quantity
+/// (CANCEL_REASON_QTY_AT_OR_BELOW_FILLED) with no successor, and ModifyOrder
+/// answers AMENDED with the order's ID rather than an error.
+///
+/// Order the states of one order ID by version (Order.version), keeping the
+/// highest applied. A terminal status is final: no later state of that order ID
+/// is open. Price and quantity order only two open states of one GTC or GTD
+/// limit order at version 1 or above: its price stays the same and its total
+/// quantity never rises, so the state with the larger total quantity is the
+/// older.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 #[repr(i32)]
 pub enum ModifyBehavior {
     /// Behavior was not provided; server treats this as AMEND_OR_REPLACE.
     MODIFY_BEHAVIOR_UNSPECIFIED = 0i32,
-    /// Try in-place amend first; if patch cannot be amended, fall back to replace.
+    /// Replace the order when the patch sets a price other than the order's, a
+    /// total quantity above the order's total quantity, or a client order ID
+    /// other than the order's; otherwise amend it in place.
     AMEND_OR_REPLACE = 1i32,
-    /// In-place amend only; reject if patch requires replace semantics.
+    /// Amend the order in place when AMEND_OR_REPLACE would amend it; reject
+    /// with MODIFICATION_REQUIRES_REPLACE a patch that AMEND_OR_REPLACE would
+    /// replace. Other checks can reject the patch first with their own codes.
     AMEND_ONLY = 2i32,
-    /// Always attempt replace semantics.
+    /// Replace the order, even when the patch changes no value.
     REPLACE_ONLY = 3i32,
 }
 impl ModifyBehavior {
@@ -11174,7 +11208,8 @@ pub mod trailing_stop_policy {
 /// if its condition still holds, exits what remains. After an exit ends, the legs keep
 /// protecting whatever position remains, unless you canceled the exit: canceling
 /// a leg's exit order, alone or with a cancel-all, ends that leg, and with oco
-/// set the other leg too.
+/// set the other leg too. Canceling a leg itself with CancelTrigger ends only
+/// that leg, whether or not oco is set, and the other leg stays active.
 ///
 /// The legs end once the parent order is terminal and no position they can
 /// exit remains: the leg whose exit ended last completes, and the others are
@@ -11211,13 +11246,15 @@ pub struct RiskPolicy {
     /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
     /// take-profit and exactly one stop leg. The legs of every parent share one
     /// position and end together as described on RiskPolicy, so this setting
-    /// does not change when exits are submitted. It decides what canceling an
-    /// exit order ends: with oco set, canceling one leg's exit ends both legs;
-    /// without it, only that leg ends and the other keeps protecting the
-    /// remaining position. Changing only this setting with ModifyOrder keeps
-    /// the existing legs, with their IDs, arming and a trailing stop's tracked
-    /// peak; changing a leg's terms, such as its trigger price, limit price or
-    /// trailing distance, still replaces that leg. Default is false.
+    /// does not change when exits are submitted. It decides only what canceling
+    /// a leg's exit order ends: with oco set, canceling one leg's exit ends both
+    /// legs; without it, only that leg ends and the other keeps protecting the
+    /// remaining position. Canceling a leg itself with CancelTrigger ends only
+    /// that leg either way, and the other leg stays active. Changing only this
+    /// setting with ModifyOrder keeps the existing legs, with their IDs, arming
+    /// and a trailing stop's tracked peak; changing a leg's terms, such as its
+    /// trigger price, limit price or trailing distance, still replaces that leg.
+    /// Default is false.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -11636,13 +11673,14 @@ pub struct CancelAllOrdersRequest {
     )]
     pub request_id: ::buffa::alloc::string::String,
     /// If true, also stops the account's triggers in the same scope: every
-    /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
-    /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
-    /// trade on the side filter, created before the request was accepted. Each
-    /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
-    /// its reserved funds, its open orders are canceled with the others, and none
-    /// places an order after the response. Defaults to false: only orders are
-    /// canceled and triggers keep running. Part of the criteria a retry must keep.
+    /// stop-loss, take-profit, trailing stop, TWAP, ladder, standalone OCO (both
+    /// its legs) and attached take-profit, stop-loss or trailing leg on the
+    /// matched symbols whose orders trade on the side filter, created before the
+    /// request was accepted. Each ends canceled with reason
+    /// `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases its reserved funds, its
+    /// open orders are canceled with the others, and none places an order after
+    /// the response. Defaults to false: only orders are canceled and triggers
+    /// keep running. Part of the criteria a retry must keep.
     ///
     /// Field 7: `include_triggers`
     #[serde(
@@ -16033,8 +16071,10 @@ pub const __MODIFY_ORDER_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry
 /// raise its total quantity and keeps its client order ID amends the order in
 /// place, under the same order ID and with its queue priority kept. A new
 /// price, a larger total quantity or a new client order ID replaces it with a
-/// successor order under a new order ID, with its queue priority reset. To
-/// force a replacement, use ModifyOrder with REPLACE_ONLY.
+/// successor order under a new order ID, with its queue priority reset. Either
+/// way, a new total quantity at or below the order's filled quantity when the
+/// item applies ends the order at its filled quantity with no successor (see
+/// ModifyBehavior). To force a replacement, use ModifyOrder with REPLACE_ONLY.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize)]
 #[serde(default)]
@@ -16535,7 +16575,8 @@ pub struct BatchReplaceAdmissionItem {
     )]
     pub old_order_id: u64,
     /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
-    /// item, whose order keeps old_order_id, and for rejected items.
+    /// item, whose order keeps old_order_id, and for rejected items. If the item
+    /// is refused when it applies, this successor never exists as an order.
     ///
     /// Field 4: `replacement_order_id`
     #[serde(
@@ -16847,6 +16888,23 @@ pub const __BATCH_REPLACE_ADMISSION_ITEM_JSON_ANY: ::buffa::type_registry::JsonA
 /// here. Resend only the rejected items, in a new batch under a fresh key, after
 /// a short backoff: the rejected batch's key keeps replaying its rejection, and
 /// admitted items must not be sent again.
+/// An admitted item that amends or replaces its order can still be refused when
+/// it applies: the item changes nothing, leaving the order as it was (at its old
+/// price, quantity and client order ID unless it had ended), and a refused
+/// replacement's successor never exists as an order. Such an item that has not applied 2 seconds after its admission is
+/// refused with ERROR_CODE_MODIFY_APPLY_EXPIRED, so none applies later than
+/// that. The trading WebSocket reports each such refusal with one
+/// BatchReplaceItemReject, which can arrive before this response. A refusal at
+/// admission is reported in this response alone, so the same code there means
+/// the item was never admitted. For 60 seconds from acceptance,
+/// GetBatchReplaceStatus reports a refused item as REJECTED, and GetOrder of a
+/// refused replacement's successor answers REJECTED with the same code, with no
+/// order terms: you know them from the batch you sent. After
+/// that window, a successor that is not found while the order it would have
+/// replaced is not CANCELED with CANCEL_REASON_REPLACED never becomes an order:
+/// the item was refused, or it applied by ending that order at its filled
+/// quantity, which that order's CANCEL_REASON_QTY_AT_OR_BELOW_FILLED shows
+/// unless a later change of yours ended it so.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
@@ -21390,6 +21448,9 @@ pub struct Order {
     )]
     pub order_id: u64,
     /// Trading symbol numeric identifier.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 3: `symbol_id`
     #[serde(
@@ -21411,6 +21472,9 @@ pub struct Order {
     )]
     pub client_order_id: ::buffa::alloc::string::String,
     /// Order side.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 5: `side`
     #[serde(
@@ -21429,6 +21493,9 @@ pub struct Order {
     )]
     pub status: ::buffa::EnumValue<OrderStatus>,
     /// Order type.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 7: `order_type`
     #[serde(
@@ -21439,6 +21506,9 @@ pub struct Order {
     )]
     pub order_type: ::buffa::EnumValue<OrderType>,
     /// Time-in-force policy.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 8: `time_in_force`
     #[serde(
@@ -21449,6 +21519,9 @@ pub struct Order {
     )]
     pub time_in_force: ::buffa::EnumValue<TimeInForce>,
     /// Self-trade prevention mode.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 9: `self_trade_prevention_mode`
     #[serde(
@@ -21459,6 +21532,9 @@ pub struct Order {
     )]
     pub self_trade_prevention_mode: ::buffa::EnumValue<SelfTradePreventionMode>,
     /// Fee asset selected for fills.
+    /// Unset for the replacement order of a batch item refused when it applied
+    /// (REJECTED with batch_request_id set), which never existed and carries no
+    /// order terms: the client knows them from the batch it sent.
     ///
     /// Field 10: `fee_asset`
     #[serde(
@@ -21480,6 +21556,9 @@ pub struct Order {
     pub post_only: bool,
     /// Current accepted total order quantity, updated by successful modifies,
     /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
+    /// 0 as a placeholder for the replacement order of a batch item refused when
+    /// it applied, which carries no order terms: the client knows them from the
+    /// batch it sent.
     ///
     /// Field 12: `orig_qty_scaled`
     #[serde(
@@ -21642,7 +21721,8 @@ pub struct Order {
     /// (see MarketIoc). A stop-loss's, take-profit's or
     /// trailing stop's market order takes the price that fired it as its
     /// reference; a buy stop's is never above the protection price at its
-    /// trigger price.
+    /// trigger price. 0 as a placeholder for the replacement order of a batch
+    /// item refused when it applied, which carries no order terms.
     ///
     /// Field 15: `price_ticks`
     #[serde(
@@ -21818,6 +21898,8 @@ pub struct Order {
     )]
     pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
     /// Logical-order identity and requested generation. Always populated by order reads.
+    /// A batch item's refused replacement never joined its predecessor's
+    /// lineage: it is its own, at generation 1.
     ///
     /// Field 31: `lineage`
     #[serde(
@@ -36545,7 +36627,8 @@ pub mod __buffa {
         /// if its condition still holds, exits what remains. After an exit ends, the legs keep
         /// protecting whatever position remains, unless you canceled the exit: canceling
         /// a leg's exit order, alone or with a cancel-all, ends that leg, and with oco
-        /// set the other leg too.
+        /// set the other leg too. Canceling a leg itself with CancelTrigger ends only
+        /// that leg, whether or not oco is set, and the other leg stays active.
         ///
         /// The legs end once the parent order is terminal and no position they can
         /// exit remains: the leg whose exit ended last completes, and the others are
@@ -36577,13 +36660,15 @@ pub mod __buffa {
             /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
             /// take-profit and exactly one stop leg. The legs of every parent share one
             /// position and end together as described on RiskPolicy, so this setting
-            /// does not change when exits are submitted. It decides what canceling an
-            /// exit order ends: with oco set, canceling one leg's exit ends both legs;
-            /// without it, only that leg ends and the other keeps protecting the
-            /// remaining position. Changing only this setting with ModifyOrder keeps
-            /// the existing legs, with their IDs, arming and a trailing stop's tracked
-            /// peak; changing a leg's terms, such as its trigger price, limit price or
-            /// trailing distance, still replaces that leg. Default is false.
+            /// does not change when exits are submitted. It decides only what canceling
+            /// a leg's exit order ends: with oco set, canceling one leg's exit ends both
+            /// legs; without it, only that leg ends and the other keeps protecting the
+            /// remaining position. Canceling a leg itself with CancelTrigger ends only
+            /// that leg either way, and the other leg stays active. Changing only this
+            /// setting with ModifyOrder keeps the existing legs, with their IDs, arming
+            /// and a trailing stop's tracked peak; changing a leg's terms, such as its
+            /// trigger price, limit price or trailing distance, still replaces that leg.
+            /// Default is false.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -37023,13 +37108,15 @@ pub mod __buffa {
             /// trailing stop) are linked and shown as one-cancels-the-other. Requires a
             /// take-profit and exactly one stop leg. The legs of every parent share one
             /// position and end together as described on RiskPolicy, so this setting
-            /// does not change when exits are submitted. It decides what canceling an
-            /// exit order ends: with oco set, canceling one leg's exit ends both legs;
-            /// without it, only that leg ends and the other keeps protecting the
-            /// remaining position. Changing only this setting with ModifyOrder keeps
-            /// the existing legs, with their IDs, arming and a trailing stop's tracked
-            /// peak; changing a leg's terms, such as its trigger price, limit price or
-            /// trailing distance, still replaces that leg. Default is false.
+            /// does not change when exits are submitted. It decides only what canceling
+            /// a leg's exit order ends: with oco set, canceling one leg's exit ends both
+            /// legs; without it, only that leg ends and the other keeps protecting the
+            /// remaining position. Canceling a leg itself with CancelTrigger ends only
+            /// that leg either way, and the other leg stays active. Changing only this
+            /// setting with ModifyOrder keeps the existing legs, with their IDs, arming
+            /// and a trailing stop's tracked peak; changing a leg's terms, such as its
+            /// trigger price, limit price or trailing distance, still replaces that leg.
+            /// Default is false.
             ///
             /// Field 4: `oco`
             #[must_use]
@@ -37114,13 +37201,14 @@ pub mod __buffa {
             /// Field 6: `request_id`
             pub request_id: &'a str,
             /// If true, also stops the account's triggers in the same scope: every
-            /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
-            /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
-            /// trade on the side filter, created before the request was accepted. Each
-            /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
-            /// its reserved funds, its open orders are canceled with the others, and none
-            /// places an order after the response. Defaults to false: only orders are
-            /// canceled and triggers keep running. Part of the criteria a retry must keep.
+            /// stop-loss, take-profit, trailing stop, TWAP, ladder, standalone OCO (both
+            /// its legs) and attached take-profit, stop-loss or trailing leg on the
+            /// matched symbols whose orders trade on the side filter, created before the
+            /// request was accepted. Each ends canceled with reason
+            /// `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases its reserved funds, its
+            /// open orders are canceled with the others, and none places an order after
+            /// the response. Defaults to false: only orders are canceled and triggers
+            /// keep running. Part of the criteria a retry must keep.
             ///
             /// Field 7: `include_triggers`
             pub include_triggers: bool,
@@ -37527,13 +37615,14 @@ pub mod __buffa {
                 self.0.reborrow().request_id
             }
             /// If true, also stops the account's triggers in the same scope: every
-            /// stop-loss, take-profit, trailing stop, TWAP, ladder and attached
-            /// take-profit, stop-loss or trailing leg on the matched symbols whose orders
-            /// trade on the side filter, created before the request was accepted. Each
-            /// ends canceled with reason `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases
-            /// its reserved funds, its open orders are canceled with the others, and none
-            /// places an order after the response. Defaults to false: only orders are
-            /// canceled and triggers keep running. Part of the criteria a retry must keep.
+            /// stop-loss, take-profit, trailing stop, TWAP, ladder, standalone OCO (both
+            /// its legs) and attached take-profit, stop-loss or trailing leg on the
+            /// matched symbols whose orders trade on the side filter, created before the
+            /// request was accepted. Each ends canceled with reason
+            /// `TRIGGER_CANCEL_REASON_CANCEL_ALL` and releases its reserved funds, its
+            /// open orders are canceled with the others, and none places an order after
+            /// the response. Defaults to false: only orders are canceled and triggers
+            /// keep running. Part of the criteria a retry must keep.
             ///
             /// Field 7: `include_triggers`
             #[must_use]
@@ -43396,8 +43485,10 @@ pub mod __buffa {
         /// raise its total quantity and keeps its client order ID amends the order in
         /// place, under the same order ID and with its queue priority kept. A new
         /// price, a larger total quantity or a new client order ID replaces it with a
-        /// successor order under a new order ID, with its queue priority reset. To
-        /// force a replacement, use ModifyOrder with REPLACE_ONLY.
+        /// successor order under a new order ID, with its queue priority reset. Either
+        /// way, a new total quantity at or below the order's filled quantity when the
+        /// item applies ends the order at its filled quantity with no successor (see
+        /// ModifyBehavior). To force a replacement, use ModifyOrder with REPLACE_ONLY.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrderItemView<'a> {
             /// Patch fields (presence-based): set at least one of new_price_ticks,
@@ -43948,7 +44039,8 @@ pub mod __buffa {
             /// Field 3: `old_order_id`
             pub old_order_id: u64,
             /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
-            /// item, whose order keeps old_order_id, and for rejected items.
+            /// item, whose order keeps old_order_id, and for rejected items. If the item
+            /// is refused when it applies, this successor never exists as an order.
             ///
             /// Field 4: `replacement_order_id`
             pub replacement_order_id: u64,
@@ -44425,7 +44517,8 @@ pub mod __buffa {
                 self.0.reborrow().old_order_id
             }
             /// Assigned successor order ID, for a REPLACED item only. Unset for an AMENDED
-            /// item, whose order keeps old_order_id, and for rejected items.
+            /// item, whose order keeps old_order_id, and for rejected items. If the item
+            /// is refused when it applies, this successor never exists as an order.
             ///
             /// Field 4: `replacement_order_id`
             #[must_use]
@@ -44522,6 +44615,23 @@ pub mod __buffa {
         /// here. Resend only the rejected items, in a new batch under a fresh key, after
         /// a short backoff: the rejected batch's key keeps replaying its rejection, and
         /// admitted items must not be sent again.
+        /// An admitted item that amends or replaces its order can still be refused when
+        /// it applies: the item changes nothing, leaving the order as it was (at its old
+        /// price, quantity and client order ID unless it had ended), and a refused
+        /// replacement's successor never exists as an order. Such an item that has not applied 2 seconds after its admission is
+        /// refused with ERROR_CODE_MODIFY_APPLY_EXPIRED, so none applies later than
+        /// that. The trading WebSocket reports each such refusal with one
+        /// BatchReplaceItemReject, which can arrive before this response. A refusal at
+        /// admission is reported in this response alone, so the same code there means
+        /// the item was never admitted. For 60 seconds from acceptance,
+        /// GetBatchReplaceStatus reports a refused item as REJECTED, and GetOrder of a
+        /// refused replacement's successor answers REJECTED with the same code, with no
+        /// order terms: you know them from the batch you sent. After
+        /// that window, a successor that is not found while the order it would have
+        /// replaced is not CANCELED with CANCEL_REASON_REPLACED never becomes an order:
+        /// the item was refused, or it applied by ending that order at its filled
+        /// quantity, which that order's CANCEL_REASON_QTY_AT_OR_BELOW_FILLED shows
+        /// unless a later change of yours ended it so.
         #[derive(Clone, Debug, Default)]
         pub struct BatchReplaceOrdersRequestView<'a> {
             /// Optional public subaccount ID. When omitted, subaccount-scoped API keys
@@ -50336,6 +50446,9 @@ pub mod __buffa {
             /// Field 1: `order_id`
             pub order_id: u64,
             /// Trading symbol numeric identifier.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 3: `symbol_id`
             pub symbol_id: u32,
@@ -50345,6 +50458,9 @@ pub mod __buffa {
             /// Field 4: `client_order_id`
             pub client_order_id: &'a str,
             /// Order side.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 5: `side`
             pub side: ::buffa::EnumValue<super::super::Side>,
@@ -50353,20 +50469,32 @@ pub mod __buffa {
             /// Field 6: `status`
             pub status: ::buffa::EnumValue<super::super::OrderStatus>,
             /// Order type.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 7: `order_type`
             pub order_type: ::buffa::EnumValue<super::super::OrderType>,
             /// Time-in-force policy.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 8: `time_in_force`
             pub time_in_force: ::buffa::EnumValue<super::super::TimeInForce>,
             /// Self-trade prevention mode.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 9: `self_trade_prevention_mode`
             pub self_trade_prevention_mode: ::buffa::EnumValue<
                 super::super::SelfTradePreventionMode,
             >,
             /// Fee asset selected for fills.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 10: `fee_asset`
             pub fee_asset: ::buffa::EnumValue<super::super::FeeAsset>,
@@ -50376,6 +50504,9 @@ pub mod __buffa {
             pub post_only: bool,
             /// Current accepted total order quantity, updated by successful modifies,
             /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
+            /// 0 as a placeholder for the replacement order of a batch item refused when
+            /// it applied, which carries no order terms: the client knows them from the
+            /// batch it sent.
             ///
             /// Field 12: `orig_qty_scaled`
             pub orig_qty_scaled: i64,
@@ -50491,7 +50622,8 @@ pub mod __buffa {
             /// (see MarketIoc). A stop-loss's, take-profit's or
             /// trailing stop's market order takes the price that fired it as its
             /// reference; a buy stop's is never above the protection price at its
-            /// trigger price.
+            /// trigger price. 0 as a placeholder for the replacement order of a batch
+            /// item refused when it applied, which carries no order terms.
             ///
             /// Field 15: `price_ticks`
             pub price_ticks: i64,
@@ -50591,6 +50723,8 @@ pub mod __buffa {
             /// Field 41: `submitted_quote_proceeds_scaled`
             pub submitted_quote_proceeds_scaled: ::core::option::Option<i64>,
             /// Logical-order identity and requested generation. Always populated by order reads.
+            /// A batch item's refused replacement never joined its predecessor's
+            /// lineage: it is its own, at generation 1.
             ///
             /// Field 31: `lineage`
             pub lineage: ::buffa::MessageFieldView<
@@ -51951,6 +52085,9 @@ pub mod __buffa {
                 self.0.reborrow().order_id
             }
             /// Trading symbol numeric identifier.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 3: `symbol_id`
             #[must_use]
@@ -51966,6 +52103,9 @@ pub mod __buffa {
                 self.0.reborrow().client_order_id
             }
             /// Order side.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 5: `side`
             #[must_use]
@@ -51980,6 +52120,9 @@ pub mod __buffa {
                 self.0.reborrow().status
             }
             /// Order type.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 7: `order_type`
             #[must_use]
@@ -51987,6 +52130,9 @@ pub mod __buffa {
                 self.0.reborrow().order_type
             }
             /// Time-in-force policy.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 8: `time_in_force`
             #[must_use]
@@ -51996,6 +52142,9 @@ pub mod __buffa {
                 self.0.reborrow().time_in_force
             }
             /// Self-trade prevention mode.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 9: `self_trade_prevention_mode`
             #[must_use]
@@ -52005,6 +52154,9 @@ pub mod __buffa {
                 self.0.reborrow().self_trade_prevention_mode
             }
             /// Fee asset selected for fills.
+            /// Unset for the replacement order of a batch item refused when it applied
+            /// (REJECTED with batch_request_id set), which never existed and carries no
+            /// order terms: the client knows them from the batch it sent.
             ///
             /// Field 10: `fee_asset`
             #[must_use]
@@ -52020,6 +52172,9 @@ pub mod __buffa {
             }
             /// Current accepted total order quantity, updated by successful modifies,
             /// scaled by the pair's base_quantity_scale from GetSpotConfig for symbol_id.
+            /// 0 as a placeholder for the replacement order of a batch item refused when
+            /// it applied, which carries no order terms: the client knows them from the
+            /// batch it sent.
             ///
             /// Field 12: `orig_qty_scaled`
             #[must_use]
@@ -52171,7 +52326,8 @@ pub mod __buffa {
             /// (see MarketIoc). A stop-loss's, take-profit's or
             /// trailing stop's market order takes the price that fired it as its
             /// reference; a buy stop's is never above the protection price at its
-            /// trigger price.
+            /// trigger price. 0 as a placeholder for the replacement order of a batch
+            /// item refused when it applied, which carries no order terms.
             ///
             /// Field 15: `price_ticks`
             #[must_use]
@@ -52323,6 +52479,8 @@ pub mod __buffa {
                 self.0.reborrow().submitted_quote_proceeds_scaled
             }
             /// Logical-order identity and requested generation. Always populated by order reads.
+            /// A batch item's refused replacement never joined its predecessor's
+            /// lineage: it is its own, at generation 1.
             ///
             /// Field 31: `lineage`
             #[must_use]

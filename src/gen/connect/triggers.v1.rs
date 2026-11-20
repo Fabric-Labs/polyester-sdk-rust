@@ -623,7 +623,11 @@ pub trait TriggersService: Send + Sync + 'static {
     /// instead, which then means the same. Pausing, resuming or modifying an
     /// ended trigger answers the same way. A trigger ID that names none of the
     /// caller's triggers returns ERROR_CODE_TRIGGER_NOT_FOUND. Cancelling
-    /// either leg of an OCO cancels both.
+    /// either leg of an OCO created with CreateOco, a trigger with an
+    /// order_list_id, cancels both. Cancelling one attached take-profit or stop
+    /// leg of an order, a trigger with a parent_order_id, ends only that leg,
+    /// whether or not the order's legs are oco: the other leg stays active and
+    /// keeps protecting the position.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///

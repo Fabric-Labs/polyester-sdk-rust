@@ -1821,6 +1821,9 @@ pub enum FundingMode {
     /// The caller's own OpenAI API key (SetModelKey): the messages use no
     /// credits.
     OWN_KEY = 2i32,
+    /// Polyester pays: the work uses no credits and no key of the caller's. Only
+    /// a subagent's work is sponsored (SubagentStarted.funding), never a message.
+    SPONSORED = 3i32,
 }
 impl FundingMode {
     ///Idiomatic alias for [`Self::FUNDING_UNSPECIFIED`]; `Debug` prints the variant name.
@@ -1832,6 +1835,9 @@ impl FundingMode {
     ///Idiomatic alias for [`Self::OWN_KEY`]; `Debug` prints the variant name.
     #[allow(non_upper_case_globals)]
     pub const OwnKey: Self = Self::OWN_KEY;
+    ///Idiomatic alias for [`Self::SPONSORED`]; `Debug` prints the variant name.
+    #[allow(non_upper_case_globals)]
+    pub const Sponsored: Self = Self::SPONSORED;
 }
 impl ::core::default::Default for FundingMode {
     fn default() -> Self {
@@ -1930,6 +1936,7 @@ impl ::buffa::Enumeration for FundingMode {
             0i32 => ::core::option::Option::Some(Self::FUNDING_UNSPECIFIED),
             1i32 => ::core::option::Option::Some(Self::CREDITS),
             2i32 => ::core::option::Option::Some(Self::OWN_KEY),
+            3i32 => ::core::option::Option::Some(Self::SPONSORED),
             _ => ::core::option::Option::None,
         }
     }
@@ -1941,6 +1948,7 @@ impl ::buffa::Enumeration for FundingMode {
             Self::FUNDING_UNSPECIFIED => "FUNDING_UNSPECIFIED",
             Self::CREDITS => "CREDITS",
             Self::OWN_KEY => "OWN_KEY",
+            Self::SPONSORED => "SPONSORED",
         }
     }
     fn from_proto_name(name: &str) -> ::core::option::Option<Self> {
@@ -1950,11 +1958,12 @@ impl ::buffa::Enumeration for FundingMode {
             }
             "CREDITS" => ::core::option::Option::Some(Self::CREDITS),
             "OWN_KEY" => ::core::option::Option::Some(Self::OWN_KEY),
+            "SPONSORED" => ::core::option::Option::Some(Self::SPONSORED),
             _ => ::core::option::Option::None,
         }
     }
     fn values() -> &'static [Self] {
-        &[Self::FUNDING_UNSPECIFIED, Self::CREDITS, Self::OWN_KEY]
+        &[Self::FUNDING_UNSPECIFIED, Self::CREDITS, Self::OWN_KEY, Self::SPONSORED]
     }
 }
 /// DisplaySetting is one of the client's display preferences the assistant may
@@ -7599,6 +7608,17 @@ pub struct ToolStarted {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub input: ::buffa::MessageField<::buffa_types::google::protobuf::Struct>,
+    /// The delegation the call belongs to, as in its SubagentStarted event: set
+    /// for a subagent's own calls, which show its progress. Omitted for the
+    /// assistant's own calls.
+    ///
+    /// Field 4: `subagent_id`
+    #[serde(
+        rename = "subagentId",
+        alias = "subagent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subagent_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7609,6 +7629,7 @@ impl ::core::fmt::Debug for ToolStarted {
             .field("tool_call_id", &self.tool_call_id)
             .field("name", &self.name)
             .field("input", &self.input)
+            .field("subagent_id", &self.subagent_id)
             .finish()
     }
 }
@@ -7618,6 +7639,18 @@ impl ToolStarted {
     ///
     /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
     pub const TYPE_URL: &'static str = "type.googleapis.com/ai.v1.ToolStarted";
+}
+impl ToolStarted {
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subagent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subagent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.subagent_id = Some(value.into());
+        self
+    }
 }
 ::buffa::impl_default_instance!(ToolStarted);
 impl ::buffa::MessageName for ToolStarted {
@@ -7651,6 +7684,9 @@ impl ::buffa::Message for ToolStarted {
                 += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                     + inner_size;
         }
+        if let Some(ref v) = self.subagent_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7670,6 +7706,9 @@ impl ::buffa::Message for ToolStarted {
         if self.input.is_set() {
             ::buffa::types::put_len_delimited_header(3u32, __cache.consume_next(), buf);
             self.input.write_to(__cache, buf);
+        }
+        if let Some(ref v) = self.subagent_id {
+            ::buffa::types::put_string_field(4u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7709,6 +7748,18 @@ impl ::buffa::Message for ToolStarted {
                     ctx,
                 )?;
             }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .subagent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7720,6 +7771,7 @@ impl ::buffa::Message for ToolStarted {
         self.tool_call_id.clear();
         self.name.clear();
         self.input = ::buffa::MessageField::none();
+        self.subagent_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -7795,6 +7847,16 @@ pub struct ToolFinished {
         skip_serializing_if = "::core::option::Option::is_none"
     )]
     pub error_message: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The delegation the call belongs to, as in its ToolStarted event. Omitted
+    /// for the assistant's own calls.
+    ///
+    /// Field 5: `subagent_id`
+    #[serde(
+        rename = "subagentId",
+        alias = "subagent_id",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub subagent_id: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -7806,6 +7868,7 @@ impl ::core::fmt::Debug for ToolFinished {
             .field("name", &self.name)
             .field("ok", &self.ok)
             .field("error_message", &self.error_message)
+            .field("subagent_id", &self.subagent_id)
             .finish()
     }
 }
@@ -7825,6 +7888,16 @@ impl ToolFinished {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.error_message = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::subagent_id`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_subagent_id(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.subagent_id = Some(value.into());
         self
     }
 }
@@ -7858,6 +7931,9 @@ impl ::buffa::Message for ToolFinished {
         if let Some(ref v) = self.error_message {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
+        if let Some(ref v) = self.subagent_id {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -7879,6 +7955,9 @@ impl ::buffa::Message for ToolFinished {
         }
         if let Some(ref v) = self.error_message {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.subagent_id {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -7926,6 +8005,18 @@ impl ::buffa::Message for ToolFinished {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .subagent_id
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -7938,6 +8029,7 @@ impl ::buffa::Message for ToolFinished {
         self.name.clear();
         self.ok = false;
         self.error_message = ::core::option::Option::None;
+        self.subagent_id = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -8843,7 +8935,7 @@ pub struct SubagentStarted {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub subagent_id: ::buffa::alloc::string::String,
-    /// Subagent name, for example "strategy-researcher".
+    /// Subagent name, for example "strategy-coder".
     ///
     /// Field 2: `name`
     #[serde(
@@ -8852,6 +8944,30 @@ pub struct SubagentStarted {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
     )]
     pub name: ::buffa::alloc::string::String,
+    /// What pays for the subagent's work: SPONSORED, CREDITS or OWN_KEY.
+    /// FUNDING_UNSPECIFIED when the server does not say.
+    ///
+    /// Field 3: `funding`
+    #[serde(
+        rename = "funding",
+        with = "::buffa::json_helpers::proto_enum",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_default_enum_value"
+    )]
+    pub funding: ::buffa::EnumValue<FundingMode>,
+    /// The most credits the subagent may use, shown before it starts. Each of
+    /// its model requests is limited to what is left of the cap, and a request
+    /// the rest cannot cover is not sent: the subagent stops there. With
+    /// SPONSORED and OWN_KEY funding the cap is measured in credits too, though
+    /// none are charged. 0 when the server does not say.
+    ///
+    /// Field 4: `credit_cap`
+    #[serde(
+        rename = "creditCap",
+        alias = "credit_cap",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub credit_cap: u64,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -8861,6 +8977,8 @@ impl ::core::fmt::Debug for SubagentStarted {
         f.debug_struct("SubagentStarted")
             .field("subagent_id", &self.subagent_id)
             .field("name", &self.name)
+            .field("funding", &self.funding)
+            .field("credit_cap", &self.credit_cap)
             .finish()
     }
 }
@@ -8895,6 +9013,15 @@ impl ::buffa::Message for SubagentStarted {
         if !self.name.is_empty() {
             size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
         }
+        {
+            let val = self.funding.to_i32();
+            if val != 0 {
+                size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+            }
+        }
+        if self.credit_cap != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.credit_cap) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -8910,6 +9037,15 @@ impl ::buffa::Message for SubagentStarted {
         }
         if !self.name.is_empty() {
             ::buffa::types::put_string_field(2u32, &self.name, buf);
+        }
+        {
+            let val = self.funding.to_i32();
+            if val != 0 {
+                ::buffa::types::put_int32_field(3u32, val, buf);
+            }
+        }
+        if self.credit_cap != 0u64 {
+            ::buffa::types::put_uint64_field(4u32, self.credit_cap, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -8938,6 +9074,22 @@ impl ::buffa::Message for SubagentStarted {
                 )?;
                 ::buffa::types::merge_string(&mut self.name, buf)?;
             }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.funding = ::buffa::EnumValue::from(
+                    ::buffa::types::decode_int32(buf)?,
+                );
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.credit_cap = ::buffa::types::decode_uint64(buf)?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -8948,6 +9100,8 @@ impl ::buffa::Message for SubagentStarted {
     fn clear(&mut self) {
         self.subagent_id.clear();
         self.name.clear();
+        self.funding = ::buffa::EnumValue::from(0);
+        self.credit_cap = 0u64;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -9018,6 +9172,17 @@ pub struct SubagentFinished {
     /// Field 4: `summary`
     #[serde(rename = "summary", skip_serializing_if = "::core::option::Option::is_none")]
     pub summary: ::core::option::Option<::buffa::alloc::string::String>,
+    /// The page on the Polyester website where the user deploys the bot the
+    /// subagent proposed, after MFA and a wallet signature. Omitted when it
+    /// proposed none. The subagent never deploys a bot itself.
+    ///
+    /// Field 5: `deploy_url`
+    #[serde(
+        rename = "deployUrl",
+        alias = "deploy_url",
+        skip_serializing_if = "::core::option::Option::is_none"
+    )]
+    pub deploy_url: ::core::option::Option<::buffa::alloc::string::String>,
     #[serde(skip)]
     #[doc(hidden)]
     pub __buffa_unknown_fields: ::buffa::UnknownFields,
@@ -9029,6 +9194,7 @@ impl ::core::fmt::Debug for SubagentFinished {
             .field("name", &self.name)
             .field("ok", &self.ok)
             .field("summary", &self.summary)
+            .field("deploy_url", &self.deploy_url)
             .finish()
     }
 }
@@ -9048,6 +9214,16 @@ impl SubagentFinished {
         value: impl Into<::buffa::alloc::string::String>,
     ) -> Self {
         self.summary = Some(value.into());
+        self
+    }
+    #[must_use = "with_* setters return `self` by value; assign or chain the result"]
+    #[inline]
+    ///Sets [`Self::deploy_url`] to `Some(value)`, consuming and returning `self`.
+    pub fn with_deploy_url(
+        mut self,
+        value: impl Into<::buffa::alloc::string::String>,
+    ) -> Self {
+        self.deploy_url = Some(value.into());
         self
     }
 }
@@ -9081,6 +9257,9 @@ impl ::buffa::Message for SubagentFinished {
         if let Some(ref v) = self.summary {
             size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
         }
+        if let Some(ref v) = self.deploy_url {
+            size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+        }
         size += self.__buffa_unknown_fields.encoded_len() as u32;
         size
     }
@@ -9102,6 +9281,9 @@ impl ::buffa::Message for SubagentFinished {
         }
         if let Some(ref v) = self.summary {
             ::buffa::types::put_string_field(4u32, v, buf);
+        }
+        if let Some(ref v) = self.deploy_url {
+            ::buffa::types::put_string_field(5u32, v, buf);
         }
         self.__buffa_unknown_fields.write_to(buf);
     }
@@ -9147,6 +9329,18 @@ impl ::buffa::Message for SubagentFinished {
                     buf,
                 )?;
             }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(
+                    self
+                        .deploy_url
+                        .get_or_insert_with(::buffa::alloc::string::String::new),
+                    buf,
+                )?;
+            }
             _ => {
                 self.__buffa_unknown_fields
                     .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
@@ -9159,6 +9353,7 @@ impl ::buffa::Message for SubagentFinished {
         self.name.clear();
         self.ok = false;
         self.summary = ::core::option::Option::None;
+        self.deploy_url = ::core::option::Option::None;
         self.__buffa_unknown_fields.clear();
     }
 }
@@ -10693,7 +10888,12 @@ pub struct AttachedExits {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
     )]
     pub trailing_stop: ::buffa::MessageField<AttachedTrailingStop>,
-    /// True when cancelling one exit ends the other.
+    /// True when the exits are linked one-cancels-the-other, as RiskPolicy.oco.
+    /// It decides only what canceling an exit's order ends: with oco set,
+    /// canceling one exit's order ends both exits; without it, only that exit
+    /// ends and the other keeps protecting the remaining position. Canceling an
+    /// exit itself with CancelTrigger ends only that exit either way, and the
+    /// other exit stays active.
     ///
     /// Field 4: `oco`
     #[serde(
@@ -35527,6 +35727,12 @@ pub mod __buffa {
             pub input: ::buffa::MessageFieldView<
                 ::buffa_types::google::protobuf::__buffa::view::StructView<'a>,
             >,
+            /// The delegation the call belongs to, as in its SubagentStarted event: set
+            /// for a subagent's own calls, which show its progress. Omitted for the
+            /// assistant's own calls.
+            ///
+            /// Field 4: `subagent_id`
+            pub subagent_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ToolStartedView<'a> {
@@ -35599,6 +35805,13 @@ pub mod __buffa {
                             }
                         }
                     }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.subagent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -35638,6 +35851,7 @@ pub mod __buffa {
                         }
                         None => ::buffa::MessageField::none(),
                     },
+                    subagent_id: self.subagent_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -35669,6 +35883,9 @@ pub mod __buffa {
                         += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
                             + inner_size;
                 }
+                if let Some(ref v) = self.subagent_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -35693,6 +35910,9 @@ pub mod __buffa {
                         buf,
                     );
                     self.input.write_to(__cache, buf);
+                }
+                if let Some(ref v) = self.subagent_id {
+                    ::buffa::types::put_string_field(4u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -35725,6 +35945,9 @@ pub mod __buffa {
                     if let ::core::option::Option::Some(__v) = self.input.as_option() {
                         __map.serialize_entry("input", __v)?;
                     }
+                }
+                if let ::core::option::Option::Some(__v) = self.subagent_id {
+                    __map.serialize_entry("subagentId", __v)?;
                 }
                 __map.end()
             }
@@ -35845,6 +36068,15 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().input
             }
+            /// The delegation the call belongs to, as in its SubagentStarted event: set
+            /// for a subagent's own calls, which show its progress. Omitted for the
+            /// assistant's own calls.
+            ///
+            /// Field 4: `subagent_id`
+            #[must_use]
+            pub fn subagent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().subagent_id
+            }
         }
         impl ::core::convert::From<::buffa::OwnedView<ToolStartedView<'static>>>
         for ToolStartedOwnedView {
@@ -35896,6 +36128,11 @@ pub mod __buffa {
             ///
             /// Field 4: `error_message`
             pub error_message: ::core::option::Option<&'a str>,
+            /// The delegation the call belongs to, as in its ToolStarted event. Omitted
+            /// for the assistant's own calls.
+            ///
+            /// Field 5: `subagent_id`
+            pub subagent_id: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for ToolFinishedView<'a> {
@@ -35957,6 +36194,13 @@ pub mod __buffa {
                         )?;
                         view.error_message = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.subagent_id = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -35990,6 +36234,7 @@ pub mod __buffa {
                     name: self.name.to_string(),
                     ok: self.ok,
                     error_message: self.error_message.map(|s| s.to_string()),
+                    subagent_id: self.subagent_id.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -36019,6 +36264,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.error_message {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
+                if let Some(ref v) = self.subagent_id {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -36041,6 +36289,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.error_message {
                     ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.subagent_id {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -36074,6 +36325,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.error_message {
                     __map.serialize_entry("errorMessage", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.subagent_id {
+                    __map.serialize_entry("subagentId", __v)?;
                 }
                 __map.end()
             }
@@ -36196,6 +36450,14 @@ pub mod __buffa {
             #[must_use]
             pub fn error_message(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().error_message
+            }
+            /// The delegation the call belongs to, as in its ToolStarted event. Omitted
+            /// for the assistant's own calls.
+            ///
+            /// Field 5: `subagent_id`
+            #[must_use]
+            pub fn subagent_id(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().subagent_id
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<ToolFinishedView<'static>>>
@@ -37855,10 +38117,23 @@ pub mod __buffa {
             ///
             /// Field 1: `subagent_id`
             pub subagent_id: &'a str,
-            /// Subagent name, for example "strategy-researcher".
+            /// Subagent name, for example "strategy-coder".
             ///
             /// Field 2: `name`
             pub name: &'a str,
+            /// What pays for the subagent's work: SPONSORED, CREDITS or OWN_KEY.
+            /// FUNDING_UNSPECIFIED when the server does not say.
+            ///
+            /// Field 3: `funding`
+            pub funding: ::buffa::EnumValue<super::super::FundingMode>,
+            /// The most credits the subagent may use, shown before it starts. Each of
+            /// its model requests is limited to what is left of the cap, and a request
+            /// the rest cannot cover is not sent: the subagent stops there. With
+            /// SPONSORED and OWN_KEY funding the cap is measured in credits too, though
+            /// none are charged. 0 when the server does not say.
+            ///
+            /// Field 4: `credit_cap`
+            pub credit_cap: u64,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubagentStartedView<'a> {
@@ -37906,6 +38181,22 @@ pub mod __buffa {
                         )?;
                         view.name = ::buffa::types::borrow_str(&mut cur)?;
                     }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.funding = ::buffa::EnumValue::from(
+                            ::buffa::types::decode_int32(&mut cur)?,
+                        );
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.credit_cap = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -37937,6 +38228,8 @@ pub mod __buffa {
                 ::core::result::Result::Ok(super::super::SubagentStarted {
                     subagent_id: self.subagent_id.to_string(),
                     name: self.name.to_string(),
+                    funding: self.funding,
+                    credit_cap: self.credit_cap,
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -37960,6 +38253,17 @@ pub mod __buffa {
                 if !self.name.is_empty() {
                     size += 1u32 + ::buffa::types::string_encoded_len(&self.name) as u32;
                 }
+                {
+                    let val = self.funding.to_i32();
+                    if val != 0 {
+                        size += 1u32 + ::buffa::types::int32_encoded_len(val) as u32;
+                    }
+                }
+                if self.credit_cap != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.credit_cap) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -37976,6 +38280,15 @@ pub mod __buffa {
                 }
                 if !self.name.is_empty() {
                     ::buffa::types::put_string_field(2u32, &self.name, buf);
+                }
+                {
+                    let val = self.funding.to_i32();
+                    if val != 0 {
+                        ::buffa::types::put_int32_field(3u32, val, buf);
+                    }
+                }
+                if self.credit_cap != 0u64 {
+                    ::buffa::types::put_uint64_field(4u32, self.credit_cap, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -38003,6 +38316,18 @@ pub mod __buffa {
                 }
                 if !::buffa::json_helpers::skip_if::is_empty_str(self.name) {
                     __map.serialize_entry("name", self.name)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_default_enum_value(
+                    &self.funding,
+                ) {
+                    __map.serialize_entry("funding", &self.funding)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.credit_cap) {
+                    __map
+                        .serialize_entry(
+                            "creditCap",
+                            &::buffa::json_helpers::ProtoJson(&self.credit_cap),
+                        )?;
                 }
                 __map.end()
             }
@@ -38107,12 +38432,31 @@ pub mod __buffa {
             pub fn subagent_id(&self) -> &'_ str {
                 self.0.reborrow().subagent_id
             }
-            /// Subagent name, for example "strategy-researcher".
+            /// Subagent name, for example "strategy-coder".
             ///
             /// Field 2: `name`
             #[must_use]
             pub fn name(&self) -> &'_ str {
                 self.0.reborrow().name
+            }
+            /// What pays for the subagent's work: SPONSORED, CREDITS or OWN_KEY.
+            /// FUNDING_UNSPECIFIED when the server does not say.
+            ///
+            /// Field 3: `funding`
+            #[must_use]
+            pub fn funding(&self) -> ::buffa::EnumValue<super::super::FundingMode> {
+                self.0.reborrow().funding
+            }
+            /// The most credits the subagent may use, shown before it starts. Each of
+            /// its model requests is limited to what is left of the cap, and a request
+            /// the rest cannot cover is not sent: the subagent stops there. With
+            /// SPONSORED and OWN_KEY funding the cap is measured in credits too, though
+            /// none are charged. 0 when the server does not say.
+            ///
+            /// Field 4: `credit_cap`
+            #[must_use]
+            pub fn credit_cap(&self) -> u64 {
+                self.0.reborrow().credit_cap
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubagentStartedView<'static>>>
@@ -38164,6 +38508,12 @@ pub mod __buffa {
             ///
             /// Field 4: `summary`
             pub summary: ::core::option::Option<&'a str>,
+            /// The page on the Polyester website where the user deploys the bot the
+            /// subagent proposed, after MFA and a wallet signature. Omitted when it
+            /// proposed none. The subagent never deploys a bot itself.
+            ///
+            /// Field 5: `deploy_url`
+            pub deploy_url: ::core::option::Option<&'a str>,
             pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
         }
         impl<'a> ::buffa::MessageView<'a> for SubagentFinishedView<'a> {
@@ -38225,6 +38575,13 @@ pub mod __buffa {
                         )?;
                         view.summary = Some(::buffa::types::borrow_str(&mut cur)?);
                     }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.deploy_url = Some(::buffa::types::borrow_str(&mut cur)?);
+                    }
                     _ => {
                         ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
                         let span_len = before_tag.len() - cur.len();
@@ -38258,6 +38615,7 @@ pub mod __buffa {
                     name: self.name.to_string(),
                     ok: self.ok,
                     summary: self.summary.map(|s| s.to_string()),
+                    deploy_url: self.deploy_url.map(|s| s.to_string()),
                     __buffa_unknown_fields: self
                         .__buffa_unknown_fields
                         .to_owned()?
@@ -38287,6 +38645,9 @@ pub mod __buffa {
                 if let Some(ref v) = self.summary {
                     size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
                 }
+                if let Some(ref v) = self.deploy_url {
+                    size += 1u32 + ::buffa::types::string_encoded_len(v) as u32;
+                }
                 size += self.__buffa_unknown_fields.encoded_len() as u32;
                 size
             }
@@ -38309,6 +38670,9 @@ pub mod __buffa {
                 }
                 if let Some(ref v) = self.summary {
                     ::buffa::types::put_string_field(4u32, v, buf);
+                }
+                if let Some(ref v) = self.deploy_url {
+                    ::buffa::types::put_string_field(5u32, v, buf);
                 }
                 self.__buffa_unknown_fields.write_to(buf);
             }
@@ -38342,6 +38706,9 @@ pub mod __buffa {
                 }
                 if let ::core::option::Option::Some(__v) = self.summary {
                     __map.serialize_entry("summary", __v)?;
+                }
+                if let ::core::option::Option::Some(__v) = self.deploy_url {
+                    __map.serialize_entry("deployUrl", __v)?;
                 }
                 __map.end()
             }
@@ -38466,6 +38833,15 @@ pub mod __buffa {
             #[must_use]
             pub fn summary(&self) -> ::core::option::Option<&'_ str> {
                 self.0.reborrow().summary
+            }
+            /// The page on the Polyester website where the user deploys the bot the
+            /// subagent proposed, after MFA and a wallet signature. Omitted when it
+            /// proposed none. The subagent never deploys a bot itself.
+            ///
+            /// Field 5: `deploy_url`
+            #[must_use]
+            pub fn deploy_url(&self) -> ::core::option::Option<&'_ str> {
+                self.0.reborrow().deploy_url
             }
         }
         impl ::core::convert::From<::buffa::OwnedView<SubagentFinishedView<'static>>>
@@ -40509,7 +40885,12 @@ pub mod __buffa {
             pub trailing_stop: ::buffa::MessageFieldView<
                 super::super::__buffa::view::AttachedTrailingStopView<'a>,
             >,
-            /// True when cancelling one exit ends the other.
+            /// True when the exits are linked one-cancels-the-other, as RiskPolicy.oco.
+            /// It decides only what canceling an exit's order ends: with oco set,
+            /// canceling one exit's order ends both exits; without it, only that exit
+            /// ends and the other keeps protecting the remaining position. Canceling an
+            /// exit itself with CancelTrigger ends only that exit either way, and the
+            /// other exit stays active.
             ///
             /// Field 4: `oco`
             pub oco: bool,
@@ -40937,7 +41318,12 @@ pub mod __buffa {
             > {
                 &self.0.reborrow().trailing_stop
             }
-            /// True when cancelling one exit ends the other.
+            /// True when the exits are linked one-cancels-the-other, as RiskPolicy.oco.
+            /// It decides only what canceling an exit's order ends: with oco set,
+            /// canceling one exit's order ends both exits; without it, only that exit
+            /// ends and the other keeps protecting the remaining position. Canceling an
+            /// exit itself with CancelTrigger ends only that exit either way, and the
+            /// other exit stays active.
             ///
             /// Field 4: `oco`
             #[must_use]

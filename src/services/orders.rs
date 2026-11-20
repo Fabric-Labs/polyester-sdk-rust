@@ -2190,12 +2190,13 @@ impl TradesService {
 
 /// Gives a read order's quantities the pair's base quantity scale from the
 /// loaded catalogs, as the order book does. Reads never wait for the
-/// catalogs: without them, quantities keep no scale.
+/// catalogs: without them, quantities keep no scale. An order without a pair,
+/// a refused batch replacement, looks up none and keeps no scale.
 pub(crate) fn scale_order(catalogs: &CatalogManager, order: &mut Order) {
-    attach_order_scale(
-        order,
-        catalogs.base_quantity_scale_for_symbol_id(order.symbol_id),
-    );
+    let base_scale = order
+        .symbol_id
+        .and_then(|symbol_id| catalogs.base_quantity_scale_for_symbol_id(symbol_id));
+    attach_order_scale(order, base_scale);
 }
 
 fn scale_trade(catalogs: &CatalogManager, trade: &mut UserTrade) {
@@ -4667,12 +4668,12 @@ mod tests {
         let incomplete = GetOrderResult {
             order: Some(Order {
                 order_id: "1".into(),
-                symbol_id: 7,
+                symbol_id: Some(7),
                 client_order_id: "c".into(),
-                side: "buy".into(),
+                side: Some("buy".into()),
                 status: "filled".into(),
-                order_type: "market".into(),
-                tif: "ioc".into(),
+                order_type: Some("market".into()),
+                tif: Some("ioc".into()),
                 orig_qty: None,
                 cum_qty: Some(
                     Quantity::from_scaled(
@@ -4697,8 +4698,8 @@ mod tests {
                 terminal_ts_ns: String::new(),
                 version: 1,
                 post_only: false,
-                fee_asset: "quote".into(),
-                self_trade_prevention_mode: String::new(),
+                fee_asset: Some("quote".into()),
+                self_trade_prevention_mode: None,
                 submitted_max_quote_debit_scaled: None,
                 submitted_quote_proceeds_scaled: None,
                 attached_risk: None,

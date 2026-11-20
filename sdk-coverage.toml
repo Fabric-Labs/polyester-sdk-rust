@@ -174,3 +174,15 @@ reason = "The public Quick Swap explorer (completed swaps and statistics) is Qui
 [[allowlist]]
 service = "notifications.v1.NotificationService"
 reason = "The notification center is not part of the trading SDK surface yet."
+
+[[allowlist]]
+procedure = "/chain.withdraw.v1.WithdrawService/CreateWalletTradingToFundingBatch"
+reason = "The Trading to Funding withdraw batch takes an interactive session with a wallet signature and recent MFA or a fresh step-up; API keys are not accepted."
+
+[[allowlist]]
+procedure = "/marketdata.v1.MarketDataService/GetPriceBand"
+reason = "The public live price band read is not wrapped in this SDK yet; call it with the generated MarketDataServiceClient."
+
+[[allowlist]]
+service = "strategies.v1.StrategiesService"
+reason = "preview, not served yet"

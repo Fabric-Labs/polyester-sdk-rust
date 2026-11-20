@@ -6101,6 +6101,18 @@ pub type OwnedListCompletedQuickSwapsResponseView = ::buffa::view::OwnedView<
         'static,
     >,
 >;
+///Shorthand for `OwnedView<GetCompletedQuickSwapRequestView<'static>>`.
+pub type OwnedGetCompletedQuickSwapRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<GetCompletedQuickSwapResponseView<'static>>`.
+pub type OwnedGetCompletedQuickSwapResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapResponseView<
+        'static,
+    >,
+>;
 ///Shorthand for `OwnedView<GetQuickSwapStatsRequestView<'static>>`.
 pub type OwnedGetQuickSwapStatsRequestView = ::buffa::view::OwnedView<
     crate::proto::swap::quickswap::v1::__buffa::view::GetQuickSwapStatsRequestView<
@@ -6131,6 +6143,34 @@ impl ::connectrpc::Encodable<
 >
 for ::buffa::view::OwnedView<
     crate::proto::swap::quickswap::v1::__buffa::view::ListCompletedQuickSwapsResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::GetCompletedQuickSwapResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::GetCompletedQuickSwapResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapResponseView<
         'static,
     >,
 > {
@@ -6178,6 +6218,15 @@ pub const QUICK_SWAP_EXPLORER_SERVICE_LIST_COMPLETED_QUICK_SWAPS_SPEC: ::connect
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetCompletedQuickSwap` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_EXPLORER_SERVICE_GET_COMPLETED_QUICK_SWAP_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapExplorerService/GetCompletedQuickSwap",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `GetQuickSwapStats` RPC.
 ///
 /// The dispatcher surfaces this on
@@ -6190,17 +6239,18 @@ pub const QUICK_SWAP_EXPLORER_SERVICE_GET_QUICK_SWAP_STATS_SPEC: ::connectrpc::S
 /// QuickSwapExplorerService is the public, read-only view of QuickSwaps, over
 /// ConnectRPC and REST. It needs no credentials and lists QuickSwaps of every
 /// broker, Polyester's own QuickSwap app included.
-/// Only completed QuickSwaps are shown: one in progress, refunded, returned
-/// or expired never is. Each shows its assets and networks, the amounts
-/// deposited and delivered, the markets traded, and the transactions and
+/// Only completed QuickSwaps are shown, listed or read by swap_id: one in
+/// progress, refunded, returned or expired never is. Each shows its assets
+/// and networks, the amounts deposited and delivered with their USD values
+/// fixed when they happened, the markets traded, and the transactions and
 /// addresses of its deposit and destination payout, as public on their
 /// networks. It shows no memo or destination tag, no return or refund
 /// address and nothing about the broker (see ExplorerQuickSwap).
 /// GetQuickSwapStats aggregates the same completed QuickSwaps over a window:
-/// totals, a time series and per-route totals, each with exact amounts per
-/// asset and their USD values fixed when they happened.
+/// totals with exact amounts per asset, a time series of counts and USD
+/// values, and per-route totals, with USD values fixed when they happened.
 /// QuickSwaps created before the Explorer launched are listed, but never
-/// match a source or destination filter and are not counted in statistics.
+/// match an asset filter and are not counted in statistics.
 /// Calls are rate limited per client address: over the limit a call fails
 /// with RESOURCE_EXHAUSTED and a Retry-After header.
 ///
@@ -6254,11 +6304,14 @@ pub const QUICK_SWAP_EXPLORER_SERVICE_GET_QUICK_SWAP_STATS_SPEC: ::connectrpc::S
 #[allow(clippy::type_complexity)]
 pub trait QuickSwapExplorerService: Send + Sync + 'static {
     /// ListCompletedQuickSwaps lists completed QuickSwaps of every broker,
-    /// newest completion first, optionally by source or destination asset and
-    /// network.
+    /// newest completion first, optionally by source and destination assets,
+    /// on given networks or on all of them, and by a range of source USD value.
     /// Errors:
-    /// - INVALID_ARGUMENT: malformed request, or PAGE_TOKEN_INVALID for a
-    /// page_token that is malformed or from other filters.
+    /// - INVALID_ARGUMENT: malformed request; a USD bound off the grid; filters
+    /// that select more than 400 routes, or routes times USD value steps; a
+    /// max_source_value_usd not above min_source_value_usd; or
+    /// PAGE_TOKEN_INVALID for a page_token that is malformed, from other
+    /// filters, or from before a change of the networks the asset IDs cover.
     ///
     /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
     ///
@@ -6278,6 +6331,35 @@ pub trait QuickSwapExplorerService: Send + Sync + 'static {
         Output = ::connectrpc::ServiceResult<
             impl ::connectrpc::Encodable<
                 crate::proto::swap::quickswap::v1::ListCompletedQuickSwapsResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
+    /// GetCompletedQuickSwap returns one completed QuickSwap of any broker by
+    /// swap_id, as ListCompletedQuickSwaps lists it.
+    /// Errors:
+    /// - NOT_FOUND: SWAP_NOT_FOUND when no completed QuickSwap has this
+    /// swap_id: none has it, it is 0, or the QuickSwap has not completed,
+    /// whatever its status. Every such answer is the same, so it never tells
+    /// which.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_completed_quick_swap<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::GetCompletedQuickSwapResponse,
             > + Send + use<'a, Self>,
         >,
     > + Send;
@@ -6375,6 +6457,35 @@ impl<S: QuickSwapExplorerService> QuickSwapExplorerServiceExt for S {
             .with_spec(QUICK_SWAP_EXPLORER_SERVICE_LIST_COMPLETED_QUICK_SWAPS_SPEC)
             .route_view(
                 QUICK_SWAP_EXPLORER_SERVICE_SERVICE_NAME,
+                "GetCompletedQuickSwap",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_completed_quick_swap(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::GetCompletedQuickSwapResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_EXPLORER_SERVICE_GET_COMPLETED_QUICK_SWAP_SPEC)
+            .route_view(
+                QUICK_SWAP_EXPLORER_SERVICE_SERVICE_NAME,
                 "GetQuickSwapStats",
                 {
                     let svc = ::std::sync::Arc::clone(&self);
@@ -6467,6 +6578,14 @@ for QuickSwapExplorerServiceServer<T> {
                         ),
                 )
             }
+            "GetCompletedQuickSwap" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(
+                            QUICK_SWAP_EXPLORER_SERVICE_GET_COMPLETED_QUICK_SWAP_SPEC,
+                        ),
+                )
+            }
             "GetQuickSwapStats" => {
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
@@ -6507,6 +6626,27 @@ for QuickSwapExplorerServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::swap::quickswap::v1::ListCompletedQuickSwapsResponse,
+                        >(format)
+                })
+            }
+            "GetCompletedQuickSwap" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_completed_quick_swap(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::GetCompletedQuickSwapResponse,
                         >(format)
                 })
             }
@@ -6681,6 +6821,51 @@ where
             )
             .await
     }
+    /// Call the GetCompletedQuickSwap RPC. Sends a request to /swap.quickswap.v1.QuickSwapExplorerService/GetCompletedQuickSwap.
+    pub async fn get_completed_quick_swap(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_completed_quick_swap_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetCompletedQuickSwap RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_completed_quick_swap_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::GetCompletedQuickSwapRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::GetCompletedQuickSwapResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_EXPLORER_SERVICE_SERVICE_NAME,
+                "GetCompletedQuickSwap",
+                request,
+                options,
+            )
+            .await
+    }
     /// Call the GetQuickSwapStats RPC. Sends a request to /swap.quickswap.v1.QuickSwapExplorerService/GetQuickSwapStats.
     pub async fn get_quick_swap_stats(
         &self,
@@ -6795,6 +6980,18 @@ pub type OwnedGetReferredQuickSwapRequestView = ::buffa::view::OwnedView<
 ///Shorthand for `OwnedView<GetReferredQuickSwapResponseView<'static>>`.
 pub type OwnedGetReferredQuickSwapResponseView = ::buffa::view::OwnedView<
     crate::proto::swap::quickswap::v1::__buffa::view::GetReferredQuickSwapResponseView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListReferralLedgerRequestView<'static>>`.
+pub type OwnedListReferralLedgerRequestView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerRequestView<
+        'static,
+    >,
+>;
+///Shorthand for `OwnedView<ListReferralLedgerResponseView<'static>>`.
+pub type OwnedListReferralLedgerResponseView = ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerResponseView<
         'static,
     >,
 >;
@@ -6958,6 +7155,34 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
+>
+for crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerResponseView<
+    '_,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<
+    crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
+>
+for ::buffa::view::OwnedView<
+    crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerResponseView<
+        'static,
+    >,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME: &str = "swap.quickswap.v1.QuickSwapReferralService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `EnrollReferralPartner` RPC.
@@ -7014,6 +7239,15 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC: ::connectrpc
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `ListReferralLedger` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/swap.quickswap.v1.QuickSwapReferralService/ListReferralLedger",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
 /// QuickSwapReferralService is a referral partner's own record, over
 /// ConnectRPC. A referral partner shares a link with their code; QuickSwaps
 /// made through it on Polyester's own QuickSwap app give the user a discount
@@ -7033,6 +7267,11 @@ pub const QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC: ::connectrpc
 /// its referral. They return no identity of the person who swapped and no
 /// account, address, memo, transaction hash or flow ID; amounts are exact and
 /// times are rounded down to the minute.
+/// Commissions are credited to the partner's earnings sub-account, which the
+/// partner owns: its balance, payouts and payout addresses are managed like
+/// any sub-account's, with AutoWithdrawService and the withdraw whitelist.
+/// ListReferralLedger lists each commission credit with its QuickSwap and
+/// each auto-withdraw payout from that sub-account.
 /// Every RPC is rate limited per account: over the limit it fails with
 /// RESOURCE_EXHAUSTED, a RateLimitDetail and a Retry-After header.
 ///
@@ -7256,6 +7495,37 @@ pub trait QuickSwapReferralService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// ListReferralLedger lists the commission credits and payouts of the
+    /// caller's earnings sub-account.
+    /// Newest first, filtered by time. A disabled partner still reads its
+    /// ledger.
+    /// Errors:
+    /// - NOT_FOUND: REFERRAL_PARTNER_NOT_FOUND.
+    /// - INVALID_ARGUMENT: a page_token from another partner, other filters or
+    /// malformed.
+    /// - UNAVAILABLE: the payouts cannot be read; retry the same request.
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn list_referral_ledger<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -7462,6 +7732,35 @@ impl<S: QuickSwapReferralService> QuickSwapReferralServiceExt for S {
                 },
             )
             .with_spec(QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC)
+            .route_view(
+                QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
+                "ListReferralLedger",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.list_referral_ledger(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -7559,6 +7858,12 @@ for QuickSwapReferralServiceServer<T> {
                         .with_spec(
                             QUICK_SWAP_REFERRAL_SERVICE_GET_REFERRED_QUICK_SWAP_SPEC,
                         ),
+                )
+            }
+            "ListReferralLedger" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(QUICK_SWAP_REFERRAL_SERVICE_LIST_REFERRAL_LEDGER_SPEC),
                 )
             }
             _ => None,
@@ -7700,6 +8005,27 @@ for QuickSwapReferralServiceServer<T> {
                         .await?
                         .encode::<
                             crate::proto::swap::quickswap::v1::GetReferredQuickSwapResponse,
+                        >(format)
+                })
+            }
+            "ListReferralLedger" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+                    >::from_parts(&req, &body);
+                    svc.list_referral_ledger(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::swap::quickswap::v1::ListReferralLedgerResponse,
                         >(format)
                 })
             }
@@ -8073,6 +8399,51 @@ where
                 &self.config,
                 QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
                 "GetReferredQuickSwap",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the ListReferralLedger RPC. Sends a request to /swap.quickswap.v1.QuickSwapReferralService/ListReferralLedger.
+    pub async fn list_referral_ledger(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.list_referral_ledger_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the ListReferralLedger RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn list_referral_ledger_with_options(
+        &self,
+        request: crate::proto::swap::quickswap::v1::ListReferralLedgerRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::swap::quickswap::v1::__buffa::view::ListReferralLedgerResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                QUICK_SWAP_REFERRAL_SERVICE_SERVICE_NAME,
+                "ListReferralLedger",
                 request,
                 options,
             )

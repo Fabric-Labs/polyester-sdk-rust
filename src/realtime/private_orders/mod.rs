@@ -279,8 +279,9 @@ impl PrivateOrdersSubscription {
                         .orders
                         .iter()
                         .find(|order| order.order_id == *order_id)
-                        .and_then(|order| {
-                            catalogs.base_quantity_scale_for_symbol_id(order.symbol_id)
+                        .and_then(|order| order.symbol_id)
+                        .and_then(|symbol_id| {
+                            catalogs.base_quantity_scale_for_symbol_id(symbol_id)
                         });
                     attach_qty_scale(&mut fill.qty, scale);
                 }

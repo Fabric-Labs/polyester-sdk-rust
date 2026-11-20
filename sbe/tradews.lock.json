@@ -2,7 +2,7 @@
   "schemaFile": "sbe/tradews-v50.xml",
   "schemaId": 7,
   "schemaVersion": 50,
-  "sha256": "5140c18421aec92431d2d41b619e76f6145e7bd0aa0ffbcded1c4af9728d5e4e",
+  "sha256": "7deed833777d43638d60397ea7e648742dd5a727afd523afdc8e31052dd62ba6",
   "source": "polyester-proto",
   "manifestBlock": "tradeWebSocketSbe",
   "generator": {

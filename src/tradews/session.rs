@@ -1613,6 +1613,9 @@ fn on_message(
         Msg::Order(update) => emit_or_exit(events, Event::Order(update)),
         Msg::Execution(execution) => emit_or_exit(events, Event::Execution(execution)),
         Msg::MarketResync(resync) => emit_or_exit(events, Event::MarketResync(resync)),
+        Msg::BatchReplaceItemReject(reject) => {
+            emit_or_exit(events, Event::BatchReplaceItemReject(reject))
+        }
         Msg::OcoAck { seq, ack } => {
             // This client sends no CreateOco or CancelOco, so an OcoAck
             // cannot answer a command or ping of this connection.

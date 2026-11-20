@@ -7849,6 +7849,968 @@ pub const __CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY: ::buffa::type_regis
     >,
     is_wkt: false,
 };
+/// TradingToFundingBatchLeg is one Trading to Funding move of a batch.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TradingToFundingBatchLeg {
+    /// Unified asset identifier from Polyester asset metadata. amount_e18 is
+    /// denominated in this asset at canonical 18-decimal scale.
+    ///
+    /// Field 1: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// Amount in canonical 18-decimal unified asset units. For example, 0.5 is
+    /// encoded as 500000000000000000.
+    ///
+    /// Field 2: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Funding account credited by this leg. Omit it to credit the source
+    /// account's own Funding account, or give another Polyester Funding
+    /// address. A Funding address of another account must be on the source
+    /// account's internal whitelist, as for a single Trading to Funding
+    /// withdraw.
+    ///
+    /// Field 3: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TradingToFundingBatchLeg {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TradingToFundingBatchLeg")
+            .field("asset_id", &self.asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .field("destination_address", &self.destination_address)
+            .finish()
+    }
+}
+impl TradingToFundingBatchLeg {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLeg";
+}
+::buffa::impl_default_instance!(TradingToFundingBatchLeg);
+impl ::buffa::MessageName for TradingToFundingBatchLeg {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "TradingToFundingBatchLeg";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.TradingToFundingBatchLeg";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLeg";
+}
+impl ::buffa::Message for TradingToFundingBatchLeg {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(3u32, &self.destination_address, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.destination_address.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TradingToFundingBatchLeg {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.TradingToFundingBatchLeg";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TradingToFundingBatchLeg {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRADING_TO_FUNDING_BATCH_LEG_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLeg",
+    to_json: ::buffa::type_registry::any_to_json::<TradingToFundingBatchLeg>,
+    from_json: ::buffa::type_registry::any_from_json::<TradingToFundingBatchLeg>,
+    is_wkt: false,
+};
+/// CreateWalletTradingToFundingBatchRequest moves up to 10 amounts from one
+/// Trading account to Funding accounts, authorized by one wallet personal_sign
+/// signature over the whole batch. The legs move together or not at all.
+///
+/// The wallet signs the UTF-8 text below with EIP-191 personal_sign. Lines are
+/// separated by a single line feed (\n), with no trailing line feed. Numbers
+/// are base-10 integers without separators or leading zeros. The signer
+/// wallet and the verifying contract are lowercase 0x-prefixed hex. A leg's
+/// destination is its destination_address as sent, in the letter case sent
+/// (a checksummed address stays checksummed), without leading or trailing
+/// whitespace; an omitted destination_address leaves an empty value after
+/// "Destination: ". Values must not contain control characters.
+///
+/// ```text
+/// Polyester Trading Withdrawal Batch
+///
+/// Version: 1
+/// Environment: polyester
+/// Action: TO_FUNDING
+/// Signer Wallet: <signer_wallet>
+/// Account ID: <the caller's public account ID>
+/// Target Account ID: <public ID of the source account: subaccount_id, or the account ID when omitted>
+/// Polyester Chain ID: <EVM chain ID of Polyester Chain, as eth_chainId returns it>
+/// Verifying Contract: <the withdraw verifying contract, as for CreateWalletTradingWithdraw>
+/// Deadline: <deadline_ts_sec>
+/// Nonce: <nonce>
+/// Idempotency Key: <idempotency_key>
+/// Legs: <number of legs>
+///
+/// Leg 1 of <number of legs>
+/// Asset ID: <legs[0].asset_id>
+/// Amount E18: <legs[0].amount_e18>
+/// Destination: <legs[0].destination_address>
+/// ```
+///
+/// followed by one such block per further leg, in request order, each after
+/// one empty line: "Leg 2 of \<number of legs\>", and so on. The header values
+/// are the ones a single wallet withdraw signs (CreateWalletTradingWithdraw),
+/// and the leg numbers bind the order of the legs. A batch signed for another
+/// chain ID or verifying contract is never paid.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateWalletTradingToFundingBatchRequest {
+    /// Moves to make, in order. 1 to 10 legs. Legs may repeat an asset or a
+    /// destination.
+    ///
+    /// Field 1: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<TradingToFundingBatchLeg>,
+    /// Optional public subaccount id of the source Trading account. Omit to
+    /// move funds from the caller's own Trading account.
+    ///
+    /// Field 2: `subaccount_id`
+    #[serde(
+        rename = "subaccountId",
+        alias = "subaccount_id",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub subaccount_id: u64,
+    /// Unix timestamp in seconds after which the signed batch is no longer
+    /// accepted, at most 15 minutes ahead.
+    ///
+    /// Field 3: `deadline_ts_sec`
+    #[serde(
+        rename = "deadlineTsSec",
+        alias = "deadline_ts_sec",
+        with = "::buffa::json_helpers::uint64",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u64"
+    )]
+    pub deadline_ts_sec: u64,
+    /// Client-generated unsigned 128-bit nonce bound to the signed batch. This
+    /// is an identifier, not a decimal amount.
+    ///
+    /// Field 4: `nonce`
+    #[serde(
+        rename = "nonce",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub nonce: ::buffa::MessageField<super::super::super::polyester::r#type::v1::U128>,
+    /// Client-chosen idempotency key for the whole batch, scoped to the source
+    /// account. Retrying with the same key and the same signed batch returns the
+    /// first answer; reusing it for another batch is refused with
+    /// ERROR_CODE_IDEMPOTENCY_CONFLICT. The first answer stands, after the
+    /// deadline too. A refused batch is final: a retry under its key answers the
+    /// same refusal, even once its cause is gone, so a corrected batch needs a
+    /// new key and signature.
+    ///
+    /// Field 5: `idempotency_key`
+    #[serde(
+        rename = "idempotencyKey",
+        alias = "idempotency_key",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub idempotency_key: ::buffa::alloc::string::String,
+    /// Wallet address that produced payload_signature.
+    ///
+    /// Field 6: `signer_wallet`
+    #[serde(
+        rename = "signerWallet",
+        alias = "signer_wallet",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub signer_wallet: ::buffa::alloc::string::String,
+    /// EIP-191 personal_sign signature over the batch message described above.
+    ///
+    /// Field 7: `payload_signature`
+    #[serde(
+        rename = "payloadSignature",
+        alias = "payload_signature",
+        with = "::buffa::json_helpers::bytes",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_bytes"
+    )]
+    pub payload_signature: ::buffa::alloc::vec::Vec<u8>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateWalletTradingToFundingBatchRequest {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateWalletTradingToFundingBatchRequest")
+            .field("legs", &self.legs)
+            .field("subaccount_id", &self.subaccount_id)
+            .field("deadline_ts_sec", &self.deadline_ts_sec)
+            .field("nonce", &self.nonce)
+            .field("idempotency_key", &self.idempotency_key)
+            .field("signer_wallet", &self.signer_wallet)
+            .field("payload_signature", &self.payload_signature)
+            .finish()
+    }
+}
+impl CreateWalletTradingToFundingBatchRequest {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+}
+::buffa::impl_default_instance!(CreateWalletTradingToFundingBatchRequest);
+impl ::buffa::MessageName for CreateWalletTradingToFundingBatchRequest {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "CreateWalletTradingToFundingBatchRequest";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+}
+impl ::buffa::Message for CreateWalletTradingToFundingBatchRequest {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if self.subaccount_id != 0u64 {
+            size += 1u32 + ::buffa::types::uint64_encoded_len(self.subaccount_id) as u32;
+        }
+        if self.deadline_ts_sec != 0u64 {
+            size
+                += 1u32
+                    + ::buffa::types::uint64_encoded_len(self.deadline_ts_sec) as u32;
+        }
+        if self.nonce.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.nonce.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.idempotency_key.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.idempotency_key) as u32;
+        }
+        if !self.signer_wallet.is_empty() {
+            size
+                += 1u32 + ::buffa::types::string_encoded_len(&self.signer_wallet) as u32;
+        }
+        if !self.payload_signature.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::bytes_encoded_len(&self.payload_signature) as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(1u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        if self.subaccount_id != 0u64 {
+            ::buffa::types::put_uint64_field(2u32, self.subaccount_id, buf);
+        }
+        if self.deadline_ts_sec != 0u64 {
+            ::buffa::types::put_uint64_field(3u32, self.deadline_ts_sec, buf);
+        }
+        if self.nonce.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.nonce.write_to(__cache, buf);
+        }
+        if !self.idempotency_key.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.idempotency_key, buf);
+        }
+        if !self.signer_wallet.is_empty() {
+            ::buffa::types::put_string_field(6u32, &self.signer_wallet, buf);
+        }
+        if !self.payload_signature.is_empty() {
+            ::buffa::types::put_bytes_field(7u32, &self.payload_signature, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.subaccount_id = ::buffa::types::decode_uint64(buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.deadline_ts_sec = ::buffa::types::decode_uint64(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.nonce.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.idempotency_key, buf)?;
+            }
+            6u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.signer_wallet, buf)?;
+            }
+            7u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_bytes(&mut self.payload_signature, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.legs.clear();
+        self.subaccount_id = 0u64;
+        self.deadline_ts_sec = 0u64;
+        self.nonce = ::buffa::MessageField::none();
+        self.idempotency_key.clear();
+        self.signer_wallet.clear();
+        self.payload_signature.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateWalletTradingToFundingBatchRequest {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateWalletTradingToFundingBatchRequest {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_WALLET_TRADING_TO_FUNDING_BATCH_REQUEST_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest",
+    to_json: ::buffa::type_registry::any_to_json::<
+        CreateWalletTradingToFundingBatchRequest,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateWalletTradingToFundingBatchRequest,
+    >,
+    is_wkt: false,
+};
+/// TradingToFundingBatchLegResult is one accepted leg of a batch.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct TradingToFundingBatchLegResult {
+    /// Zero-based position of the leg in the request.
+    ///
+    /// Field 1: `leg_index`
+    #[serde(
+        rename = "legIndex",
+        alias = "leg_index",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub leg_index: u32,
+    /// Stable server-owned intent identifier of the leg's withdraw, the same
+    /// identifier a single wallet withdraw returns. Clients use it to follow the
+    /// leg's progress.
+    ///
+    /// Field 2: `intent_id`
+    #[serde(
+        rename = "intentId",
+        alias = "intent_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub intent_id: ::buffa::alloc::string::String,
+    /// Echoed unified asset identifier.
+    ///
+    /// Field 3: `asset_id`
+    #[serde(
+        rename = "assetId",
+        alias = "asset_id",
+        with = "::buffa::json_helpers::uint32",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_u32"
+    )]
+    pub asset_id: u32,
+    /// Echoed amount in canonical 18-decimal unified asset units.
+    ///
+    /// Field 4: `amount_e18`
+    #[serde(
+        rename = "amountE18",
+        alias = "amount_e18",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_unset_message_field"
+    )]
+    pub amount_e18: ::buffa::MessageField<
+        super::super::super::polyester::r#type::v1::U128,
+    >,
+    /// Echoed destination_address; empty when the leg credits the source
+    /// account's own Funding account.
+    ///
+    /// Field 5: `destination_address`
+    #[serde(
+        rename = "destinationAddress",
+        alias = "destination_address",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub destination_address: ::buffa::alloc::string::String,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for TradingToFundingBatchLegResult {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("TradingToFundingBatchLegResult")
+            .field("leg_index", &self.leg_index)
+            .field("intent_id", &self.intent_id)
+            .field("asset_id", &self.asset_id)
+            .field("amount_e18", &self.amount_e18)
+            .field("destination_address", &self.destination_address)
+            .finish()
+    }
+}
+impl TradingToFundingBatchLegResult {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLegResult";
+}
+::buffa::impl_default_instance!(TradingToFundingBatchLegResult);
+impl ::buffa::MessageName for TradingToFundingBatchLegResult {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "TradingToFundingBatchLegResult";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.TradingToFundingBatchLegResult";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLegResult";
+}
+impl ::buffa::Message for TradingToFundingBatchLegResult {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if self.leg_index != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.leg_index) as u32;
+        }
+        if !self.intent_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.intent_id) as u32;
+        }
+        if self.asset_id != 0u32 {
+            size += 1u32 + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+        }
+        if self.amount_e18.is_set() {
+            let __slot = __cache.reserve();
+            let inner_size = self.amount_e18.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        if !self.destination_address.is_empty() {
+            size
+                += 1u32
+                    + ::buffa::types::string_encoded_len(&self.destination_address)
+                        as u32;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if self.leg_index != 0u32 {
+            ::buffa::types::put_uint32_field(1u32, self.leg_index, buf);
+        }
+        if !self.intent_id.is_empty() {
+            ::buffa::types::put_string_field(2u32, &self.intent_id, buf);
+        }
+        if self.asset_id != 0u32 {
+            ::buffa::types::put_uint32_field(3u32, self.asset_id, buf);
+        }
+        if self.amount_e18.is_set() {
+            ::buffa::types::put_len_delimited_header(4u32, __cache.consume_next(), buf);
+            self.amount_e18.write_to(__cache, buf);
+        }
+        if !self.destination_address.is_empty() {
+            ::buffa::types::put_string_field(5u32, &self.destination_address, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.leg_index = ::buffa::types::decode_uint32(buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.intent_id, buf)?;
+            }
+            3u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::Varint,
+                )?;
+                self.asset_id = ::buffa::types::decode_uint32(buf)?;
+            }
+            4u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::Message::merge_length_delimited(
+                    self.amount_e18.get_or_insert_default(),
+                    buf,
+                    ctx,
+                )?;
+            }
+            5u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.destination_address, buf)?;
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.leg_index = 0u32;
+        self.intent_id.clear();
+        self.asset_id = 0u32;
+        self.amount_e18 = ::buffa::MessageField::none();
+        self.destination_address.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for TradingToFundingBatchLegResult {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.TradingToFundingBatchLegResult";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for TradingToFundingBatchLegResult {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __TRADING_TO_FUNDING_BATCH_LEG_RESULT_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLegResult",
+    to_json: ::buffa::type_registry::any_to_json::<TradingToFundingBatchLegResult>,
+    from_json: ::buffa::type_registry::any_from_json::<TradingToFundingBatchLegResult>,
+    is_wkt: false,
+};
+/// CreateWalletTradingToFundingBatchResponse is an accepted batch: every leg
+/// is reserved and will be paid together with the others, or, if the payment
+/// fails, every leg is refunded to the source Trading account.
+#[derive(Clone, PartialEq, Default)]
+#[derive(::serde::Serialize, ::serde::Deserialize)]
+#[serde(default)]
+pub struct CreateWalletTradingToFundingBatchResponse {
+    /// Stable server-owned identifier of the batch.
+    ///
+    /// Field 1: `batch_id`
+    #[serde(
+        rename = "batchId",
+        alias = "batch_id",
+        with = "::buffa::json_helpers::proto_string",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_str"
+    )]
+    pub batch_id: ::buffa::alloc::string::String,
+    /// Every leg, in request order.
+    ///
+    /// Field 2: `legs`
+    #[serde(
+        rename = "legs",
+        skip_serializing_if = "::buffa::json_helpers::skip_if::is_empty_vec",
+        deserialize_with = "::buffa::json_helpers::null_as_default"
+    )]
+    pub legs: ::buffa::alloc::vec::Vec<TradingToFundingBatchLegResult>,
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub __buffa_unknown_fields: ::buffa::UnknownFields,
+}
+impl ::core::fmt::Debug for CreateWalletTradingToFundingBatchResponse {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.debug_struct("CreateWalletTradingToFundingBatchResponse")
+            .field("batch_id", &self.batch_id)
+            .field("legs", &self.legs)
+            .finish()
+    }
+}
+impl CreateWalletTradingToFundingBatchResponse {
+    /// Protobuf type URL for this message, for use with `Any::pack` and
+    /// `Any::unpack_if`.
+    ///
+    /// Format: `type.googleapis.com/<fully.qualified.TypeName>`
+    pub const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+}
+::buffa::impl_default_instance!(CreateWalletTradingToFundingBatchResponse);
+impl ::buffa::MessageName for CreateWalletTradingToFundingBatchResponse {
+    const PACKAGE: &'static str = "chain.withdraw.v1";
+    const NAME: &'static str = "CreateWalletTradingToFundingBatchResponse";
+    const FULL_NAME: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+    const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+}
+impl ::buffa::Message for CreateWalletTradingToFundingBatchResponse {
+    /// Returns the total encoded size in bytes.
+    ///
+    /// The result is a `u32`; the protobuf specification requires all
+    /// messages to fit within 2 GiB (2,147,483,647 bytes), so a
+    /// compliant message will never overflow this type.
+    #[allow(clippy::let_and_return)]
+    fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        let mut size = 0u32;
+        if !self.batch_id.is_empty() {
+            size += 1u32 + ::buffa::types::string_encoded_len(&self.batch_id) as u32;
+        }
+        for v in &self.legs {
+            let __slot = __cache.reserve();
+            let inner_size = v.compute_size(__cache);
+            __cache.set(__slot, inner_size);
+            size
+                += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                    + inner_size;
+        }
+        size += self.__buffa_unknown_fields.encoded_len() as u32;
+        size
+    }
+    fn write_to(
+        &self,
+        __cache: &mut ::buffa::SizeCache,
+        buf: &mut impl ::buffa::bytes::BufMut,
+    ) {
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        if !self.batch_id.is_empty() {
+            ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+        }
+        for v in &self.legs {
+            ::buffa::types::put_len_delimited_header(2u32, __cache.consume_next(), buf);
+            v.write_to(__cache, buf);
+        }
+        self.__buffa_unknown_fields.write_to(buf);
+    }
+    fn merge_field(
+        &mut self,
+        tag: ::buffa::encoding::Tag,
+        buf: &mut impl ::buffa::bytes::Buf,
+        ctx: ::buffa::DecodeContext<'_>,
+    ) -> ::core::result::Result<(), ::buffa::DecodeError> {
+        #[allow(unused_imports)]
+        use ::buffa::bytes::Buf as _;
+        #[allow(unused_imports)]
+        use ::buffa::Enumeration as _;
+        match tag.field_number() {
+            1u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                ::buffa::types::merge_string(&mut self.batch_id, buf)?;
+            }
+            2u32 => {
+                ::buffa::encoding::check_wire_type(
+                    tag,
+                    ::buffa::encoding::WireType::LengthDelimited,
+                )?;
+                let mut elem = ::core::default::Default::default();
+                ::buffa::Message::merge_length_delimited(&mut elem, buf, ctx)?;
+                self.legs.push(elem);
+            }
+            _ => {
+                self.__buffa_unknown_fields
+                    .push(::buffa::encoding::decode_unknown_field(tag, buf, ctx)?);
+            }
+        }
+        ::core::result::Result::Ok(())
+    }
+    fn clear(&mut self) {
+        self.batch_id.clear();
+        self.legs.clear();
+        self.__buffa_unknown_fields.clear();
+    }
+}
+impl ::buffa::ExtensionSet for CreateWalletTradingToFundingBatchResponse {
+    const PROTO_FQN: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+    fn unknown_fields(&self) -> &::buffa::UnknownFields {
+        &self.__buffa_unknown_fields
+    }
+    fn unknown_fields_mut(&mut self) -> &mut ::buffa::UnknownFields {
+        &mut self.__buffa_unknown_fields
+    }
+}
+impl ::buffa::json_helpers::ProtoElemJson for CreateWalletTradingToFundingBatchResponse {
+    fn serialize_proto_json<S: ::serde::Serializer>(
+        v: &Self,
+        s: S,
+    ) -> ::core::result::Result<S::Ok, S::Error> {
+        ::serde::Serialize::serialize(v, s)
+    }
+    fn deserialize_proto_json<'de, D: ::serde::Deserializer<'de>>(
+        d: D,
+    ) -> ::core::result::Result<Self, D::Error> {
+        <Self as ::serde::Deserialize>::deserialize(d)
+    }
+}
+#[doc(hidden)]
+pub const __CREATE_WALLET_TRADING_TO_FUNDING_BATCH_RESPONSE_JSON_ANY: ::buffa::type_registry::JsonAnyEntry = ::buffa::type_registry::JsonAnyEntry {
+    type_url: "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse",
+    to_json: ::buffa::type_registry::any_to_json::<
+        CreateWalletTradingToFundingBatchResponse,
+    >,
+    from_json: ::buffa::type_registry::any_from_json::<
+        CreateWalletTradingToFundingBatchResponse,
+    >,
+    is_wkt: false,
+};
 /// ValidateWithdrawDestinationRequest checks one external-chain
 /// destination for an authenticated caller without creating a withdraw.
 #[derive(Clone, PartialEq, Default)]
@@ -20221,6 +21183,1861 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
+        /// TradingToFundingBatchLeg is one Trading to Funding move of a batch.
+        #[derive(Clone, Debug, Default)]
+        pub struct TradingToFundingBatchLegView<'a> {
+            /// Unified asset identifier from Polyester asset metadata. amount_e18 is
+            /// denominated in this asset at canonical 18-decimal scale.
+            ///
+            /// Field 1: `asset_id`
+            pub asset_id: u32,
+            /// Amount in canonical 18-decimal unified asset units. For example, 0.5 is
+            /// encoded as 500000000000000000.
+            ///
+            /// Field 2: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Funding account credited by this leg. Omit it to credit the source
+            /// account's own Funding account, or give another Polyester Funding
+            /// address. A Funding address of another account must be on the source
+            /// account's internal whitelist, as for a single Trading to Funding
+            /// withdraw.
+            ///
+            /// Field 3: `destination_address`
+            pub destination_address: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TradingToFundingBatchLegView<'a> {
+            type Owned = super::super::TradingToFundingBatchLeg;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TradingToFundingBatchLeg {
+                    asset_id: self.asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    destination_address: self.destination_address.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TradingToFundingBatchLegView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        3u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TradingToFundingBatchLegView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TradingToFundingBatchLegView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "TradingToFundingBatchLeg";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.TradingToFundingBatchLeg";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLeg";
+        }
+        ::buffa::impl_default_view_instance!(TradingToFundingBatchLegView);
+        ::buffa::impl_view_reborrow!(TradingToFundingBatchLegView);
+        /** Self-contained, `'static` owned view of a `TradingToFundingBatchLeg` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TradingToFundingBatchLegView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TradingToFundingBatchLegView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TradingToFundingBatchLegOwnedView(
+            ::buffa::OwnedView<TradingToFundingBatchLegView<'static>>,
+        );
+        impl TradingToFundingBatchLegOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegOwnedView(::buffa::OwnedView::decode(bytes)?),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TradingToFundingBatchLeg,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`TradingToFundingBatchLegView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TradingToFundingBatchLegView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLeg,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Unified asset identifier from Polyester asset metadata. amount_e18 is
+            /// denominated in this asset at canonical 18-decimal scale.
+            ///
+            /// Field 1: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// Amount in canonical 18-decimal unified asset units. For example, 0.5 is
+            /// encoded as 500000000000000000.
+            ///
+            /// Field 2: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// Funding account credited by this leg. Omit it to credit the source
+            /// account's own Funding account, or give another Polyester Funding
+            /// address. A Funding address of another account must be on the source
+            /// account's internal whitelist, as for a single Trading to Funding
+            /// withdraw.
+            ///
+            /// Field 3: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<TradingToFundingBatchLegView<'static>>,
+        > for TradingToFundingBatchLegOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TradingToFundingBatchLegView<'static>>,
+            ) -> Self {
+                TradingToFundingBatchLegOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TradingToFundingBatchLegOwnedView>
+        for ::buffa::OwnedView<TradingToFundingBatchLegView<'static>> {
+            fn from(wrapper: TradingToFundingBatchLegOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<TradingToFundingBatchLegView<'static>>,
+        > for TradingToFundingBatchLegOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<TradingToFundingBatchLegView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TradingToFundingBatchLeg {
+            type View<'a> = TradingToFundingBatchLegView<'a>;
+            type ViewHandle = TradingToFundingBatchLegOwnedView;
+        }
+        impl ::serde::Serialize for TradingToFundingBatchLegOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateWalletTradingToFundingBatchRequest moves up to 10 amounts from one
+        /// Trading account to Funding accounts, authorized by one wallet personal_sign
+        /// signature over the whole batch. The legs move together or not at all.
+        ///
+        /// The wallet signs the UTF-8 text below with EIP-191 personal_sign. Lines are
+        /// separated by a single line feed (\n), with no trailing line feed. Numbers
+        /// are base-10 integers without separators or leading zeros. The signer
+        /// wallet and the verifying contract are lowercase 0x-prefixed hex. A leg's
+        /// destination is its destination_address as sent, in the letter case sent
+        /// (a checksummed address stays checksummed), without leading or trailing
+        /// whitespace; an omitted destination_address leaves an empty value after
+        /// "Destination: ". Values must not contain control characters.
+        ///
+        /// ```text
+        /// Polyester Trading Withdrawal Batch
+        ///
+        /// Version: 1
+        /// Environment: polyester
+        /// Action: TO_FUNDING
+        /// Signer Wallet: <signer_wallet>
+        /// Account ID: <the caller's public account ID>
+        /// Target Account ID: <public ID of the source account: subaccount_id, or the account ID when omitted>
+        /// Polyester Chain ID: <EVM chain ID of Polyester Chain, as eth_chainId returns it>
+        /// Verifying Contract: <the withdraw verifying contract, as for CreateWalletTradingWithdraw>
+        /// Deadline: <deadline_ts_sec>
+        /// Nonce: <nonce>
+        /// Idempotency Key: <idempotency_key>
+        /// Legs: <number of legs>
+        ///
+        /// Leg 1 of <number of legs>
+        /// Asset ID: <legs[0].asset_id>
+        /// Amount E18: <legs[0].amount_e18>
+        /// Destination: <legs[0].destination_address>
+        /// ```
+        ///
+        /// followed by one such block per further leg, in request order, each after
+        /// one empty line: "Leg 2 of \<number of legs\>", and so on. The header values
+        /// are the ones a single wallet withdraw signs (CreateWalletTradingWithdraw),
+        /// and the leg numbers bind the order of the legs. A batch signed for another
+        /// chain ID or verifying contract is never paid.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateWalletTradingToFundingBatchRequestView<'a> {
+            /// Moves to make, in order. 1 to 10 legs. Legs may repeat an asset or a
+            /// destination.
+            ///
+            /// Field 1: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TradingToFundingBatchLegView<'a>,
+            >,
+            /// Optional public subaccount id of the source Trading account. Omit to
+            /// move funds from the caller's own Trading account.
+            ///
+            /// Field 2: `subaccount_id`
+            pub subaccount_id: u64,
+            /// Unix timestamp in seconds after which the signed batch is no longer
+            /// accepted, at most 15 minutes ahead.
+            ///
+            /// Field 3: `deadline_ts_sec`
+            pub deadline_ts_sec: u64,
+            /// Client-generated unsigned 128-bit nonce bound to the signed batch. This
+            /// is an identifier, not a decimal amount.
+            ///
+            /// Field 4: `nonce`
+            pub nonce: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Client-chosen idempotency key for the whole batch, scoped to the source
+            /// account. Retrying with the same key and the same signed batch returns the
+            /// first answer; reusing it for another batch is refused with
+            /// ERROR_CODE_IDEMPOTENCY_CONFLICT. The first answer stands, after the
+            /// deadline too. A refused batch is final: a retry under its key answers the
+            /// same refusal, even once its cause is gone, so a corrected batch needs a
+            /// new key and signature.
+            ///
+            /// Field 5: `idempotency_key`
+            pub idempotency_key: &'a str,
+            /// Wallet address that produced payload_signature.
+            ///
+            /// Field 6: `signer_wallet`
+            pub signer_wallet: &'a str,
+            /// EIP-191 personal_sign signature over the batch message described above.
+            ///
+            /// Field 7: `payload_signature`
+            pub payload_signature: &'a [u8],
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateWalletTradingToFundingBatchRequestView<'a> {
+            type Owned = super::super::CreateWalletTradingToFundingBatchRequest;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.subaccount_id = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.deadline_ts_sec = ::buffa::types::decode_uint64(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.nonce.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.nonce = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.idempotency_key = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    6u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.signer_wallet = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    7u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.payload_signature = ::buffa::types::borrow_bytes(&mut cur)?;
+                    }
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::__buffa::view::TradingToFundingBatchLegView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateWalletTradingToFundingBatchRequest {
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    subaccount_id: self.subaccount_id,
+                    deadline_ts_sec: self.deadline_ts_sec,
+                    nonce: match self.nonce.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    idempotency_key: self.idempotency_key.to_string(),
+                    signer_wallet: self.signer_wallet.to_string(),
+                    payload_signature: (self.payload_signature).to_vec(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CreateWalletTradingToFundingBatchRequestView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if self.subaccount_id != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.subaccount_id)
+                                as u32;
+                }
+                if self.deadline_ts_sec != 0u64 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint64_encoded_len(self.deadline_ts_sec)
+                                as u32;
+                }
+                if self.nonce.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.nonce.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.idempotency_key.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.idempotency_key)
+                                as u32;
+                }
+                if !self.signer_wallet.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.signer_wallet)
+                                as u32;
+                }
+                if !self.payload_signature.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::bytes_encoded_len(&self.payload_signature)
+                                as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        1u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                if self.subaccount_id != 0u64 {
+                    ::buffa::types::put_uint64_field(2u32, self.subaccount_id, buf);
+                }
+                if self.deadline_ts_sec != 0u64 {
+                    ::buffa::types::put_uint64_field(3u32, self.deadline_ts_sec, buf);
+                }
+                if self.nonce.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.nonce.write_to(__cache, buf);
+                }
+                if !self.idempotency_key.is_empty() {
+                    ::buffa::types::put_string_field(5u32, &self.idempotency_key, buf);
+                }
+                if !self.signer_wallet.is_empty() {
+                    ::buffa::types::put_string_field(6u32, &self.signer_wallet, buf);
+                }
+                if !self.payload_signature.is_empty() {
+                    ::buffa::types::put_bytes_field(7u32, &self.payload_signature, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CreateWalletTradingToFundingBatchRequestView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.subaccount_id) {
+                    __map
+                        .serialize_entry(
+                            "subaccountId",
+                            &::buffa::json_helpers::ProtoJson(&self.subaccount_id),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u64(&self.deadline_ts_sec) {
+                    __map
+                        .serialize_entry(
+                            "deadlineTsSec",
+                            &::buffa::json_helpers::ProtoJson(&self.deadline_ts_sec),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self.nonce.as_option() {
+                        __map.serialize_entry("nonce", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.idempotency_key) {
+                    __map.serialize_entry("idempotencyKey", self.idempotency_key)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.signer_wallet) {
+                    __map.serialize_entry("signerWallet", self.signer_wallet)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_bytes(
+                    self.payload_signature,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "payloadSignature",
+                            &::buffa::json_helpers::BytesJson(self.payload_signature),
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for CreateWalletTradingToFundingBatchRequestView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "CreateWalletTradingToFundingBatchRequest";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchRequest";
+        }
+        ::buffa::impl_default_view_instance!(
+            CreateWalletTradingToFundingBatchRequestView
+        );
+        ::buffa::impl_view_reborrow!(CreateWalletTradingToFundingBatchRequestView);
+        /** Self-contained, `'static` owned view of a `CreateWalletTradingToFundingBatchRequest` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWalletTradingToFundingBatchRequestView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWalletTradingToFundingBatchRequestView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateWalletTradingToFundingBatchRequestOwnedView(
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchRequestView<'static>>,
+        );
+        impl CreateWalletTradingToFundingBatchRequestOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchRequestOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateWalletTradingToFundingBatchRequest,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchRequestOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateWalletTradingToFundingBatchRequestView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateWalletTradingToFundingBatchRequestView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchRequest,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Moves to make, in order. 1 to 10 legs. Legs may repeat an asset or a
+            /// destination.
+            ///
+            /// Field 1: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TradingToFundingBatchLegView<'_>,
+            > {
+                &self.0.reborrow().legs
+            }
+            /// Optional public subaccount id of the source Trading account. Omit to
+            /// move funds from the caller's own Trading account.
+            ///
+            /// Field 2: `subaccount_id`
+            #[must_use]
+            pub fn subaccount_id(&self) -> u64 {
+                self.0.reborrow().subaccount_id
+            }
+            /// Unix timestamp in seconds after which the signed batch is no longer
+            /// accepted, at most 15 minutes ahead.
+            ///
+            /// Field 3: `deadline_ts_sec`
+            #[must_use]
+            pub fn deadline_ts_sec(&self) -> u64 {
+                self.0.reborrow().deadline_ts_sec
+            }
+            /// Client-generated unsigned 128-bit nonce bound to the signed batch. This
+            /// is an identifier, not a decimal amount.
+            ///
+            /// Field 4: `nonce`
+            #[must_use]
+            pub fn nonce(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().nonce
+            }
+            /// Client-chosen idempotency key for the whole batch, scoped to the source
+            /// account. Retrying with the same key and the same signed batch returns the
+            /// first answer; reusing it for another batch is refused with
+            /// ERROR_CODE_IDEMPOTENCY_CONFLICT. The first answer stands, after the
+            /// deadline too. A refused batch is final: a retry under its key answers the
+            /// same refusal, even once its cause is gone, so a corrected batch needs a
+            /// new key and signature.
+            ///
+            /// Field 5: `idempotency_key`
+            #[must_use]
+            pub fn idempotency_key(&self) -> &'_ str {
+                self.0.reborrow().idempotency_key
+            }
+            /// Wallet address that produced payload_signature.
+            ///
+            /// Field 6: `signer_wallet`
+            #[must_use]
+            pub fn signer_wallet(&self) -> &'_ str {
+                self.0.reborrow().signer_wallet
+            }
+            /// EIP-191 personal_sign signature over the batch message described above.
+            ///
+            /// Field 7: `payload_signature`
+            #[must_use]
+            pub fn payload_signature(&self) -> &'_ [u8] {
+                self.0.reborrow().payload_signature
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchRequestView<'static>>,
+        > for CreateWalletTradingToFundingBatchRequestOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateWalletTradingToFundingBatchRequestView<'static>,
+                >,
+            ) -> Self {
+                CreateWalletTradingToFundingBatchRequestOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateWalletTradingToFundingBatchRequestOwnedView>
+        for ::buffa::OwnedView<CreateWalletTradingToFundingBatchRequestView<'static>> {
+            fn from(wrapper: CreateWalletTradingToFundingBatchRequestOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchRequestView<'static>>,
+        > for CreateWalletTradingToFundingBatchRequestOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                CreateWalletTradingToFundingBatchRequestView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateWalletTradingToFundingBatchRequest {
+            type View<'a> = CreateWalletTradingToFundingBatchRequestView<'a>;
+            type ViewHandle = CreateWalletTradingToFundingBatchRequestOwnedView;
+        }
+        impl ::serde::Serialize for CreateWalletTradingToFundingBatchRequestOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// TradingToFundingBatchLegResult is one accepted leg of a batch.
+        #[derive(Clone, Debug, Default)]
+        pub struct TradingToFundingBatchLegResultView<'a> {
+            /// Zero-based position of the leg in the request.
+            ///
+            /// Field 1: `leg_index`
+            pub leg_index: u32,
+            /// Stable server-owned intent identifier of the leg's withdraw, the same
+            /// identifier a single wallet withdraw returns. Clients use it to follow the
+            /// leg's progress.
+            ///
+            /// Field 2: `intent_id`
+            pub intent_id: &'a str,
+            /// Echoed unified asset identifier.
+            ///
+            /// Field 3: `asset_id`
+            pub asset_id: u32,
+            /// Echoed amount in canonical 18-decimal unified asset units.
+            ///
+            /// Field 4: `amount_e18`
+            pub amount_e18: ::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    'a,
+                >,
+            >,
+            /// Echoed destination_address; empty when the leg credits the source
+            /// account's own Funding account.
+            ///
+            /// Field 5: `destination_address`
+            pub destination_address: &'a str,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a> for TradingToFundingBatchLegResultView<'a> {
+            type Owned = super::super::TradingToFundingBatchLegResult;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.leg_index = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.intent_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    3u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::Varint,
+                        )?;
+                        view.asset_id = ::buffa::types::decode_uint32(&mut cur)?;
+                    }
+                    4u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        match view.amount_e18.as_mut() {
+                            Some(existing) => {
+                                ::buffa::MessageView::merge_into_view(
+                                    existing,
+                                    sub,
+                                    __sub_ctx,
+                                )?
+                            }
+                            None => {
+                                view.amount_e18 = ::buffa::MessageFieldView::set(
+                                    <super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View as ::buffa::MessageView>::decode_view_ctx(
+                                        sub,
+                                        __sub_ctx,
+                                    )?,
+                                );
+                            }
+                        }
+                    }
+                    5u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.destination_address = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::TradingToFundingBatchLegResult {
+                    leg_index: self.leg_index,
+                    intent_id: self.intent_id.to_string(),
+                    asset_id: self.asset_id,
+                    amount_e18: match self.amount_e18.as_option() {
+                        Some(v) => {
+                            ::buffa::MessageField::<
+                                super::super::super::super::super::polyester::r#type::v1::U128,
+                            >::some(v.to_owned_from_source(__buffa_src)?)
+                        }
+                        None => ::buffa::MessageField::none(),
+                    },
+                    destination_address: self.destination_address.to_string(),
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a> for TradingToFundingBatchLegResultView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if self.leg_index != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.leg_index) as u32;
+                }
+                if !self.intent_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.intent_id) as u32;
+                }
+                if self.asset_id != 0u32 {
+                    size
+                        += 1u32
+                            + ::buffa::types::uint32_encoded_len(self.asset_id) as u32;
+                }
+                if self.amount_e18.is_set() {
+                    let __slot = __cache.reserve();
+                    let inner_size = self.amount_e18.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                if !self.destination_address.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(
+                                &self.destination_address,
+                            ) as u32;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if self.leg_index != 0u32 {
+                    ::buffa::types::put_uint32_field(1u32, self.leg_index, buf);
+                }
+                if !self.intent_id.is_empty() {
+                    ::buffa::types::put_string_field(2u32, &self.intent_id, buf);
+                }
+                if self.asset_id != 0u32 {
+                    ::buffa::types::put_uint32_field(3u32, self.asset_id, buf);
+                }
+                if self.amount_e18.is_set() {
+                    ::buffa::types::put_len_delimited_header(
+                        4u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    self.amount_e18.write_to(__cache, buf);
+                }
+                if !self.destination_address.is_empty() {
+                    ::buffa::types::put_string_field(
+                        5u32,
+                        &self.destination_address,
+                        buf,
+                    );
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize for TradingToFundingBatchLegResultView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.leg_index) {
+                    __map
+                        .serialize_entry(
+                            "legIndex",
+                            &::buffa::json_helpers::ProtoJson(&self.leg_index),
+                        )?;
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.intent_id) {
+                    __map.serialize_entry("intentId", self.intent_id)?;
+                }
+                if !::buffa::json_helpers::skip_if::is_zero_u32(&self.asset_id) {
+                    __map
+                        .serialize_entry(
+                            "assetId",
+                            &::buffa::json_helpers::ProtoJson(&self.asset_id),
+                        )?;
+                }
+                {
+                    if let ::core::option::Option::Some(__v) = self
+                        .amount_e18
+                        .as_option()
+                    {
+                        __map.serialize_entry("amountE18", __v)?;
+                    }
+                }
+                if !::buffa::json_helpers::skip_if::is_empty_str(
+                    self.destination_address,
+                ) {
+                    __map
+                        .serialize_entry(
+                            "destinationAddress",
+                            self.destination_address,
+                        )?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName for TradingToFundingBatchLegResultView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "TradingToFundingBatchLegResult";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.TradingToFundingBatchLegResult";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.TradingToFundingBatchLegResult";
+        }
+        ::buffa::impl_default_view_instance!(TradingToFundingBatchLegResultView);
+        ::buffa::impl_view_reborrow!(TradingToFundingBatchLegResultView);
+        /** Self-contained, `'static` owned view of a `TradingToFundingBatchLegResult` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`TradingToFundingBatchLegResultView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`TradingToFundingBatchLegResultView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct TradingToFundingBatchLegResultOwnedView(
+            ::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>>,
+        );
+        impl TradingToFundingBatchLegResultOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegResultOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegResultOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::TradingToFundingBatchLegResult,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    TradingToFundingBatchLegResultOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`TradingToFundingBatchLegResultView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &TradingToFundingBatchLegResultView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::TradingToFundingBatchLegResult,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Zero-based position of the leg in the request.
+            ///
+            /// Field 1: `leg_index`
+            #[must_use]
+            pub fn leg_index(&self) -> u32 {
+                self.0.reborrow().leg_index
+            }
+            /// Stable server-owned intent identifier of the leg's withdraw, the same
+            /// identifier a single wallet withdraw returns. Clients use it to follow the
+            /// leg's progress.
+            ///
+            /// Field 2: `intent_id`
+            #[must_use]
+            pub fn intent_id(&self) -> &'_ str {
+                self.0.reborrow().intent_id
+            }
+            /// Echoed unified asset identifier.
+            ///
+            /// Field 3: `asset_id`
+            #[must_use]
+            pub fn asset_id(&self) -> u32 {
+                self.0.reborrow().asset_id
+            }
+            /// Echoed amount in canonical 18-decimal unified asset units.
+            ///
+            /// Field 4: `amount_e18`
+            #[must_use]
+            pub fn amount_e18(
+                &self,
+            ) -> &::buffa::MessageFieldView<
+                super::super::super::super::super::polyester::r#type::v1::__buffa::view::U128View<
+                    '_,
+                >,
+            > {
+                &self.0.reborrow().amount_e18
+            }
+            /// Echoed destination_address; empty when the leg credits the source
+            /// account's own Funding account.
+            ///
+            /// Field 5: `destination_address`
+            #[must_use]
+            pub fn destination_address(&self) -> &'_ str {
+                self.0.reborrow().destination_address
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>>,
+        > for TradingToFundingBatchLegResultOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>>,
+            ) -> Self {
+                TradingToFundingBatchLegResultOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<TradingToFundingBatchLegResultOwnedView>
+        for ::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>> {
+            fn from(wrapper: TradingToFundingBatchLegResultOwnedView) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>>,
+        > for TradingToFundingBatchLegResultOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<TradingToFundingBatchLegResultView<'static>> {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView for super::super::TradingToFundingBatchLegResult {
+            type View<'a> = TradingToFundingBatchLegResultView<'a>;
+            type ViewHandle = TradingToFundingBatchLegResultOwnedView;
+        }
+        impl ::serde::Serialize for TradingToFundingBatchLegResultOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
+        /// CreateWalletTradingToFundingBatchResponse is an accepted batch: every leg
+        /// is reserved and will be paid together with the others, or, if the payment
+        /// fails, every leg is refunded to the source Trading account.
+        #[derive(Clone, Debug, Default)]
+        pub struct CreateWalletTradingToFundingBatchResponseView<'a> {
+            /// Stable server-owned identifier of the batch.
+            ///
+            /// Field 1: `batch_id`
+            pub batch_id: &'a str,
+            /// Every leg, in request order.
+            ///
+            /// Field 2: `legs`
+            pub legs: ::buffa::RepeatedView<
+                'a,
+                super::super::__buffa::view::TradingToFundingBatchLegResultView<'a>,
+            >,
+            pub __buffa_unknown_fields: ::buffa::UnknownFieldsView<'a>,
+        }
+        impl<'a> ::buffa::MessageView<'a>
+        for CreateWalletTradingToFundingBatchResponseView<'a> {
+            type Owned = super::super::CreateWalletTradingToFundingBatchResponse;
+            fn decode_view(
+                buf: &'a [u8],
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                let __limit = ::core::cell::Cell::new(
+                    ::buffa::DEFAULT_UNKNOWN_FIELD_LIMIT,
+                );
+                <Self as ::buffa::MessageView>::decode_view_ctx(
+                    buf,
+                    ::buffa::DecodeContext::new(::buffa::RECURSION_LIMIT, &__limit),
+                )
+            }
+            fn decode_view_with_ctx(
+                buf: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                <Self as ::buffa::MessageView>::decode_view_ctx(buf, ctx)
+            }
+            fn merge_view_field(
+                &mut self,
+                tag: ::buffa::encoding::Tag,
+                cur: &'a [u8],
+                before_tag: &'a [u8],
+                ctx: ::buffa::DecodeContext<'_>,
+            ) -> ::core::result::Result<&'a [u8], ::buffa::DecodeError> {
+                let _ = ctx;
+                #[allow(unused_variables)]
+                let view = self;
+                let mut cur = cur;
+                match tag.field_number() {
+                    1u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        view.batch_id = ::buffa::types::borrow_str(&mut cur)?;
+                    }
+                    2u32 => {
+                        ::buffa::encoding::check_wire_type(
+                            tag,
+                            ::buffa::encoding::WireType::LengthDelimited,
+                        )?;
+                        let __sub_ctx = ctx.descend()?;
+                        let sub = ::buffa::types::borrow_bytes(&mut cur)?;
+                        view.legs
+                            .push(
+                                <super::super::__buffa::view::TradingToFundingBatchLegResultView as ::buffa::MessageView>::decode_view_ctx(
+                                    sub,
+                                    __sub_ctx,
+                                )?,
+                            );
+                    }
+                    _ => {
+                        ::buffa::encoding::skip_field_depth(tag, &mut cur, ctx.depth())?;
+                        let span_len = before_tag.len() - cur.len();
+                        view.__buffa_unknown_fields
+                            .push_record(before_tag, span_len, ctx)?;
+                    }
+                }
+                ::core::result::Result::Ok(cur)
+            }
+            fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.to_owned_from_source(None)
+            }
+            #[allow(clippy::useless_conversion, clippy::needless_update)]
+            fn to_owned_from_source(
+                &self,
+                __buffa_src: ::core::option::Option<&::buffa::bytes::Bytes>,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                #[allow(unused_imports)]
+                use ::buffa::alloc::string::ToString as _;
+                let _ = __buffa_src;
+                ::core::result::Result::Ok(super::super::CreateWalletTradingToFundingBatchResponse {
+                    batch_id: self.batch_id.to_string(),
+                    legs: self
+                        .legs
+                        .iter()
+                        .map(|v| v.to_owned_from_source(__buffa_src))
+                        .collect::<::core::result::Result<_, ::buffa::DecodeError>>()?,
+                    __buffa_unknown_fields: self
+                        .__buffa_unknown_fields
+                        .to_owned()?
+                        .into(),
+                    ..::core::default::Default::default()
+                })
+            }
+        }
+        impl<'a> ::buffa::ViewEncode<'a>
+        for CreateWalletTradingToFundingBatchResponseView<'a> {
+            #[allow(clippy::needless_borrow, clippy::let_and_return)]
+            fn compute_size(&self, __cache: &mut ::buffa::SizeCache) -> u32 {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                let mut size = 0u32;
+                if !self.batch_id.is_empty() {
+                    size
+                        += 1u32
+                            + ::buffa::types::string_encoded_len(&self.batch_id) as u32;
+                }
+                for v in &self.legs {
+                    let __slot = __cache.reserve();
+                    let inner_size = v.compute_size(__cache);
+                    __cache.set(__slot, inner_size);
+                    size
+                        += 1u32 + ::buffa::encoding::varint_len(inner_size as u64) as u32
+                            + inner_size;
+                }
+                size += self.__buffa_unknown_fields.encoded_len() as u32;
+                size
+            }
+            #[allow(clippy::needless_borrow)]
+            fn write_to(
+                &self,
+                __cache: &mut ::buffa::SizeCache,
+                buf: &mut impl ::buffa::bytes::BufMut,
+            ) {
+                #[allow(unused_imports)]
+                use ::buffa::Enumeration as _;
+                if !self.batch_id.is_empty() {
+                    ::buffa::types::put_string_field(1u32, &self.batch_id, buf);
+                }
+                for v in &self.legs {
+                    ::buffa::types::put_len_delimited_header(
+                        2u32,
+                        __cache.consume_next(),
+                        buf,
+                    );
+                    v.write_to(__cache, buf);
+                }
+                self.__buffa_unknown_fields.write_to(buf);
+            }
+        }
+        /// Serializes this view as protobuf JSON.
+        ///
+        /// Implicit-presence fields with default values are omitted, `required`
+        /// fields are always emitted, explicit-presence (`optional`) fields are
+        /// emitted only when set, bytes fields are base64-encoded, and enum
+        /// values are their proto name strings.
+        ///
+        /// This impl uses `serialize_map(None)` because the number of emitted
+        /// fields depends on default-omission rules; serializers that require
+        /// known map lengths (e.g. `bincode`) will return a runtime error.
+        /// Use the owned message type for those formats.
+        impl<'__a> ::serde::Serialize
+        for CreateWalletTradingToFundingBatchResponseView<'__a> {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                use ::serde::ser::SerializeMap as _;
+                let mut __map = __s.serialize_map(::core::option::Option::None)?;
+                if !::buffa::json_helpers::skip_if::is_empty_str(self.batch_id) {
+                    __map.serialize_entry("batchId", self.batch_id)?;
+                }
+                if !self.legs.is_empty() {
+                    __map.serialize_entry("legs", &*self.legs)?;
+                }
+                __map.end()
+            }
+        }
+        impl<'a> ::buffa::MessageName
+        for CreateWalletTradingToFundingBatchResponseView<'a> {
+            const PACKAGE: &'static str = "chain.withdraw.v1";
+            const NAME: &'static str = "CreateWalletTradingToFundingBatchResponse";
+            const FULL_NAME: &'static str = "chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+            const TYPE_URL: &'static str = "type.googleapis.com/chain.withdraw.v1.CreateWalletTradingToFundingBatchResponse";
+        }
+        ::buffa::impl_default_view_instance!(
+            CreateWalletTradingToFundingBatchResponseView
+        );
+        ::buffa::impl_view_reborrow!(CreateWalletTradingToFundingBatchResponseView);
+        /** Self-contained, `'static` owned view of a `CreateWalletTradingToFundingBatchResponse` message.
+
+ Wraps [`::buffa::OwnedView`]`<`[`CreateWalletTradingToFundingBatchResponseView`]`<'static>>`: the decoded view and the [`::buffa::bytes::Bytes`] buffer it borrows from travel together, so the handle is `'static` and `Send + Sync` — suitable for async handlers, spawned tasks, and anywhere a `'static` bound is required.
+
+ Field accessors return borrows tied to `&self`. Use [`Self::view`] to get the full [`CreateWalletTradingToFundingBatchResponseView`] when you need struct patterns, iteration helpers, or to pass the view to lifetime-parameterised code.*/
+        #[derive(Clone, Debug)]
+        pub struct CreateWalletTradingToFundingBatchResponseOwnedView(
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchResponseView<'static>>,
+        );
+        impl CreateWalletTradingToFundingBatchResponseOwnedView {
+            /// Decode an owned view from a [`::buffa::bytes::Bytes`] buffer.
+            ///
+            /// The view borrows directly from the buffer's data; the buffer is
+            /// retained inside the returned handle.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer contains invalid
+            /// protobuf data.
+            pub fn decode(
+                bytes: ::buffa::bytes::Bytes,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode(bytes)?,
+                    ),
+                )
+            }
+            /// Decode with custom [`::buffa::DecodeOptions`] (recursion limit,
+            /// max message size).
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the buffer is invalid or
+            /// exceeds the configured limits.
+            pub fn decode_with_options(
+                bytes: ::buffa::bytes::Bytes,
+                opts: &::buffa::DecodeOptions,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchResponseOwnedView(
+                        ::buffa::OwnedView::decode_with_options(bytes, opts)?,
+                    ),
+                )
+            }
+            /// Build from an owned message via an encode → decode round-trip.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`::buffa::DecodeError`] if the re-encoded bytes are
+            /// somehow invalid (should not happen for well-formed messages).
+            pub fn from_owned(
+                msg: &super::super::CreateWalletTradingToFundingBatchResponse,
+            ) -> ::core::result::Result<Self, ::buffa::DecodeError> {
+                ::core::result::Result::Ok(
+                    CreateWalletTradingToFundingBatchResponseOwnedView(
+                        ::buffa::OwnedView::from_owned(msg)?,
+                    ),
+                )
+            }
+            /// Borrow the full [`CreateWalletTradingToFundingBatchResponseView`] with its lifetime tied to `&self`.
+            #[must_use]
+            pub fn view(&self) -> &CreateWalletTradingToFundingBatchResponseView<'_> {
+                self.0.reborrow()
+            }
+            /// Convert to the owned message type.
+            ///
+            /// # Errors
+            ///
+            /// Returns an error if re-materializing preserved unknown fields
+            /// fails (e.g. the unknown-field limit is exceeded).
+            pub fn to_owned_message(
+                &self,
+            ) -> ::core::result::Result<
+                super::super::CreateWalletTradingToFundingBatchResponse,
+                ::buffa::DecodeError,
+            > {
+                self.0.to_owned_message()
+            }
+            /// The underlying bytes buffer.
+            #[must_use]
+            pub fn bytes(&self) -> &::buffa::bytes::Bytes {
+                self.0.bytes()
+            }
+            /// Consume the handle, returning the underlying bytes buffer.
+            #[must_use]
+            pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
+                self.0.into_bytes()
+            }
+            /// Stable server-owned identifier of the batch.
+            ///
+            /// Field 1: `batch_id`
+            #[must_use]
+            pub fn batch_id(&self) -> &'_ str {
+                self.0.reborrow().batch_id
+            }
+            /// Every leg, in request order.
+            ///
+            /// Field 2: `legs`
+            #[must_use]
+            pub fn legs(
+                &self,
+            ) -> &::buffa::RepeatedView<
+                '_,
+                super::super::__buffa::view::TradingToFundingBatchLegResultView<'_>,
+            > {
+                &self.0.reborrow().legs
+            }
+        }
+        impl ::core::convert::From<
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchResponseView<'static>>,
+        > for CreateWalletTradingToFundingBatchResponseOwnedView {
+            fn from(
+                inner: ::buffa::OwnedView<
+                    CreateWalletTradingToFundingBatchResponseView<'static>,
+                >,
+            ) -> Self {
+                CreateWalletTradingToFundingBatchResponseOwnedView(inner)
+            }
+        }
+        impl ::core::convert::From<CreateWalletTradingToFundingBatchResponseOwnedView>
+        for ::buffa::OwnedView<CreateWalletTradingToFundingBatchResponseView<'static>> {
+            fn from(
+                wrapper: CreateWalletTradingToFundingBatchResponseOwnedView,
+            ) -> Self {
+                wrapper.0
+            }
+        }
+        impl ::core::convert::AsRef<
+            ::buffa::OwnedView<CreateWalletTradingToFundingBatchResponseView<'static>>,
+        > for CreateWalletTradingToFundingBatchResponseOwnedView {
+            fn as_ref(
+                &self,
+            ) -> &::buffa::OwnedView<
+                CreateWalletTradingToFundingBatchResponseView<'static>,
+            > {
+                &self.0
+            }
+        }
+        impl ::buffa::HasMessageView
+        for super::super::CreateWalletTradingToFundingBatchResponse {
+            type View<'a> = CreateWalletTradingToFundingBatchResponseView<'a>;
+            type ViewHandle = CreateWalletTradingToFundingBatchResponseOwnedView;
+        }
+        impl ::serde::Serialize for CreateWalletTradingToFundingBatchResponseOwnedView {
+            fn serialize<__S: ::serde::Serializer>(
+                &self,
+                __s: __S,
+            ) -> ::core::result::Result<__S::Ok, __S::Error> {
+                ::serde::Serialize::serialize(&self.0, __s)
+            }
+        }
         /// ValidateWithdrawDestinationRequest checks one external-chain
         /// destination for an authenticated caller without creating a withdraw.
         #[derive(Clone, Debug, Default)]
@@ -22569,6 +25386,14 @@ pub mod __buffa {
         reg.register_json_any(super::__TRADING_WITHDRAW_INTENT_PAYLOAD_JSON_ANY);
         reg.register_json_any(super::__CREATE_TRADING_WITHDRAW_REQUEST_JSON_ANY);
         reg.register_json_any(super::__CREATE_WALLET_TRADING_WITHDRAW_REQUEST_JSON_ANY);
+        reg.register_json_any(super::__TRADING_TO_FUNDING_BATCH_LEG_JSON_ANY);
+        reg.register_json_any(
+            super::__CREATE_WALLET_TRADING_TO_FUNDING_BATCH_REQUEST_JSON_ANY,
+        );
+        reg.register_json_any(super::__TRADING_TO_FUNDING_BATCH_LEG_RESULT_JSON_ANY);
+        reg.register_json_any(
+            super::__CREATE_WALLET_TRADING_TO_FUNDING_BATCH_RESPONSE_JSON_ANY,
+        );
         reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_REQUEST_JSON_ANY);
         reg.register_json_any(super::__VALIDATE_WITHDRAW_DESTINATION_RESPONSE_JSON_ANY);
         reg.register_json_any(super::__GET_WALLET_BALANCES_REQUEST_JSON_ANY);
@@ -22669,6 +25494,22 @@ pub use self::__buffa::view::CreateTradingWithdrawRequestOwnedView;
 pub use self::__buffa::view::CreateWalletTradingWithdrawRequestView;
 #[doc(inline)]
 pub use self::__buffa::view::CreateWalletTradingWithdrawRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TradingToFundingBatchLegView;
+#[doc(inline)]
+pub use self::__buffa::view::TradingToFundingBatchLegOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWalletTradingToFundingBatchRequestView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWalletTradingToFundingBatchRequestOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::TradingToFundingBatchLegResultView;
+#[doc(inline)]
+pub use self::__buffa::view::TradingToFundingBatchLegResultOwnedView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWalletTradingToFundingBatchResponseView;
+#[doc(inline)]
+pub use self::__buffa::view::CreateWalletTradingToFundingBatchResponseOwnedView;
 #[doc(inline)]
 pub use self::__buffa::view::ValidateWithdrawDestinationRequestView;
 #[doc(inline)]

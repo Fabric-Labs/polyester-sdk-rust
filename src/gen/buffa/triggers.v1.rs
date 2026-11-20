@@ -10,9 +10,11 @@
 pub enum TriggerType {
     /// Trigger type was not provided.
     TRIGGER_TYPE_UNSPECIFIED = 0i32,
-    /// Stop-loss: fires when the price crosses a threshold.
+    /// Stop-loss: a SELL fires when the price falls to or below its trigger
+    /// price, a BUY when the price rises to or above it.
     STOP_LOSS = 1i32,
-    /// Take-profit: fires when the price crosses a threshold.
+    /// Take-profit: a SELL fires when the price rises to or above its trigger
+    /// price, a BUY when the price falls to or below it.
     TAKE_PROFIT = 2i32,
     /// Trailing stop: dynamic stop that trails price by a distance.
     TRAILING_STOP = 3i32,
@@ -4314,12 +4316,36 @@ pub mod conditional_child_execution {
     #[doc(inline)]
     pub use super::__buffa::view::oneof::conditional_child_execution::Execution as ExecutionView;
 }
-/// ConditionalTrigger configures a standalone stop-loss or take-profit.
+/// ConditionalTrigger configures a standalone stop-loss or take-profit. There
+/// is no direction field: the strategy and the child order's side set the
+/// direction in which the watched price must move to fire the trigger.
+///
+/// - A SELL stop-loss fires when the price falls to or below the trigger
+///   price: it limits the loss on a held position.
+/// - A BUY stop-loss is a breakout buy: it fires when the price rises to or
+///   above the trigger price.
+/// - A SELL take-profit sells into a rise: it fires when the price rises to or
+///   above the trigger price.
+/// - A BUY take-profit buys a dip: it fires when the price falls to or below
+///   the trigger price.
+///
+/// The comparison is inclusive: a price equal to the trigger price fires the
+/// trigger, as does one past it. Trigger reads report the direction as
+/// StopDetails.trigger_direction, ABOVE or BELOW.
+///
+/// A trigger price that the watched price has already reached when the trigger
+/// takes effect, at or past it in the firing direction, is not refused at
+/// create: CreateTrigger returns a trigger ID, then the trigger ends
+/// STATUS_FAILED with failure reason
+/// TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY. It never fires,
+/// places no order, and its reserved funds are released. Read the trigger
+/// after the create to tell this outcome from an armed trigger.
 #[derive(Clone, PartialEq, Default)]
 #[derive(::serde::Serialize, ::serde::Deserialize)]
 #[serde(default)]
 pub struct ConditionalTrigger {
-    /// Positive trigger threshold in quote units scaled by 1e9.
+    /// Positive trigger threshold in quote units scaled by 1e9. The side and
+    /// strategy set whether the trigger fires at or above it, or at or below it.
     ///
     /// Field 1: `trigger_price_ticks`
     #[serde(
@@ -4329,7 +4355,10 @@ pub struct ConditionalTrigger {
         skip_serializing_if = "::buffa::json_helpers::skip_if::is_zero_i64"
     )]
     pub trigger_price_ticks: i64,
-    /// Child order side. Required.
+    /// Child order side. Required. With the strategy, it sets the fire
+    /// direction: a SELL stop-loss and a BUY take-profit fire at or below the
+    /// trigger price; a BUY stop-loss and a SELL take-profit fire at or above
+    /// it.
     ///
     /// Field 2: `side`
     #[serde(
@@ -13970,7 +13999,10 @@ pub struct StopDetails {
     pub trigger_price_source: ::buffa::EnumValue<
         super::super::orders::v1::TriggerPriceSource,
     >,
-    /// Direction the price must cross to fire the trigger.
+    /// Direction in which the price must reach the trigger price to fire the
+    /// trigger, inclusive: ABOVE fires at or above it, BELOW at or below it. Set
+    /// from the strategy and side at create: BELOW for a SELL stop-loss or a BUY
+    /// take-profit, ABOVE for a BUY stop-loss or a SELL take-profit.
     ///
     /// Field 3: `trigger_direction`
     #[serde(
@@ -18620,14 +18652,41 @@ pub mod __buffa {
                 ::serde::Serialize::serialize(&self.0, __s)
             }
         }
-        /// ConditionalTrigger configures a standalone stop-loss or take-profit.
+        /// ConditionalTrigger configures a standalone stop-loss or take-profit. There
+        /// is no direction field: the strategy and the child order's side set the
+        /// direction in which the watched price must move to fire the trigger.
+        ///
+        /// - A SELL stop-loss fires when the price falls to or below the trigger
+        ///   price: it limits the loss on a held position.
+        /// - A BUY stop-loss is a breakout buy: it fires when the price rises to or
+        ///   above the trigger price.
+        /// - A SELL take-profit sells into a rise: it fires when the price rises to or
+        ///   above the trigger price.
+        /// - A BUY take-profit buys a dip: it fires when the price falls to or below
+        ///   the trigger price.
+        ///
+        /// The comparison is inclusive: a price equal to the trigger price fires the
+        /// trigger, as does one past it. Trigger reads report the direction as
+        /// StopDetails.trigger_direction, ABOVE or BELOW.
+        ///
+        /// A trigger price that the watched price has already reached when the trigger
+        /// takes effect, at or past it in the firing direction, is not refused at
+        /// create: CreateTrigger returns a trigger ID, then the trigger ends
+        /// STATUS_FAILED with failure reason
+        /// TRIGGER_FAILURE_REASON_TRIGGER_WOULD_TRIGGER_IMMEDIATELY. It never fires,
+        /// places no order, and its reserved funds are released. Read the trigger
+        /// after the create to tell this outcome from an armed trigger.
         #[derive(Clone, Debug, Default)]
         pub struct ConditionalTriggerView<'a> {
-            /// Positive trigger threshold in quote units scaled by 1e9.
+            /// Positive trigger threshold in quote units scaled by 1e9. The side and
+            /// strategy set whether the trigger fires at or above it, or at or below it.
             ///
             /// Field 1: `trigger_price_ticks`
             pub trigger_price_ticks: i64,
-            /// Child order side. Required.
+            /// Child order side. Required. With the strategy, it sets the fire
+            /// direction: a SELL stop-loss and a BUY take-profit fire at or below the
+            /// trigger price; a BUY stop-loss and a SELL take-profit fire at or above
+            /// it.
             ///
             /// Field 2: `side`
             pub side: ::buffa::EnumValue<super::super::super::super::orders::v1::Side>,
@@ -18990,14 +19049,18 @@ pub mod __buffa {
             pub fn into_bytes(self) -> ::buffa::bytes::Bytes {
                 self.0.into_bytes()
             }
-            /// Positive trigger threshold in quote units scaled by 1e9.
+            /// Positive trigger threshold in quote units scaled by 1e9. The side and
+            /// strategy set whether the trigger fires at or above it, or at or below it.
             ///
             /// Field 1: `trigger_price_ticks`
             #[must_use]
             pub fn trigger_price_ticks(&self) -> i64 {
                 self.0.reborrow().trigger_price_ticks
             }
-            /// Child order side. Required.
+            /// Child order side. Required. With the strategy, it sets the fire
+            /// direction: a SELL stop-loss and a BUY take-profit fire at or below the
+            /// trigger price; a BUY stop-loss and a SELL take-profit fire at or above
+            /// it.
             ///
             /// Field 2: `side`
             #[must_use]
@@ -33417,7 +33480,10 @@ pub mod __buffa {
             pub trigger_price_source: ::buffa::EnumValue<
                 super::super::super::super::orders::v1::TriggerPriceSource,
             >,
-            /// Direction the price must cross to fire the trigger.
+            /// Direction in which the price must reach the trigger price to fire the
+            /// trigger, inclusive: ABOVE fires at or above it, BELOW at or below it. Set
+            /// from the strategy and side at create: BELOW for a SELL stop-loss or a BUY
+            /// take-profit, ABOVE for a BUY stop-loss or a SELL take-profit.
             ///
             /// Field 3: `trigger_direction`
             pub trigger_direction: ::buffa::EnumValue<
@@ -33729,7 +33795,10 @@ pub mod __buffa {
             > {
                 self.0.reborrow().trigger_price_source
             }
-            /// Direction the price must cross to fire the trigger.
+            /// Direction in which the price must reach the trigger price to fire the
+            /// trigger, inclusive: ABOVE fires at or above it, BELOW at or below it. Set
+            /// from the strategy and side at create: BELOW for a SELL stop-loss or a BUY
+            /// take-profit, ABOVE for a BUY stop-loss or a SELL take-profit.
             ///
             /// Field 3: `trigger_direction`
             #[must_use]

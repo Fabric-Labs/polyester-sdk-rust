@@ -2698,6 +2698,31 @@ fn map_connect_error_inner(err: ConnectError) -> Error {
             ) {
                 return rate_limit_error(fallback_message.clone(), None, header_retry, Some(code));
             }
+            // A missing grant (`ERROR_CODE_PERMISSION_DENIED`, or
+            // `ERROR_CODE_POLICY_DENIED` for a sub-account role) keeps its code
+            // and the message naming the action to grant: the credentials
+            // were accepted, the operation is not allowed. A batch read
+            // refused this way is not an unknown batch.
+            if err.code == ErrorCode::PermissionDenied
+                && matches!(
+                    transfer_detail.code.as_known(),
+                    Some(TransferErrorCode::PermissionDenied | TransferErrorCode::PolicyDenied)
+                )
+            {
+                return Error::PermissionDenied {
+                    message: if raw_message.is_empty() {
+                        fallback_message.clone()
+                    } else {
+                        raw_message.to_owned()
+                    },
+                    status,
+                    code,
+                    context: String::new(),
+                    endpoint: String::new(),
+                    problem: None,
+                    answer: None,
+                };
+            }
             if err.code == ErrorCode::Unavailable {
                 return Error::Server {
                     message: fallback_message.clone(),
@@ -4022,7 +4047,10 @@ mod tests {
         match map_connect_error(ConnectError::permission_denied("denied").with_detail(
             ErrorDetail::from_message("transfer.v1.ErrorDetail", &transfer),
         )) {
-            Error::Auth { .. } => {}
+            Error::PermissionDenied { code, message, .. } => {
+                assert_eq!(code, "ERROR_CODE_PERMISSION_DENIED");
+                assert_eq!(message, "denied");
+            }
             other => panic!("unexpected transfer error: {other:?}"),
         }
 

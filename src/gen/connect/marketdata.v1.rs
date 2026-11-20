@@ -40,6 +40,14 @@ pub type OwnedGetSpotConfigRequestView = ::buffa::view::OwnedView<
 pub type OwnedGetSpotConfigResponseView = ::buffa::view::OwnedView<
     crate::proto::marketdata::v1::__buffa::view::GetSpotConfigResponseView<'static>,
 >;
+///Shorthand for `OwnedView<GetPriceBandRequestView<'static>>`.
+pub type OwnedGetPriceBandRequestView = ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetPriceBandRequestView<'static>,
+>;
+///Shorthand for `OwnedView<GetPriceBandResponseView<'static>>`.
+pub type OwnedGetPriceBandResponseView = ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetPriceBandResponseView<'static>,
+>;
 impl ::connectrpc::Encodable<crate::proto::marketdata::v1::ListAssetInfoResponse>
 for crate::proto::marketdata::v1::__buffa::view::ListAssetInfoResponseView<'_> {
     fn encode(
@@ -140,6 +148,26 @@ for ::buffa::view::OwnedView<
         ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
     }
 }
+impl ::connectrpc::Encodable<crate::proto::marketdata::v1::GetPriceBandResponse>
+for crate::proto::marketdata::v1::__buffa::view::GetPriceBandResponseView<'_> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self, codec)
+    }
+}
+impl ::connectrpc::Encodable<crate::proto::marketdata::v1::GetPriceBandResponse>
+for ::buffa::view::OwnedView<
+    crate::proto::marketdata::v1::__buffa::view::GetPriceBandResponseView<'static>,
+> {
+    fn encode(
+        &self,
+        codec: ::connectrpc::CodecFormat,
+    ) -> ::std::result::Result<::buffa::bytes::Bytes, ::connectrpc::ConnectError> {
+        ::connectrpc::__codegen::encode_view_body(self.reborrow(), codec)
+    }
+}
 /// Full service name for this service.
 pub const MARKET_DATA_SERVICE_SERVICE_NAME: &str = "marketdata.v1.MarketDataService";
 /// Static [`Spec`](::connectrpc::Spec) for the server-side `ListAssetInfo` RPC.
@@ -184,6 +212,15 @@ pub const MARKET_DATA_SERVICE_GET_CANDLES_COLUMNS_SPEC: ::connectrpc::Spec = ::c
 /// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
 pub const MARKET_DATA_SERVICE_GET_SPOT_CONFIG_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
         "/marketdata.v1.MarketDataService/GetSpotConfig",
+        ::connectrpc::StreamType::Unary,
+    )
+    .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
+/// Static [`Spec`](::connectrpc::Spec) for the server-side `GetPriceBand` RPC.
+///
+/// The dispatcher surfaces this on
+/// [`RequestContext::spec`](::connectrpc::RequestContext::spec).
+pub const MARKET_DATA_SERVICE_GET_PRICE_BAND_SPEC: ::connectrpc::Spec = ::connectrpc::Spec::server(
+        "/marketdata.v1.MarketDataService/GetPriceBand",
         ::connectrpc::StreamType::Unary,
     )
     .with_idempotency_level(::connectrpc::IdempotencyLevel::Unknown);
@@ -364,6 +401,35 @@ pub trait MarketDataService: Send + Sync + 'static {
             > + Send + use<'a, Self>,
         >,
     > + Send;
+    /// Retrieve a spot pair's live price band: its reference price and the
+    /// limit prices the pair admits now. Never cached. A band is returned only
+    /// when it was confirmed current within the last 5 seconds; otherwise the
+    /// call fails with unavailable, and its error code tells a band that went
+    /// stale (PRICE_BAND_STALE) from one that is not known
+    /// (PRICE_BAND_UNKNOWN). Retry after a second. An unknown symbol_id fails with
+    /// not_found (UNKNOWN_SYMBOL).
+    ///
+    /// `'a` lets the response body borrow from `&self` (e.g. server-resident state).
+    ///
+    /// `request` is borrowed from the request body and is valid for the
+    /// duration of the call; message fields are read directly on it
+    /// (zero-copy). The response cannot borrow from `request` — use
+    /// `.to_owned_message()` (or copy the specific fields) for anything
+    /// returned, stored, or moved into `tokio::spawn`.
+    fn get_price_band<'a>(
+        &'a self,
+        ctx: ::connectrpc::RequestContext,
+        request: ::connectrpc::ServiceRequest<
+            '_,
+            crate::proto::marketdata::v1::GetPriceBandRequest,
+        >,
+    ) -> impl ::std::future::Future<
+        Output = ::connectrpc::ServiceResult<
+            impl ::connectrpc::Encodable<
+                crate::proto::marketdata::v1::GetPriceBandResponse,
+            > + Send + use<'a, Self>,
+        >,
+    > + Send;
 }
 /// Extension trait for registering a service implementation with a Router.
 ///
@@ -541,6 +607,35 @@ impl<S: MarketDataService> MarketDataServiceExt for S {
                 },
             )
             .with_spec(MARKET_DATA_SERVICE_GET_SPOT_CONFIG_SPEC)
+            .route_view(
+                MARKET_DATA_SERVICE_SERVICE_NAME,
+                "GetPriceBand",
+                {
+                    let svc = ::std::sync::Arc::clone(&self);
+                    ::connectrpc::view_handler_fn(move |
+                        ctx,
+                        req: ::buffa::view::OwnedView<
+                            crate::proto::marketdata::v1::__buffa::view::GetPriceBandRequestView<
+                                'static,
+                            >,
+                        >,
+                        format|
+                    {
+                        let svc = ::std::sync::Arc::clone(&svc);
+                        async move {
+                            let sreq = ::connectrpc::ServiceRequest::<
+                                crate::proto::marketdata::v1::GetPriceBandRequest,
+                            >::from_parts(req.reborrow(), req.bytes());
+                            svc.get_price_band(ctx, sreq)
+                                .await?
+                                .encode::<
+                                    crate::proto::marketdata::v1::GetPriceBandResponse,
+                                >(format)
+                        }
+                    })
+                },
+            )
+            .with_spec(MARKET_DATA_SERVICE_GET_PRICE_BAND_SPEC)
     }
 }
 /// Type-inference marker used by [`Router::add_service`](::connectrpc::Router::add_service).
@@ -623,6 +718,12 @@ impl<T: MarketDataService> ::connectrpc::Dispatcher for MarketDataServiceServer<
                 Some(
                     ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
                         .with_spec(MARKET_DATA_SERVICE_GET_SPOT_CONFIG_SPEC),
+                )
+            }
+            "GetPriceBand" => {
+                Some(
+                    ::connectrpc::dispatcher::codegen::MethodDescriptor::unary(false)
+                        .with_spec(MARKET_DATA_SERVICE_GET_PRICE_BAND_SPEC),
                 )
             }
             _ => None,
@@ -742,6 +843,27 @@ impl<T: MarketDataService> ::connectrpc::Dispatcher for MarketDataServiceServer<
                         .await?
                         .encode::<
                             crate::proto::marketdata::v1::GetSpotConfigResponse,
+                        >(format)
+                })
+            }
+            "GetPriceBand" => {
+                let svc = ::std::sync::Arc::clone(&self.inner);
+                Box::pin(async move {
+                    let body = ::connectrpc::dispatcher::codegen::request_proto_bytes::<
+                        crate::proto::marketdata::v1::GetPriceBandRequest,
+                    >(request.encoded()?, format)?;
+                    let req: crate::proto::marketdata::v1::__buffa::view::GetPriceBandRequestView<
+                        '_,
+                    > = ::connectrpc::dispatcher::codegen::decode_borrowed_request_view(
+                        &body,
+                    )?;
+                    let req = ::connectrpc::ServiceRequest::<
+                        crate::proto::marketdata::v1::GetPriceBandRequest,
+                    >::from_parts(&req, &body);
+                    svc.get_price_band(ctx, req)
+                        .await?
+                        .encode::<
+                            crate::proto::marketdata::v1::GetPriceBandResponse,
                         >(format)
                 })
             }
@@ -1067,6 +1189,51 @@ where
                 &self.config,
                 MARKET_DATA_SERVICE_SERVICE_NAME,
                 "GetSpotConfig",
+                request,
+                options,
+            )
+            .await
+    }
+    /// Call the GetPriceBand RPC. Sends a request to /marketdata.v1.MarketDataService/GetPriceBand.
+    pub async fn get_price_band(
+        &self,
+        request: crate::proto::marketdata::v1::GetPriceBandRequest,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::marketdata::v1::__buffa::view::GetPriceBandResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        self.get_price_band_with_options(
+                request,
+                ::connectrpc::client::CallOptions::default(),
+            )
+            .await
+    }
+    /// Call the GetPriceBand RPC with explicit per-call options. Options override [`ClientConfig`](::connectrpc::client::ClientConfig) defaults.
+    pub async fn get_price_band_with_options(
+        &self,
+        request: crate::proto::marketdata::v1::GetPriceBandRequest,
+        options: ::connectrpc::client::CallOptions,
+    ) -> Result<
+        ::connectrpc::client::UnaryResponse<
+            ::buffa::view::OwnedView<
+                crate::proto::marketdata::v1::__buffa::view::GetPriceBandResponseView<
+                    'static,
+                >,
+            >,
+        >,
+        ::connectrpc::ConnectError,
+    > {
+        ::connectrpc::client::call_unary(
+                &self.transport,
+                &self.config,
+                MARKET_DATA_SERVICE_SERVICE_NAME,
+                "GetPriceBand",
                 request,
                 options,
             )
