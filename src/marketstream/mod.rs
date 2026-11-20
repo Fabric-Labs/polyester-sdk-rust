@@ -432,14 +432,16 @@ pub enum StreamError {
     Schema { schema_id: u16, version: u16 },
     /// A message whose bytes do not match its declared layout, or whose values
     /// break the protocol. The client reconnects, so every stream restarts
-    /// from a fresh baseline.
+    /// from a fresh baseline; without [`Config::auto_reconnect`] it stops
+    /// with this error.
     #[error("invalid market stream message (template {template_id}): {message}")]
     Frame { template_id: u16, message: String },
     /// An unsubscribe that the server answered with neither
     /// [`SubscribeResult::Ok`] nor [`SubscribeResult::NotSubscribed`] for a
     /// stream it holds, as its answers show, those to superseded requests
     /// included: the stream stays held whatever the caller wants, so the
-    /// client reconnects, and every stream it wants is resubscribed.
+    /// client reconnects, and every stream it wants is resubscribed; without
+    /// [`Config::auto_reconnect`] it stops with this error.
     #[error("market stream unsubscribe of {topic} answered {result}")]
     Unsubscribe {
         topic: Topic,

@@ -141,7 +141,9 @@ pub struct Config {
     /// 0: 1000.
     pub queue_size: usize,
     /// How often the client pings the server; a pong must answer within
-    /// `pong_timeout` or the client reconnects. Zero: 15 and 10 seconds.
+    /// `pong_timeout` or the connection counts as lost, and the client
+    /// reconnects by default ([`Self::auto_reconnect`]). Zero: 15 and 10
+    /// seconds.
     pub ping_interval: Duration,
     pub pong_timeout: Duration,
     /// Permit a `ws://` URL on a host that is not loopback.
@@ -384,7 +386,9 @@ struct State {
 }
 
 /// Connects to the market-data stream. A failure of this first connection is
-/// returned; once connected, the stream reconnects on its own until closed.
+/// returned; once connected, the stream by default reconnects on its own until
+/// closed, and without [`Config::auto_reconnect`] stops at the first lost
+/// connection.
 /// Subscribe with [`MarketStream::subscribe`].
 pub async fn connect(mut config: Config) -> Result<MarketStream> {
     if config.url.is_empty() {
