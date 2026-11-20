@@ -26,6 +26,8 @@ mod clear_attached_risk;
 mod contract_1945423c;
 #[path = "contract_74af7f3/mod.rs"]
 mod contract_74af7f3;
+#[path = "contract_8894e54/mod.rs"]
+mod contract_8894e54;
 #[path = "contract_e339360/mod.rs"]
 mod contract_e339360;
 #[path = "contract_ebbbeac/mod.rs"]

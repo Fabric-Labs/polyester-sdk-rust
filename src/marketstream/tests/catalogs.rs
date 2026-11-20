@@ -40,6 +40,11 @@ impl Pairs for Table {
     fn symbol(&self, symbol_id: u32) -> Option<String> {
         self.0.get(&symbol_id).map(|(s, _)| (*s).to_owned())
     }
+    fn base_quantity_scale_and_symbol(&self, symbol_id: u32) -> Option<(u32, Option<String>)> {
+        self.0
+            .get(&symbol_id)
+            .map(|(s, scale)| (*scale, Some((*s).to_owned())))
+    }
     fn symbol_id(&self, symbol: &str) -> Option<u32> {
         self.0
             .iter()

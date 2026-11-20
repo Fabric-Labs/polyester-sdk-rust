@@ -275,10 +275,13 @@ impl ChangelogService {
 
     /// All breaking changes published at or after `since`, newest post first.
     ///
-    /// It filters on the post's first publication time, which a
-    /// republication does not move, so an edit to an older post is not
-    /// reported: compare the `revision` of [`Self::posts`] summaries to find
-    /// edited posts. A change met again because its post was republished
+    /// It filters on the post's `published_at`, which a republication does
+    /// not move, so an edit to an older post is not reported: compare the
+    /// `revision` of [`Self::posts`] summaries to find edited posts. A
+    /// release post's `published_at` is its live time in the environment
+    /// read, or its first publication while the release is pending there, so
+    /// it can move into or out of the window when the release goes live or
+    /// its `live_at` changes. A change met again because its post was republished
     /// during the call is returned once, at its first position, with the
     /// wording last received.
     pub async fn breaking_changes_since(

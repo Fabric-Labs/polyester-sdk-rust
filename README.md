@@ -884,9 +884,10 @@ let read = client
     .orders
     .get(OrderKey::OrderId(order_id), SubAccountScope::Default)
     .await?;
-if let Some(order) = read.order {
-    let base = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id);
-    let quote = client.catalogs.quote_quantity_scale_for_symbol_id(order.symbol_id);
+// `symbol_id` is `None` only for a refused batch replacement, which has no fills.
+if let Some((order, symbol_id)) = read.order.and_then(|o| o.symbol_id.map(|id| (o, id))) {
+    let base = client.catalogs.base_quantity_scale_for_symbol_id(symbol_id);
+    let quote = client.catalogs.quote_quantity_scale_for_symbol_id(symbol_id);
     println!("average {:?}", order.avg_price());
     if let (Some(base), Some(quote)) = (base, quote) {
         println!("used {:?}", order.quote_used(base));
@@ -1105,23 +1106,31 @@ requests are rate-limited per client address. Responses are newest post first.
 - `list_posts(opts)` returns one page of post summaries with change counts;
   `posts(opts)` is a stream over every page. A published post can be
   republished, for example to correct its copy or withdraw a change: its
-  `slug`, `published_at` and change ids stay the same, `revision` (from 1)
-  increases and `updated_at` is when the current revision was published. To
-  follow edits, read a post again when its `revision` differs from the one you
-  hold, and drop a post that is no longer listed.
+  `slug` and change ids stay the same, a republication does not move
+  `published_at`, `revision` (from 1) increases and `updated_at` is when the
+  current revision was published. `published_at` is the post's date in the
+  environment you read: a release post's is when the release went live there
+  (that environment's `live_at`), or its first publication while the release
+  is still pending there, so it differs between environments and can move
+  without a new `revision`; every other post keeps its first publication time.
+  For a release post, `updated_at` is independent of `published_at`. To follow
+  edits, read a post again when its `revision` differs from the one you hold,
+  and drop a post that is no longer listed.
 - `get_post(slug)` returns one post with its sections and changes. A slug is the
   post's coverage cutoff date, `YYYY-MM-DD`; a later post on the same day gets
   `-2`, `-3`. An unknown slug is `Error::Api` with code `NotFound`.
 - `list_changes(opts)` returns one page of individual changes across posts,
-  filtered by category, surface, audience, `action_required`, first publication
-  time (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)`
+  filtered by category, surface, audience, `action_required`, `published_at`
+  (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)`
   is a stream over every page that yields each change id once: when a post is
   republished during the walk, paging restarts at that post's first change.
   Values within one filter combine with OR.
 - `breaking_changes_since(t)` and `action_required_since(t)` collect every
   matching change published at or after `t`, each once with the wording last
-  received. They filter on first publication, so they don't report an edit to
-  an older post; compare `revision` for that.
+  received. They filter on `published_at`, which a republication does not
+  move, so they don't report an edit to an older post; compare `revision` for
+  that. A release post's `published_at` can move into or out of the window
+  when its release goes live.
 - `list_deployment_groups(opts)` returns one page of this environment's
   deployment groups, newest deployment first: each deployment that raised the
   release version, with every release it brought (`versions`, ascending) and
@@ -1694,7 +1703,12 @@ SDK notes:
   stay within the account's burst before sending, since one that outweighs it
   is never admitted. For any ambiguous failure, a `RATE_LIMIT_EXCEEDED`
   included, retry under the same key with the same legs, after `Retry-After`
-  when there is one.
+  when there is one. `get_batch` with an API key whose policy does not grant
+  `READ_INTERNAL_TRANSFERS` is refused with `Error::PermissionDenied` whose
+  `code` is `ERROR_CODE_PERMISSION_DENIED` for every request ID, whether the
+  batch exists or not, and its message names the action to grant. A key
+  allowed to read transfers gets `ERROR_CODE_NOT_FOUND` for an unknown batch
+  and for one it may not read.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -2244,6 +2258,18 @@ an accepted batch again. An order the batch admitted reads back from
 `orders.get`, `orders.list_open`, `orders.list_history` and `orders.subscribe`
 with `Order::batch_request_id` set to the admission's `batch_request_id`, also
 after it is filled or canceled; it is empty for an order of any other origin.
+An item admitted and then refused as it applies creates no successor, but for
+60 seconds from the batch's acceptance `orders.get` of its
+`replacement_order_id` answers an order without terms: `status` `rejected`
+with the refusal in `reject_reason` (for example `modify_apply_expired`, an
+admitted item not applied within 2 seconds), `batch_request_id` set and
+`version` 1. Its `symbol_id`, `side`, `order_type`, `tif`,
+`self_trade_prevention_mode` and `fee_asset` are `None`. Its quantities and
+prices are 0 placeholders on the wire (`"0"` in JSON): decoded, `orig_qty`,
+`price` and `avg_px` are `None`, and `cum_qty`, `leaves_qty`,
+`inherited_cum_qty`, `display_qty` and `hidden_qty` are zero quantities without
+a pair or scale. Take its terms from the batch you sent. After the 60 seconds it is not found. Open orders, order history and
+`orders.subscribe` always carry the terms.
 `batch_request_id` is an opaque public ID: pass it back unchanged and compare
 it only with other values of the same account. An ID received before the
 exchange made it opaque reads `not_found`; reconcile those batches by their
@@ -2525,7 +2551,10 @@ replaces it.
 The client pings every 15 seconds and reconnects when a pong is late or the
 connection drops, with jittered backoff, and resubscribes every topic the
 server accepted. Topics it refused (an unknown or disabled pair, or more
-subscriptions than one connection may hold) are not resubscribed. Events are
+subscriptions than one connection may hold) are not resubscribed. With
+`Config::auto_reconnect` set to `false`, a lost connection stops the stream
+instead: `MarketStream::err` reports the loss, requests in flight return it,
+and `recv` returns the queued events, then `None`. Events are
 queued up to `Config::queue_size`: a consumer that falls behind fails the
 stream with `Error::QueueOverflow` instead of losing messages.
 
@@ -2595,6 +2624,11 @@ good-till-cancelled limit orders.
   echoing the opt-in is refused (`TradeError::NotProtected`). Every reconnect
   opts in again, which renews the account's cancel-on-disconnect, until
   `disable_cancel_on_disconnect` turns it off (see the kill sequence below).
+- **Pairs.** `tradews::Config::new(url, credentials, pairs)` takes the pair
+  scales and symbols every order is checked against, usually the client's
+  catalogs: `client.catalogs.clone()` after `client.wait_for_catalogs()`, as
+  `marketstream::Config::new` takes them. The session reads a pair's row when
+  it sends, so a catalog the client reloads applies to the next command.
 - **Ready.** The session subscribes to executions, orders and marketResync and
   sends no command until the server confirms it: wait for
   `TradeSession::ready` or `Event::Ready`. It pings the server; a ping or
@@ -2624,6 +2658,26 @@ good-till-cancelled limit orders.
   process it after the deadline, and the session does not send it once the
   deadline has passed. Prices are `types::Price` ticks and quantities
   `types::Quantity` at the pair's base quantity scale, exact integers.
+- **Checked as the Orders API checks them.** Before a create, modify, batch
+  create or batch replace is sent, each quantity and price is checked against
+  its pair's catalog row with the same rules as `orders.create`, and the same
+  wording for a scale or symbol mismatch. Any mismatch is refused with
+  `Error::Validation`, and nothing is sent:
+  - A quantity that carries a scale must carry the pair's base quantity
+    scale: `Quantity::from_decimal_str("1.5", 8, ..)` on a pair of scale 6
+    is refused with `quantity scale mismatch: value scale is 8, destination is 6`.
+    A quantity without a scale (`Quantity::from_scaled(n, None, ..)`) is
+    already in the pair's units and is sent as `n`.
+  - A symbol or `symbol_id` that a quantity carries must be the pair's, and
+    a symbol that a price carries must be the pair's. A value without one is
+    taken as the pair's. A value tagged with a symbol is refused when the
+    pairs do not know the pair's symbol, since the tag cannot be checked.
+  - A price has no scale or tick size of its own: its ticks are always quote
+    units times 1e9. `Price::from_ticks(t, None)` is sent as `t`. The venue
+    refuses a price that is not on the pair's tick size, as it does for the
+    Orders API.
+  - A pair missing from the catalog is refused (`quantity scale for pair 9 is
+    unavailable; ...`).
 - **Answers.** Each command returns its acknowledgement, or an
   `Error::TradeSession`: `TradeError::Rejected` with a typed `RejectCode`,
   `TradeError::NotSent` when nothing reached the server, or
@@ -2635,8 +2689,14 @@ good-till-cancelled limit orders.
   as its idempotency identity. `Event::Disconnected` lists the correlation IDs
   a lost connection left unanswered.
 - **Events.** `Event::Order` (with `CancelReason`, including `CancelAllAfter`
-  and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
-  (reconcile the pair through the Orders API). The schema adds messages
+  and `CancelOnDisconnect`), `Event::Execution`, `Event::MarketResync`
+  (reconcile the pair through the Orders API) and
+  `Event::BatchReplaceItemReject`: a batch-replace item admitted in its
+  `BatchReplaceAck` and then refused when it applied (for example
+  `MODIFY_APPLY_EXPIRED`), which changed nothing and whose replacement never
+  exists; it names the item by `batch_request_id` and `order_id`, follows the
+  acknowledgement on the connection that sent the batch, and can arrive first
+  on the account's other connections. The schema adds messages
   without changing its version: a message of a template this client does not
   know is skipped and logged at debug level, never queued as an event, and the
   connection carries on. `Event` and the other `tradews` enums that grow are
@@ -2687,7 +2747,7 @@ This example connects, splits the session, arms the dead-man switch and reads
 events; `quote` shows how an order is placed from any task and is not called.
 
 ```rust,no_run
-# async fn _readme() -> Result<(), Box<dyn std::error::Error>> {
+# async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
 use std::time::Duration;
 
 use polyester::auth::Credentials;
@@ -2695,7 +2755,10 @@ use polyester::tradews::{self, Deadline, Event, PostOnlyOrder, TradeSender};
 
 let credentials = Credentials::load(None, None, true)?.expect("POLYESTER_API_KEY_ID and POLYESTER_API_PRIVATE_KEY");
 let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
-let session = tradews::connect(tradews::Config::new(url, credentials)).await?;
+// Orders are checked against the pair scales of the client's catalogs.
+client.wait_for_catalogs().await?;
+let config = tradews::Config::new(url, credentials, client.catalogs.clone());
+let session = tradews::connect(config).await?;
 session.ready().await?;
 // Commands from any number of tasks, events drained by this one.
 let (sender, mut events) = session.split();
@@ -2783,8 +2846,9 @@ let limiter = ReconnectLimiter::new(32)?;
 
 let url = tradews::url(&std::env::var("POLYESTER_TRADE_WS_HOST")?)?;
 let mut sessions = Vec::new();
+client.wait_for_catalogs().await?;
 for credentials in keys {
-    let mut config = tradews::Config::new(url.clone(), credentials);
+    let mut config = tradews::Config::new(url.clone(), credentials, client.catalogs.clone());
     config.reconnect_limiter = Some(limiter.clone());
     sessions.push(tradews::connect(config).await?);
 }

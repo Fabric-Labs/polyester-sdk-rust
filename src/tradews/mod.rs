@@ -37,9 +37,17 @@
 //!
 //! Prices are exact integer ticks ([`Price`], quote units times 1e9) and
 //! quantities exact integers scaled by the pair's `base_quantity_scale` from
-//! the spot config ([`Quantity`]). The codecs are generated from the published
-//! schema with Real Logic's sbe-tool; a message of another schema or version is
-//! refused ([`TradeError::Schema`]), never misread. The schema adds messages
+//! the spot config ([`Quantity`]). Every order and modification is checked
+//! against the pair in [`Config::pairs`], usually the client's catalogs, as
+//! the Orders API checks it: a quantity whose scale, symbol or pair differs
+//! from the pair's, a price whose symbol differs, or a pair the catalog does
+//! not have is refused before sending ([`crate::Error::Validation`]). A
+//! quantity without a scale is taken as already at the pair's scale, and a
+//! price without a symbol as the pair's.
+//!
+//! The codecs are generated from the published schema with Real Logic's
+//! sbe-tool; a message of another schema or version is refused
+//! ([`TradeError::Schema`]), never misread. The schema adds messages
 //! without changing its version, so a message of a template this client does
 //! not know is skipped: it is logged at debug level, never queued as an event,
 //! and the connection and its commands in flight carry on.
@@ -57,6 +65,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::errors::{Error, Result};
+use crate::marketstream::Pairs;
 use crate::types::{Price, Quantity, QuantityDomain};
 
 pub use codec::{SCHEMA_ID, SCHEMA_VERSION};
@@ -199,7 +208,8 @@ pub struct PostOnlyOrder {
     /// The limit price; positive.
     pub price: Price,
     /// The base quantity at the pair's base quantity scale; positive. A
-    /// quantity that names a pair must name `symbol_id`.
+    /// quantity that carries a scale, symbol or pair must carry the pair's;
+    /// one without a scale is already in the pair's units.
     pub qty: Quantity,
     /// 1 to 36 of `A-Z a-z 0-9 . _ : / -`, unique in the account while the
     /// server retains it. It is how an order of an unknown outcome is found.
@@ -458,6 +468,11 @@ impl RejectCode {
     pub const ACCOUNT_REPAIRING: Self = Self(300);
     pub const ORDER_CREATE_OUTCOME_UNKNOWN: Self = Self(303);
     pub const REQUEST_DEADLINE_EXCEEDED: Self = Self(308);
+    /// An admitted [`BatchReplaceOrders`] item had not applied 2 seconds
+    /// after its admission, so it was refused when it applied
+    /// ([`BatchReplaceItemReject`]). Nothing changed: send a new batch with
+    /// the current quote.
+    pub const MODIFY_APPLY_EXPIRED: Self = Self(319);
     pub const SEQUENCE_OUT_OF_ORDER: Self = Self(1001);
 
     pub const fn from_raw(raw: u16) -> Self {
@@ -712,6 +727,47 @@ pub struct MarketResync {
     pub gateway_time: SystemTime,
 }
 
+/// An item of a [`BatchReplaceOrders`], admitted in its [`BatchReplaceAck`],
+/// that was refused when it applied (`BatchReplaceItemReject`, template 32).
+///
+/// The item changed nothing: the order is as it was, at its old price,
+/// quantity and client order ID unless it had ended, and a refused
+/// replacement's successor (`replacement_order_id`) never exists as an
+/// order. It is sent once per refused item to every connection of the
+/// account: on the connection that sent the batch it follows the batch's
+/// acknowledgement, and on the account's other connections it can arrive
+/// before that acknowledgement does. A refusal at admission is reported in
+/// the [`BatchReplaceAck`] alone, so this always means the item was admitted,
+/// then refused. `batch_request_id` and `order_id` together name the item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct BatchReplaceItemReject {
+    /// The batch's pair.
+    pub symbol_id: u32,
+    /// The order the item targeted, the item's `old_order_id` in the
+    /// [`BatchReplaceAck`]; the item changed nothing of it.
+    pub order_id: u64,
+    /// The order's version when the item was refused, the counter of
+    /// [`OrderUpdate::version`]: the refusal changed nothing, so the order's
+    /// state at this version still holds. `None` when the order had already
+    /// ended: its terminal order event is the newer state.
+    pub version: Option<u32>,
+    /// The batch, as its [`BatchReplaceAck::batch_request_id`] names it.
+    pub batch_request_id: u64,
+    /// For an item that would have replaced the order, the successor the
+    /// [`BatchReplaceAck`] named, which never exists as an order; `None` for
+    /// an item that would have amended the order in place.
+    pub replacement_order_id: Option<u64>,
+    /// Why the item was refused when it applied, for example
+    /// [`RejectCode::MODIFY_APPLY_EXPIRED`]: the code the same cause has in
+    /// every other answer.
+    pub code: RejectCode,
+    /// When the item was refused.
+    pub event_time: SystemTime,
+    /// When the server sent it.
+    pub gateway_time: SystemTime,
+}
+
 /// What [`TradeSession::recv`] delivers, in order.
 ///
 /// The server adds messages without changing the schema's version, and this
@@ -761,6 +817,10 @@ pub enum Event {
     /// session and is reported as it arrives. One that names a command this
     /// connection has in flight is a wrong answer and ends the connection.
     OcoAck(OcoAck),
+    /// An admitted [`BatchReplaceOrders`] item refused when it applied: it
+    /// changed nothing, and a replacement's successor never exists. Settle
+    /// the item by `batch_request_id` and `order_id`.
+    BatchReplaceItemReject(BatchReplaceItemReject),
 }
 
 /// A single-order acknowledgement: the server accepted the command, and order
@@ -891,7 +951,9 @@ pub struct ReplaceItemResult {
     pub action: Option<ReplaceAction>,
     /// The order the item named.
     pub order_id: Option<u64>,
-    /// Its successor, when replaced.
+    /// Its successor, when replaced. If an
+    /// [`Event::BatchReplaceItemReject`] reports the item, this successor
+    /// never exists as an order.
     pub replacement_order_id: Option<u64>,
 }
 
@@ -911,6 +973,10 @@ pub enum BatchStatus {
     Unknown(u8),
 }
 
+/// A [`BatchReplaceOrders`]'s admission receipt, one result per item in
+/// request order. An accepted item was admitted, not yet applied: order
+/// events report what applied, and an [`Event::BatchReplaceItemReject`]
+/// reports each admitted item refused when it applied.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BatchReplaceAck {
@@ -1208,64 +1274,118 @@ fn check_ref(order: &OrderRef) -> Result<()> {
     }
 }
 
-/// The scaled value of a positive order quantity of the pair `symbol_id`.
-fn qty_scaled(qty: &Quantity, symbol_id: u32) -> Result<i64> {
-    if qty.domain() != QuantityDomain::OrderBase {
-        return Err(Error::validation(
-            "tradews quantity must be a base quantity",
-        ));
-    }
-    if qty.symbol_id().is_some_and(|id| id != symbol_id) {
-        return Err(Error::validation(format!(
-            "tradews quantity is for pair {}, the order for pair {symbol_id}",
-            qty.symbol_id().unwrap_or_default()
-        )));
-    }
-    if qty.as_scaled() <= 0 {
-        return Err(Error::validation("tradews quantity must be positive"));
-    }
-    Ok(qty.as_scaled())
+/// The pair an order or modification names, as the catalog has it: what its
+/// quantity and price are checked against.
+struct Pair {
+    symbol_id: u32,
+    symbol: Option<String>,
+    base_quantity_scale: u32,
 }
 
-fn price_ticks(price: &Price) -> Result<i64> {
-    if price.as_ticks() <= 0 {
-        return Err(Error::validation("tradews price must be positive"));
+impl Pair {
+    /// The pair `symbol_id` of `pairs`, its scale and symbol read together
+    /// so a reload cannot mix two versions of its row. Refused when its base
+    /// quantity scale is unknown, as the Orders API refuses a pair missing
+    /// from the catalog.
+    fn of(pairs: &dyn Pairs, symbol_id: u32) -> Result<Self> {
+        let (base_quantity_scale, symbol) = pairs
+            .base_quantity_scale_and_symbol(symbol_id)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "quantity scale for pair {symbol_id} is unavailable; await client.wait_for_catalogs() before placing orders"
+                ))
+            })?;
+        Ok(Self {
+            symbol_id,
+            symbol,
+            base_quantity_scale,
+        })
     }
-    Ok(price.as_ticks())
+
+    /// The pair's symbol to check a value tagged `tagged` against. A value
+    /// tagged with a symbol is refused when the pair's symbol is unknown,
+    /// since the tag cannot be checked; an untagged value needs none.
+    fn symbol_for(&self, what: &str, tagged: Option<&str>) -> Result<Option<&str>> {
+        match (tagged, self.symbol.as_deref()) {
+            (Some(tag), None) => Err(Error::validation(format!(
+                "{what} symbol {tag} cannot be checked: the symbol of pair {} is unavailable",
+                self.symbol_id
+            ))),
+            (_, symbol) => Ok(symbol),
+        }
+    }
+
+    /// The scaled value of a positive base quantity of this pair. As on the
+    /// Orders API, a scale, symbol or pair the quantity carries must be the
+    /// pair's, and one without a scale is already in the pair's units.
+    fn qty_scaled(&self, qty: &Quantity) -> Result<i64> {
+        if qty.domain() != QuantityDomain::OrderBase {
+            return Err(Error::validation(
+                "tradews quantity must be a base quantity",
+            ));
+        }
+        if qty.symbol_id().is_some_and(|id| id != self.symbol_id) {
+            return Err(Error::validation(format!(
+                "tradews quantity is for pair {}, the order for pair {}",
+                qty.symbol_id().unwrap_or_default(),
+                self.symbol_id
+            )));
+        }
+        qty.compatible_with(
+            QuantityDomain::OrderBase,
+            Some(self.base_quantity_scale),
+            self.symbol_for("quantity", qty.symbol())?,
+            Some(self.symbol_id),
+        )?;
+        if qty.as_scaled() <= 0 {
+            return Err(Error::validation("tradews quantity must be positive"));
+        }
+        Ok(qty.as_scaled())
+    }
+
+    /// The ticks of a positive price of this pair. Ticks have the fixed
+    /// scale of 1e9 for every pair, so a price has no scale to mismatch; as
+    /// on the Orders API, a symbol it carries must be the pair's, and the
+    /// venue checks the pair's tick size.
+    fn price_ticks(&self, price: &Price) -> Result<i64> {
+        price.compatible_with(self.symbol_for("price", price.symbol())?)?;
+        if price.as_ticks() <= 0 {
+            return Err(Error::validation("tradews price must be positive"));
+        }
+        Ok(price.as_ticks())
+    }
+
+    fn check_replace(&self, qty: Option<&Quantity>, price: Option<&Price>) -> Result<()> {
+        if qty.is_none() && price.is_none() {
+            return Err(Error::validation(
+                "tradews modification changes the price, the quantity or both",
+            ));
+        }
+        if let Some(qty) = qty {
+            self.qty_scaled(qty)?;
+        }
+        if let Some(price) = price {
+            self.price_ticks(price)?;
+        }
+        Ok(())
+    }
 }
 
 impl PostOnlyOrder {
-    pub(crate) fn check(&self) -> Result<(i64, i64)> {
+    pub(crate) fn check(&self, pairs: &dyn Pairs) -> Result<(i64, i64)> {
         check_symbol(self.symbol_id)?;
         check_client_order_id(&self.client_order_id)?;
-        Ok((
-            price_ticks(&self.price)?,
-            qty_scaled(&self.qty, self.symbol_id)?,
-        ))
+        let pair = Pair::of(pairs, self.symbol_id)?;
+        Ok((pair.price_ticks(&self.price)?, pair.qty_scaled(&self.qty)?))
     }
-}
-
-fn check_replace(symbol_id: u32, qty: Option<&Quantity>, price: Option<&Price>) -> Result<()> {
-    if qty.is_none() && price.is_none() {
-        return Err(Error::validation(
-            "tradews modification changes the price, the quantity or both",
-        ));
-    }
-    if let Some(qty) = qty {
-        qty_scaled(qty, symbol_id)?;
-    }
-    if let Some(price) = price {
-        price_ticks(price)?;
-    }
-    Ok(())
 }
 
 impl ModifyOrder {
-    pub(crate) fn check(&self) -> Result<()> {
+    pub(crate) fn check(&self, pairs: &dyn Pairs) -> Result<()> {
         check_correlation(self.correlation_id)?;
         check_symbol(self.symbol_id)?;
         check_ref(&self.order)?;
-        check_replace(self.symbol_id, self.qty.as_ref(), self.price.as_ref())
+        Pair::of(pairs, self.symbol_id)?.check_replace(self.qty.as_ref(), self.price.as_ref())
     }
 }
 
@@ -1282,19 +1402,21 @@ impl CancelAllOrders {
 }
 
 impl BatchCreateOrders {
-    pub(crate) fn check(&self) -> Result<()> {
+    pub(crate) fn check(&self, pairs: &dyn Pairs) -> Result<()> {
         check_correlation(self.correlation_id)?;
         if self.orders.is_empty() || self.orders.len() > MAX_BATCH_CREATE {
             return Err(Error::validation(format!(
                 "tradews batch create carries 1 to {MAX_BATCH_CREATE} orders"
             )));
         }
-        self.orders.iter().try_for_each(|o| o.check().map(drop))
+        self.orders
+            .iter()
+            .try_for_each(|o| o.check(pairs).map(drop))
     }
 }
 
 impl BatchReplaceOrders {
-    pub(crate) fn check(&self) -> Result<()> {
+    pub(crate) fn check(&self, pairs: &dyn Pairs) -> Result<()> {
         check_correlation(self.correlation_id)?;
         check_symbol(self.symbol_id)?;
         if self.items.is_empty() || self.items.len() > MAX_BATCH_REPLACE {
@@ -1302,9 +1424,10 @@ impl BatchReplaceOrders {
                 "tradews batch replace carries 1 to {MAX_BATCH_REPLACE} items"
             )));
         }
+        let pair = Pair::of(pairs, self.symbol_id)?;
         self.items.iter().try_for_each(|item| {
             check_ref(&item.order)?;
-            check_replace(self.symbol_id, item.qty.as_ref(), item.price.as_ref())
+            pair.check_replace(item.qty.as_ref(), item.price.as_ref())
         })
     }
 }

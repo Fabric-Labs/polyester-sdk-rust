@@ -11,6 +11,7 @@ pub mod batch_create_ack_codec;
 pub mod batch_create_orders_codec;
 pub mod batch_item_status;
 pub mod batch_replace_ack_codec;
+pub mod batch_replace_item_reject_codec;
 pub mod batch_replace_orders_codec;
 pub mod batch_status;
 pub mod cancel_all_after_ack_codec;
@@ -61,7 +62,7 @@ pub mod var_data_encoding_codec;
 
 pub const SBE_SCHEMA_ID: u16 = 7;
 pub const SBE_SCHEMA_VERSION: u16 = 50;
-pub const SBE_SEMANTIC_VERSION: &str = "2.6.0";
+pub const SBE_SEMANTIC_VERSION: &str = "2.7.0";
 
 pub type SbeResult<T> = core::result::Result<T, SbeErr>;
 

@@ -117,10 +117,10 @@ pub struct ChangelogSection {
 /// A changelog post without its sections, with change counts by kind.
 ///
 /// A published post can be republished, for example to correct its copy or
-/// withdraw a change. Its `slug`, `published_at` and its changes' `id`
-/// values stay the same; `revision` and `updated_at` tell the versions
-/// apart. To follow edits, read a post again when its `revision` differs
-/// from the one you hold.
+/// withdraw a change. Its `slug` and its changes' `id` values stay the same,
+/// and a republication does not move `published_at`; `revision` and
+/// `updated_at` tell the versions apart. To follow edits, read a post again
+/// when its `revision` differs from the one you hold.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ChangelogPostSummary {
     /// The post's coverage cutoff date, `YYYY-MM-DD`, with a `-2` or `-3`
@@ -129,10 +129,19 @@ pub struct ChangelogPostSummary {
     pub slug: String,
     pub title: String,
     pub introduction: String,
-    /// Time of first publication. A republication does not move it.
+    /// The post's date in the environment the client reads. For a release
+    /// post (one with a `release_version`) it is when the release went live
+    /// there, that environment's `live_at`, or the time of first publication
+    /// while the release is still pending there; so it differs between
+    /// environments and moves, without a new `revision`, when the release
+    /// goes live or its `live_at` changes later. Do not keep it as fixed:
+    /// read it again with the post. Every other post keeps its time of first
+    /// publication. A republication never moves it.
     pub published_at: Option<Timestamp>,
-    /// When the current revision was published; equal to `published_at` for
-    /// revision 1. `None` from a server that predates revisions.
+    /// When the current revision was published. For a release post it is
+    /// independent of `published_at` and can be earlier or later; for
+    /// another post it equals `published_at` at revision 1. `None` from a
+    /// server that predates revisions.
     pub updated_at: Option<Timestamp>,
     /// Published revision, starting at 1 and increasing with each
     /// republication. 0 from a server that predates revisions.
@@ -173,6 +182,9 @@ pub struct ChangelogPost {
 pub struct ChangelogChangeEntry {
     pub change: ChangelogChange,
     pub post_slug: String,
+    /// The post's `published_at`: for a release post, its live time in the
+    /// environment read, which can move without a new revision (see
+    /// [`ChangelogPostSummary::published_at`]).
     pub published_at: Option<Timestamp>,
     pub section_heading: String,
 }
@@ -200,11 +212,15 @@ pub struct ChangelogDeploymentGroupPost {
     /// The release the post announces, for example `0.92.9`.
     pub release_version: String,
     pub title: String,
-    /// Time of first publication of the post.
+    /// When the release went live in the environment read (its `live_at`),
+    /// or the post's first publication while the release is pending there.
+    /// It can move without a new `revision` (see
+    /// [`ChangelogPostSummary::published_at`]).
     pub published_at: Option<Timestamp>,
     /// The post's published revision, starting at 1.
     pub revision: u32,
-    /// When the post's current revision was published.
+    /// When the post's current revision was published, independent of
+    /// `published_at`.
     pub updated_at: Option<Timestamp>,
 }
 

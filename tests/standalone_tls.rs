@@ -73,7 +73,11 @@ async fn connect_market_stream(port: u16) -> polyester::Result<()> {
 
 async fn connect_trade_session(port: u16) -> polyester::Result<()> {
     let credentials = Credentials::new("ak_test", &"11".repeat(32)).unwrap();
-    let config = tradews::Config::new(format!("wss://localhost:{port}/ws/trade.sbe"), credentials);
+    let config = tradews::Config::new(
+        format!("wss://localhost:{port}/ws/trade.sbe"),
+        credentials,
+        Arc::new(polyester::catalogs::Manager::new()),
+    );
     tradews::connect(config).await.map(drop)
 }
 
