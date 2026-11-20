@@ -401,7 +401,7 @@ impl InternalTransfersService {
         .await?
         {
             Ok(resp) => resp,
-            Err(err) => return Err(batch_create_failure(err).for_procedure(PROCEDURE)),
+            Err(err) => return Err(batch_create_failure(err, PROCEDURE)),
         };
         // A decoded reply that breaks the contract is an unknown outcome too,
         // keeping the answer's status and Retry-After.
@@ -419,9 +419,17 @@ impl InternalTransfersService {
     /// `request_id` [`Self::batch_create`] returned
     /// (`GetInternalTransferBatch`), as the batch was answered: for example
     /// to follow a `processing` batch without resubmitting it. The read
-    /// does not submit or retry the batch and needs no fresh MFA. The caller
-    /// must be allowed to read the transfers of every source account of the
-    /// batch; any other batch is not found, as an unknown one is.
+    /// does not submit or retry the batch and needs no fresh MFA.
+    ///
+    /// An API key whose policy does not grant `READ_INTERNAL_TRANSFERS` is
+    /// refused for every request ID, whether the batch exists or not, with
+    /// [`crate::errors::Error::PermissionDenied`] whose `code` is
+    /// `ERROR_CODE_PERMISSION_DENIED` (ConnectRPC `permission_denied`, HTTP
+    /// 403) and whose message names the action to grant: grant it on the
+    /// key's policy rather than treating the batch as unknown. It is final,
+    /// not retryable. A caller allowed to read transfers must be allowed to
+    /// read those of every source account of the batch; any other batch is
+    /// not found (`ERROR_CODE_NOT_FOUND`), as an unknown one is.
     ///
     /// `request_id` is sent as given; one that is empty, over 39 characters,
     /// or not decimal digits without a leading zero is refused before
@@ -1230,6 +1238,17 @@ impl TransfersService {
     /// List ledger transfers. An unset `subaccount_id` takes the configured
     /// default sub-account, as the typed helpers do; a sub-account set on
     /// `req` is sent unchanged.
+    ///
+    /// `reversed` lists newest first; `false` lists oldest first.
+    /// `transfer_code` lists only transfers with that reason: a
+    /// `ledger.v1.TransferCode`, the number a row carries in
+    /// [`crate::models::LedgerTransfer::transfer_type`] (for example 1000 for
+    /// `DEPOSIT`); unset (0) lists every reason. A value this SDK does not
+    /// name is sent as given, but a negative one is refused with
+    /// [`crate::Error::Validation`] before sending. A page token is bound to
+    /// the filters it was returned for: continue with the same subaccount,
+    /// `transfer_code`, time bounds and `reversed`. An empty
+    /// `next_page_token` ends paging.
     pub async fn list(
         &self,
         mut req: crate::proto::ledger::read::v1::ListTransfersRequest,
@@ -1240,6 +1259,7 @@ impl TransfersService {
             req.limit,
             super::limits::LIST_TRANSFERS_LIMIT_MAX,
         )?;
+        super::limits::check_transfer_code("transfers.list", req.transfer_code)?;
         req.subaccount_id = super::scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.connect_client();
         let resp = {
@@ -2006,9 +2026,9 @@ impl RateLimitService {
 /// answer names it) and the answer's real status and Retry-After. The batch
 /// is only ever sent again under the same idempotency key and legs, which
 /// the contract makes safe whether or not it was admitted.
-fn batch_create_failure(err: connectrpc::ConnectError) -> crate::errors::Error {
+fn batch_create_failure(err: connectrpc::ConnectError, procedure: &str) -> crate::errors::Error {
     use crate::errors::Error;
-    let mapped = crate::transport::Factory::map_error(err.clone());
+    let mapped = crate::transport::Factory::map_error(err.clone()).for_procedure(procedure);
     let mapped_code = match &mapped {
         Error::Api { code, .. }
         | Error::AdmissionUnavailable { code, .. }

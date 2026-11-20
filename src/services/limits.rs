@@ -169,6 +169,22 @@ pub(crate) fn check_limit(operation: &str, limit: u32, max: u32) -> Result<()> {
     Ok(())
 }
 
+/// Refuse a transfer reason filter that is no `ledger.v1.TransferCode`
+/// number: a negative one. 0 lists every reason, and a positive number this
+/// SDK does not name is sent as given.
+pub(crate) fn check_transfer_code(
+    operation: &str,
+    code: buffa::EnumValue<crate::proto::ledger::v1::TransferCode>,
+) -> Result<()> {
+    let code = code.to_i32();
+    if code < 0 {
+        return Err(Error::validation(format!(
+            "{operation} transfer_code {code} must be a ledger.v1.TransferCode value, or 0 for every reason"
+        )));
+    }
+    Ok(())
+}
+
 /// Refuse a page size outside `min..=max`, the contract's `gte: min, lte:
 /// max` rule on a plain `uint32` `limit`, which is on the wire even at 0.
 pub(crate) fn check_limit_range(operation: &str, limit: u32, min: u32, max: u32) -> Result<()> {

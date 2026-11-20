@@ -23,6 +23,7 @@ pub mod orderbook;
 pub mod orders;
 pub mod ratelimit;
 pub mod rewards;
+pub mod strategies;
 pub mod swap;
 pub mod system;
 pub mod transfer;

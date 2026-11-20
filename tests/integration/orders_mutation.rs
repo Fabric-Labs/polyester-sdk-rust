@@ -514,7 +514,7 @@ async fn gtd_limit_order_round_trip() {
         }
         Err(err) => panic!("wait open: {err}"),
     };
-    assert_eq!(open_order.tif, "gtd");
+    assert_eq!(open_order.tif.as_deref(), Some("gtd"));
     assert!(
         open_order
             .expire_at
@@ -531,7 +531,7 @@ async fn gtd_limit_order_round_trip() {
     })
     .await;
     let order = detail.order.expect("detail.order");
-    assert_eq!(order.tif, "gtd");
+    assert_eq!(order.tif.as_deref(), Some("gtd"));
     assert!(order.expire_at.is_some());
 
     let _ = client

@@ -5,15 +5,40 @@ use crate::types::{AssetAmount, Price, Quantity};
 use buffa_types::google::protobuf::Timestamp;
 use rust_decimal::Decimal;
 
+/// A normalized open or historical order.
+///
+/// A refused batch replacement carries no order terms. When a
+/// [`crate::services::OrdersService::batch_replace`] item is
+/// admitted and then refused as it applies, the successor order it would
+/// have created never exists, but for 60 seconds from the batch's
+/// acceptance `orders.get` of that successor's ID answers it: `status`
+/// `rejected` with the refusal in `reject_reason` (for example
+/// `modify_apply_expired`, an admitted item not applied within 2 seconds),
+/// `batch_request_id` set, `version` 1, `created_ts_ns` the batch's
+/// admission, no `terminal_ts_ns`, and its own `lineage` at generation 1.
+/// Its `symbol_id`, `side`, `order_type`, `tif`, `self_trade_prevention_mode`
+/// and `fee_asset` are `None`, and its quantities and prices read 0 as
+/// placeholders that name no pair, so they carry no scale. Take its terms
+/// from the batch you sent. After the 60 seconds it is not found. Open
+/// orders, order history and the order streams always carry the terms.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Order {
     pub order_id: String,
-    pub symbol_id: u32,
+    /// The order's pair. `None` only for a refused batch replacement read
+    /// through `orders.get` (see [`Order`]).
+    pub symbol_id: Option<u32>,
     pub client_order_id: String,
-    pub side: String,
+    /// `buy`, `sell`, or `UNKNOWN(<number>)` for a side this SDK does not
+    /// know. `side`, `order_type`, `tif`, `self_trade_prevention_mode` and
+    /// `fee_asset` are `None` when the server does not report them, as for a
+    /// refused batch replacement read through `orders.get` (see [`Order`]).
+    pub side: Option<String>,
     pub status: String,
-    pub order_type: String,
-    pub tif: String,
+    /// `limit`, `market`, or `UNKNOWN(<number>)`; `None` when not reported.
+    pub order_type: Option<String>,
+    /// `gtc`, `ioc`, `fok`, `gtd`, or `UNKNOWN(<number>)`; `None` when not
+    /// reported.
+    pub tif: Option<String>,
     /// Current accepted total quantity. A successful modify updates this to
     /// the amended total; retain the first submitted quantity separately if
     /// needed. `cum_qty` and `avg_px` are cumulative execution values across
@@ -94,16 +119,19 @@ pub struct Order {
     pub version: u32,
     pub post_only: bool,
     /// Asset selected to pay fees: `quote`, `base`, or an
-    /// `UNKNOWN(<number>)` forward-compatible enum value.
-    pub fee_asset: String,
+    /// `UNKNOWN(<number>)` forward-compatible enum value; `None` when the
+    /// server does not report it, as for a refused batch replacement (see
+    /// [`Order`]).
+    pub fee_asset: Option<String>,
     /// The order's self-trade prevention mode: `expire_taker`,
-    /// `expire_maker`, `expire_both` or `decrement`, empty when the read does
-    /// not carry it, or `UNKNOWN(<number>)` for a mode this SDK does not
+    /// `expire_maker`, `expire_both` or `decrement`, `None` when the read
+    /// does not carry it, as for a refused batch replacement (see
+    /// [`Order`]), or `UNKNOWN(<number>)` for a mode this SDK does not
     /// know. Its attached take-profit, stop-loss and trailing-stop exits use
     /// the same mode. A `decrement` order that self-trade prevention reduced
     /// reads its lowered quantity; one it reduced to nothing ends `canceled`
     /// with `cancel_reason` `stp_decrement`.
-    pub self_trade_prevention_mode: String,
+    pub self_trade_prevention_mode: Option<String>,
     /// Hard all-in quote debit submitted with quote-budget sizing, when used.
     pub submitted_max_quote_debit_scaled: Option<i64>,
     /// Quote proceeds target a SELL was sized by
@@ -262,10 +290,10 @@ impl Order {
         let scale = notional_scale.max(fee_scale);
         let notional = rescale(notional, notional_scale, scale)?;
         let amount = rescale(amount, fee_scale, scale)?;
-        let used = match self.fee_asset.as_str() {
-            "base" => notional,
-            "quote" if fee.is_rebate => notional.checked_sub(amount)?,
-            "quote" => notional.checked_add(amount)?,
+        let used = match self.fee_asset.as_deref() {
+            Some("base") => notional,
+            Some("quote") if fee.is_rebate => notional.checked_sub(amount)?,
+            Some("quote") => notional.checked_add(amount)?,
             _ => return None,
         };
         Some((used, scale))
@@ -1807,7 +1835,7 @@ mod tests {
     /// 0.000001 quote fee, and a budget of 1 at quote scale 6.
     fn quote_buy(base_scale: u32) -> super::Order {
         super::Order {
-            fee_asset: "quote".into(),
+            fee_asset: Some("quote".into()),
             cum_notional: format!("3{}", "0".repeat(base_scale as usize + 9 - 21)),
             submitted_max_quote_debit_scaled: Some(1_000_000),
             fee_total: Some(super::OrderFeeTotal {

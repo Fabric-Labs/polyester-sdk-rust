@@ -884,9 +884,10 @@ let read = client
     .orders
     .get(OrderKey::OrderId(order_id), SubAccountScope::Default)
     .await?;
-if let Some(order) = read.order {
-    let base = client.catalogs.base_quantity_scale_for_symbol_id(order.symbol_id);
-    let quote = client.catalogs.quote_quantity_scale_for_symbol_id(order.symbol_id);
+// `symbol_id` is `None` only for a refused batch replacement, which has no fills.
+if let Some((order, symbol_id)) = read.order.and_then(|o| o.symbol_id.map(|id| (o, id))) {
+    let base = client.catalogs.base_quantity_scale_for_symbol_id(symbol_id);
+    let quote = client.catalogs.quote_quantity_scale_for_symbol_id(symbol_id);
     println!("average {:?}", order.avg_price());
     if let (Some(base), Some(quote)) = (base, quote) {
         println!("used {:?}", order.quote_used(base));
@@ -1105,23 +1106,31 @@ requests are rate-limited per client address. Responses are newest post first.
 - `list_posts(opts)` returns one page of post summaries with change counts;
   `posts(opts)` is a stream over every page. A published post can be
   republished, for example to correct its copy or withdraw a change: its
-  `slug`, `published_at` and change ids stay the same, `revision` (from 1)
-  increases and `updated_at` is when the current revision was published. To
-  follow edits, read a post again when its `revision` differs from the one you
-  hold, and drop a post that is no longer listed.
+  `slug` and change ids stay the same, a republication does not move
+  `published_at`, `revision` (from 1) increases and `updated_at` is when the
+  current revision was published. `published_at` is the post's date in the
+  environment you read: a release post's is when the release went live there
+  (that environment's `live_at`), or its first publication while the release
+  is still pending there, so it differs between environments and can move
+  without a new `revision`; every other post keeps its first publication time.
+  For a release post, `updated_at` is independent of `published_at`. To follow
+  edits, read a post again when its `revision` differs from the one you hold,
+  and drop a post that is no longer listed.
 - `get_post(slug)` returns one post with its sections and changes. A slug is the
   post's coverage cutoff date, `YYYY-MM-DD`; a later post on the same day gets
   `-2`, `-3`. An unknown slug is `Error::Api` with code `NotFound`.
 - `list_changes(opts)` returns one page of individual changes across posts,
-  filtered by category, surface, audience, `action_required`, first publication
-  time (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)`
+  filtered by category, surface, audience, `action_required`, `published_at`
+  (`start_time` inclusive, `end_time` exclusive) or post; `changes(opts)`
   is a stream over every page that yields each change id once: when a post is
   republished during the walk, paging restarts at that post's first change.
   Values within one filter combine with OR.
 - `breaking_changes_since(t)` and `action_required_since(t)` collect every
   matching change published at or after `t`, each once with the wording last
-  received. They filter on first publication, so they don't report an edit to
-  an older post; compare `revision` for that.
+  received. They filter on `published_at`, which a republication does not
+  move, so they don't report an edit to an older post; compare `revision` for
+  that. A release post's `published_at` can move into or out of the window
+  when its release goes live.
 - `list_deployment_groups(opts)` returns one page of this environment's
   deployment groups, newest deployment first: each deployment that raised the
   release version, with every release it brought (`versions`, ascending) and
@@ -1694,7 +1703,12 @@ SDK notes:
   stay within the account's burst before sending, since one that outweighs it
   is never admitted. For any ambiguous failure, a `RATE_LIMIT_EXCEEDED`
   included, retry under the same key with the same legs, after `Retry-After`
-  when there is one.
+  when there is one. `get_batch` with an API key whose policy does not grant
+  `READ_INTERNAL_TRANSFERS` is refused with `Error::PermissionDenied` whose
+  `code` is `ERROR_CODE_PERMISSION_DENIED` for every request ID, whether the
+  batch exists or not, and its message names the action to grant. A key
+  allowed to read transfers gets `ERROR_CODE_NOT_FOUND` for an unknown batch
+  and for one it may not read.
 
 ```rust,no_run
 # async fn _readme(client: polyester::Client) -> Result<(), Box<dyn std::error::Error>> {
@@ -2244,6 +2258,16 @@ an accepted batch again. An order the batch admitted reads back from
 `orders.get`, `orders.list_open`, `orders.list_history` and `orders.subscribe`
 with `Order::batch_request_id` set to the admission's `batch_request_id`, also
 after it is filled or canceled; it is empty for an order of any other origin.
+An item admitted and then refused as it applies creates no successor, but for
+60 seconds from the batch's acceptance `orders.get` of its
+`replacement_order_id` answers an order without terms: `status` `rejected`
+with the refusal in `reject_reason` (for example `modify_apply_expired`, an
+admitted item not applied within 2 seconds), `batch_request_id` set and
+`version` 1. Its `symbol_id`, `side`, `order_type`, `tif`,
+`self_trade_prevention_mode` and `fee_asset` are `None` and its quantities and
+prices are 0 placeholders that carry no scale; take its terms from the batch
+you sent. After the 60 seconds it is not found. Open orders, order history and
+`orders.subscribe` always carry the terms.
 `batch_request_id` is an opaque public ID: pass it back unchanged and compare
 it only with other values of the same account. An ID received before the
 exchange made it opaque reads `not_found`; reconcile those batches by their
