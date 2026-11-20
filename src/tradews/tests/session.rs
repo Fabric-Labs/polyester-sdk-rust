@@ -1534,20 +1534,78 @@ async fn order_events_carry_cancel_on_disconnect_and_cancel_all_after() {
     );
 }
 
+/// A `BatchReplaceItemReject` reaches `recv` as
+/// `Event::BatchReplaceItemReject`, in order with the order events around
+/// it, whether or not a command is in flight, and keeps the connection.
+#[tokio::test]
+async fn batch_replace_item_rejects_reach_recv() {
+    use super::codec::{ORDER, item_reject};
+    use crate::tradews::BatchReplaceItemReject;
+    let script = Script {
+        after_ready: vec![
+            order_event(11, 1),
+            item_reject(Some(3), Some(ORDER + 1), 319),
+            order_event(12, 1),
+        ],
+        before_answer: vec![item_reject(None, None, 58)],
+        ..serve()
+    };
+    let (url, record) = stand_in(vec![script]).await;
+    let mut session = start(url).await;
+    ready_on(&mut session, 1).await;
+    session
+        .cancel_order(7, &OrderRef::Id(1), within(1_000))
+        .await
+        .expect("answered");
+    let mut seen = Vec::new();
+    while seen.len() < 4 {
+        let event = wait(&mut session, |e| {
+            (!matches!(e, Event::Pong { .. })).then(|| e.clone())
+        })
+        .await;
+        seen.push(match event {
+            Event::Order(o) => format!("order {}", o.order_id),
+            Event::BatchReplaceItemReject(BatchReplaceItemReject {
+                symbol_id,
+                order_id,
+                version,
+                replacement_order_id,
+                code,
+                ..
+            }) => {
+                assert_eq!((symbol_id, order_id), (7, ORDER));
+                format!("reject {version:?} {replacement_order_id:?} {code}")
+            }
+            other => panic!("{other:?}"),
+        });
+    }
+    assert_eq!(
+        seen,
+        [
+            "order 11".to_string(),
+            format!("reject Some(3) Some({}) MODIFY_APPLY_EXPIRED", ORDER + 1),
+            "order 12".into(),
+            "reject None None POST_ONLY_CROSS".into(),
+        ]
+    );
+    assert_eq!(record.lock().unwrap().len(), 1, "one connection");
+    assert!(session.is_alive());
+}
+
 #[tokio::test]
 async fn unknown_templates_and_oco_acks_keep_the_connection_and_its_commands() {
     use super::codec::{oco_ack, unknown};
     use command_type::CommandType as T;
     let script = Script {
         after_ready: vec![
-            unknown(32),
+            unknown(33),
             order_event(11, 1),
             oco_ack(0, 77, T::CANCEL_OCO, b""),
         ],
-        // While each command is in flight: a BatchReplaceItemReject from a
-        // newer server, an OcoAck of no command, another unknown template.
+        // While each command is in flight: a template from a newer server, an
+        // OcoAck of no command, another unknown template.
         before_answer: vec![
-            unknown(32),
+            unknown(33),
             oco_ack(0, 78, T::CREATE_OCO, b"oco-1"),
             unknown(99),
         ],
@@ -1611,7 +1669,7 @@ async fn unknown_templates_never_fill_the_event_queue() {
     // More unknown messages than the queue holds, while a cancel waits for
     // its answer and nothing reads the events.
     let script = Script {
-        before_answer: (0..5).map(|i| unknown(32 + i)).collect(),
+        before_answer: (0..5).map(|i| unknown(33 + i)).collect(),
         ..serve()
     };
     let (url, record) = stand_in(vec![script]).await;

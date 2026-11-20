@@ -12,10 +12,10 @@ use crate::errors::Error;
 use crate::tradews::codec::{self, Answer, HEADER, Msg};
 use crate::tradews::sbe::{
     self, WriteBuf, batch_create_ack_codec, batch_item_status, batch_replace_ack_codec,
-    cancel_all_after_codec, cancel_all_listing_status, cancel_all_orders_codec, command_ack_codec,
-    command_reject_codec, command_type, execution_event_codec, fee_asset, market_resync_codec,
-    market_resync_reason, oco_ack_codec, order_event_codec, order_status, reject_code,
-    replace_action, side,
+    batch_replace_item_reject_codec, cancel_all_after_codec, cancel_all_listing_status,
+    cancel_all_orders_codec, command_ack_codec, command_reject_codec, command_type,
+    execution_event_codec, fee_asset, market_resync_codec, market_resync_reason, oco_ack_codec,
+    order_event_codec, order_status, reject_code, replace_action, side,
 };
 use crate::tradews::{
     BatchCancelOrders, BatchCreateOrders, BatchReplaceOrders, BatchStatus, CancelAllAfterOptions,
@@ -368,42 +368,42 @@ pub(super) fn unknown(template_id: u16) -> Vec<u8> {
 
 #[test]
 fn unknown_templates_are_skipped_whole() {
-    // BatchReplaceItemReject (32) from a newer server, and any other.
-    for template_id in [32, 99, u16::MAX] {
+    // A template from a newer server, such as 33, and any other.
+    for template_id in [33, 99, u16::MAX] {
         assert_eq!(
             codec::decode(&unknown(template_id)).unwrap(),
             Msg::Unknown { template_id }
         );
     }
     // A header alone, declaring an empty block.
-    let mut bare = unknown(32)[..HEADER].to_vec();
+    let mut bare = unknown(33)[..HEADER].to_vec();
     bare[..2].copy_from_slice(&0u16.to_le_bytes());
     assert_eq!(
         codec::decode(&bare).unwrap(),
-        Msg::Unknown { template_id: 32 }
+        Msg::Unknown { template_id: 33 }
     );
     // Each WebSocket message is one SBE message: the known frames around an
     // unknown one decode as they do alone.
-    let stream = [server()[0].clone(), unknown(32), server()[1].clone()];
+    let stream = [server()[0].clone(), unknown(33), server()[1].clone()];
     let got: Vec<Msg> = stream.iter().map(|f| codec::decode(f).unwrap()).collect();
     assert_eq!(
         got,
-        [decoded(0), Msg::Unknown { template_id: 32 }, decoded(1)]
+        [decoded(0), Msg::Unknown { template_id: 33 }, decoded(1)]
     );
     // Shorter than its header and the block the header declares: refused.
-    let frame = unknown(32);
+    let frame = unknown(33);
     for len in 0..HEADER + 12 {
         let got = codec::decode(&frame[..len]);
         assert!(frame_error(got.clone()), "{len}: {got:?}");
     }
     // Another schema or version is refused whatever the template.
-    let mut newer = unknown(32);
+    let mut newer = unknown(33);
     newer[6..8].copy_from_slice(&(codec::SCHEMA_VERSION + 1).to_le_bytes());
     assert!(matches!(
         codec::decode(&newer),
         Err(Error::TradeSession(TradeError::Schema { .. }))
     ));
-    let mut other = unknown(32);
+    let mut other = unknown(33);
     other[4..6].copy_from_slice(&20u16.to_le_bytes());
     assert!(matches!(
         codec::decode(&other),
@@ -412,6 +412,84 @@ fn unknown_templates_are_skipped_whole() {
             ..
         }))
     ));
+}
+
+/// A `BatchReplaceItemReject` as the generated encoder writes it, its code
+/// written raw so a number this client does not name can be sent; `None`
+/// writes the field's null.
+pub(super) fn item_reject(version: Option<u32>, replacement: Option<u64>, code: u16) -> Vec<u8> {
+    let mut buf = vec![0u8; HEADER + batch_replace_item_reject_codec::SBE_BLOCK_LENGTH as usize];
+    let mut e = batch_replace_item_reject_codec::BatchReplaceItemRejectEncoder::default()
+        .wrap(WriteBuf::new(&mut buf), HEADER)
+        .header(0)
+        .parent()
+        .unwrap();
+    e.symbol_id(PAIR);
+    e.order_id(ORDER);
+    e.version(version.unwrap_or(u32::MAX));
+    e.batch_request_id(OTHER);
+    e.replacement_order_id(replacement.unwrap_or(u64::MAX));
+    e.event_ts_ns(ACK_NS);
+    e.gateway_ts_ns(GATEWAY_NS);
+    buf[HEADER + codec::ITEM_REJECT_CODE..][..2].copy_from_slice(&code.to_le_bytes());
+    buf
+}
+
+#[test]
+fn batch_replace_item_rejects_decode_with_their_nulls_and_codes() {
+    use crate::tradews::BatchReplaceItemReject;
+    let reject = |version, replacement_order_id, code| {
+        Msg::BatchReplaceItemReject(BatchReplaceItemReject {
+            symbol_id: PAIR,
+            order_id: ORDER,
+            version,
+            batch_request_id: OTHER,
+            replacement_order_id,
+            code,
+            event_time: at(ACK_NS),
+            gateway_time: at(GATEWAY_NS),
+        })
+    };
+    // A replacement refused when it applied, at the order's version 3.
+    assert_eq!(
+        codec::decode(&item_reject(Some(3), Some(ORDER + 1), 319)).unwrap(),
+        reject(Some(3), Some(ORDER + 1), RejectCode::MODIFY_APPLY_EXPIRED)
+    );
+    assert_eq!(
+        RejectCode::MODIFY_APPLY_EXPIRED.name().as_deref(),
+        Some("MODIFY_APPLY_EXPIRED")
+    );
+    // An amend of an order that had already ended: both nulls are `None`.
+    assert_eq!(
+        codec::decode(&item_reject(None, None, 58)).unwrap(),
+        reject(None, None, RejectCode::POST_ONLY_CROSS)
+    );
+    // Zero is a version and an ID like any other, not a null.
+    assert_eq!(
+        codec::decode(&item_reject(Some(0), Some(0), 58)).unwrap(),
+        reject(Some(0), Some(0), RejectCode::POST_ONLY_CROSS)
+    );
+    // A code this client does not name keeps its number.
+    let Msg::BatchReplaceItemReject(unnamed) =
+        codec::decode(&item_reject(None, None, 4242)).unwrap()
+    else {
+        panic!("not an item reject");
+    };
+    assert_eq!(unnamed.code.raw(), 4242);
+    assert_eq!(unnamed.code.to_string(), "UNKNOWN(4242)");
+    // A frame shorter or longer than its block is refused, a block shorter
+    // than this version's too.
+    let frame = item_reject(Some(3), None, 319);
+    for len in 0..frame.len() {
+        assert!(frame_error(codec::decode(&frame[..len])), "{len}");
+    }
+    let mut long = frame.clone();
+    long.push(0);
+    assert!(frame_error(codec::decode(&long)));
+    let mut short_block = frame.clone();
+    short_block[0] -= 1;
+    short_block.pop();
+    assert!(frame_error(codec::decode(&short_block)));
 }
 
 /// An `OcoAck` as the generated encoder writes it; a create names both legs.
@@ -797,6 +875,19 @@ fn raw_offsets_are_the_generated_codecs() {
         e.status(sbe::batch_status::BatchStatus::REJECTED);
     });
     assert_eq!(f[HEADER + codec::REPLACE_ACK_STATUS], 3);
+    let f = generated!(
+        batch_replace_item_reject_codec::BatchReplaceItemRejectEncoder,
+        |e| {
+            e.code(reject_code::RejectCode::MODIFY_APPLY_EXPIRED);
+        }
+    );
+    assert_eq!(
+        u16::from_le_bytes([
+            f[HEADER + codec::ITEM_REJECT_CODE],
+            f[HEADER + codec::ITEM_REJECT_CODE + 1]
+        ]),
+        319
+    );
     let f = generated!(oco_ack_codec::OcoAckEncoder, |e| {
         e.command_type(command_type::CommandType::CANCEL_OCO);
     });

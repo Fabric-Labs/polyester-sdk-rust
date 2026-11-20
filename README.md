@@ -2264,9 +2264,11 @@ An item admitted and then refused as it applies creates no successor, but for
 with the refusal in `reject_reason` (for example `modify_apply_expired`, an
 admitted item not applied within 2 seconds), `batch_request_id` set and
 `version` 1. Its `symbol_id`, `side`, `order_type`, `tif`,
-`self_trade_prevention_mode` and `fee_asset` are `None` and its quantities and
-prices are 0 placeholders that carry no scale; take its terms from the batch
-you sent. After the 60 seconds it is not found. Open orders, order history and
+`self_trade_prevention_mode` and `fee_asset` are `None`. Its quantities and
+prices are 0 placeholders on the wire (`"0"` in JSON): decoded, `orig_qty`,
+`price` and `avg_px` are `None`, and `cum_qty`, `leaves_qty`,
+`inherited_cum_qty`, `display_qty` and `hidden_qty` are zero quantities without
+a pair or scale. Take its terms from the batch you sent. After the 60 seconds it is not found. Open orders, order history and
 `orders.subscribe` always carry the terms.
 `batch_request_id` is an opaque public ID: pass it back unchanged and compare
 it only with other values of the same account. An ID received before the
@@ -2687,8 +2689,14 @@ good-till-cancelled limit orders.
   as its idempotency identity. `Event::Disconnected` lists the correlation IDs
   a lost connection left unanswered.
 - **Events.** `Event::Order` (with `CancelReason`, including `CancelAllAfter`
-  and `CancelOnDisconnect`), `Event::Execution` and `Event::MarketResync`
-  (reconcile the pair through the Orders API). The schema adds messages
+  and `CancelOnDisconnect`), `Event::Execution`, `Event::MarketResync`
+  (reconcile the pair through the Orders API) and
+  `Event::BatchReplaceItemReject`: a batch-replace item admitted in its
+  `BatchReplaceAck` and then refused when it applied (for example
+  `MODIFY_APPLY_EXPIRED`), which changed nothing and whose replacement never
+  exists; it names the item by `batch_request_id` and `order_id`, follows the
+  acknowledgement on the connection that sent the batch, and can arrive first
+  on the account's other connections. The schema adds messages
   without changing its version: a message of a template this client does not
   know is skipped and logged at debug level, never queued as an event, and the
   connection carries on. `Event` and the other `tradews` enums that grow are

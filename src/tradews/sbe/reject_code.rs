@@ -199,6 +199,7 @@ pub enum RejectCode {
     INVALID_PEG = 0x13a_u16,
     TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE = 0x13b_u16,
     CLIENT_LIST_ID_INVALID = 0x13e_u16,
+    MODIFY_APPLY_EXPIRED = 0x13f_u16,
     #[default]
     NullVal = 0xffff_u16,
 }
@@ -404,6 +405,7 @@ impl From<u16> for RejectCode {
             0x13a_u16 => Self::INVALID_PEG,
             0x13b_u16 => Self::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE,
             0x13e_u16 => Self::CLIENT_LIST_ID_INVALID,
+            0x13f_u16 => Self::MODIFY_APPLY_EXPIRED,
             _ => Self::NullVal,
         }
     }
@@ -610,6 +612,7 @@ impl From<RejectCode> for u16 {
             RejectCode::INVALID_PEG => 0x13a_u16,
             RejectCode::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE => 0x13b_u16,
             RejectCode::CLIENT_LIST_ID_INVALID => 0x13e_u16,
+            RejectCode::MODIFY_APPLY_EXPIRED => 0x13f_u16,
             RejectCode::NullVal => 0xffff_u16,
         }
     }
@@ -826,6 +829,7 @@ impl core::str::FromStr for RejectCode {
                 Ok(Self::TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE)
             }
             "CLIENT_LIST_ID_INVALID" => Ok(Self::CLIENT_LIST_ID_INVALID),
+            "MODIFY_APPLY_EXPIRED" => Ok(Self::MODIFY_APPLY_EXPIRED),
             _ => Ok(Self::NullVal),
         }
     }
@@ -1056,6 +1060,7 @@ impl core::fmt::Display for RejectCode {
                 write!(f, "TRIGGER_ACTIVATION_PRICE_NOT_MODIFIABLE")
             }
             Self::CLIENT_LIST_ID_INVALID => write!(f, "CLIENT_LIST_ID_INVALID"),
+            Self::MODIFY_APPLY_EXPIRED => write!(f, "MODIFY_APPLY_EXPIRED"),
             Self::NullVal => write!(f, "NullVal"),
         }
     }
