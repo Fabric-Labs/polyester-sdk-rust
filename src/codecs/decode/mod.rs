@@ -14,6 +14,8 @@ mod enums;
 mod fees;
 mod guard_signer;
 mod lifecycle;
+#[cfg(test)]
+mod lifecycle_flow_fields_tests;
 mod market_data;
 mod market_overview;
 mod money;
