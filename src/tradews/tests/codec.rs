@@ -569,20 +569,21 @@ fn client_frames() -> Vec<(&'static str, Vec<u8>)> {
                 &order(Side::Buy, 95_123_450_000_000, CLIENT),
                 2,
                 &deadline(500),
+                &*super::pairs(),
             )
             .unwrap(),
         ),
         (
             "BatchCreateOrders: BUY @ 95000000000000, SELL @ 95200000000000, 500 ms window",
-            codec::encode_batch_create(&batch_create, &deadline(500)).unwrap(),
+            codec::encode_batch_create(&batch_create, &deadline(500), &*super::pairs()).unwrap(),
         ),
         (
             "ModifyOrder by client ID: price 95100000000000, AMEND_OR_REPLACE, 500 ms window",
-            codec::encode_modify(&modify, &deadline(500)).unwrap(),
+            codec::encode_modify(&modify, &deadline(500), &*super::pairs()).unwrap(),
         ),
         (
             "BatchReplaceOrders pair 7: by order ID 2000000 @ 95050000000000, by client ID qty 500000",
-            codec::encode_batch_replace(&batch_replace, &deadline(500)).unwrap(),
+            codec::encode_batch_replace(&batch_replace, &deadline(500), &*super::pairs()).unwrap(),
         ),
         (
             "CancelOrder by client ID, 500 ms window",
@@ -936,6 +937,7 @@ fn commands_the_server_would_refuse_are_refused_here() {
     );
     let d = deadline(500);
     assert_eq!(d.expires_at(), UNIX_EPOCH + ms(1_790_000_000_623));
+    let pairs = &*super::pairs();
 
     let bad_orders = [
         order(Side::Buy, 1, &"x".repeat(37)),
@@ -960,7 +962,7 @@ fn commands_the_server_would_refuse_are_refused_here() {
         },
     ];
     for o in &bad_orders {
-        assert!(validation(codec::encode_create(o, 1, &d)), "{o:?}");
+        assert!(validation(codec::encode_create(o, 1, &d, pairs)), "{o:?}");
     }
     assert!(validation(codec::encode_batch_create(
         &BatchCreateOrders::new(
@@ -968,15 +970,17 @@ fn commands_the_server_would_refuse_are_refused_here() {
                 .map(|i| order(Side::Buy, 1, &format!("o{i}")))
                 .collect()
         ),
-        &d
+        &d,
+        pairs
     )));
     assert!(validation(codec::encode_batch_create(
         &BatchCreateOrders::new(vec![]),
-        &d
+        &d,
+        pairs
     )));
     let mut zero = BatchCreateOrders::new(vec![order(Side::Buy, 1, "a")]);
     zero.correlation_id = 0;
-    assert!(validation(codec::encode_batch_create(&zero, &d)));
+    assert!(validation(codec::encode_batch_create(&zero, &d, pairs)));
     assert!(validation(codec::encode_cancel(
         PAIR,
         &OrderRef::Id(0),
@@ -1006,14 +1010,14 @@ fn commands_the_server_would_refuse_are_refused_here() {
     }
     assert!(codec::encode_cancel_all_after(Duration::ZERO, 1, Default::default(), &d).is_ok());
     let unchanged = ModifyOrder::new(PAIR, OrderRef::Id(ORDER));
-    assert!(validation(codec::encode_modify(&unchanged, &d)));
+    assert!(validation(codec::encode_modify(&unchanged, &d, pairs)));
     let mut zero_price = ModifyOrder::new(PAIR, OrderRef::Id(ORDER));
     zero_price.price = Some(price(0));
-    assert!(validation(codec::encode_modify(&zero_price, &d)));
+    assert!(validation(codec::encode_modify(&zero_price, &d, pairs)));
     let mut replace_only = ModifyOrder::new(PAIR, OrderRef::Id(ORDER));
     replace_only.behavior = ModifyBehavior::ReplaceOnly;
     replace_only.qty = Some(qty(5));
-    assert!(codec::encode_modify(&replace_only, &d).is_ok());
+    assert!(codec::encode_modify(&replace_only, &d, pairs).is_ok());
     assert!(validation(codec::encode_batch_replace(
         &BatchReplaceOrders::new(
             PAIR,
@@ -1023,7 +1027,8 @@ fn commands_the_server_would_refuse_are_refused_here() {
                 price: None
             }]
         ),
-        &d
+        &d,
+        pairs
     )));
     assert!(validation(codec::encode_batch_cancel(
         &BatchCancelOrders::new(

@@ -6,7 +6,8 @@
 //! returns a [`MarketStream`] whose [`MarketStream::recv`] delivers every
 //! stream's messages in order, with prices and quantities as exact decimal
 //! values scaled by the pair's catalog scales. The client reconnects on its own
-//! and resubscribes; each stream recovers as the protocol defines:
+//! and resubscribes, unless [`Config::auto_reconnect`] is off; each stream
+//! recovers as the protocol defines:
 //!
 //! - trades: every trade arrives once or is reported in a [`TradesGap`], which
 //!   the client can backfill from the trade history API ([`Config::history`]);
@@ -200,6 +201,10 @@ pub struct Trade {
     pub price: Price,
     pub qty: Quantity,
     pub taker_side: Side,
+    /// Time the trade executed, in Unix nanoseconds: the time of the book
+    /// update that executed it, the [`Trades::transact_ts_ns`] of a live
+    /// trade. 0 when the trade history does not report it.
+    pub transact_ts_ns: u64,
 }
 
 /// Trades of one book update, in ascending trade ID order. Each trade is
@@ -427,14 +432,16 @@ pub enum StreamError {
     Schema { schema_id: u16, version: u16 },
     /// A message whose bytes do not match its declared layout, or whose values
     /// break the protocol. The client reconnects, so every stream restarts
-    /// from a fresh baseline.
+    /// from a fresh baseline; without [`Config::auto_reconnect`] it stops
+    /// with this error.
     #[error("invalid market stream message (template {template_id}): {message}")]
     Frame { template_id: u16, message: String },
     /// An unsubscribe that the server answered with neither
     /// [`SubscribeResult::Ok`] nor [`SubscribeResult::NotSubscribed`] for a
     /// stream it holds, as its answers show, those to superseded requests
     /// included: the stream stays held whatever the caller wants, so the
-    /// client reconnects, and every stream it wants is resubscribed.
+    /// client reconnects, and every stream it wants is resubscribed; without
+    /// [`Config::auto_reconnect`] it stops with this error.
     #[error("market stream unsubscribe of {topic} answered {result}")]
     Unsubscribe {
         topic: Topic,

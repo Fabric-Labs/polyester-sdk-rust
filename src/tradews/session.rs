@@ -54,6 +54,7 @@ use super::{
 };
 use crate::auth::Credentials;
 use crate::errors::{Error, Result};
+use crate::marketstream::Pairs;
 use crate::realtime::{ReconnectBackoff, lock_unpoisoned};
 use crate::reconnect::{ReconnectLimiter, upgrade_slot};
 
@@ -106,6 +107,12 @@ pub struct Config {
     /// The API key the upgrade is signed with; the session trades for the
     /// account the key is bound to.
     pub credentials: Credentials,
+    /// Pair scales and symbols, usually the client's catalogs
+    /// (`client.catalogs`, after `client.wait_for_catalogs()`). Every order
+    /// and modification is checked against its pair's row, read when it is
+    /// sent, and refused before sending when the pair is missing or a value
+    /// carries another pair's scale or symbol.
+    pub pairs: Arc<dyn Pairs>,
     /// The cancel-on-disconnect grace period, whole seconds from 10 to 120:
     /// once no session of the account that opted in has been connected for
     /// this long, the account's open orders are cancelled with
@@ -141,10 +148,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(url: impl Into<String>, credentials: Credentials) -> Self {
+    pub fn new(url: impl Into<String>, credentials: Credentials, pairs: Arc<dyn Pairs>) -> Self {
         Self {
             url: url.into(),
             credentials,
+            pairs,
             cancel_on_disconnect: Some(DEFAULT_GRACE),
             timer_gate: Some(TimerGate::default()),
             queue_size: 0,
@@ -531,6 +539,11 @@ impl TradeEvents {
 }
 
 impl TradeSender {
+    /// The pairs every order and modification is checked against.
+    fn pairs(&self) -> &dyn Pairs {
+        &*self.shared.cfg.pairs
+    }
+
     /// Waits until a connection's subscription is confirmed and returns the
     /// connection's number; commands are sent on it from then on. Fails once
     /// the session has stopped.
@@ -652,7 +665,7 @@ impl TradeSender {
         deadline: Deadline,
     ) -> Result<OrderAck> {
         let correlation_id = new_correlation_id();
-        let frame = codec::encode_create(order, correlation_id, &deadline)?;
+        let frame = codec::encode_create(order, correlation_id, &deadline, self.pairs())?;
         match self
             .call(Command::CreateOrder, correlation_id, deadline, frame)
             .await?
@@ -688,7 +701,7 @@ impl TradeSender {
     /// `ORDER_MODIFY_OUTCOME_UNKNOWN`: resend the same [`ModifyOrder`], whose
     /// correlation ID is the modification's identity, or read the order back.
     pub async fn modify_order(&self, modify: &ModifyOrder, deadline: Deadline) -> Result<OrderAck> {
-        let frame = codec::encode_modify(modify, &deadline)?;
+        let frame = codec::encode_modify(modify, &deadline, self.pairs())?;
         match self
             .call(Command::ModifyOrder, modify.correlation_id, deadline, frame)
             .await?
@@ -773,7 +786,7 @@ impl TradeSender {
         batch: &BatchCreateOrders,
         deadline: Deadline,
     ) -> Result<BatchCreateAck> {
-        let frame = codec::encode_batch_create(batch, &deadline)?;
+        let frame = codec::encode_batch_create(batch, &deadline, self.pairs())?;
         match self
             .call(
                 Command::BatchCreateOrders,
@@ -796,7 +809,7 @@ impl TradeSender {
         batch: &BatchReplaceOrders,
         deadline: Deadline,
     ) -> Result<BatchReplaceAck> {
-        let frame = codec::encode_batch_replace(batch, &deadline)?;
+        let frame = codec::encode_batch_replace(batch, &deadline, self.pairs())?;
         match self
             .call(
                 Command::BatchReplaceOrders,
@@ -1868,7 +1881,11 @@ mod write_tests {
         let (link, _) = watch::channel(Link::default());
         let (stop, _) = watch::channel(false);
         let shared = Arc::new(Shared {
-            cfg: Config::new("ws://127.0.0.1:9/ws/trade.sbe", credentials),
+            cfg: Config::new(
+                "ws://127.0.0.1:9/ws/trade.sbe",
+                credentials,
+                Arc::new(crate::catalogs::Manager::new()),
+            ),
             commands,
             link,
             stop,

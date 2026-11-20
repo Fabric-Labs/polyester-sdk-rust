@@ -35,7 +35,7 @@ impl Limited for Session {
         limiter: Option<ReconnectLimiter>,
         connect_timeout: Duration,
     ) -> Self {
-        let mut config = Config::new(url, credentials());
+        let mut config = Config::new(url, credentials(), super::pairs());
         config.ping_interval = Duration::from_secs(2);
         config.answer_timeout = Duration::from_secs(2);
         config.reconnect_limiter = limiter;

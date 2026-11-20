@@ -35,6 +35,9 @@ impl Pairs for TestPairs {
     fn symbol(&self, symbol_id: u32) -> Option<String> {
         (symbol_id == 7).then(|| "BTC-USDC".to_owned())
     }
+    fn base_quantity_scale_and_symbol(&self, symbol_id: u32) -> Option<(u32, Option<String>)> {
+        Some((self.base_quantity_scale(symbol_id)?, self.symbol(symbol_id)))
+    }
     fn symbol_id(&self, symbol: &str) -> Option<u32> {
         (symbol == "BTC-USDC").then_some(7)
     }
@@ -398,6 +401,15 @@ async fn delivers_every_stream() {
         vec![101, 102]
     );
     assert_eq!(tr.trades[0].taker_side, Side::Buy);
+    assert_eq!(
+        tr.trades
+            .iter()
+            .map(|x| x.transact_ts_ns)
+            .collect::<Vec<_>>(),
+        vec![tr.transact_ts_ns; 2],
+        "each trade carries its book update's time"
+    );
+    assert_eq!(tr.transact_ts_ns, 1_700_000_000_000_000_000);
     assert_eq!(tr.trades[0].price.format(), "65000");
     assert_eq!(tr.trades[0].qty.format(None).unwrap(), "1.5");
     let quote = expect(&mut stream, |e| {
@@ -809,6 +821,78 @@ async fn a_malformed_message_reconnects() {
         "{err}"
     );
     server.accept().await;
+}
+
+/// By default a lost connection is reported and the stream reconnects.
+#[tokio::test]
+async fn with_auto_reconnect_a_lost_connection_reconnects() {
+    let mut server = FakeServer::start().await;
+    assert!(config(&server).auto_reconnect, "on by default");
+    let mut stream = dial(&server, |_| {}).await;
+    server.accept().await.close();
+    expect(&mut stream, |e| {
+        matches!(e, Event::Disconnected { .. }).then_some(())
+    })
+    .await;
+    server.accept().await;
+    assert!(stream.is_alive());
+    assert!(stream.err().is_none(), "{:?}", stream.err());
+}
+
+/// With `auto_reconnect` off, a lost connection ends the stream: the loss is
+/// its terminal error, which a request in flight returns too; the queued
+/// events stay readable, then `recv` returns `None`; nothing reconnects.
+#[tokio::test]
+async fn without_auto_reconnect_a_lost_connection_ends_the_stream() {
+    let mut server = FakeServer::start().await;
+    let mut stream = dial(&server, |c| c.auto_reconnect = false).await;
+    let mut conn = server.accept().await;
+    let topics = [t(7, Stream::Bbo)];
+    let pending = {
+        let mut subscribe = std::pin::pin!(stream.subscribe(&topics));
+        assert!(
+            subscribe.as_mut().now_or_never().is_none(),
+            "subscribe sent"
+        );
+        conn.request().await;
+        conn.close();
+        tokio::time::timeout(Duration::from_secs(5), subscribe)
+            .await
+            .expect("answered")
+    };
+    let mut events = Vec::new();
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while let Some(e) = stream.recv().await {
+            events.push(e);
+        }
+    })
+    .await
+    .expect("events end");
+    assert!(
+        matches!(events.first(), Some(Event::Connected { reconnect: false })),
+        "{events:?}"
+    );
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, Event::Disconnected { .. })),
+        "no reconnect is announced: {events:?}"
+    );
+    stops(&stream).await;
+    let err = stream.err().expect("the loss is the terminal error");
+    assert!(
+        !err.to_string().contains("reconnect"),
+        "the terminal error promises no reconnect: {err}"
+    );
+    let pending = pending.expect_err("the pending request fails");
+    assert_eq!(pending.to_string(), err.to_string());
+    let after = stream
+        .subscribe(&[t(7, Stream::Bbo)])
+        .await
+        .expect_err("a stopped stream refuses requests");
+    assert_eq!(after.to_string(), err.to_string());
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(server.count.load(Ordering::SeqCst), 1, "reconnected");
 }
 
 #[tokio::test]

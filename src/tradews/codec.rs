@@ -27,6 +27,7 @@ use super::{
     TimerAck, TradeError, from_unix_ns,
 };
 use crate::errors::{Error, Result};
+use crate::marketstream::Pairs;
 use crate::types::{Price, Quantity, QuantityDomain};
 
 /// The schema the codecs are generated from; the server sends and accepts
@@ -176,8 +177,9 @@ pub(crate) fn encode_create(
     order: &PostOnlyOrder,
     correlation_id: u64,
     deadline: &Deadline,
+    pairs: &dyn Pairs,
 ) -> Result<Vec<u8>> {
-    let (price, qty) = order.check()?;
+    let (price, qty) = order.check(pairs)?;
     let mut buf = frame(create_order_codec::SBE_BLOCK_LENGTH as usize + VAR_HEADER + MAX_ID);
     let mut e = encoder!(create_order_codec::CreateOrderEncoder, &mut buf);
     e.seq(0);
@@ -194,8 +196,9 @@ pub(crate) fn encode_create(
 pub(crate) fn encode_batch_create(
     batch: &BatchCreateOrders,
     deadline: &Deadline,
+    pairs: &dyn Pairs,
 ) -> Result<Vec<u8>> {
-    batch.check()?;
+    batch.check(pairs)?;
     let mut buf = frame(
         batch_create_orders_codec::SBE_BLOCK_LENGTH as usize
             + GROUP_HEADER
@@ -211,7 +214,7 @@ pub(crate) fn encode_batch_create(
     e.recv_window_ms(deadline.window_ms);
     let mut g = e.items_encoder(count(batch.orders.len()), Default::default());
     for order in &batch.orders {
-        let (price, qty) = order.check()?;
+        let (price, qty) = order.check(pairs)?;
         g.advance().expect("the group encoder holds its parent");
         order_fields!(g, order, price, qty);
         g.client_order_id(order.client_order_id.as_bytes());
@@ -230,8 +233,12 @@ fn opt_price(price: Option<&Price>) -> i64 {
     price.map_or(NULL_I64, Price::as_ticks)
 }
 
-pub(crate) fn encode_modify(modify: &ModifyOrder, deadline: &Deadline) -> Result<Vec<u8>> {
-    modify.check()?;
+pub(crate) fn encode_modify(
+    modify: &ModifyOrder,
+    deadline: &Deadline,
+    pairs: &dyn Pairs,
+) -> Result<Vec<u8>> {
+    modify.check(pairs)?;
     let mut buf = frame(modify_order_codec::SBE_BLOCK_LENGTH as usize + 2 * (VAR_HEADER + MAX_ID));
     let mut e = encoder!(modify_order_codec::ModifyOrderEncoder, &mut buf);
     e.seq(0);
@@ -254,8 +261,9 @@ pub(crate) fn encode_modify(modify: &ModifyOrder, deadline: &Deadline) -> Result
 pub(crate) fn encode_batch_replace(
     batch: &BatchReplaceOrders,
     deadline: &Deadline,
+    pairs: &dyn Pairs,
 ) -> Result<Vec<u8>> {
-    batch.check()?;
+    batch.check(pairs)?;
     let mut buf = frame(
         batch_replace_orders_codec::SBE_BLOCK_LENGTH as usize
             + GROUP_HEADER
