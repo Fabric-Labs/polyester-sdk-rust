@@ -273,11 +273,13 @@ impl MarketDataService {
     /// Columnar OHLCV candles decoded into row-oriented [`CandlesResult`].
     ///
     /// The columnar reply carries no closed flag, so [`Candle::is_closed`] is
-    /// derived from the request. With `include_incomplete` false every columnar
-    /// row is closed. With `include_incomplete` true the newest primary row (and
-    /// the newest reference row) reads `false`, meaning "not known to be
-    /// closed": it may be the open bucket, or a closed one when no open candle
-    /// was in range. Earlier rows read `true`.
+    /// derived from the request. With `include_incomplete` false every row is
+    /// closed and reads `true`. With `include_incomplete` true, on a first page
+    /// (no `page_token`), the newest primary row reads `false`, meaning "not
+    /// known to be closed": it may be the open bucket, or a closed one when no
+    /// open candle was in range; earlier rows read `true`. A continuation page
+    /// (a `page_token` set) holds only older, closed candles, so every row
+    /// reads `true`. Reference rows are always closed buckets and read `true`.
     pub async fn get_candles_columns(&self, opts: GetCandlesOpts) -> Result<CandlesResult> {
         check_limit(
             "get_candles_columns",
@@ -287,6 +289,9 @@ impl MarketDataService {
         // Decoded with the pair's catalog scales.
         self.ctx.wait_for_catalogs().await?;
         let (base, volume_scale) = self.build_candles_request(&opts)?;
+        // Only a first page can hold the open candle: a continuation page
+        // holds only older, closed candles.
+        let may_hold_open_candle = base.include_incomplete && base.page_token.is_empty();
         let req = GetCandlesColumnsRequest {
             symbol_id: base.symbol_id,
             timeframe: base.timeframe,
@@ -308,8 +313,10 @@ impl MarketDataService {
                 .catalogs
                 .reference_price_scale_for_symbol_id(base.symbol_id),
         )?;
-        if base.include_incomplete {
-            mark_newest_columns_not_known_closed(&mut result);
+        if may_hold_open_candle && let Some(newest) = result.candles.last_mut() {
+            // The open candle, when one is in range, comes last in the
+            // oldest-first primary series, unflagged.
+            newest.is_closed = false;
         }
         Ok(result)
     }
@@ -454,17 +461,6 @@ fn parse_timeframe(interval: &str) -> Result<Timeframe> {
         }
     };
     Ok(tf)
-}
-
-/// The columnar reply puts the open candle, when one is in range, last in each
-/// oldest-first series and does not flag it: the newest row of each series is
-/// not known to be closed.
-fn mark_newest_columns_not_known_closed(result: &mut CandlesResult) {
-    for series in [&mut result.candles, &mut result.reference_candles] {
-        if let Some(newest) = series.last_mut() {
-            newest.is_closed = false;
-        }
-    }
 }
 
 fn newest_candle(result: CandlesResult) -> Option<Candle> {
@@ -912,7 +908,8 @@ impl OrderbookService {
     ///
     /// Order snapshots by `(book_epoch, book_seq)` with
     /// [`crate::codecs::decode::compare_snapshots`]. A snapshot is a frozen view:
-    /// never apply stream updates to it, and fetch it again to refresh it.
+    /// never apply stream updates to it, and fetch it again to refresh it. Its
+    /// `ts` is the server's snapshot time, `None` when the reply has none.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
         let tier = match depth {
             None => DepthTier::DEPTH_UNSPECIFIED,
@@ -973,6 +970,10 @@ impl OrderbookService {
     /// 50 when `None`. The book rides the smallest tier covering it, snapshot
     /// included, and each view is trimmed to it; a depth no tier covers is a
     /// validation error before connecting.
+    ///
+    /// Each view's `ts` is the server time of the latest snapshot or delta
+    /// applied to the book, `None` when that one carried none; a stale or
+    /// out-of-sequence delta, which is not applied, leaves it unchanged.
     pub async fn create_subscription(
         &self,
         opts: CreateSubscriptionOptions,
@@ -1046,6 +1047,7 @@ impl OrderbookService {
             asks: BookSide::new(),
             book_seq: 0,
             available: false,
+            ts: None,
             awaiting_reset: false,
             last_view_unavailable: false,
             recheck_pending: false,
@@ -1077,13 +1079,13 @@ impl OrderbookService {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
-                let (bids, asks, book_seq, available) = {
+                let (bids, asks, book_seq, available, ts) = {
                     let mut s = crate::realtime::lock_unpoisoned(&state);
                     // A book that missed an update is not current until the
                     // next reset, whatever its snapshot said.
                     let available = s.available && !s.awaiting_reset;
                     s.last_view_unavailable = !available;
-                    (s.bids.clone(), s.asks.clone(), s.book_seq, available)
+                    (s.bids.clone(), s.asks.clone(), s.book_seq, available, s.ts)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = match build_orderbook_data(
@@ -1096,7 +1098,7 @@ impl OrderbookService {
                     quantity_scale,
                     available,
                 ) {
-                    Ok(data) => data,
+                    Ok(data) => OrderbookData { ts, ..data },
                     Err(err) => {
                         closed.store(true, std::sync::atomic::Ordering::SeqCst);
                         *crate::realtime::lock_unpoisoned(&last_error) = Some(err.clone());
@@ -1152,6 +1154,12 @@ impl OrderbookService {
                 let (new_seq, out_of_sync) = apply_delta(bids, asks, *book_seq, &delta);
                 let advanced = new_seq != *book_seq;
                 *book_seq = new_seq;
+                if advanced {
+                    // Applied: the book is now this update's state, at its
+                    // time. A stale or out-of-sequence update is not applied
+                    // and leaves the book's time as it was.
+                    s.ts = delta.ts;
+                }
                 if out_of_sync {
                     // The first gap of an episode changes the view: it is no
                     // longer current.
@@ -1271,6 +1279,7 @@ impl OrderbookService {
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
                             s.available = snapshot.available;
+                            s.ts = snapshot.ts;
                             s.awaiting_reset = false;
                             !snapshot.available && s.last_view_unavailable && buffered.is_empty()
                         };
@@ -1329,6 +1338,9 @@ struct BookState {
     /// Whether the last snapshot was current; see
     /// [`OrderbookData::available`].
     available: bool,
+    /// The server time of the latest snapshot or update applied to the book,
+    /// `None` when that one carried none; see [`OrderbookData::ts`].
+    ts: Option<std::time::SystemTime>,
     /// An update did not continue the book: it is out of sync until the next
     /// reset or snapshot.
     awaiting_reset: bool,
@@ -1512,6 +1524,7 @@ mod tests {
                         reset: false,
                         bids: vec![],
                         asks: vec![],
+                        ts: None,
                     })
                 }),
                 fetch_snapshot: Arc::new(|| {
@@ -1524,6 +1537,7 @@ mod tests {
                             bids: vec![],
                             asks: vec![],
                             available: true,
+                            ts: None,
                         })
                     })
                 }),
@@ -1574,6 +1588,7 @@ mod tests {
                         reset: false,
                         bids: vec![],
                         asks: vec![],
+                        ts: None,
                     })
                 }),
                 fetch_snapshot: Arc::new(|| {
@@ -1586,6 +1601,7 @@ mod tests {
                             bids: vec![],
                             asks: vec![],
                             available: true,
+                            ts: None,
                         })
                     })
                 }),
@@ -1622,6 +1638,7 @@ mod tests {
                 bids: vec![],
                 asks: vec![],
                 available: true,
+                ts: None,
             })
             .unwrap();
         stream.fail(Error::transport("terminal transport failure"));

@@ -2385,6 +2385,12 @@ fetch it again later instead of reading empty sides as no liquidity. It is the
 server's value as sent, never inferred from the levels; a managed order book
 subscription carries the value of its last snapshot, and false after it missed
 an update until the next reset. A server that predates the field reports false.
+Its `ts` is the server's best-effort snapshot time (`Option<SystemTime>`), `None`
+when the server sends none, never the local receipt time. A raw delta's `ts`, and a
+managed view's `ts` (that of the latest snapshot or delta applied to the book), follow
+the same rule. Its precision is the platform's `SystemTime`: the server's nanoseconds
+on Unix-like targets, truncated to 100 ns intervals on Windows. Order snapshots by
+`(book_epoch, book_seq)`, not by `ts`.
 
 `get_candles` and `get_candles_with` return rows newest-first by `ts_sec`.
 When incomplete rows are included, the current open candle is prepended.
@@ -3215,6 +3221,18 @@ let page = client
 
 A page token is bound to the request it was returned for: continue with the same account,
 participation, scope and order; only `limit` may change.
+
+Every flow read and flow update carries what moved and when. `amount` is the gross principal, an
+exact `AssetAmount` at the 18-decimal ledger scale in units of `unified_asset_id` (never a float),
+and `request_fee` the request's fee apart from it. `source_tx_hash` is the transaction that started
+the flow, with `tx_occurrence_index` telling apart the legs of one batched deposit, and
+`latest_tx_ref` an opaque reference to the latest one. `source_domain` and `destination_domain`
+name the route (`funding` to `external_chain` for a Funding withdrawal). `started_at`,
+`updated_at`, `last_activity_at`, `terminal_at` (`None` while open) and `estimated_completion_at`
+(`None` while `is_delayed`; read `terminal_at`, not it, for when a flow ended) are `SystemTime`s.
+`progress_timeline`, `current_step_sequence` and `current_progress` drive a progress bar. A
+transaction lookup carries the amount, asset, transactions, route and `last_activity_at`, but no
+fee, progress or other times.
 
 An account reads all of its own flows, including transfers between Trading accounts and Trading
 withdrawals not yet on chain, with the signed `list_account_flows` and `get_account_flow`. They take

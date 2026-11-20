@@ -600,12 +600,13 @@ async fn candle_stream_says_when_a_bucket_closes() {
 
 const CANDLES_COLUMNS: &str = "/marketdata.v1.MarketDataService/GetCandlesColumns";
 
-// The columnar reply has no closed flag. Without `include_incomplete` every
-// row is a closed candle. With it, the newest primary and reference rows read
-// `false`, not known to be closed: the open bucket comes last when one is in
-// range, but nothing says whether it was. Earlier rows read `true`.
-#[tokio::test]
-async fn candle_columns_never_call_a_possibly_open_row_closed() {
+// The columnar reply has no closed flag, so `get_candles_columns` derives
+// `is_closed` from the request. Each case serves the same two primary and two
+// reference rows, oldest first, and returns `(ts_sec, is_closed)` for each.
+async fn candle_columns_closed_flags(
+    include_incomplete: bool,
+    page_token: Option<&str>,
+) -> (Vec<(i64, bool)>, Vec<(i64, bool)>) {
     use polyester::proto::marketdata::v1::GetCandlesColumnsResponse;
 
     let columns = GetCandlesColumnsResponse {
@@ -641,33 +642,74 @@ async fn candle_columns_never_call_a_possibly_open_row_closed() {
     })
     .unwrap();
     client.wait_for_catalogs().await.unwrap();
+    let got = client
+        .market_data
+        .get_candles_columns(GetCandlesOpts {
+            symbol: Some("BTC-USDT".into()),
+            timeframe: "1m".into(),
+            include_incomplete,
+            include_reference: true,
+            page_token: page_token.map(str::to_owned),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
     let flags = |rows: &[polyester::models::Candle]| {
         rows.iter()
             .map(|c| (c.ts_sec, c.is_closed))
             .collect::<Vec<_>>()
     };
-    for (include_incomplete, newest_closed) in [(false, true), (true, false)] {
-        let got = client
-            .market_data
-            .get_candles_columns(GetCandlesOpts {
-                symbol: Some("BTC-USDT".into()),
-                timeframe: "1m".into(),
-                include_incomplete,
-                include_reference: true,
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-        let want = [(60, true), (120, newest_closed)];
+    (flags(&got.candles), flags(&got.reference_candles))
+}
+
+// Without `include_incomplete` every row is a closed candle, on any page.
+#[tokio::test]
+async fn candle_columns_without_incomplete_are_all_closed() {
+    for page_token in [None, Some("older")] {
+        let (primary, _) = candle_columns_closed_flags(false, page_token).await;
         assert_eq!(
-            flags(&got.candles),
-            want,
-            "include_incomplete={include_incomplete}"
+            primary,
+            [(60, true), (120, true)],
+            "page_token={page_token:?}"
         );
+    }
+}
+
+// On a first page (no page token, or an empty one) with `include_incomplete`,
+// the newest primary row reads `false`, not known to be closed: the open
+// bucket comes last when one is in range, but nothing says whether it was.
+// Earlier rows read `true`.
+#[tokio::test]
+async fn candle_columns_first_page_newest_row_is_not_known_closed() {
+    for page_token in [None, Some("")] {
+        let (primary, _) = candle_columns_closed_flags(true, page_token).await;
         assert_eq!(
-            flags(&got.reference_candles),
-            want,
-            "include_incomplete={include_incomplete}"
+            primary,
+            [(60, true), (120, false)],
+            "page_token={page_token:?}"
         );
+    }
+}
+
+// A continuation page holds only candles older than the first page's, all
+// closed, so every row reads `true` even with `include_incomplete`.
+#[tokio::test]
+async fn candle_columns_continuation_page_is_all_closed() {
+    let (primary, _) = candle_columns_closed_flags(true, Some("older")).await;
+    assert_eq!(primary, [(60, true), (120, true)]);
+}
+
+// Reference rows are always closed buckets, whatever the request.
+#[tokio::test]
+async fn candle_columns_reference_rows_are_always_closed() {
+    for include_incomplete in [false, true] {
+        for page_token in [None, Some("older")] {
+            let (_, reference) = candle_columns_closed_flags(include_incomplete, page_token).await;
+            assert_eq!(
+                reference,
+                [(60, true), (120, true)],
+                "include_incomplete={include_incomplete} page_token={page_token:?}"
+            );
+        }
     }
 }

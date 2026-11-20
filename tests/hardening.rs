@@ -65,6 +65,8 @@ mod orderbook_bucket_validation;
 mod orderbook_depths;
 #[path = "orderbook_symbol_id_only/mod.rs"]
 mod orderbook_symbol_id_only;
+#[path = "orderbook_timestamp/mod.rs"]
+mod orderbook_timestamp;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
 #[path = "public_id_strings/mod.rs"]
