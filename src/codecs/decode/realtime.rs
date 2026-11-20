@@ -104,6 +104,8 @@ pub fn market_trade_batch_from_bytes(
     }
 }
 
+/// Decode an `OrderBookDelta` publication. Its `ts` is the update's time,
+/// `None` when the publication has none.
 pub fn orderbook_delta_from_bytes(payload: &[u8]) -> Result<OrderBookDeltaUpdate> {
     let msg = decode_proto::<OrderBookDelta>(payload)?;
     Ok(OrderBookDeltaUpdate {
@@ -127,6 +129,7 @@ pub fn orderbook_delta_from_bytes(payload: &[u8]) -> Result<OrderBookDeltaUpdate
                 qty_scaled: l.qty_scaled,
             })
             .collect(),
+        ts: super::orderbook::book_time(&msg.ts),
     })
 }
 
@@ -290,6 +293,35 @@ fn lowercase_enum_label<E: Enumeration>(value: buffa::EnumValue<E>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An update's timestamp is kept to the precision `SystemTime` holds when
+    /// sent, and is `None` when the server sends none.
+    #[test]
+    fn orderbook_delta_maps_the_update_timestamp_or_none() {
+        use buffa::Message as _;
+        use buffa_types::google::protobuf::Timestamp;
+        use std::time::{Duration, UNIX_EPOCH};
+        let read = |ts: buffa::MessageField<Timestamp>| {
+            let payload = OrderBookDelta {
+                symbol_id: 1,
+                book_seq_start: 7,
+                book_seq_end: 8,
+                ts,
+                ..Default::default()
+            }
+            .encode_to_vec();
+            orderbook_delta_from_bytes(&payload).unwrap().ts
+        };
+        assert_eq!(
+            read(buffa::MessageField::some(Timestamp {
+                seconds: 1_795_113_634,
+                nanos: 123_456_789,
+                ..Default::default()
+            })),
+            Some(UNIX_EPOCH + Duration::new(1_795_113_634, 123_456_789))
+        );
+        assert_eq!(read(buffa::MessageField::none()), None);
+    }
     use crate::proto::orders::v1::Order as ProtoOrder;
     use crate::proto::orders::v1::{OrderStatus, OrderType, Side, TimeInForce};
 

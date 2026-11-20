@@ -908,7 +908,8 @@ impl OrderbookService {
     ///
     /// Order snapshots by `(book_epoch, book_seq)` with
     /// [`crate::codecs::decode::compare_snapshots`]. A snapshot is a frozen view:
-    /// never apply stream updates to it, and fetch it again to refresh it.
+    /// never apply stream updates to it, and fetch it again to refresh it. Its
+    /// `ts` is the server's snapshot time, `None` when the reply has none.
     pub async fn get(&self, symbol: &str, depth: Option<u32>) -> Result<OrderbookData> {
         let tier = match depth {
             None => DepthTier::DEPTH_UNSPECIFIED,
@@ -969,6 +970,10 @@ impl OrderbookService {
     /// 50 when `None`. The book rides the smallest tier covering it, snapshot
     /// included, and each view is trimmed to it; a depth no tier covers is a
     /// validation error before connecting.
+    ///
+    /// Each view's `ts` is the server time of the latest snapshot or delta
+    /// applied to the book, `None` when that one carried none; a stale or
+    /// out-of-sequence delta, which is not applied, leaves it unchanged.
     pub async fn create_subscription(
         &self,
         opts: CreateSubscriptionOptions,
@@ -1042,6 +1047,7 @@ impl OrderbookService {
             asks: BookSide::new(),
             book_seq: 0,
             available: false,
+            ts: None,
             awaiting_reset: false,
             last_view_unavailable: false,
             recheck_pending: false,
@@ -1073,13 +1079,13 @@ impl OrderbookService {
                 if closed.load(std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
-                let (bids, asks, book_seq, available) = {
+                let (bids, asks, book_seq, available, ts) = {
                     let mut s = crate::realtime::lock_unpoisoned(&state);
                     // A book that missed an update is not current until the
                     // next reset, whatever its snapshot said.
                     let available = s.available && !s.awaiting_reset;
                     s.last_view_unavailable = !available;
-                    (s.bids.clone(), s.asks.clone(), s.book_seq, available)
+                    (s.bids.clone(), s.asks.clone(), s.book_seq, available, s.ts)
                 };
                 let ticks = *crate::realtime::lock_unpoisoned(&bucket_ticks);
                 let data = match build_orderbook_data(
@@ -1092,7 +1098,7 @@ impl OrderbookService {
                     quantity_scale,
                     available,
                 ) {
-                    Ok(data) => data,
+                    Ok(data) => OrderbookData { ts, ..data },
                     Err(err) => {
                         closed.store(true, std::sync::atomic::Ordering::SeqCst);
                         *crate::realtime::lock_unpoisoned(&last_error) = Some(err.clone());
@@ -1148,6 +1154,12 @@ impl OrderbookService {
                 let (new_seq, out_of_sync) = apply_delta(bids, asks, *book_seq, &delta);
                 let advanced = new_seq != *book_seq;
                 *book_seq = new_seq;
+                if advanced {
+                    // Applied: the book is now this update's state, at its
+                    // time. A stale or out-of-sequence update is not applied
+                    // and leaves the book's time as it was.
+                    s.ts = delta.ts;
+                }
                 if out_of_sync {
                     // The first gap of an episode changes the view: it is no
                     // longer current.
@@ -1267,6 +1279,7 @@ impl OrderbookService {
                             s.asks = levels_from_orderbook_side(&snapshot.asks);
                             s.book_seq = parsed_seq;
                             s.available = snapshot.available;
+                            s.ts = snapshot.ts;
                             s.awaiting_reset = false;
                             !snapshot.available && s.last_view_unavailable && buffered.is_empty()
                         };
@@ -1325,6 +1338,9 @@ struct BookState {
     /// Whether the last snapshot was current; see
     /// [`OrderbookData::available`].
     available: bool,
+    /// The server time of the latest snapshot or update applied to the book,
+    /// `None` when that one carried none; see [`OrderbookData::ts`].
+    ts: Option<std::time::SystemTime>,
     /// An update did not continue the book: it is out of sync until the next
     /// reset or snapshot.
     awaiting_reset: bool,
@@ -1508,6 +1524,7 @@ mod tests {
                         reset: false,
                         bids: vec![],
                         asks: vec![],
+                        ts: None,
                     })
                 }),
                 fetch_snapshot: Arc::new(|| {
@@ -1520,6 +1537,7 @@ mod tests {
                             bids: vec![],
                             asks: vec![],
                             available: true,
+                            ts: None,
                         })
                     })
                 }),
@@ -1570,6 +1588,7 @@ mod tests {
                         reset: false,
                         bids: vec![],
                         asks: vec![],
+                        ts: None,
                     })
                 }),
                 fetch_snapshot: Arc::new(|| {
@@ -1582,6 +1601,7 @@ mod tests {
                             bids: vec![],
                             asks: vec![],
                             available: true,
+                            ts: None,
                         })
                     })
                 }),
@@ -1618,6 +1638,7 @@ mod tests {
                 bids: vec![],
                 asks: vec![],
                 available: true,
+                ts: None,
             })
             .unwrap();
         stream.fail(Error::transport("terminal transport failure"));

@@ -160,7 +160,7 @@ orderbook.v1.GetOrderBookResponse.book_epoch	covered	OrderbookData.book_epoch
 orderbook.v1.GetOrderBookResponse.book_seq	covered	OrderbookData.book_seq
 orderbook.v1.GetOrderBookResponse.depth	covered	OrderbookData.depth (the tier served)
 orderbook.v1.GetOrderBookResponse.symbol_id	covered	OrderbookData.symbol (the symbol the caller passed)
-orderbook.v1.GetOrderBookResponse.ts	omitted	a best-effort snapshot time, unchanged by this contract and not exposed; order snapshots by (book_epoch, book_seq)
+orderbook.v1.GetOrderBookResponse.ts	covered	OrderbookData.ts (None when the reply has none)
 orders.v1.CancelAllAfterRequest.include_triggers	covered	CancelAllAfterOpts.include_triggers
 orders.v1.CancelAllAfterRequest.request_id	covered	CancelAllAfterOpts.request_id (generated when None)
 orders.v1.CancelAllAfterRequest.side	covered	CancelAllAfterOpts.side
