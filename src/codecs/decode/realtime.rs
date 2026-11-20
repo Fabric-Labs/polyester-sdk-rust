@@ -132,15 +132,15 @@ pub fn orderbook_delta_from_bytes(payload: &[u8]) -> Result<OrderBookDeltaUpdate
 
 pub fn flow_summary_from_bytes(payload: &[u8]) -> Result<LifecycleFlowSummary> {
     let msg = decode_proto::<FlowSummaryView>(payload)?;
-    Ok(flow_summary_message_from_proto(&msg))
+    flow_summary_message_from_proto(&msg)
 }
 
 pub fn flow_detail_from_bytes(payload: &[u8]) -> Result<LifecycleFlowSummary> {
     let msg = decode_proto::<FlowDetailView>(payload)?;
-    msg.summary
-        .as_option()
-        .map(flow_summary_message_from_proto)
-        .ok_or_else(|| Error::realtime("proto decode: flow detail is missing summary".to_owned()))
+    let summary = msg.summary.as_option().ok_or_else(|| {
+        Error::realtime("proto decode: flow detail is missing summary".to_owned())
+    })?;
+    flow_summary_message_from_proto(summary)
 }
 
 pub fn account_identity_from_bytes(payload: &[u8]) -> Result<AccountIdentity> {

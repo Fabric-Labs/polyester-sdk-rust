@@ -1,15 +1,24 @@
 //! Lifecycle flow decoders.
 
 use crate::codecs::decode::common::require_str_id;
+use crate::codecs::decode::dust::e18_amount;
 use crate::codecs::decode::enums::enum_proto_name;
 use crate::errors::{Error, Result};
-use crate::models::{LifecycleFlowSummary, LifecycleFlowsList, ZipperReasonDetails};
+use crate::models::{
+    LifecycleFlowProgress, LifecycleFlowSummary, LifecycleFlowTimelineItem, LifecycleFlowsList,
+    LifecycleRequestFee, ZipperReasonDetails,
+};
 use crate::proto::chain::lifecycle::v1::{
-    FlowKind as FlowKindEnum, FlowParticipation, FlowStep, FlowSummaryView, FlowTxMatchView,
-    GetAccountFlowResponse, GetFlowResponse, LifecycleReason, ListAccountFlowsResponse,
-    ListFlowsByTxResponse, ListFlowsResponse,
+    AssetIds, FlowDomain, FlowKind as FlowKindEnum, FlowParticipation, FlowStep,
+    FlowSummaryProgressView, FlowSummaryView, FlowTimelineItemView, FlowTimelineStatus,
+    FlowTxMatchView, GetAccountFlowResponse, GetFlowResponse, LifecycleReason,
+    ListAccountFlowsResponse, ListFlowsByTxResponse, ListFlowsResponse, RequestFee,
+    RequestFeeStatus,
 };
 use crate::proto::chain::zipper::v1::ZipperReasonDetails as ProtoZipperReasonDetails;
+use crate::proto::polyester::r#type::v1::U128;
+use crate::types::AssetAmount;
+use buffa_types::google::protobuf::Timestamp;
 
 fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
     match value.as_known() {
@@ -112,8 +121,123 @@ fn flow_participation_label(value: &buffa::EnumValue<FlowParticipation>) -> Stri
     }
 }
 
-fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
-    LifecycleFlowSummary {
+/// Names a `FlowDomain` lowercased without its `DOMAIN_` prefix. A value
+/// newer than this SDK reads `unknown_domain_<n>`, never unspecified.
+fn flow_domain_label(value: &buffa::EnumValue<FlowDomain>) -> String {
+    match value.as_known() {
+        Some(FlowDomain::DOMAIN_UNSPECIFIED) => "unspecified".to_owned(),
+        Some(FlowDomain::DOMAIN_EXTERNAL_CHAIN) => "external_chain".to_owned(),
+        Some(FlowDomain::DOMAIN_ZIPPER) => "zipper".to_owned(),
+        Some(FlowDomain::DOMAIN_FUNDING) => "funding".to_owned(),
+        Some(FlowDomain::DOMAIN_TRADING) => "trading".to_owned(),
+        Some(FlowDomain::DOMAIN_LENDING) => "lending".to_owned(),
+        None => format!("unknown_domain_{}", value.to_i32()),
+    }
+}
+
+fn request_fee_status_label(value: &buffa::EnumValue<RequestFeeStatus>) -> String {
+    match value.as_known() {
+        Some(RequestFeeStatus::REQUEST_FEE_STATUS_UNSPECIFIED) => "unspecified".to_owned(),
+        Some(RequestFeeStatus::REQUEST_FEE_STATUS_LOCKED) => "locked".to_owned(),
+        Some(RequestFeeStatus::REQUEST_FEE_STATUS_SETTLED) => "settled".to_owned(),
+        Some(RequestFeeStatus::REQUEST_FEE_STATUS_KEPT) => "kept".to_owned(),
+        None => format!("unknown_fee_status_{}", value.to_i32()),
+    }
+}
+
+fn flow_timeline_status_label(value: &buffa::EnumValue<FlowTimelineStatus>) -> String {
+    match value.as_known() {
+        Some(FlowTimelineStatus::TIMELINE_STATUS_UNSPECIFIED) => "unspecified".to_owned(),
+        Some(FlowTimelineStatus::TIMELINE_STATUS_COMPLETED) => "completed".to_owned(),
+        Some(FlowTimelineStatus::TIMELINE_STATUS_CURRENT) => "current".to_owned(),
+        Some(FlowTimelineStatus::TIMELINE_STATUS_PLANNED) => "planned".to_owned(),
+        None => format!("unknown_timeline_status_{}", value.to_i32()),
+    }
+}
+
+/// A time the contract sends in milliseconds since the epoch (UTC). Zero is
+/// the contract's "no time" and reads `None`, as does a value past `i64`
+/// milliseconds.
+fn unix_ms_time(ms: u64) -> Option<Timestamp> {
+    let ms = i64::try_from(ms).ok().filter(|ms| *ms != 0)?;
+    Some(Timestamp {
+        seconds: ms / 1000,
+        nanos: i32::try_from(ms % 1000).ok()? * 1_000_000,
+        ..Default::default()
+    })
+}
+
+/// The `(zipped, unified)` asset IDs, 0 when the server sends none.
+fn asset_ids(msg: &buffa::MessageField<AssetIds>) -> (u32, u32) {
+    msg.as_option()
+        .map_or((0, 0), |ids| (ids.zipped_asset_id, ids.unified_asset_id))
+}
+
+/// An exact 18-decimal ledger amount in units of `unified_asset_id` (none
+/// when it is 0); `None` when the server sends none.
+fn ledger_amount(
+    operation: &str,
+    field: &str,
+    value: &buffa::MessageField<U128>,
+    unified_asset_id: u32,
+) -> Result<Option<AssetAmount>> {
+    value
+        .as_option()
+        .map(|v| {
+            e18_amount(
+                operation,
+                field,
+                Some(v),
+                (unified_asset_id != 0).then_some(unified_asset_id),
+            )
+        })
+        .transpose()
+}
+
+fn request_fee_from_proto(operation: &str, msg: &RequestFee) -> Result<LifecycleRequestFee> {
+    let (zipped_asset_id, unified_asset_id) = asset_ids(&msg.asset_ids);
+    Ok(LifecycleRequestFee {
+        zipped_asset_id,
+        unified_asset_id,
+        amount: ledger_amount(
+            operation,
+            "request_fee.amount_e18",
+            &msg.amount_e18,
+            unified_asset_id,
+        )?,
+        recipient_address: msg.recipient_address.clone(),
+        status: request_fee_status_label(&msg.status),
+    })
+}
+
+fn flow_progress_from_proto(msg: &FlowSummaryProgressView) -> LifecycleFlowProgress {
+    LifecycleFlowProgress {
+        current_step_started_at: unix_ms_time(msg.current_step_started_at_unix_ms),
+        current_step_expected_duration_ms: msg.current_step_expected_duration_ms,
+        current_confirmations: msg.current_confirmations,
+        required_confirmations: msg.required_confirmations,
+        approve_count: msg.approve_count,
+        reject_count: msg.reject_count,
+        validator_count: msg.validator_count,
+        required_approvals: msg.required_approvals,
+        required_rejections: msg.required_rejections,
+    }
+}
+
+fn flow_timeline_item_from_proto(msg: &FlowTimelineItemView) -> LifecycleFlowTimelineItem {
+    LifecycleFlowTimelineItem {
+        sequence: msg.sequence,
+        step: flow_step_label(&msg.step),
+        status: flow_timeline_status_label(&msg.status),
+        expected_duration_ms: msg.expected_duration_ms,
+    }
+}
+
+/// A flow summary, refused with `Error::ResponseContract` under `operation`
+/// when its amount or fee is past what [`AssetAmount`] holds.
+fn flow_summary_from_proto(operation: &str, msg: &FlowSummaryView) -> Result<LifecycleFlowSummary> {
+    let (zipped_asset_id, unified_asset_id) = asset_ids(&msg.asset_ids);
+    Ok(LifecycleFlowSummary {
         intent_id: msg.flow_id.clone(),
         flow_kind: flow_kind_label(&msg.flow_kind),
         latest_step: flow_step_label(&msg.current_step),
@@ -126,18 +250,49 @@ fn flow_summary_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
         participation: flow_participation_label(&msg.participation),
         source_address: msg.source_address.clone(),
         destination_address: msg.destination_address.clone(),
-    }
+        zipped_asset_id,
+        unified_asset_id,
+        polyester_chain_id: msg.polyester_chain_id,
+        amount: ledger_amount(operation, "amount_e18", &msg.amount_e18, unified_asset_id)?,
+        request_fee: msg
+            .request_fee
+            .as_option()
+            .map(|fee| request_fee_from_proto(operation, fee))
+            .transpose()?,
+        source_tx_hash: msg.source_tx_hash.clone(),
+        tx_occurrence_index: msg.tx_occurrence_index,
+        latest_tx_ref: msg.latest_tx_ref.clone(),
+        source_domain: flow_domain_label(&msg.source_domain),
+        destination_domain: flow_domain_label(&msg.destination_domain),
+        started_at: unix_ms_time(msg.started_at_unix_ms),
+        updated_at: unix_ms_time(msg.updated_at_unix_ms),
+        terminal_at: unix_ms_time(msg.terminal_at_unix_ms),
+        last_activity_at: unix_ms_time(msg.last_activity_at_unix_ms),
+        estimated_completion_at: unix_ms_time(msg.estimated_completion_unix_ms),
+        current_step_sequence: msg.current_step_sequence,
+        current_progress: msg
+            .current_progress
+            .as_option()
+            .map(flow_progress_from_proto),
+        progress_timeline: msg
+            .progress_timeline
+            .iter()
+            .map(flow_timeline_item_from_proto)
+            .collect(),
+    })
 }
 
-pub fn flow_summary_message_from_proto(msg: &FlowSummaryView) -> LifecycleFlowSummary {
-    flow_summary_from_proto(msg)
+/// A flow summary as a realtime flow update carries it. An amount or fee
+/// past what [`AssetAmount`] holds is an [`Error::ResponseContract`].
+pub fn flow_summary_message_from_proto(msg: &FlowSummaryView) -> Result<LifecycleFlowSummary> {
+    flow_summary_from_proto("FlowSummary", msg)
 }
 
 /// A read flow summary, refused with `Error::ResponseContract` without its
 /// flow ID.
 fn required_flow_summary(operation: &str, msg: &FlowSummaryView) -> Result<LifecycleFlowSummary> {
     require_str_id(operation, "flow_id", &msg.flow_id)?;
-    Ok(flow_summary_from_proto(msg))
+    flow_summary_from_proto(operation, msg)
 }
 
 pub fn flows_list_from_proto(msg: &ListFlowsResponse) -> Result<LifecycleFlowsList> {
@@ -151,8 +306,12 @@ pub fn flows_list_from_proto(msg: &ListFlowsResponse) -> Result<LifecycleFlowsLi
     })
 }
 
-fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
-    LifecycleFlowSummary {
+/// A transaction match, which carries the amount, asset, chain,
+/// transactions, route and last activity but none of the summary's fee,
+/// progress or other times.
+fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> Result<LifecycleFlowSummary> {
+    let (zipped_asset_id, unified_asset_id) = asset_ids(&msg.asset_ids);
+    Ok(LifecycleFlowSummary {
         intent_id: msg.flow_id.clone(),
         flow_kind: flow_kind_label(&msg.flow_kind),
         latest_step: flow_step_label(&msg.current_step),
@@ -167,7 +326,23 @@ fn flow_tx_match_from_proto(msg: &FlowTxMatchView) -> LifecycleFlowSummary {
         participation: String::new(),
         source_address: msg.source_address.clone(),
         destination_address: msg.destination_address.clone(),
-    }
+        zipped_asset_id,
+        unified_asset_id,
+        polyester_chain_id: msg.polyester_chain_id,
+        amount: ledger_amount(
+            "ListFlowsByTx",
+            "amount_e18",
+            &msg.amount_e18,
+            unified_asset_id,
+        )?,
+        source_tx_hash: msg.source_tx_hash.clone(),
+        tx_occurrence_index: msg.tx_occurrence_index,
+        latest_tx_ref: msg.latest_tx_ref.clone(),
+        source_domain: flow_domain_label(&msg.source_domain),
+        destination_domain: flow_domain_label(&msg.destination_domain),
+        last_activity_at: unix_ms_time(msg.last_activity_at_unix_ms),
+        ..Default::default()
+    })
 }
 
 pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> Result<LifecycleFlowsList> {
@@ -177,7 +352,7 @@ pub fn flows_by_tx_list_from_proto(msg: &ListFlowsByTxResponse) -> Result<Lifecy
             .iter()
             .map(|flow| {
                 require_str_id("ListFlowsByTx", "flow_id", &flow.flow_id)?;
-                Ok(flow_tx_match_from_proto(flow))
+                flow_tx_match_from_proto(flow)
             })
             .collect::<Result<_>>()?,
         next_page_token: msg.next_page_token.clone(),
@@ -260,7 +435,7 @@ mod tests {
             .into(),
             ..Default::default()
         };
-        let flow = flow_summary_message_from_proto(&msg);
+        let flow = flow_summary_message_from_proto(&msg).unwrap();
         assert_eq!(flow.intent_id, "flow-abc");
         assert!(flow.is_terminal);
         assert_eq!(flow.flow_kind, "deposit");
@@ -294,7 +469,7 @@ mod tests {
                 .into(),
                 ..Default::default()
             };
-            let flow = flow_summary_message_from_proto(&msg);
+            let flow = flow_summary_message_from_proto(&msg).unwrap();
             assert_eq!(flow.lifecycle_reason, "zipper_withdraw_execution_failed");
             let zipper = flow.zipper_reason.expect("zipper_reason");
             assert_eq!(zipper.code, code.map_or(0, |c| c as i32));
@@ -310,7 +485,7 @@ mod tests {
             lifecycle_reason: buffa::EnumValue::from(2001),
             ..Default::default()
         };
-        let flow = flow_summary_message_from_proto(&msg);
+        let flow = flow_summary_message_from_proto(&msg).unwrap();
         assert_eq!(flow.flow_kind, "unspecified");
         assert_eq!(flow.latest_step, "unspecified");
         assert_eq!(flow.lifecycle_reason, "unknown_reason_2001");
@@ -342,7 +517,7 @@ mod tests {
                 lifecycle_reason: reason.into(),
                 ..Default::default()
             };
-            let flow = flow_summary_message_from_proto(&msg);
+            let flow = flow_summary_message_from_proto(&msg).unwrap();
             assert_eq!(flow.lifecycle_reason, expected);
         }
     }
@@ -354,7 +529,7 @@ mod tests {
             lifecycle_reason: LifecycleReason::ZIPPER_COMPLIANCE_TRANSFERRED.into(),
             ..Default::default()
         };
-        let flow = flow_summary_message_from_proto(&msg);
+        let flow = flow_summary_message_from_proto(&msg).unwrap();
         assert_eq!(flow.lifecycle_reason, "zipper_compliance_transferred");
     }
 
@@ -370,7 +545,7 @@ mod tests {
             lifecycle_reason: LifecycleReason::ZIPPER_DEPOSIT_DELIVERED_TO_WALLET.into(),
             ..Default::default()
         };
-        let flow = flow_summary_message_from_proto(&msg);
+        let flow = flow_summary_message_from_proto(&msg).unwrap();
         assert_eq!(flow.lifecycle_reason, "zipper_deposit_delivered_to_wallet");
         assert!(flow.is_terminal && !flow.is_open);
         assert_eq!(flow.latest_step, "transfer");
@@ -378,7 +553,8 @@ mod tests {
             flow_id: "flow-wallet".into(),
             lifecycle_reason: buffa::EnumValue::from(106),
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert_eq!(
             by_number.lifecycle_reason,
             "zipper_deposit_delivered_to_wallet"
@@ -448,14 +624,15 @@ mod tests {
             lifecycle_reason: LifecycleReason::DEPOSIT_SOURCE_NOT_CONFIRMED.into(),
             ..Default::default()
         };
-        let flow = flow_summary_message_from_proto(&msg);
+        let flow = flow_summary_message_from_proto(&msg).unwrap();
         assert!(flow.is_delayed);
         assert_eq!(flow.lifecycle_reason, "deposit_source_not_confirmed");
 
         let on_time = flow_summary_message_from_proto(&FlowSummaryView {
             is_open: true,
             ..Default::default()
-        });
+        })
+        .unwrap();
         assert!(!on_time.is_delayed);
     }
 
