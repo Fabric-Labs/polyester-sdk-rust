@@ -680,6 +680,7 @@ fn history_trade(id: u64) -> Trade {
         price: Price::from_ticks(1, None).unwrap(),
         qty: Quantity::from_scaled(1, Some(3), QuantityDomain::OrderBase, None, None).unwrap(),
         taker_side: Side::Buy,
+        transact_ts_ns: 0,
     }
 }
 
@@ -919,4 +920,70 @@ async fn backfill_gives_up_after_repeated_failures() {
             .is_err()
     );
     assert_eq!(*history.0.lock().unwrap(), 10);
+}
+
+/// A recovered trade keeps its exchange time: the trade history's `ts_ns`
+/// becomes the trade's `transact_ts_ns`, in Unix nanoseconds as on a live
+/// trade.
+#[test]
+fn backfilled_trades_keep_their_exchange_time() {
+    use crate::codecs::decode::market_trades_from_proto;
+    use crate::marketstream::backfill::history_page;
+    use crate::proto::marketdata::v1::{GetTradesResponse, MarketTrade as ProtoMarketTrade};
+
+    let wire = |match_id: u64, ts_ns: u64| ProtoMarketTrade {
+        symbol_id: 7,
+        match_id,
+        is_buy: true,
+        price_ticks: 65_000_000_000_000,
+        qty_scaled: 1_500,
+        ts_ns,
+        ..Default::default()
+    };
+    let res = market_trades_from_proto(
+        &GetTradesResponse {
+            trades: vec![wire(101, 1_700_000_000_123_456_789), wire(102, 0)],
+            complete_through_trade_id: 102,
+            next_after_trade_id: 102,
+            ..Default::default()
+        },
+        3,
+    )
+    .unwrap();
+    let page = history_page(res).unwrap();
+    assert_eq!(
+        page.trades
+            .iter()
+            .map(|t| (t.trade_id, t.transact_ts_ns))
+            .collect::<Vec<_>>(),
+        vec![(101, 1_700_000_000_123_456_789), (102, 0)],
+        "a time the history does not report stays 0"
+    );
+}
+
+#[test]
+fn a_backfilled_trade_time_that_is_not_a_number_breaks_the_contract() {
+    use crate::marketstream::backfill::history_page;
+    use crate::models::{MarketTrade, MarketTradesResult};
+
+    let res = MarketTradesResult {
+        trades: vec![MarketTrade {
+            symbol_id: 7,
+            match_id: "101".into(),
+            price: Some(Price::from_ticks(1, None).unwrap()),
+            qty: Some(
+                Quantity::from_scaled(1, Some(3), QuantityDomain::OrderBase, None, None).unwrap(),
+            ),
+            ts_ns: "soon".into(),
+            side: "buy".into(),
+        }],
+        next_page_token: String::new(),
+        complete_through_trade_id: 101,
+        next_after_trade_id: 101,
+        epoch_ends: Vec::new(),
+    };
+    assert!(
+        matches!(history_page(res), Err(Error::ResponseContract { .. })),
+        "a trade time that is not Unix nanoseconds is refused"
+    );
 }
