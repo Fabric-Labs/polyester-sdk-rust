@@ -1227,19 +1227,36 @@ struct Pair {
 }
 
 impl Pair {
-    /// The pair `symbol_id` of `pairs`, refused when its base quantity scale
-    /// is unknown, as the Orders API refuses a pair missing from the catalog.
+    /// The pair `symbol_id` of `pairs`, its scale and symbol read together
+    /// so a reload cannot mix two versions of its row. Refused when its base
+    /// quantity scale is unknown, as the Orders API refuses a pair missing
+    /// from the catalog.
     fn of(pairs: &dyn Pairs, symbol_id: u32) -> Result<Self> {
-        let base_quantity_scale = pairs.base_quantity_scale(symbol_id).ok_or_else(|| {
-            Error::validation(format!(
-                "quantity scale for pair {symbol_id} is unavailable; await client.wait_for_catalogs() before placing orders"
-            ))
-        })?;
+        let (base_quantity_scale, symbol) = pairs
+            .base_quantity_scale_and_symbol(symbol_id)
+            .ok_or_else(|| {
+                Error::validation(format!(
+                    "quantity scale for pair {symbol_id} is unavailable; await client.wait_for_catalogs() before placing orders"
+                ))
+            })?;
         Ok(Self {
             symbol_id,
-            symbol: pairs.symbol(symbol_id),
+            symbol,
             base_quantity_scale,
         })
+    }
+
+    /// The pair's symbol to check a value tagged `tagged` against. A value
+    /// tagged with a symbol is refused when the pair's symbol is unknown,
+    /// since the tag cannot be checked; an untagged value needs none.
+    fn symbol_for(&self, what: &str, tagged: Option<&str>) -> Result<Option<&str>> {
+        match (tagged, self.symbol.as_deref()) {
+            (Some(tag), None) => Err(Error::validation(format!(
+                "{what} symbol {tag} cannot be checked: the symbol of pair {} is unavailable",
+                self.symbol_id
+            ))),
+            (_, symbol) => Ok(symbol),
+        }
     }
 
     /// The scaled value of a positive base quantity of this pair. As on the
@@ -1261,7 +1278,7 @@ impl Pair {
         qty.compatible_with(
             QuantityDomain::OrderBase,
             Some(self.base_quantity_scale),
-            self.symbol.as_deref(),
+            self.symbol_for("quantity", qty.symbol())?,
             Some(self.symbol_id),
         )?;
         if qty.as_scaled() <= 0 {
@@ -1275,7 +1292,7 @@ impl Pair {
     /// on the Orders API, a symbol it carries must be the pair's, and the
     /// venue checks the pair's tick size.
     fn price_ticks(&self, price: &Price) -> Result<i64> {
-        price.compatible_with(self.symbol.as_deref())?;
+        price.compatible_with(self.symbol_for("price", price.symbol())?)?;
         if price.as_ticks() <= 0 {
             return Err(Error::validation("tradews price must be positive"));
         }

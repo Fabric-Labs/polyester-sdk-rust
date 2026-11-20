@@ -2641,7 +2641,8 @@ good-till-cancelled limit orders.
     already in the pair's units and is sent as `n`.
   - A symbol or `symbol_id` that a quantity carries must be the pair's, and
     a symbol that a price carries must be the pair's. A value without one is
-    taken as the pair's.
+    taken as the pair's. A value tagged with a symbol is refused when the
+    pairs do not know the pair's symbol, since the tag cannot be checked.
   - A price has no scale or tick size of its own: its ticks are always quote
     units times 1e9. `Price::from_ticks(t, None)` is sent as `t`. The venue
     refuses a price that is not on the pair's tick size, as it does for the

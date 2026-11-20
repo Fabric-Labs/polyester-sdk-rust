@@ -817,6 +817,18 @@ impl Manager {
             .copied()
     }
 
+    /// The pair's base quantity scale and display symbol from one read of the
+    /// catalog, so a reload never pairs one row's scale with another's
+    /// symbol. `None` when the scale is unknown or unhydrated.
+    pub fn base_quantity_scale_and_symbol_for_symbol_id(
+        &self,
+        id: u32,
+    ) -> Option<(u32, Option<String>)> {
+        let inner = read_unpoisoned(&self.inner);
+        let scale = inner.id_to_base_scale.get(&id).copied()?;
+        Some((scale, inner.id_to_symbol.get(&id).cloned()))
+    }
+
     /// Returns the pair quote quantity scale, or `None` when unknown/unhydrated.
     ///
     /// Quote-debit budgets must use this scale. Callers must not infer it from

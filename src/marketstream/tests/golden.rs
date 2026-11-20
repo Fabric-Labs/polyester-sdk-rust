@@ -143,6 +143,9 @@ impl Pairs for AnyPairs {
     fn symbol(&self, _: u32) -> Option<String> {
         None
     }
+    fn base_quantity_scale_and_symbol(&self, _: u32) -> Option<(u32, Option<String>)> {
+        Some((8, None))
+    }
     fn symbol_id(&self, _: &str) -> Option<u32> {
         None
     }
