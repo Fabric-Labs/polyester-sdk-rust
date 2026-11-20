@@ -55,8 +55,14 @@ struct SigningTimestampAllocator {
 
 impl SigningTimestampAllocator {
     fn next(&self) -> Result<u64> {
+        self.next_with_clock(|| timestamp_ms_from(SystemTime::now()))
+    }
+
+    /// Allocate against `now_ms`, read once per attempt. This never waits:
+    /// a full window returns a retryable capacity error at once.
+    fn next_with_clock(&self, mut now_ms: impl FnMut() -> Result<u64>) -> Result<u64> {
         loop {
-            let now = timestamp_ms_from(SystemTime::now())?;
+            let now = now_ms()?;
             let ceiling = now
                 .checked_add(MAX_SIGNING_FUTURE_SKEW_MS)
                 .ok_or_else(|| Error::transport("signing timestamp ceiling overflow"))?;
@@ -842,21 +848,46 @@ mod tests {
 
     #[test]
     fn synchronous_signing_capacity_returns_retryable_error_without_sleeping() {
+        // A fixed clock, so nothing here depends on wall time or scheduling.
+        const NOW_MS: u64 = 1_700_000_000_000;
+        let ceiling = NOW_MS + MAX_SIGNING_FUTURE_SKEW_MS;
+        for (seed, wait_ms) in [(ceiling, 1), (ceiling + 41, 42)] {
+            let allocator = SigningTimestampAllocator::default();
+            allocator.last_timestamp_ms.store(seed, Ordering::Release);
+            let clock_reads = std::cell::Cell::new(0_u32);
+            let error = allocator
+                .next_with_clock(|| {
+                    clock_reads.set(clock_reads.get() + 1);
+                    // Capacity reopens only as the clock advances, so waiting
+                    // for it means reading the clock again.
+                    assert_eq!(
+                        clock_reads.get(),
+                        1,
+                        "full capacity waited for the clock instead of returning"
+                    );
+                    Ok(NOW_MS)
+                })
+                .unwrap_err();
+            assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
+            assert!(error.is_retryable());
+            assert_eq!(error.retry_after(), Some(wait_ms as f64 / 1_000.0));
+            assert_eq!(clock_reads.get(), 1);
+            assert_eq!(allocator.last_timestamp_ms.load(Ordering::Acquire), seed);
+        }
+
+        // The wall-clock entry point takes the same path: a seed far beyond
+        // any ceiling stays refused however much time passes.
         let allocator = SigningTimestampAllocator::default();
-        // Seed far beyond the skew ceiling so wall-clock advance between store
-        // and next() cannot reopen capacity under parallel CI load.
         allocator
             .last_timestamp_ms
             .store(u64::MAX - 2, Ordering::Release);
-        let started = Instant::now();
         let error = allocator.next().unwrap_err();
-        assert!(matches!(error, Error::RateLimit { .. }));
+        assert!(matches!(error, Error::RateLimit { .. }), "{error:?}");
         assert!(error.is_retryable());
         assert!(error.retry_after().is_some_and(|value| value > 0.0));
-        assert!(
-            started.elapsed() < Duration::from_millis(50),
-            "synchronous capacity handling blocked for {:?}",
-            started.elapsed()
+        assert_eq!(
+            allocator.last_timestamp_ms.load(Ordering::Acquire),
+            u64::MAX - 2
         );
     }
 
