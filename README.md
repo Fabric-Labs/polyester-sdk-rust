@@ -3188,7 +3188,7 @@ the flow, with `tx_occurrence_index` telling apart the legs of one batched depos
 `latest_tx_ref` an opaque reference to the latest one. `source_domain` and `destination_domain`
 name the route (`funding` to `external_chain` for a Funding withdrawal). `started_at`,
 `updated_at`, `last_activity_at`, `terminal_at` (`None` while open) and `estimated_completion_at`
-(`None` while `is_delayed`; read `terminal_at`, not it, for when a flow ended) are UTC timestamps.
+(`None` while `is_delayed`; read `terminal_at`, not it, for when a flow ended) are `SystemTime`s.
 `progress_timeline`, `current_step_sequence` and `current_progress` drive a progress bar. A
 transaction lookup carries the amount, asset, transactions, route and `last_activity_at`, but no
 fee, progress or other times.

@@ -18,7 +18,7 @@ use crate::proto::chain::lifecycle::v1::{
 use crate::proto::chain::zipper::v1::ZipperReasonDetails as ProtoZipperReasonDetails;
 use crate::proto::polyester::r#type::v1::U128;
 use crate::types::AssetAmount;
-use buffa_types::google::protobuf::Timestamp;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn lifecycle_reason_label(value: &buffa::EnumValue<LifecycleReason>) -> String {
     match value.as_known() {
@@ -155,16 +155,14 @@ fn flow_timeline_status_label(value: &buffa::EnumValue<FlowTimelineStatus>) -> S
     }
 }
 
-/// A time the contract sends in milliseconds since the epoch (UTC). Zero is
-/// the contract's "no time" and reads `None`, as does a value past `i64`
-/// milliseconds.
-fn unix_ms_time(ms: u64) -> Option<Timestamp> {
-    let ms = i64::try_from(ms).ok().filter(|ms| *ms != 0)?;
-    Some(Timestamp {
-        seconds: ms / 1000,
-        nanos: i32::try_from(ms % 1000).ok()? * 1_000_000,
-        ..Default::default()
-    })
+/// A time the contract sends in milliseconds since the Unix epoch. Zero is
+/// the contract's "no time" and reads `None`, as does one `SystemTime`
+/// cannot hold.
+fn unix_ms_time(ms: u64) -> Option<SystemTime> {
+    if ms == 0 {
+        return None;
+    }
+    UNIX_EPOCH.checked_add(Duration::from_millis(ms))
 }
 
 /// The `(zipped, unified)` asset IDs, 0 when the server sends none.

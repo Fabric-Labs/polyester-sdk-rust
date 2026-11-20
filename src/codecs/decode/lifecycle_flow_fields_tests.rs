@@ -15,7 +15,7 @@ use crate::proto::chain::lifecycle::v1::{
 use crate::proto::polyester::r#type::v1::U128;
 use crate::types::{AssetAmount, QuantityDomain};
 use buffa::Message;
-use buffa_types::google::protobuf::Timestamp;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// A flow summary in the shape the API's JSON answer has: an open withdrawal
 /// with its amount, fee, transactions, route, times, current progress and
@@ -77,13 +77,9 @@ fn detail(summary: FlowSummaryView) -> FlowDetailView {
     }
 }
 
-/// The UTC time `ms` milliseconds after the epoch.
-fn at(ms: i64) -> Option<Timestamp> {
-    Some(Timestamp {
-        seconds: ms / 1000,
-        nanos: i32::try_from(ms % 1000).unwrap() * 1_000_000,
-        ..Default::default()
-    })
+/// The time `ms` milliseconds after the Unix epoch.
+fn at(ms: u64) -> Option<SystemTime> {
+    Some(UNIX_EPOCH + Duration::from_millis(ms))
 }
 
 fn assert_ledger_amount(name: &str, got: Option<&AssetAmount>, want: i128, asset_id: u32) {
@@ -485,4 +481,19 @@ fn flow_amount_out_of_range_fails_closed() {
         }),
         Err(Error::ResponseContract { .. })
     ));
+}
+
+/// A flow summary stays `Eq`, as it was before it carried its times: callers
+/// compare flows and pages with `==` and require `Eq` of them.
+#[test]
+fn flow_models_stay_eq() {
+    fn eq<T: Eq>() {}
+    eq::<LifecycleFlowSummary>();
+    eq::<crate::models::LifecycleFlowsList>();
+    eq::<crate::models::LifecycleRequestFee>();
+    eq::<crate::models::LifecycleFlowProgress>();
+    eq::<LifecycleFlowTimelineItem>();
+    let flow = flow_summary_message_from_proto(&open_withdraw_view()).unwrap();
+    assert_eq!(flow, flow.clone());
+    assert_ne!(flow, LifecycleFlowSummary::default());
 }

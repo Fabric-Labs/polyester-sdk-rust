@@ -1,7 +1,7 @@
 //! Lifecycle flow models (Go `models/trading.go` lifecycle parity).
 
 use crate::types::AssetAmount;
-use buffa_types::google::protobuf::Timestamp;
+use std::time::SystemTime;
 
 /// Specific Zipper reason details when a notable outcome has a catalog entry.
 ///
@@ -25,7 +25,7 @@ pub struct ZipperReasonDetails {
 
 /// A lifecycle flow: a deposit, withdrawal or transfer, with what moved,
 /// where, and when.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct LifecycleFlowSummary {
     pub intent_id: String,
     pub flow_kind: String,
@@ -103,17 +103,17 @@ pub struct LifecycleFlowSummary {
     pub source_domain: String,
     pub destination_domain: String,
     /// The flow's first observed business time (`started_at`) and the
-    /// summary's last update (`updated_at`), UTC; `None` when the server
+    /// summary's last update (`updated_at`); `None` when the server
     /// sends none. Transaction lookups carry neither.
-    pub started_at: Option<Timestamp>,
-    pub updated_at: Option<Timestamp>,
-    /// When the flow reached its final state, UTC; `None` while it is open.
+    pub started_at: Option<SystemTime>,
+    pub updated_at: Option<SystemTime>,
+    /// When the flow reached its final state; `None` while it is open.
     /// Transaction lookups do not carry it.
-    pub terminal_at: Option<Timestamp>,
-    /// The time lists order flows by, UTC; `None` when the server sends
+    pub terminal_at: Option<SystemTime>,
+    /// The time lists order flows by; `None` when the server sends
     /// none.
-    pub last_activity_at: Option<Timestamp>,
-    /// When the flow is expected to complete, UTC; `None` when the server
+    pub last_activity_at: Option<SystemTime>,
+    /// When the flow is expected to complete; `None` when the server
     /// sends none, as transaction lookups do.
     ///
     /// The contract sends no estimate (`None` here) while `is_delayed` is
@@ -122,7 +122,7 @@ pub struct LifecycleFlowSummary {
     /// The contract does not say what a terminal flow carries here. Devnet
     /// sends the flow's terminal time, the same as `terminal_at`, but do not
     /// rely on that: read `terminal_at` for when a flow ended.
-    pub estimated_completion_at: Option<Timestamp>,
+    pub estimated_completion_at: Option<SystemTime>,
     /// The one-based position of `latest_step` in `progress_timeline`; 0
     /// when the server sends none.
     pub current_step_sequence: u32,
@@ -162,11 +162,11 @@ pub struct LifecycleRequestFee {
 /// when they do not apply to the step: confirmations to a step waiting on
 /// source-chain confirmations, approvals and rejections to a validation
 /// step.
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct LifecycleFlowProgress {
-    /// When the current step started, UTC; `None` when the server sends
+    /// When the current step started; `None` when the server sends
     /// none.
-    pub current_step_started_at: Option<Timestamp>,
+    pub current_step_started_at: Option<SystemTime>,
     /// How long the current step is expected to take, in milliseconds.
     pub current_step_expected_duration_ms: u64,
     pub current_confirmations: u32,
@@ -198,7 +198,7 @@ pub struct LifecycleFlowTimelineItem {
     pub expected_duration_ms: u64,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LifecycleFlowsList {
     pub flows: Vec<LifecycleFlowSummary>,
     pub next_page_token: String,
