@@ -684,11 +684,21 @@ impl Client {
     /// [`StopAllTradingResult::trigger_failures`] (each listed leg of an OCO
     /// whose cancel failed). An error listing the triggers returns before
     /// anything is canceled; an error of the final cancel-all is returned as
-    /// is.
+    /// is. A blank `symbol`, or a `request_id` the cancel-all would refuse,
+    /// is refused before anything is listed or canceled.
     pub async fn stop_all_trading(
         &self,
         scope: StopAllTradingScope,
     ) -> Result<StopAllTradingResult> {
+        let cancel_all = CancelAllOpts {
+            symbol: scope.symbol.clone(),
+            subaccount_id: scope.subaccount_id,
+            request_id: scope.request_id.clone(),
+            ..Default::default()
+        };
+        // The final cancel-all refuses a blank symbol or a request ID it would
+        // not send as given: refuse it here, before any trigger is canceled.
+        crate::services::OrdersService::check_cancel_all(&cancel_all)?;
         // Each cancel to send, in listing order: a trigger (no OCO ID), or an
         // OCO with the legs listed.
         let mut targets: Vec<(Option<String>, Vec<String>)> = Vec::new();
@@ -764,15 +774,7 @@ impl Client {
             }
         }
 
-        let orders = self
-            .orders
-            .cancel_all_with(CancelAllOpts {
-                symbol: scope.symbol,
-                subaccount_id: scope.subaccount_id,
-                request_id: scope.request_id,
-                ..Default::default()
-            })
-            .await?;
+        let orders = self.orders.cancel_all_with(cancel_all).await?;
         Ok(StopAllTradingResult {
             canceled_trigger_ids,
             trigger_failures,

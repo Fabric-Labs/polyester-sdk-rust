@@ -1176,6 +1176,11 @@ pub struct CancelOrderParams {
 /// Options for [`crate::services::OrdersService::cancel_all_with`].
 #[derive(Debug, Clone, Default)]
 pub struct CancelAllOpts {
+    /// `symbol`, `symbols` or `symbol_ids`/`symbol_id` (at most one of them)
+    /// select the markets; none matches every market. A supplied symbol must
+    /// name a market: a blank `symbol`, or a blank entry in `symbols`, is
+    /// refused rather than read as every market. Leave `symbol` `None` and
+    /// `symbols` empty to cancel on every market.
     pub symbol: Option<String>,
     pub symbols: Vec<String>,
     pub symbol_id: Option<u32>,
@@ -1194,8 +1199,9 @@ pub struct CancelAllOpts {
     pub include_triggers: bool,
     /// Optional mutation request id (API-required on the wire).
     ///
-    /// When omitted or blank, the SDK generates a unique id (TypeScript/Go/Python parity).
-    /// Set a stable non-empty value when you may retry the same logical cancel-all after an
+    /// When omitted, the SDK generates a unique id (TypeScript/Go/Python parity). A supplied
+    /// one is sent exactly as given: a blank or padded one is refused, never trimmed or
+    /// replaced. Set a stable value when you may retry the same logical cancel-all after an
     /// ambiguous failure, and reuse that same value on retry. A blind retry that omits
     /// `request_id` mints a *new* id and is not an idempotent replay.
     pub request_id: Option<String>,
@@ -1207,10 +1213,13 @@ pub struct CancelAllOpts {
 pub struct StopAllTradingScope {
     /// Sub-account to stop (see [`SubAccountScope`]).
     pub subaccount_id: SubAccountScope,
-    /// Market to stop, such as `BTC-USDT`; `None` stops every market.
+    /// Market to stop, such as `BTC-USDT`; `None` stops every market. A
+    /// blank one is refused before anything is canceled.
     pub symbol: Option<String>,
     /// Request id of the final cancel-all; generated when omitted. Reuse it
-    /// when retrying the same stop after an ambiguous failure.
+    /// when retrying the same stop after an ambiguous failure. It is sent
+    /// exactly as given: a blank or padded one is refused before anything is
+    /// canceled.
     pub request_id: Option<String>,
 }
 

@@ -1,6 +1,6 @@
 use super::ServiceContext;
 use super::correlation_id::{
-    optional_client_order_id, optional_request_id, require_client_style_id,
+    exact_request_id, optional_client_order_id, optional_request_id, require_client_style_id,
 };
 use super::limits::{ORDER_READ_LIMIT_MAX, check_optional_limit};
 use super::scope;
@@ -1918,6 +1918,9 @@ impl OrdersService {
     ///
     /// A `request_id` is generated when omitted (TypeScript/Go/Python parity). Provide a stable
     /// non-empty value via [`Self::cancel_all_with`] when retrying the same logical bulk cancellation.
+    ///
+    /// `None` cancels on every market; a blank `symbol` is refused, as for
+    /// [`Self::cancel_all_with`].
     pub async fn cancel_all(
         &self,
         symbol: Option<&str>,
@@ -1940,9 +1943,17 @@ impl OrdersService {
     /// accepted, each ending canceled with cancel reason `cancel_all`;
     /// [`CancelAllOrdersResult::matched_triggers`] counts them.
     ///
-    /// A `request_id` is generated when omitted or blank. Provide a stable non-empty value when
-    /// retrying the same logical bulk cancellation.
+    /// A `request_id` is generated when omitted. Provide a stable value when retrying the same
+    /// logical bulk cancellation: a supplied one is sent exactly as given, never trimmed or
+    /// replaced, so a blank or padded one is refused.
+    ///
+    /// Refused before sending, and before waiting for the catalogs: a blank
+    /// `symbol` or `symbols` entry (leave them unset to match every market)
+    /// and an invalid `request_id`. More than one of `symbol`, `symbols` and
+    /// `symbol_ids`/`symbol_id`, an unknown symbol, a zero symbol ID and more
+    /// than 100 markets are refused before sending too.
     pub async fn cancel_all_with(&self, opts: CancelAllOpts) -> Result<CancelAllOrdersResult> {
+        Self::check_cancel_all(&opts)?;
         if opts.symbol.is_some() || !opts.symbols.is_empty() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -1962,7 +1973,12 @@ impl OrdersService {
             },
             dry_run: opts.dry_run,
             include_triggers: opts.include_triggers,
-            request_id: Self::coalesce_request_id(opts.request_id, "cancel-all")?,
+            // A caller's request ID is sent exactly as given, or refused:
+            // never trimmed or replaced, so a retry replays the same key.
+            request_id: match opts.request_id {
+                Some(id) => exact_request_id(&id)?,
+                None => Self::coalesce_request_id(None, "cancel-all")?,
+            },
             ..Default::default()
         };
         if let Some(side) = opts.side.as_deref() {
@@ -1978,6 +1994,32 @@ impl OrdersService {
         .await?
         .into_owned();
         cancel_all_from_proto(&resp)
+    }
+
+    /// Refuse a cancel-all whose market filter or request ID would not be
+    /// sent as given. A blank symbol would resolve to no market and so match
+    /// every market, and a trimmed or generated request ID would turn a retry
+    /// into a new cancel.
+    pub(crate) fn check_cancel_all(opts: &CancelAllOpts) -> Result<()> {
+        const OP: &str = "orders.cancel_all";
+        if opts
+            .symbol
+            .as_deref()
+            .is_some_and(|symbol| symbol.trim().is_empty())
+        {
+            return Err(Error::validation(format!(
+                "{OP} symbol must not be blank; leave it None to match every market"
+            )));
+        }
+        if let Some(i) = opts.symbols.iter().position(|s| s.trim().is_empty()) {
+            return Err(Error::validation(format!(
+                "{OP} symbols[{i}] must not be blank; leave symbols empty to match every market"
+            )));
+        }
+        if let Some(id) = opts.request_id.as_deref() {
+            exact_request_id(id)?;
+        }
+        Ok(())
     }
 
     fn parse_side(side: &str) -> Result<Side> {
