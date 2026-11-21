@@ -600,6 +600,20 @@ async fn cancel_all_refuses_invalid_filters_before_sending() {
             ),
             (
                 CancelAllTriggersOpts {
+                    symbol: Some(" ".into()),
+                    ..Default::default()
+                },
+                "symbol must not be blank",
+            ),
+            (
+                CancelAllTriggersOpts {
+                    symbols: vec!["".into()],
+                    ..Default::default()
+                },
+                "symbols[0] must not be blank",
+            ),
+            (
+                CancelAllTriggersOpts {
                     symbol_ids: (1..=101).collect(),
                     ..Default::default()
                 },

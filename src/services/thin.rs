@@ -23,20 +23,6 @@ macro_rules! thin_service {
     };
 }
 
-macro_rules! realtime_only_service {
-    ($name:ident) => {
-        #[derive(Clone)]
-        pub struct $name {
-            pub(crate) ctx: ServiceContext,
-        }
-        impl $name {
-            pub fn new(ctx: ServiceContext) -> Self {
-                Self { ctx }
-            }
-        }
-    };
-}
-
 thin_service!(
     ChainAnalyticsService,
     crate::connect::chain::analytics::v1::ChainAnalyticsServiceClient<
@@ -53,7 +39,6 @@ thin_service!(
     HeatmapService,
     crate::connect::marketdata::v1::HeatmapServiceClient<crate::transport::SharedTransport>
 );
-realtime_only_service!(PoliciesService);
 thin_service!(
     SubAccountsService,
     crate::connect::auth::v1::SubaccountServiceClient<crate::transport::SharedTransport>
@@ -551,47 +536,6 @@ impl InternalTransfersService {
             idempotency_key: params.idempotency_key,
             ..Default::default()
         })
-    }
-}
-
-impl PoliciesService {
-    /// Subscribe to private subaccount policy updates (requires `realtime` feature).
-    pub async fn subscribe(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
-    {
-        self.subscribe_subaccount_policies(account_id).await
-    }
-
-    /// Subscribe to private subaccount policy updates (requires `realtime` feature).
-    pub async fn subscribe_subaccount_policies(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
-    {
-        let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
-        let channel = format!("private:auth:subaccount-policies:{account}:proto");
-        self.ctx
-            .realtime
-            .subscribe_proto(
-                &channel,
-                crate::codecs::decode::subaccount_policy_from_bytes,
-            )
-            .await
-    }
-
-    /// Subscribe to private API-key policy updates (requires `realtime` feature).
-    pub async fn subscribe_api_policies(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::ApiPolicy>> {
-        let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
-        let channel = format!("private:auth:api-policies:{account}:proto");
-        self.ctx
-            .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::api_policy_from_bytes)
-            .await
     }
 }
 

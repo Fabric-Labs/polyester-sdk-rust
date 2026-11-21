@@ -29,12 +29,13 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Profile (identity subscribe) | Yes |
 | API keys (list/get/subscribe/local keypair generation) | Yes |
 | Subaccounts (list/get/members/invites/activity/subscribe) | Yes |
-| Address book (list/view/create/update/subscribe) | Yes |
+| Address book (list/view/subscribe/create/update) | Yes |
 | Policies (realtime subscribe) | Yes |
 | Guard signer | Yes |
 | VIP tiers + status | Yes |
 | Spot fee rates | Yes |
 | Trading rate limits | Yes |
+| Profit and loss + trading statistics | Yes |
 | Product changelog (posts + changes) | Yes |
 | Server build version | Yes |
 | Price alerts (devnet) | Yes |
@@ -44,8 +45,8 @@ Proprietary license (not open source). API-key only; no browser login or JWT flo
 | Triggers | Yes |
 | Internal transfers | Yes |
 | Dust conversion | Yes |
-| Statement export files | Yes |
 | Transfer history | Yes |
+| Statement export files | Yes |
 | Deposit addresses | Yes |
 | Trading / funding withdraws | Yes |
 | Zipper deposit-withdraw config | Yes |

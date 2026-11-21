@@ -314,6 +314,27 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
     Ok(())
 }
 
+/// Refuse a blank market filter of a cancel-all of triggers: it would resolve
+/// to no market and so match every market.
+fn check_cancel_all_symbols(opts: &CancelAllTriggersOpts) -> Result<()> {
+    const OP: &str = "triggers.cancel_all";
+    if opts
+        .symbol
+        .as_deref()
+        .is_some_and(|symbol| symbol.trim().is_empty())
+    {
+        return Err(Error::validation(format!(
+            "{OP} symbol must not be blank; leave it None to match every market"
+        )));
+    }
+    if let Some(i) = opts.symbols.iter().position(|s| s.trim().is_empty()) {
+        return Err(Error::validation(format!(
+            "{OP} symbols[{i}] must not be blank; leave symbols empty to match every market"
+        )));
+    }
+    Ok(())
+}
+
 fn trigger_type_to_proto(trigger_type: CreateTriggerType) -> TriggerType {
     match trigger_type {
         CreateTriggerType::StopLoss => TriggerType::STOP_LOSS,
@@ -1133,6 +1154,7 @@ impl TriggersService {
 
     fn encode_cancel_all(&self, opts: CancelAllTriggersOpts) -> Result<CancelAllTriggersRequest> {
         const OP: &str = "triggers.cancel_all";
+        check_cancel_all_symbols(&opts)?;
         let mut trigger_types = Vec::with_capacity(opts.trigger_types.len());
         for trigger_type in &opts.trigger_types {
             let trigger_type = trigger_type_to_proto(*trigger_type);
@@ -1487,21 +1509,28 @@ impl TriggersService {
     /// open. With [`CancelAllTriggersOpts::dry_run`] it only counts them. The
     /// answer lists no trigger IDs: read the triggers again afterwards.
     ///
-    /// A `request_id` is generated when omitted. Provide a stable non-empty
-    /// value, with the same filters, when retrying the same cancel after an
-    /// ambiguous failure, including `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`:
-    /// within two minutes it returns the original count and cancels nothing
-    /// again. Every request costs 10 units of the cancel rate limit, a dry
-    /// run and a retry included.
+    /// Generate [`CancelAllTriggersOpts::request_id`] once per user action
+    /// and keep it: a retry needs the same key and filters. Within two
+    /// minutes such a retry returns the original count and cancels nothing
+    /// again; after an ambiguous failure, including
+    /// `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`, retry with it. When it is
+    /// omitted a key is generated, but the result does not return it, so
+    /// that request cannot be retried safely: supply your own whenever a
+    /// retry may follow. Request IDs are a separate key space from
+    /// [`crate::services::OrdersService::cancel_all_with`]. Every request
+    /// costs 10 units of the cancel rate limit, a dry run and a retry
+    /// included.
     ///
     /// While it ends an order's attached legs, a modify of that order that
     /// adds or changes an attached take-profit, stop-loss or trailing leg is
     /// refused with the retryable `ERROR_CODE_ORDER_MODIFY_IN_PROGRESS`.
     ///
-    /// Refused before sending: more than one of `symbol`, `symbols` and
-    /// `symbol_ids`, an unknown symbol, a zero symbol ID, more than 100
-    /// markets, and an invalid `request_id`.
+    /// Refused before sending: a blank `symbol` or `symbols` entry (leave
+    /// them unset to match every market), more than one of `symbol`,
+    /// `symbols` and `symbol_ids`, an unknown symbol, a zero symbol ID, more
+    /// than 100 markets, and an invalid `request_id`.
     pub async fn cancel_all(&self, opts: CancelAllTriggersOpts) -> Result<CancelAllTriggersResult> {
+        check_cancel_all_symbols(&opts)?;
         if opts.symbol.is_some() || !opts.symbols.is_empty() {
             self.ctx.wait_for_catalogs().await?;
         }
@@ -4160,6 +4189,20 @@ mod tests {
                 ..Default::default()
             },
             "only one of symbol, symbols, or symbol_ids",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                symbol: Some("  ".into()),
+                ..Default::default()
+            },
+            "symbol must not be blank",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                symbols: vec!["BTC-USDT".into(), "".into()],
+                ..Default::default()
+            },
+            "symbols[1] must not be blank",
         );
         refused(
             CancelAllTriggersOpts {

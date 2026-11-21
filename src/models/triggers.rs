@@ -542,9 +542,11 @@ pub struct CancelAllTriggersOpts {
     /// The account whose triggers to cancel (see [`SubAccountScope`]).
     pub subaccount_id: SubAccountScope,
     /// Only the triggers of this market, such as `BTC-USDT`. Set at most one
-    /// of `symbol`, `symbols` and `symbol_ids`.
+    /// of `symbol`, `symbols` and `symbol_ids`; leave all three unset to
+    /// match every market. A blank name is refused, never read as every
+    /// market.
     pub symbol: Option<String>,
-    /// Only the triggers of these markets.
+    /// Only the triggers of these markets; a blank entry is refused.
     pub symbols: Vec<String>,
     /// Only the triggers of these markets, by symbol ID; each positive.
     /// Duplicates are sent once; at most 100 markets.
@@ -560,12 +562,13 @@ pub struct CancelAllTriggersOpts {
     pub trigger_types: Vec<CreateTriggerType>,
     /// Return the number of matching triggers without canceling any.
     pub dry_run: bool,
-    /// Idempotency key: 1 to 64 letters, digits, `.`, `_`, `:`, `/` or `-`.
-    /// Generated when omitted or blank. Set it, and reuse it with the same
-    /// filters, when retrying the same cancel after an ambiguous failure: a
-    /// retry within two minutes returns the original count and cancels
-    /// nothing again. A retry that omits it mints a new key and is not an
-    /// idempotent replay. The same key with other filters is refused with
+    /// Idempotency key: 1 to 64 letters, digits, `.`, `_`, `:`, `/` or `-`,
+    /// sent trimmed. Generate it once per user action and keep it: a retry
+    /// needs the same key and filters, and within two minutes returns the
+    /// original count and cancels nothing again. When omitted or blank a key
+    /// is generated, but it is not returned, so such a request cannot be
+    /// retried safely: supply your own whenever a retry may follow. The same
+    /// key with other filters is refused with
     /// `ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE`.
     pub request_id: Option<String>,
 }

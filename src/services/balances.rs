@@ -162,7 +162,9 @@ impl BalancesService {
     ///    - the subscription reconnected, as
     ///      [`crate::realtime::TypedSubscription::take_resubscribed`] (or a
     ///      growing [`crate::realtime::TypedSubscription::resubscribes`])
-    ///      reports: publications missed meanwhile are not recovered.
+    ///      reports: publications missed meanwhile are not recovered. Check it
+    ///      on a timer of its own, not only when an update arrives: an idle
+    ///      account may publish nothing after the reconnect.
     /// 5. Apply a FUNDING update to an asset only when its
     ///    [`crate::models::BalanceUpdateAsset::funding_revision`] is higher
     ///    than the one you hold for it.
@@ -187,6 +189,15 @@ impl BalancesService {
     /// or a `trading_applied_through_ts_ns` at or past its
     /// [`crate::models::LedgerTransfer::ts_ns`].
     ///
+    /// Read the stream and [`Self::list`] for the same account. An unset
+    /// `account_id` here takes the client's `default_account_id`, while
+    /// [`Self::list`] with an unset `subaccount_id` takes the configured
+    /// default sub-account, or the main account when none is configured. So
+    /// name the account in both: for a sub-account, `subscribe` with its
+    /// public ID and `list` with its `subaccount_id`; for the main account,
+    /// `subscribe` with the main account's public ID and `list` with no
+    /// `subaccount_id` on a client without a default sub-account.
+    ///
     /// Requires the `realtime` feature. An API key needs `READ_BALANCES` on
     /// its policy.
     ///
@@ -194,35 +205,52 @@ impl BalancesService {
     /// # async fn example(client: polyester::Client) -> polyester::Result<()> {
     /// use polyester::models::BalanceUpdateAccount;
     /// use polyester::proto::ledger::read::v1::GetBalancesRequest;
+    /// use std::time::Duration;
     ///
+    /// // A sub-account: the stream and the snapshot name the same account.
+    /// let (sub_public_id, sub_id) = ("<sub-account public ID>", 42_u64);
     /// // 1. Subscribe before reading the snapshot.
-    /// let mut stream = client.balances.subscribe(None).await?;
+    /// let mut stream = client.balances.subscribe(Some(sub_public_id)).await?;
     /// // 2. The snapshot and its position (E, Q).
-    /// let snapshot = client.balances.list(GetBalancesRequest::default()).await?;
+    /// let snapshot = client
+    ///     .balances
+    ///     .list(GetBalancesRequest {
+    ///         subaccount_id: Some(sub_id),
+    ///         ..Default::default()
+    ///     })
+    ///     .await?;
     /// let (epoch, mut sequence) = (snapshot.trading_epoch, snapshot.trading_sequence);
-    /// while let Some(update) = stream.recv().await {
-    ///     if stream.take_resubscribed() {
-    ///         // Publications may have been missed: reload from step 2.
-    ///         break;
-    ///     }
-    ///     match update.account {
-    ///         BalanceUpdateAccount::Trading if update.trading_epoch == epoch => {
-    ///             if update.trading_sequence <= sequence {
-    ///                 continue; // already in the snapshot, or a repeat
+    /// // A reconnect is checked on its own timer, not only with an update.
+    /// let mut reconnect_check = tokio::time::interval(Duration::from_millis(500));
+    /// loop {
+    ///     tokio::select! {
+    ///         _ = reconnect_check.tick() => {
+    ///             if stream.take_resubscribed() {
+    ///                 break; // publications may have been missed: reload
     ///             }
-    ///             if update.trading_sequence != sequence + 1 {
-    ///                 break; // a gap: reload from step 2
+    ///         }
+    ///         update = stream.recv() => {
+    ///             let Some(update) = update else { break };
+    ///             match update.account {
+    ///                 BalanceUpdateAccount::Trading if update.trading_epoch == epoch => {
+    ///                     if update.trading_sequence <= sequence {
+    ///                         continue; // already in the snapshot, or a repeat
+    ///                     }
+    ///                     if update.trading_sequence != sequence + 1 {
+    ///                         break; // a gap: reload from step 2
+    ///                     }
+    ///                     sequence = update.trading_sequence;
+    ///                     // Apply the Trading fields of `update.balances`.
+    ///                 }
+    ///                 BalanceUpdateAccount::Trading => {
+    ///                     // Another epoch: drop it if dropped, otherwise reload.
+    ///                 }
+    ///                 BalanceUpdateAccount::Funding => {
+    ///                     // Apply each asset whose funding_revision is higher.
+    ///                 }
+    ///                 BalanceUpdateAccount::Unknown(_) => {}
     ///             }
-    ///             sequence = update.trading_sequence;
-    ///             // Apply the Trading fields of `update.balances`.
     ///         }
-    ///         BalanceUpdateAccount::Trading => {
-    ///             // Another epoch: drop it if dropped, otherwise reload.
-    ///         }
-    ///         BalanceUpdateAccount::Funding => {
-    ///             // Apply each asset whose funding_revision is higher.
-    ///         }
-    ///         BalanceUpdateAccount::Unknown(_) => {}
     ///     }
     /// }
     /// # Ok(())

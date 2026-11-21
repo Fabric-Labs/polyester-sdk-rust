@@ -11,6 +11,8 @@ mod dust;
 mod limits;
 mod market_data;
 mod orders;
+mod pnl;
+mod policies;
 mod profile;
 mod scope;
 mod statements;
@@ -38,6 +40,8 @@ pub use market_data::{
 };
 pub(crate) use orders::scale_order;
 pub use orders::{OrdersService, TradesService};
+pub use pnl::{ListDailyProfitAndLossOptions, ProfitAndLossOptions, ProfitAndLossService};
+pub use policies::PoliciesService;
 pub use profile::ProfileService;
 pub use statements::{CreateStatementExportOptions, StatementsService};
 pub use system::ListStatusEventsOptions;
