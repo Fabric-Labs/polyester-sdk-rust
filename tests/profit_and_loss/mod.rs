@@ -88,6 +88,10 @@ struct Server {
 }
 
 async fn server(wire: WireFormat) -> Server {
+    server_with_default(wire, None).await
+}
+
+async fn server_with_default(wire: WireFormat, default_sub_account_id: Option<String>) -> Server {
     let sent = Arc::new(Mutex::new(Sent::default()));
     let log = sent.clone();
     let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
@@ -167,6 +171,7 @@ async fn server(wire: WireFormat) -> Server {
         api_private_key: Some(TEST_KEY.into()),
         hydrate_catalogs: false,
         wire_format: wire,
+        default_sub_account_id,
         ..Default::default()
     })
     .expect("client");
@@ -407,6 +412,100 @@ async fn invalid_reads_are_refused_before_sending() {
         assert_eq!(
             s.http.requests.load(Ordering::SeqCst),
             before + 1,
+            "{wire:?}: a refused read must send nothing"
+        );
+    }
+}
+
+/// Profit and loss has no main-account-only read: `Main` names no
+/// sub-account (the caller's whole account), even with a default sub-account
+/// configured; `Default` sends the configured default; `Id` sends that
+/// sub-account. All three reads send the same selection.
+#[tokio::test]
+async fn account_selectors_send_the_documented_subaccount() {
+    for wire in WIRES {
+        let s = server_with_default(wire, Some(polyester::codecs::format_uint64_id(77))).await;
+        let days = |scope| ListDailyProfitAndLossOptions {
+            subaccount_id: scope,
+            start_time: Some(at(NOV_1)),
+            end_time: Some(at(NOV_1 + DAY)),
+            ..Default::default()
+        };
+        for scope in [
+            SubAccountScope::Main,
+            SubAccountScope::Default,
+            SubAccountScope::Id(5),
+        ] {
+            let mut opts = ProfitAndLossOptions::new(ProfitAndLossWindow::Today);
+            opts.subaccount_id = scope;
+            s.client.pnl.get(opts.clone()).await.expect("get");
+            s.client
+                .pnl
+                .get_trading_statistics(opts)
+                .await
+                .expect("statistics");
+            s.client.pnl.list_daily(days(scope)).await.expect("daily");
+        }
+        let sent = s.sent.lock().unwrap();
+        let want = [None, Some(77), Some(5)];
+        assert_eq!(
+            sent.gets
+                .iter()
+                .map(|r| r.subaccount_id)
+                .collect::<Vec<_>>(),
+            want,
+            "{wire:?}"
+        );
+        assert_eq!(
+            sent.statistics
+                .iter()
+                .map(|r| r.subaccount_id)
+                .collect::<Vec<_>>(),
+            want,
+            "{wire:?}"
+        );
+        assert_eq!(
+            sent.daily
+                .iter()
+                .map(|r| r.subaccount_id)
+                .collect::<Vec<_>>(),
+            want,
+            "{wire:?}"
+        );
+    }
+}
+
+/// A blank market name is refused through both market-filtered reads, alone
+/// or beside a symbol ID, before anything is sent: it never widens the read
+/// to every market.
+#[tokio::test]
+async fn blank_market_names_are_refused_before_sending() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        for (symbol, symbol_id, want) in [
+            ("", None, "symbol must not be blank"),
+            ("   ", None, "symbol must not be blank"),
+            (" ", Some(1), "symbol must not be blank"),
+            ("BTC-USDT", Some(1), "symbol or symbol_id, not both"),
+        ] {
+            let mut opts = ProfitAndLossOptions::new(ProfitAndLossWindow::Days7);
+            opts.symbol = Some(symbol.into());
+            opts.symbol_id = symbol_id;
+            let err = s.client.pnl.get(opts.clone()).await.expect_err("refused");
+            assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
+            assert!(err.to_string().contains(want), "{wire:?}: {want}: {err}");
+            let err = s
+                .client
+                .pnl
+                .get_trading_statistics(opts)
+                .await
+                .expect_err("refused");
+            assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
+            assert!(err.to_string().contains(want), "{wire:?}: {want}: {err}");
+        }
+        assert_eq!(
+            s.http.requests.load(Ordering::SeqCst),
+            0,
             "{wire:?}: a refused read must send nothing"
         );
     }

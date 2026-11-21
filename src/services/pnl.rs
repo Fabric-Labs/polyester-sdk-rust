@@ -36,16 +36,26 @@ const LIST_DAILY_PROFIT_AND_LOSS: &str = "/pnl.v1.ProfitAndLossService/ListDaily
 pub struct ProfitAndLossOptions {
     /// The period to report.
     pub window: ProfitAndLossWindow,
-    /// The account to read (see [`SubAccountScope`]). With
-    /// [`SubAccountScope::Default`] and no default configured, a main-account
-    /// key reads the main account together with every sub-account it owns,
-    /// and a sub-account key its own sub-account. [`SubAccountScope::Id`] 0
-    /// is refused.
+    /// The account to read. Profit and loss has no main-account-only read:
+    /// a read either names one sub-account or names none, and one that names
+    /// none returns the caller's whole account.
+    ///
+    /// - [`SubAccountScope::Id`] reads that sub-account; a main-account key
+    ///   may name a sub-account its main account owns. 0 is refused before
+    ///   sending.
+    /// - [`SubAccountScope::Main`] names no sub-account, so it does **not**
+    ///   read the main account alone: a session or main-account key reads
+    ///   the main account together with every sub-account it owns, and a
+    ///   sub-account key reads its own sub-account.
+    /// - [`SubAccountScope::Default`] reads the configured default
+    ///   sub-account, or names none as [`SubAccountScope::Main`] does when no
+    ///   default is configured.
     pub subaccount_id: SubAccountScope,
     /// Only this product; `None` reads every product.
     pub product: Option<ProfitAndLossProduct>,
     /// Only this market, such as `BTC-USDT`. Set at most one of `symbol` and
-    /// `symbol_id`; neither reads every market.
+    /// `symbol_id`; neither reads every market. A blank name is refused,
+    /// never read as every market.
     /// [`ProfitAndLossService::get`] limits only its `markets` to it, not
     /// its totals or holdings.
     pub symbol: Option<String>,
@@ -70,7 +80,9 @@ impl ProfitAndLossOptions {
 /// one account.
 #[derive(Debug, Clone, Default)]
 pub struct ListDailyProfitAndLossOptions {
-    /// The account to read, as for [`ProfitAndLossOptions::subaccount_id`].
+    /// The account to read, as for [`ProfitAndLossOptions::subaccount_id`]:
+    /// [`SubAccountScope::Main`] names no sub-account and reads the caller's
+    /// whole account, never the main account alone.
     pub subaccount_id: SubAccountScope,
     /// The first day, inclusive: 00:00 UTC of a day. Required.
     pub start_time: Option<SystemTime>,
@@ -84,7 +96,13 @@ pub struct ListDailyProfitAndLossOptions {
     pub page_token: Option<String>,
 }
 
-/// Profit and loss of the main account or one sub-account, in USD.
+/// Profit and loss of the caller's whole account or one sub-account, in USD.
+///
+/// A read names one sub-account or none. Named, it reads that sub-account.
+/// Unnamed, a session or main-account key reads the main account together
+/// with every sub-account it owns, and a sub-account key reads its own
+/// sub-account; there is no main-account-only read (see
+/// [`ProfitAndLossOptions::subaccount_id`]).
 ///
 /// Spot PnL uses the weighted average cost of each asset: every trade is
 /// valued at its execution time, every fee is a realized expense, and
@@ -120,12 +138,22 @@ impl ProfitAndLossService {
         &self,
         opts: &ProfitAndLossOptions,
     ) -> Result<(Option<u64>, ProtoWindow, ProtoProduct, u32)> {
+        // A blank name would resolve to no market and so read every market,
+        // or slip past the one-selector rule beside a symbol ID: refuse it.
+        if let Some(symbol) = opts.symbol.as_deref() {
+            if symbol.trim().is_empty() {
+                return Err(Error::validation(
+                    "pnl symbol must not be blank; leave it None to read every market",
+                ));
+            }
+            if opts.symbol_id.is_some() {
+                return Err(Error::validation(
+                    "pnl accepts symbol or symbol_id, not both",
+                ));
+            }
+        }
         let subaccount_id = scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?;
-        if opts
-            .symbol
-            .as_deref()
-            .is_some_and(|symbol| !symbol.trim().is_empty())
-        {
+        if opts.symbol.is_some() {
             self.ctx.wait_for_catalogs().await?;
         }
         let symbol_id = self
