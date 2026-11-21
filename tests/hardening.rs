@@ -69,6 +69,8 @@ mod orderbook_symbol_id_only;
 mod orderbook_timestamp;
 #[path = "orders_and_batches/mod.rs"]
 mod orders_and_batches;
+#[path = "orders_cancel_all/mod.rs"]
+mod orders_cancel_all;
 #[path = "profit_and_loss/mod.rs"]
 mod profit_and_loss;
 #[path = "public_id_strings/mod.rs"]
