@@ -7,16 +7,20 @@
 use super::hardening_support::{HttpScript, MockHttpServer, MockWsServer};
 use buffa::Message as _;
 use polyester::models::SubAccountScope;
-use polyester::models::{CreateOcoParams, CreateSide, ListTriggersOpts, OcoLegParams, Trigger};
+use polyester::models::{
+    CancelAllTriggersOpts, CreateOcoParams, CreateSide, CreateTriggerType, ListTriggersOpts,
+    OcoLegParams, Trigger,
+};
 use polyester::proto::orders::v1::{
     ErrorDetail, FieldViolation, Side, TriggerPriceSource, risk_execution,
 };
 use polyester::proto::polyester::ratelimit::v1::RateLimitDetail;
 use polyester::proto::triggers::v1::{
     BatchCancelTriggersRequest, BatchCancelTriggersResponse, BatchCancelTriggersResultItem,
-    CancelOcoRequest, CancelOcoResponse, CreateOcoRequest, CreateOcoResponse, GetTriggerResponse,
-    ListTriggersRequest, ListTriggersResponse, Trigger as ProtoTrigger, TriggerStatus,
-    batch_cancel_triggers_result_item,
+    CancelAllTriggersRequest, CancelAllTriggersResponse, CancelOcoRequest, CancelOcoResponse,
+    CreateOcoRequest, CreateOcoResponse, GetTriggerResponse, ListTriggersRequest,
+    ListTriggersResponse, Trigger as ProtoTrigger, TriggerStatus, TriggerType,
+    batch_cancel_triggers_result_item, cancel_all_triggers_response,
 };
 use polyester::transport::WireFormat;
 use polyester::{Client, Config, Error, Price, Quantity};
@@ -28,6 +32,7 @@ const TEST_KEY: &str = "0123456789abcdef0123456789abcdef0123456789abcdef01234567
 const CREATE_OCO: &str = "/triggers.v1.TriggersService/CreateOco";
 const CANCEL_OCO: &str = "/triggers.v1.TriggersService/CancelOco";
 const BATCH_CANCEL: &str = "/triggers.v1.TriggersService/BatchCancelTriggers";
+const CANCEL_ALL: &str = "/triggers.v1.TriggersService/CancelAllTriggers";
 const LIST: &str = "/triggers.v1.TriggersService/ListTriggers";
 const GET: &str = "/triggers.v1.TriggersService/GetTrigger";
 
@@ -115,6 +120,7 @@ struct Server {
     cancels: Arc<Mutex<Vec<CancelOcoRequest>>>,
     batches: Arc<Mutex<Vec<BatchCancelTriggersRequest>>>,
     lists: Arc<Mutex<Vec<ListTriggersRequest>>>,
+    cancel_alls: Arc<Mutex<Vec<CancelAllTriggersRequest>>>,
 }
 
 impl Server {
@@ -128,11 +134,13 @@ async fn server(wire: WireFormat) -> Server {
     let cancels = Arc::new(Mutex::new(Vec::new()));
     let batches = Arc::new(Mutex::new(Vec::new()));
     let lists = Arc::new(Mutex::new(Vec::new()));
-    let (c, x, b, l) = (
+    let cancel_alls = Arc::new(Mutex::new(Vec::new()));
+    let (c, x, b, l, a) = (
         creates.clone(),
         cancels.clone(),
         batches.clone(),
         lists.clone(),
+        cancel_alls.clone(),
     );
     let http = MockHttpServer::spawn(move |req| match req.path.as_str() {
         LIST => {
@@ -199,6 +207,24 @@ async fn server(wire: WireFormat) -> Server {
                 },
             )
         }
+        CANCEL_ALL => {
+            let sent: CancelAllTriggersRequest = request(wire, &req.body);
+            let status = if sent.dry_run {
+                cancel_all_triggers_response::Status::DRY_RUN
+            } else {
+                cancel_all_triggers_response::Status::SUBMITTED
+            };
+            a.lock().unwrap().push(sent);
+            answer(
+                wire,
+                &CancelAllTriggersResponse {
+                    status: status.into(),
+                    matched_triggers: 4,
+                    ts_ns: 1_700_000_000_000_000_001,
+                    ..Default::default()
+                },
+            )
+        }
         _ => HttpScript::NotFound,
     })
     .await;
@@ -229,6 +255,7 @@ async fn server(wire: WireFormat) -> Server {
         cancels,
         batches,
         lists,
+        cancel_alls,
     }
 }
 
@@ -489,6 +516,113 @@ async fn batch_cancel_refuses_invalid_batches_before_sending() {
             assert!(err.to_string().contains(want), "{wire:?}: {err}");
         }
         assert_eq!(s.sent(), 0, "{wire:?}: a refused batch must send nothing");
+    }
+}
+
+/// `cancel_all` sends the account's filters (markets by symbol ID, side,
+/// trigger types, dry run) with its request ID, and returns the count and
+/// time. A retry with the same request ID sends the identical request.
+#[tokio::test]
+async fn cancel_all_sends_its_filters_and_a_retry_sends_the_same_request() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        let opts = CancelAllTriggersOpts {
+            symbol: Some("BTC-USDT".into()),
+            side: Some(CreateSide::Sell),
+            trigger_types: vec![CreateTriggerType::StopLoss, CreateTriggerType::TakeProfit],
+            request_id: Some("ui-tpsl-cancel-all-7f3a".into()),
+            ..Default::default()
+        };
+        let result = s
+            .client
+            .triggers
+            .cancel_all(opts.clone())
+            .await
+            .expect("cancel all");
+        assert_eq!(result.status, "submitted", "{wire:?}");
+        assert_eq!(result.matched_triggers, 4, "{wire:?}");
+        assert_eq!(result.ts_ns, 1_700_000_000_000_000_001, "{wire:?}");
+
+        s.client.triggers.cancel_all(opts).await.expect("retry");
+        let dry_run = s
+            .client
+            .triggers
+            .cancel_all(CancelAllTriggersOpts {
+                dry_run: true,
+                ..Default::default()
+            })
+            .await
+            .expect("dry run");
+        assert_eq!(dry_run.status, "dry_run", "{wire:?}");
+
+        let sent = s.cancel_alls.lock().unwrap().clone();
+        assert_eq!(sent.len(), 3, "{wire:?}");
+        assert_eq!(sent[0].symbol_ids, vec![1], "{wire:?}");
+        assert_eq!(sent[0].side, Side::Sell, "{wire:?}");
+        assert_eq!(
+            sent[0].trigger_types,
+            vec![
+                buffa::EnumValue::from(TriggerType::STOP_LOSS),
+                buffa::EnumValue::from(TriggerType::TAKE_PROFIT)
+            ],
+            "{wire:?}"
+        );
+        assert_eq!(sent[0].request_id, "ui-tpsl-cancel-all-7f3a", "{wire:?}");
+        assert_eq!(sent[0].subaccount_id, None, "{wire:?}");
+        assert!(!sent[0].dry_run, "{wire:?}");
+        assert_eq!(
+            sent[1], sent[0],
+            "{wire:?}: a retry must send the same request"
+        );
+        assert!(sent[2].dry_run, "{wire:?}");
+        assert!(sent[2].symbol_ids.is_empty() && sent[2].trigger_types.is_empty());
+        assert!(
+            sent[2].request_id.starts_with("cancel-all-triggers-"),
+            "{wire:?}: {}",
+            sent[2].request_id
+        );
+    }
+}
+
+/// Filters the SDK can refuse are refused before anything is sent.
+#[tokio::test]
+async fn cancel_all_refuses_invalid_filters_before_sending() {
+    for wire in WIRES {
+        let s = server(wire).await;
+        for (opts, want) in [
+            (
+                CancelAllTriggersOpts {
+                    symbol: Some("BTC-USDT".into()),
+                    symbol_ids: vec![1],
+                    ..Default::default()
+                },
+                "only one of symbol, symbols, or symbol_ids",
+            ),
+            (
+                CancelAllTriggersOpts {
+                    symbol_ids: (1..=101).collect(),
+                    ..Default::default()
+                },
+                "at most 100 symbol_ids",
+            ),
+            (
+                CancelAllTriggersOpts {
+                    request_id: Some("not valid!".into()),
+                    ..Default::default()
+                },
+                "request_id",
+            ),
+        ] {
+            let err = s
+                .client
+                .triggers
+                .cancel_all(opts)
+                .await
+                .expect_err("refused");
+            assert!(matches!(err, Error::Validation(_)), "{wire:?}: {err}");
+            assert!(err.to_string().contains(want), "{wire:?}: {err}");
+        }
+        assert_eq!(s.sent(), 0, "{wire:?}: a refused cancel must send nothing");
     }
 }
 

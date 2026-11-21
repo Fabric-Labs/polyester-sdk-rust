@@ -535,6 +535,60 @@ pub struct BatchCancelTriggersResultItem {
     pub violations: Vec<super::OrderFieldViolation>,
 }
 
+/// Options for [`crate::services::TriggersService::cancel_all`]: which of the
+/// account's triggers to cancel. Every filter left empty matches everything.
+#[derive(Debug, Clone, Default)]
+pub struct CancelAllTriggersOpts {
+    /// The account whose triggers to cancel (see [`SubAccountScope`]).
+    pub subaccount_id: SubAccountScope,
+    /// Only the triggers of this market, such as `BTC-USDT`. Set at most one
+    /// of `symbol`, `symbols` and `symbol_ids`.
+    pub symbol: Option<String>,
+    /// Only the triggers of these markets.
+    pub symbols: Vec<String>,
+    /// Only the triggers of these markets, by symbol ID; each positive.
+    /// Duplicates are sent once; at most 100 markets.
+    pub symbol_ids: Vec<u32>,
+    /// Only the triggers whose orders trade on this side: a sell stop-loss
+    /// matches `Sell`. `None` matches both sides.
+    pub side: Option<CreateSide>,
+    /// Only the triggers of these types, as [`Trigger`] reads report them.
+    /// Duplicates are sent once. An order's attached
+    /// take-profit, stop-loss and trailing legs end together, and so do an
+    /// OCO's two legs: when one of them matches, all of them are canceled and
+    /// counted.
+    pub trigger_types: Vec<CreateTriggerType>,
+    /// Return the number of matching triggers without canceling any.
+    pub dry_run: bool,
+    /// Idempotency key: 1 to 64 letters, digits, `.`, `_`, `:`, `/` or `-`.
+    /// Generated when omitted or blank. Set it, and reuse it with the same
+    /// filters, when retrying the same cancel after an ambiguous failure: a
+    /// retry within two minutes returns the original count and cancels
+    /// nothing again. A retry that omits it mints a new key and is not an
+    /// idempotent replay. The same key with other filters is refused with
+    /// `ERROR_CODE_CONFLICT_IDEMPOTENCY_KEY_REUSE`.
+    pub request_id: Option<String>,
+}
+
+/// What a cancel-all of triggers matched.
+///
+/// It lists no trigger IDs: read the triggers again afterwards. Each
+/// canceled trigger's final state arrives on the trigger events and reads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancelAllTriggersResult {
+    /// `submitted`, or `dry_run` when nothing was canceled.
+    pub status: String,
+    /// The account's triggers that matched the filters when the request was
+    /// first accepted, each canceled unless it was a dry run, linked legs
+    /// included. A retry with the same `request_id` and filters returns the
+    /// original count.
+    pub matched_triggers: u32,
+    /// When the server first accepted the request, in nanoseconds since the
+    /// Unix epoch: `ts_ns`, or `ts` when only that is sent; 0 when neither
+    /// is.
+    pub ts_ns: u64,
+}
+
 /// Results of a batch trigger cancel, one per requested trigger, in request
 /// order.
 #[derive(Debug, Clone, PartialEq, Eq)]

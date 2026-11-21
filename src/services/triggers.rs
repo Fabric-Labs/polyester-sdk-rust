@@ -4,34 +4,36 @@ use super::limits::{TRIGGER_LIST_LIMIT_MAX, check_limit};
 use super::scope;
 use super::unary;
 use crate::codecs::decode::{
-    attach_trigger_scale, batch_cancel_triggers_from_proto, cancel_oco_from_proto,
-    create_oco_from_proto, get_trigger_from_proto, trigger_events_list_from_proto,
-    trigger_mutation_from_cancel, trigger_mutation_from_create, trigger_mutation_from_modify,
-    trigger_mutation_from_pause, trigger_mutation_from_resume, triggers_list_from_proto,
+    attach_trigger_scale, batch_cancel_triggers_from_proto, cancel_all_triggers_from_proto,
+    cancel_oco_from_proto, create_oco_from_proto, get_trigger_from_proto,
+    trigger_events_list_from_proto, trigger_mutation_from_cancel, trigger_mutation_from_create,
+    trigger_mutation_from_modify, trigger_mutation_from_pause, trigger_mutation_from_resume,
+    triggers_list_from_proto,
 };
 use crate::codecs::scalars::id_to_u64;
 use crate::connect::triggers::v1::TriggersServiceClient;
 use crate::errors::{Error, Result};
 use crate::models::SubAccountScope;
 use crate::models::{
-    BatchCancelTriggersResult, CancelOcoResult, CreateOcoParams, CreateOcoResult, CreateOrderType,
-    CreateSide, CreateTimeInForce, CreateTriggerParams, CreateTriggerType, FeeAsset,
-    ListTriggerEventsOpts, ListTriggersOpts, ModifyTriggerParams, OcoLegParams,
-    ResumeTriggerParams, Trigger, TriggerEvent, TriggerEventsList, TriggerMutationResult,
-    TriggersList,
+    BatchCancelTriggersResult, CancelAllTriggersOpts, CancelAllTriggersResult, CancelOcoResult,
+    CreateOcoParams, CreateOcoResult, CreateOrderType, CreateSide, CreateTimeInForce,
+    CreateTriggerParams, CreateTriggerType, FeeAsset, ListTriggerEventsOpts, ListTriggersOpts,
+    ModifyTriggerParams, OcoLegParams, ResumeTriggerParams, Trigger, TriggerEvent,
+    TriggerEventsList, TriggerMutationResult, TriggersList,
 };
 use crate::proto::orders::v1::{
     FeeAsset as ProtoFeeAsset, RiskExecution, RiskLimitGtc, SelfTradePreventionMode, Side,
     TriggerPriceSource, risk_execution,
 };
 use crate::proto::triggers::v1::{
-    BatchCancelTriggersRequest, CancelOcoRequest, CancelTriggerRequest, ConditionalChildExecution,
-    ConditionalTrigger, CreateOcoRequest, CreateTriggerRequest, GetTriggerRequest, LadderTrigger,
-    ListTriggerEventsRequest, ListTriggersRequest, ModifyTriggerRequest, OcoIntent, OcoLeg,
-    PauseTriggerRequest, ResumeTriggerRequest, TrailingStopTrigger, TriggerIntent, TriggerLimitFok,
-    TriggerLimitGtc, TriggerLimitIoc, TriggerMarketIoc, TriggerType, TwapLimitGtc, TwapMarketIoc,
-    TwapTrigger, conditional_child_execution, modify_trigger_request, trailing_stop_trigger,
-    trigger_intent, trigger_market_ioc, twap_market_ioc, twap_trigger,
+    BatchCancelTriggersRequest, CancelAllTriggersRequest, CancelOcoRequest, CancelTriggerRequest,
+    ConditionalChildExecution, ConditionalTrigger, CreateOcoRequest, CreateTriggerRequest,
+    GetTriggerRequest, LadderTrigger, ListTriggerEventsRequest, ListTriggersRequest,
+    ModifyTriggerRequest, OcoIntent, OcoLeg, PauseTriggerRequest, ResumeTriggerRequest,
+    TrailingStopTrigger, TriggerIntent, TriggerLimitFok, TriggerLimitGtc, TriggerLimitIoc,
+    TriggerMarketIoc, TriggerType, TwapLimitGtc, TwapMarketIoc, TwapTrigger,
+    conditional_child_execution, modify_trigger_request, trailing_stop_trigger, trigger_intent,
+    trigger_market_ioc, twap_market_ioc, twap_trigger,
 };
 use crate::types::resolve_qty_scaled;
 
@@ -312,6 +314,16 @@ fn validate_create_option_applicability(p: &CreateTriggerParams) -> Result<()> {
     Ok(())
 }
 
+fn trigger_type_to_proto(trigger_type: CreateTriggerType) -> TriggerType {
+    match trigger_type {
+        CreateTriggerType::StopLoss => TriggerType::STOP_LOSS,
+        CreateTriggerType::TakeProfit => TriggerType::TAKE_PROFIT,
+        CreateTriggerType::TrailingStop => TriggerType::TRAILING_STOP,
+        CreateTriggerType::Twap => TriggerType::TWAP,
+        CreateTriggerType::Ladder => TriggerType::LADDER,
+    }
+}
+
 #[derive(Clone)]
 pub struct TriggersService {
     ctx: ServiceContext,
@@ -391,14 +403,7 @@ impl TriggersService {
             req.status.push(status.into());
         }
         if let Some(trigger_type) = opts.trigger_type {
-            req.trigger_type = match trigger_type {
-                CreateTriggerType::StopLoss => TriggerType::STOP_LOSS,
-                CreateTriggerType::TakeProfit => TriggerType::TAKE_PROFIT,
-                CreateTriggerType::TrailingStop => TriggerType::TRAILING_STOP,
-                CreateTriggerType::Twap => TriggerType::TWAP,
-                CreateTriggerType::Ladder => TriggerType::LADDER,
-            }
-            .into();
+            req.trigger_type = trigger_type_to_proto(trigger_type).into();
         }
         if let Some(parent) = opts.parent_order_id.as_deref() {
             let id = id_to_u64(parent, "parent_order_id")?;
@@ -1126,6 +1131,42 @@ impl TriggersService {
         })
     }
 
+    fn encode_cancel_all(&self, opts: CancelAllTriggersOpts) -> Result<CancelAllTriggersRequest> {
+        const OP: &str = "triggers.cancel_all";
+        let mut trigger_types = Vec::with_capacity(opts.trigger_types.len());
+        for trigger_type in &opts.trigger_types {
+            let trigger_type = trigger_type_to_proto(*trigger_type);
+            if !trigger_types.contains(&trigger_type) {
+                trigger_types.push(trigger_type);
+            }
+        }
+        let symbol_ids = self.ctx.catalogs.resolve_cancel_all_symbol_ids(
+            opts.symbol.as_deref(),
+            Some(opts.symbols.as_slice()),
+            Some(opts.symbol_ids.as_slice()),
+            OP,
+        )?;
+        let mut req = CancelAllTriggersRequest {
+            subaccount_id: scope::resolve_subaccount(&self.ctx, opts.subaccount_id)?,
+            symbol_ids,
+            dry_run: opts.dry_run,
+            request_id: super::orders::OrdersService::coalesce_request_id(
+                opts.request_id,
+                "cancel-all-triggers",
+            )?,
+            trigger_types: trigger_types.into_iter().map(Into::into).collect(),
+            ..Default::default()
+        };
+        if let Some(side) = opts.side {
+            req.side = match side {
+                CreateSide::Buy => Side::Buy,
+                CreateSide::Sell => Side::Sell,
+            }
+            .into();
+        }
+        Ok(req)
+    }
+
     fn encode_modify_params(&self, params: &ModifyTriggerParams) -> Result<ModifyTriggerRequest> {
         if params.trigger_price.is_none()
             && params.activation_price.is_none()
@@ -1432,6 +1473,49 @@ impl TriggersService {
         .await?
         .into_owned();
         batch_cancel_triggers_from_proto(&resp)
+    }
+
+    /// Cancel, in one request, every trigger of the account that matches
+    /// the filters of `opts` (markets, side, trigger types), and no order.
+    ///
+    /// What it cancels is fixed when its `request_id` is first accepted:
+    /// triggers created later keep running. Each matching trigger ends
+    /// canceled with cancel reason `cancel_all` and releases its reserved
+    /// funds, and none places an order after the answer. A TWAP's working
+    /// slice, a ladder's open levels and an attached leg's working exit are
+    /// canceled with their trigger; an order a stop already placed stays
+    /// open. With [`CancelAllTriggersOpts::dry_run`] it only counts them. The
+    /// answer lists no trigger IDs: read the triggers again afterwards.
+    ///
+    /// A `request_id` is generated when omitted. Provide a stable non-empty
+    /// value, with the same filters, when retrying the same cancel after an
+    /// ambiguous failure, including `ERROR_CODE_ORDER_CANCEL_OUTCOME_UNKNOWN`:
+    /// within two minutes it returns the original count and cancels nothing
+    /// again. Every request costs 10 units of the cancel rate limit, a dry
+    /// run and a retry included.
+    ///
+    /// While it ends an order's attached legs, a modify of that order that
+    /// adds or changes an attached take-profit, stop-loss or trailing leg is
+    /// refused with the retryable `ERROR_CODE_ORDER_MODIFY_IN_PROGRESS`.
+    ///
+    /// Refused before sending: more than one of `symbol`, `symbols` and
+    /// `symbol_ids`, an unknown symbol, a zero symbol ID, more than 100
+    /// markets, and an invalid `request_id`.
+    pub async fn cancel_all(&self, opts: CancelAllTriggersOpts) -> Result<CancelAllTriggersResult> {
+        if opts.symbol.is_some() || !opts.symbols.is_empty() {
+            self.ctx.wait_for_catalogs().await?;
+        }
+        let req = self.encode_cancel_all(opts)?;
+        let client = self.client();
+        let resp = unary::await_auth(
+            &self.ctx.factory,
+            "/triggers.v1.TriggersService/CancelAllTriggers",
+            req,
+            |req, opts| client.cancel_all_triggers_with_options(req, opts),
+        )
+        .await?
+        .into_owned();
+        cancel_all_triggers_from_proto(&resp)
     }
 
     /// An unset `subaccount_id` takes the configured default sub-account, as
@@ -3991,6 +4075,125 @@ mod tests {
         refused(
             vec![format_id(42)],
             Some("r".repeat(65).as_str()),
+            "request_id",
+        );
+    }
+
+    #[test]
+    fn cancel_all_sends_its_filters_once_each_with_a_request_id() {
+        let client = client();
+        let wire = client
+            .triggers
+            .encode_cancel_all(CancelAllTriggersOpts {
+                subaccount_id: SubAccountScope::Id(5),
+                symbols: vec!["BTC-USDT".into(), "BTC-USDT".into()],
+                side: Some(CreateSide::Sell),
+                trigger_types: vec![
+                    CreateTriggerType::StopLoss,
+                    CreateTriggerType::TakeProfit,
+                    CreateTriggerType::StopLoss,
+                ],
+                dry_run: true,
+                request_id: Some(" ui/tpsl:cancel-all.7f3a ".into()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(wire.subaccount_id, Some(5));
+        assert_eq!(wire.symbol_ids, vec![7]);
+        assert_eq!(wire.side, Side::Sell);
+        assert_eq!(
+            wire.trigger_types,
+            vec![
+                buffa::EnumValue::from(TriggerType::STOP_LOSS),
+                buffa::EnumValue::from(TriggerType::TAKE_PROFIT)
+            ]
+        );
+        assert!(wire.dry_run);
+        assert_eq!(wire.request_id, "ui/tpsl:cancel-all.7f3a");
+
+        // Every filter empty matches every trigger of the account; a request
+        // ID is generated.
+        let all = client
+            .triggers
+            .encode_cancel_all(CancelAllTriggersOpts::default())
+            .unwrap();
+        assert_eq!(all.subaccount_id, None);
+        assert!(all.symbol_ids.is_empty() && all.trigger_types.is_empty());
+        assert_eq!(all.side, Side::SIDE_UNSPECIFIED);
+        assert!(!all.dry_run);
+        assert!(
+            all.request_id.starts_with("cancel-all-triggers-"),
+            "{}",
+            all.request_id
+        );
+
+        let by_id = client
+            .triggers
+            .encode_cancel_all(CancelAllTriggersOpts {
+                symbol_ids: vec![9, 9, 3],
+                trigger_types: vec![
+                    CreateTriggerType::StopLoss,
+                    CreateTriggerType::TakeProfit,
+                    CreateTriggerType::TrailingStop,
+                    CreateTriggerType::Twap,
+                    CreateTriggerType::Ladder,
+                ],
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(by_id.symbol_ids, vec![9, 3]);
+        assert_eq!(by_id.trigger_types.len(), 5);
+    }
+
+    #[test]
+    fn cancel_all_refuses_invalid_filters_before_sending() {
+        let client = client();
+        let refused = |opts: CancelAllTriggersOpts, want: &str| {
+            let err = client.triggers.encode_cancel_all(opts).unwrap_err();
+            assert!(matches!(err, Error::Validation(_)), "{want}: {err:?}");
+            assert!(err.to_string().contains(want), "{want}: {err}");
+        };
+        refused(
+            CancelAllTriggersOpts {
+                symbol: Some("BTC-USDT".into()),
+                symbol_ids: vec![7],
+                ..Default::default()
+            },
+            "only one of symbol, symbols, or symbol_ids",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                symbol_ids: vec![0],
+                ..Default::default()
+            },
+            "symbol_ids must be positive",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                symbol_ids: (1..=101).collect(),
+                ..Default::default()
+            },
+            "at most 100 symbol_ids",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                symbol: Some("DOGE-USDT".into()),
+                ..Default::default()
+            },
+            "DOGE-USDT",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                request_id: Some("has space".into()),
+                ..Default::default()
+            },
+            "request_id",
+        );
+        refused(
+            CancelAllTriggersOpts {
+                request_id: Some("r".repeat(65)),
+                ..Default::default()
+            },
             "request_id",
         );
     }
