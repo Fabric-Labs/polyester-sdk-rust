@@ -16,9 +16,9 @@ use crate::services::{
     ChainAnalyticsService, ChangelogService, DepositService, DustConversionService, FeeService,
     GuardSignerService, HeatmapService, InternalTransfersService, LifecycleService,
     MarketDataService, MarketOverviewService, OrderbookService, OrdersService, PoliciesService,
-    RateLimitService, ServiceContext, SocialVerificationService, StatementsService,
-    SubAccountsService, TradesService, TransfersService, TriggersService, VipService,
-    WithdrawService, ZipperService,
+    ProfitAndLossService, RateLimitService, ServiceContext, SocialVerificationService,
+    StatementsService, SubAccountsService, TradesService, TransfersService, TriggersService,
+    VipService, WithdrawService, ZipperService,
 };
 use crate::transport::{
     Config as TransportConfig, DEFAULT_API_URL, DEFAULT_WS_URL, Factory, WireFormat,
@@ -164,6 +164,9 @@ pub struct Client {
     /// Account statement exports (CSV); signed like the other ledger reads.
     /// An API key needs `READ_STATEMENTS` on its policy.
     pub statements: StatementsService,
+    /// Profit and loss and trading statistics, in USD. Signed; an API key
+    /// needs `READ_PNL` on its policy.
+    pub pnl: ProfitAndLossService,
     pub withdraw: WithdrawService,
     /// Price alerts of the root account. Devnet only: not yet available on
     /// testnet. An API key needs `READ_PRICE_ALERTS` to list and
@@ -297,6 +300,7 @@ impl Client {
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
             statements: StatementsService::new(ctx.clone()),
+            pnl: ProfitAndLossService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
@@ -412,6 +416,7 @@ impl Client {
             rate_limits: RateLimitService::new(ctx.clone()),
             changelog: ChangelogService::new(ctx.clone()),
             statements: StatementsService::new(ctx.clone()),
+            pnl: ProfitAndLossService::new(ctx.clone()),
             alerts: AlertsService::new(ctx.clone()),
             factory: ctx.factory.clone(),
             withdraw: WithdrawService::new(ctx),
@@ -998,6 +1003,7 @@ mod tests {
             &client.trades,
             &client.triggers,
             &client.balances,
+            &client.pnl,
             &client.orderbook,
             &client.zipper,
             &client.transfers,

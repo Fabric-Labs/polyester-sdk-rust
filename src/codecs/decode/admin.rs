@@ -33,6 +33,7 @@ pub fn api_key_from_proto(msg: &ProtoApiKey) -> ApiKeySummary {
         } else {
             enum_proto_name(&msg.purpose)
         },
+        strategy_bot_id: format_optional_uint64_id(msg.strategy_bot_id.unwrap_or_default()),
     }
 }
 
@@ -135,6 +136,30 @@ mod tests {
         assert_eq!(purpose(ApiKeyPurpose::ADMIN_KEY.into()), "ADMIN_KEY");
         assert_eq!(purpose(ApiKeyPurpose::PURPOSE_UNSPECIFIED.into()), "");
         assert_eq!(purpose(buffa::EnumValue::from(9)), "UNKNOWN(9)");
+    }
+
+    /// A strategy bot's key reads `STRATEGY_BOT` with its bot's public ID;
+    /// every other key has no bot ID.
+    #[test]
+    fn api_key_reads_its_strategy_bot() {
+        use crate::proto::auth::v1::ApiKeyPurpose;
+        let bot = api_key_from_proto(&ProtoApiKey {
+            key_id: "ak_1".into(),
+            purpose: ApiKeyPurpose::STRATEGY_BOT.into(),
+            strategy_bot_id: Some(9_223_372_036_854_775_808),
+            ..Default::default()
+        });
+        assert_eq!(bot.purpose, "STRATEGY_BOT");
+        assert_eq!(
+            bot.strategy_bot_id,
+            format_uint64_id(9_223_372_036_854_775_808)
+        );
+        let standard = api_key_from_proto(&ProtoApiKey {
+            key_id: "ak_2".into(),
+            purpose: ApiKeyPurpose::STANDARD.into(),
+            ..Default::default()
+        });
+        assert_eq!(standard.strategy_bot_id, "");
     }
 
     /// An update returns the same complete key a read does: its policy ID,

@@ -155,9 +155,9 @@ pub struct Candle {
     /// historical rows and a live stream's terminal update, `false` only while
     /// the bucket is still open and its values can still change.
     ///
-    /// The columnar reply carries no closed flag; see
+    /// The columnar reply carries the same flag; see
     /// [`MarketDataService::get_candles_columns`](crate::services::MarketDataService::get_candles_columns)
-    /// for how its rows read.
+    /// for how its rows read from a server that predates it.
     pub is_closed: bool,
 }
 
@@ -241,6 +241,75 @@ pub struct MarketOverviewEntry {
     pub last_trade_ts_ns: String,
     /// Time the market was listed, in epoch nanoseconds; empty when unknown.
     pub listed_ts_ns: String,
+    /// The pair's live price band, a convenience copy of what the price band
+    /// read returns. `None` means no fresh band is known, never that the pair
+    /// has no band; a band past its `valid_until_ts_ns` is unknown too (see
+    /// [`LivePriceBand::is_fresh_at`]). The overview stream sends a row again
+    /// when its band changes, appears or lapses, not on each confirmation.
+    /// To check an order price, read the price band itself.
+    pub price_band: Option<LivePriceBand>,
+}
+
+/// A pair's live price band. Prices are exact price ticks (quote units
+/// scaled by 1e9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LivePriceBand {
+    pub symbol_id: u32,
+    /// `active` (at least one price lies inside the band), `off` (the pair
+    /// applies no band), `empty` (the band is on and no price lies inside it:
+    /// every order that adds exposure is refused until the reference or the
+    /// settings change; not a trading halt) or `unknown` (no band was
+    /// confirmed current within the last 5 seconds); `unknown(<n>)` for a
+    /// state newer than this SDK.
+    pub state: String,
+    /// The reference price; set when `state` is `active` or `empty`.
+    pub reference_price: Option<Price>,
+    /// `last_trade`, `listing_reference` or `index_price`; empty when `state`
+    /// is `off` or `unknown`.
+    pub reference_source: String,
+    /// The highest buy and lowest sell limit prices admitted, inclusive; set
+    /// only when `state` is `active`.
+    pub max_buy_price: Option<Price>,
+    pub min_sell_price: Option<Price>,
+    /// The lowest buy and highest sell limit prices admitted, inclusive; set
+    /// only when the band limits passive prices too.
+    pub min_buy_price: Option<Price>,
+    pub max_sell_price: Option<Price>,
+    /// When the band last changed, in epoch nanoseconds.
+    pub updated_ts_ns: u64,
+    /// From when the next order operation on the pair may move the reference
+    /// price, in epoch nanoseconds; `None` unless `state` is `active` or
+    /// `empty`.
+    pub reanchor_eligible_ts_ns: Option<u64>,
+    /// A trade newer than the reference price is waiting to move it.
+    pub reanchor_pending: bool,
+    /// The band's settings, as the spot config returns them; `None` when
+    /// `state` is `off` or they cannot be expressed exactly. The limits above
+    /// are authoritative either way.
+    pub parameters: Option<PriceBand>,
+    /// Never decreases; a band of a greater epoch is newer.
+    pub epoch: u64,
+    /// Orders bands within one epoch: a greater value is newer.
+    pub update_id: u64,
+    /// When the band was last confirmed current, in epoch nanoseconds.
+    pub as_of_ts_ns: u64,
+    /// `as_of_ts_ns` plus 5 seconds: after it, treat the band as unknown.
+    pub valid_until_ts_ns: u64,
+}
+
+impl LivePriceBand {
+    /// Whether this band is known to be current at `now`: not `unknown` and
+    /// not past `valid_until_ts_ns`. A band that is not fresh means no band
+    /// is known, never that the pair has none.
+    pub fn is_fresh_at(&self, now: std::time::SystemTime) -> bool {
+        if self.state == "unknown" || self.state.starts_with("unknown(") || self.state.is_empty() {
+            return false;
+        }
+        now.duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|since| u64::try_from(since.as_nanos()).ok())
+            .is_some_and(|nanos| nanos <= self.valid_until_ts_ns)
+    }
 }
 
 /// A market's recent closing prices over `interval`, newest first.

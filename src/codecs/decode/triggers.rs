@@ -6,22 +6,23 @@ use super::money::{attach_qty_scale, decode_price_ticks, decode_qty_scaled};
 use crate::codecs::scalars::TsNs;
 use crate::codecs::scalars::format_uint64_id;
 use crate::models::{
-    BatchCancelTriggersResult, BatchCancelTriggersResultItem, CancelOcoResult, CreateOcoResult,
-    MaxSlippage, Trigger, TriggerDetails, TriggerEvent, TriggerEventsList, TriggerLadderDetails,
-    TriggerMutationResult, TriggerStopDetails, TriggerTrailingDetails, TriggerTwapDetails,
-    TriggersList,
+    BatchCancelTriggersResult, BatchCancelTriggersResultItem, CancelAllTriggersResult,
+    CancelOcoResult, CreateOcoResult, MaxSlippage, Trigger, TriggerDetails, TriggerEvent,
+    TriggerEventsList, TriggerLadderDetails, TriggerMutationResult, TriggerStopDetails,
+    TriggerTrailingDetails, TriggerTwapDetails, TriggersList,
 };
 use crate::proto::orders::v1::{
     FeeAsset, Side as TrailingSide, TriggerDirection, TriggerPriceSource,
 };
 use crate::proto::triggers::v1::{
-    BatchCancelTriggersResponse, CancelOcoResponse, CancelTriggerResponse, ConditionalTrigger,
-    CreateOcoResponse, CreateTriggerResponse, GetTriggerResponse, LadderDistribution,
-    LadderOutcome, ListTriggerEventsResponse, ListTriggersResponse, ModifyTriggerResponse,
-    PauseTriggerResponse, ResumeTriggerResponse, Trigger as ProtoTrigger,
-    TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus, TriggerType,
-    batch_cancel_triggers_result_item, conditional_child_execution, trailing_stop_trigger, trigger,
-    trigger_event, trigger_market_ioc, twap_market_ioc, twap_trigger,
+    BatchCancelTriggersResponse, CancelAllTriggersResponse, CancelOcoResponse,
+    CancelTriggerResponse, ConditionalTrigger, CreateOcoResponse, CreateTriggerResponse,
+    GetTriggerResponse, LadderDistribution, LadderOutcome, ListTriggerEventsResponse,
+    ListTriggersResponse, ModifyTriggerResponse, PauseTriggerResponse, ResumeTriggerResponse,
+    Trigger as ProtoTrigger, TriggerEvent as ProtoTriggerEvent, TriggerEventType, TriggerStatus,
+    TriggerType, batch_cancel_triggers_result_item, cancel_all_triggers_response,
+    conditional_child_execution, trailing_stop_trigger, trigger, trigger_event, trigger_market_ioc,
+    twap_market_ioc, twap_trigger,
 };
 use crate::types::Price;
 use buffa::Enumeration;
@@ -724,6 +725,29 @@ pub fn batch_cancel_triggers_from_proto(
         results,
         accepted_count: msg.accepted_count,
         rejected_count: msg.rejected_count,
+        ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
+    })
+}
+
+/// Decode a `CancelAllTriggers` answer, refused with
+/// `Error::ResponseContract` when its status is unset or unknown.
+pub fn cancel_all_triggers_from_proto(
+    msg: &CancelAllTriggersResponse,
+) -> crate::errors::Result<CancelAllTriggersResult> {
+    use cancel_all_triggers_response::Status;
+    let status = match msg.status.as_known() {
+        Some(Status::SUBMITTED) => "submitted",
+        Some(Status::DRY_RUN) => "dry_run",
+        _ => {
+            return Err(crate::Error::response_contract(
+                "CancelAllTriggers",
+                format!("unknown status {}", msg.status.to_i32()),
+            ));
+        }
+    };
+    Ok(CancelAllTriggersResult {
+        status: status.to_owned(),
+        matched_triggers: msg.matched_triggers,
         ts_ns: paired_ts_ns(msg.ts_ns, msg.ts.as_option()),
     })
 }
@@ -2169,5 +2193,49 @@ mod tests {
         })
         .unwrap();
         assert_eq!(event.ts_ns, "1700000000000");
+    }
+
+    #[test]
+    fn cancel_all_triggers_decodes_status_count_and_time() {
+        use crate::proto::triggers::v1::{CancelAllTriggersResponse, cancel_all_triggers_response};
+        let submitted = cancel_all_triggers_from_proto(&CancelAllTriggersResponse {
+            status: cancel_all_triggers_response::Status::SUBMITTED.into(),
+            matched_triggers: u32::MAX,
+            ts_ns: 1_767_225_600_123_456_789,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(submitted.status, "submitted");
+        assert_eq!(submitted.matched_triggers, u32::MAX);
+        assert_eq!(submitted.ts_ns, 1_767_225_600_123_456_789);
+
+        // A dry run with only `ts` reads its time from it.
+        let dry_run = cancel_all_triggers_from_proto(&CancelAllTriggersResponse {
+            status: cancel_all_triggers_response::Status::DRY_RUN.into(),
+            matched_triggers: 3,
+            ts: Timestamp {
+                seconds: 2,
+                nanos: 5,
+                ..Default::default()
+            }
+            .into(),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(dry_run.status, "dry_run");
+        assert_eq!(dry_run.matched_triggers, 3);
+        assert_eq!(dry_run.ts_ns, 2_000_000_005);
+
+        for status in [0, 9] {
+            let err = cancel_all_triggers_from_proto(&CancelAllTriggersResponse {
+                status: buffa::EnumValue::from(status),
+                ..Default::default()
+            })
+            .unwrap_err();
+            assert!(
+                matches!(err, crate::Error::ResponseContract { .. }),
+                "{status}: {err:?}"
+            );
+        }
     }
 }

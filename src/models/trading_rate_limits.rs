@@ -35,12 +35,20 @@ pub struct TradingRateLimits {
     /// The rules enforced for the selected account: placement, cancellation
     /// and read (`TRADING_RATE_LIMIT_CLASS_READ`). All of the account's API
     /// keys and sessions draw on these together: budget against them. The
-    /// read rule is the root account's, shared by all of its sub-accounts,
-    /// also when a sub-account is selected. Select a rule by `policy_class`,
-    /// not by its position or the number of rules.
+    /// read rule is the selected account's own: the root account and each
+    /// sub-account read on separate budgets, so reading one sub-account never
+    /// uses another's. Order, fill, trigger, trading-limit and fee reads, and
+    /// order previews, draw on the read limit of the account they read. A
+    /// sub-account reads at its own read-limit override, else at its root
+    /// account's VIP tier read limit, never on the root account's override.
+    /// Select a rule by `policy_class`, not by its position or the number of
+    /// rules.
     pub rules: Vec<TradingRateLimitRule>,
     /// The rules resolved for the calling API key, in the same order; empty
-    /// for a session. Informational only: trading requests are not limited
-    /// per API key, and only `rules` are enforced.
+    /// for a session. The key's read rule is enforced on top of the
+    /// account's: a read is refused when either is exhausted, so pace reads
+    /// per API key too when the key has its own read rule. Its placement and
+    /// cancellation rules are informational: trading requests are not
+    /// limited per API key.
     pub api_key_rules: Vec<TradingRateLimitRule>,
 }

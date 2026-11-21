@@ -8,7 +8,7 @@ use crate::codecs::decode::{
 };
 use crate::connect::ledger::read::v1::LedgerReadServiceClient;
 use crate::errors::Result;
-use crate::models::{AssetBalance, BalanceHistory, BalancesList, EquityHistory, TransfersList};
+use crate::models::{BalanceHistory, BalanceUpdate, BalancesList, EquityHistory, TransfersList};
 use crate::proto::ledger::read::v1::{
     GetBalanceHistoryRequest, GetBalancesRequest, GetEquityHistorySeriesRequest,
 };
@@ -30,6 +30,17 @@ impl BalancesService {
         )
     }
 
+    /// Read the account's balances (`GetBalances`) and the position their
+    /// Trading values are at: [`BalancesList::trading_epoch`],
+    /// [`BalancesList::trading_sequence`] and
+    /// [`BalancesList::trading_applied_through_ts_ns`].
+    ///
+    /// The Trading values of every asset are taken at that one position, and
+    /// the answer reflects every balance update the stream published before
+    /// the call began. When the server cannot answer that yet it refuses the
+    /// call as `unavailable` (HTTP 503); retry it with a short backoff. See
+    /// [`Self::subscribe`] for keeping the balances exact with the balance
+    /// stream. An API key needs `READ_BALANCES` on its policy.
     pub async fn list(&self, mut req: GetBalancesRequest) -> Result<BalancesList> {
         req.subaccount_id = scope::optional_subaccount(&self.ctx, req.subaccount_id)?;
         let client = self.client();
@@ -113,16 +124,199 @@ impl BalancesService {
         transfers_list_from_proto(&resp)
     }
 
-    /// Subscribe to private balance updates (requires `realtime` feature).
+    /// Subscribe to the account's balance stream,
+    /// `private:ledger:balances:{account}:proto`.
+    ///
+    /// Each item is one publication, a `ledger.read.v1.BalanceUpdate`
+    /// decoded as it arrived: the SDK does not buffer, reorder, merge or
+    /// reconcile updates. A TRADING update is one numbered step of the
+    /// account's Trading balances; a FUNDING update carries one asset's
+    /// Funding balance (see [`BalanceUpdate`]). `account_id` defaults to the
+    /// client's `default_account_id`.
+    ///
+    /// # Keeping balances exact
+    ///
+    /// Combine the stream with [`Self::list`] as follows:
+    ///
+    /// 1. Subscribe first, and buffer the updates as they arrive.
+    /// 2. Call [`Self::list`] and take its balances. Remember its position
+    ///    `(E, Q)`: [`BalancesList::trading_epoch`] and
+    ///    [`BalancesList::trading_sequence`]. Retry an `unavailable` answer
+    ///    with a backoff.
+    /// 3. Drop every TRADING update of epoch `E` with a sequence at or below
+    ///    `Q`, buffered or later (a reconnect can repeat one). Apply the
+    ///    sequences `Q + 1`, `Q + 2`, and so on, in order.
+    /// 4. Keep a set of dropped epochs: every epoch you held before `E`, and
+    ///    every epoch other than `E` seen on an update received before the
+    ///    [`Self::list`] call that answered `E` began. The server never
+    ///    answers a dropped epoch again, so drop a TRADING update of a
+    ///    dropped epoch without reloading: after an ownership move, late
+    ///    updates of the earlier epoch can still arrive. Reload from step 2
+    ///    when:
+    ///    - a TRADING update's epoch is neither `E` nor dropped, including
+    ///      one buffered while the call ran: the numbering restarted;
+    ///    - its sequence skips a number: an update was missed;
+    ///    - after an update of `E` with `complete` false, `E`'s next sequence
+    ///      does not arrive within 2 seconds (FUNDING updates, repeats and
+    ///      updates of dropped epochs do not stop that timer);
+    ///    - the subscription reconnected, as
+    ///      [`crate::realtime::TypedSubscription::take_resubscribed`] (or a
+    ///      growing [`crate::realtime::TypedSubscription::resubscribes`])
+    ///      reports: publications missed meanwhile are not recovered. Check it
+    ///      on a timer of its own, not only when an update arrives: an idle
+    ///      account may publish nothing after the reconnect.
+    /// 5. Apply a FUNDING update to an asset only when its
+    ///    [`crate::models::BalanceUpdateAsset::funding_revision`] is higher
+    ///    than the one you hold for it.
+    ///
+    /// Take only the Trading fields from a TRADING update and only the
+    /// Funding fields from a FUNDING update; keep the other fields from your
+    /// earlier state. Tell the two kinds apart by
+    /// [`BalanceUpdate::account`], never by a zero epoch.
+    ///
+    /// Show Trading values only after an update with
+    /// [`BalanceUpdate::complete`] set: until then the same step continues in
+    /// the next update. The updates of a new epoch up to its first complete
+    /// one carry every asset the account holds in Trading.
+    ///
+    /// [`Self::list`] reflects every update published before the call began,
+    /// so a reload covers anything the stream missed, even the last update of
+    /// an idle account: no heartbeat is needed. After an ownership move, a
+    /// new epoch's Trading values can briefly be older than the previous
+    /// epoch's last ones, and their transfer legs can arrive a second time in
+    /// the new epoch: (`transfer_id`, `is_debit`) identifies a leg. Count a
+    /// transfer as applied only by a receipt in the current epoch: its leg,
+    /// or a `trading_applied_through_ts_ns` at or past its
+    /// [`crate::models::LedgerTransfer::ts_ns`].
+    ///
+    /// Read the stream and [`Self::list`] for the same account. An unset
+    /// `account_id` here takes the client's `default_account_id`, while
+    /// [`Self::list`] with an unset `subaccount_id` takes the configured
+    /// default sub-account, or the main account when none is configured. So
+    /// name the account in both: for a sub-account, `subscribe` with its
+    /// public ID and `list` with its `subaccount_id`; for the main account,
+    /// `subscribe` with the main account's public ID and `list` with no
+    /// `subaccount_id` on a client without a default sub-account.
+    ///
+    /// Requires the `realtime` feature. An API key needs `READ_BALANCES` on
+    /// its policy.
+    ///
+    /// The example below runs the whole loop for one sub-account. It is
+    /// conservative in one place: it reloads on any TRADING update of an
+    /// epoch other than the snapshot's, also a late update of an epoch it
+    /// could have dropped under step 4, which costs an extra
+    /// [`Self::list`] but never leaves stale balances.
+    ///
+    /// ```rust,no_run
+    /// # async fn example(client: polyester::Client) -> polyester::Result<()> {
+    /// use polyester::models::{BalanceUpdate, BalanceUpdateAccount, BalancesList};
+    /// use polyester::proto::ledger::read::v1::GetBalancesRequest;
+    /// use polyester::realtime::TypedSubscription;
+    /// use std::time::Duration;
+    /// use tokio::time::{Instant, interval, sleep_until};
+    ///
+    /// /// Why the stream stopped following a snapshot.
+    /// enum Stop {
+    ///     /// Reload from step 2 on the same subscription.
+    ///     Reload,
+    ///     /// The subscription ended, with its error if any: subscribe again.
+    ///     Ended(Option<polyester::Error>),
+    /// }
+    ///
+    /// /// Apply the stream on top of `snapshot` until a reload is due or the
+    /// /// stream ends.
+    /// async fn follow(
+    ///     stream: &mut TypedSubscription<BalanceUpdate>,
+    ///     snapshot: &BalancesList,
+    /// ) -> Stop {
+    ///     let epoch = snapshot.trading_epoch;
+    ///     let mut sequence = snapshot.trading_sequence;
+    ///     // Set after an incomplete update: the next sequence is due by then.
+    ///     let mut next_due: Option<Instant> = None;
+    ///     // A reconnect is checked on its own timer, not only with an update.
+    ///     let mut reconnect_check = interval(Duration::from_millis(500));
+    ///     loop {
+    ///         let stalled = async {
+    ///             match next_due {
+    ///                 Some(at) => sleep_until(at).await,
+    ///                 None => std::future::pending().await,
+    ///             }
+    ///         };
+    ///         tokio::select! {
+    ///             _ = reconnect_check.tick() => {
+    ///                 if stream.take_resubscribed() {
+    ///                     return Stop::Reload; // publications may have been missed
+    ///                 }
+    ///             }
+    ///             _ = stalled => return Stop::Reload, // the step did not continue in 2 s
+    ///             next = stream.recv_result() => {
+    ///                 let update = match next {
+    ///                     Ok(Some(update)) => update,
+    ///                     Ok(None) => return Stop::Ended(None),
+    ///                     Err(err) => return Stop::Ended(Some(err)),
+    ///                 };
+    ///                 match update.account {
+    ///                     BalanceUpdateAccount::Trading => {
+    ///                         if update.trading_epoch != epoch {
+    ///                             return Stop::Reload; // the numbering restarted
+    ///                         }
+    ///                         if update.trading_sequence <= sequence {
+    ///                             continue; // in the snapshot already, or a repeat
+    ///                         }
+    ///                         if update.trading_sequence != sequence + 1 {
+    ///                             return Stop::Reload; // an update was missed
+    ///                         }
+    ///                         sequence = update.trading_sequence;
+    ///                         // Apply only the Trading fields of `update.balances`.
+    ///                         next_due = if update.complete {
+    ///                             // The Trading values are consistent: show them.
+    ///                             None
+    ///                         } else {
+    ///                             Some(Instant::now() + Duration::from_secs(2))
+    ///                         };
+    ///                     }
+    ///                     BalanceUpdateAccount::Funding => {
+    ///                         // Apply each asset's Funding fields when its
+    ///                         // `funding_revision` is higher than the one held.
+    ///                     }
+    ///                     BalanceUpdateAccount::Unknown(_) => {}
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    ///
+    /// // A sub-account: the stream and the snapshot name the same account.
+    /// let (sub_public_id, sub_id) = ("<sub-account public ID>", 42_u64);
+    /// let request = GetBalancesRequest {
+    ///     subaccount_id: Some(sub_id),
+    ///     ..Default::default()
+    /// };
+    /// loop {
+    ///     // 1. Subscribe first: the subscription queues updates meanwhile.
+    ///     let mut stream = client.balances.subscribe(Some(sub_public_id)).await?;
+    ///     loop {
+    ///         // 2. The snapshot and its position (E, Q); take its balances as
+    ///         // the state. Retry an `unavailable` answer with a backoff.
+    ///         let snapshot = client.balances.list(request.clone()).await?;
+    ///         match follow(&mut stream, &snapshot).await {
+    ///             Stop::Reload => continue,
+    ///             // Subscribe again, then reload: nothing can be missed.
+    ///             Stop::Ended(_) => break,
+    ///         }
+    ///     }
+    /// }
+    /// # }
+    /// ```
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
-    ) -> Result<crate::realtime::TypedSubscription<AssetBalance>> {
+    ) -> Result<crate::realtime::TypedSubscription<BalanceUpdate>> {
         let account = scope::resolve_account_id(&self.ctx, account_id)?;
         let channel = format!("private:ledger:balances:{account}:proto");
         self.ctx
             .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::asset_balance_from_bytes)
+            .subscribe_proto(&channel, crate::codecs::decode::balance_update_from_bytes)
             .await
     }
 }

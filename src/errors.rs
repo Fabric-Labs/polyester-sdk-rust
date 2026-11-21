@@ -463,6 +463,15 @@ pub mod auth_codes {
     /// A session-only method called with an account API key; see
     /// [`super::Error::SessionRequired`].
     pub const SESSION_KIND_NOT_ALLOWED: &str = "AUTH_SESSION_KIND_NOT_ALLOWED";
+    /// A strategy bot manages the key, policy or sub-account the call would
+    /// change (HTTP 412). Stop the bot, or disable its sub-account, instead.
+    pub const STRATEGY_BOT_MANAGED: &str = "AUTH_STRATEGY_BOT_MANAGED";
+    /// The sub-account cannot hold a strategy bot (HTTP 412); only the
+    /// deploy flow meets it.
+    pub const STRATEGY_BOT_SUBACCOUNT_INELIGIBLE: &str = "AUTH_STRATEGY_BOT_SUBACCOUNT_INELIGIBLE";
+    /// Another strategy bot access change is in progress (HTTP 409); only the
+    /// deploy flow meets it.
+    pub const STRATEGY_BOT_OPERATION_CONFLICT: &str = "AUTH_STRATEGY_BOT_OPERATION_CONFLICT";
     /// The API key signature does not verify, or the key is unknown.
     pub const SIGNATURE_INVALID: &str = "AUTH_SIGNATURE_INVALID";
     /// The timestamp or signature header is missing.

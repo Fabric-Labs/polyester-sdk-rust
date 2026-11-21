@@ -600,10 +600,11 @@ async fn candle_stream_says_when_a_bucket_closes() {
 
 const CANDLES_COLUMNS: &str = "/marketdata.v1.MarketDataService/GetCandlesColumns";
 
-// The columnar reply has no closed flag, so `get_candles_columns` derives
-// `is_closed` from the request. Each case serves the same two primary and two
-// reference rows, oldest first, and returns `(ts_sec, is_closed)` for each.
-async fn candle_columns_closed_flags(
+// Each case serves the same two primary and two reference rows, oldest first,
+// with the server's `is_closed` column (empty from a server that predates it),
+// and returns `(ts_sec, is_closed)` for each row.
+async fn candle_columns_closed_flags_from(
+    is_closed: Vec<bool>,
     include_incomplete: bool,
     page_token: Option<&str>,
 ) -> (Vec<(i64, bool)>, Vec<(i64, bool)>) {
@@ -618,6 +619,7 @@ async fn candle_columns_closed_flags(
         low: vec![1, 1],
         close: vec![1, 1],
         volume: vec![1, 1],
+        is_closed,
         reference_ts_sec: vec![60, 120],
         reference_open: vec![1, 1],
         reference_high: vec![1, 1],
@@ -660,6 +662,28 @@ async fn candle_columns_closed_flags(
             .collect::<Vec<_>>()
     };
     (flags(&got.candles), flags(&got.reference_candles))
+}
+
+// A server that predates the `is_closed` column sends it empty: then
+// `get_candles_columns` derives `is_closed` from the request.
+async fn candle_columns_closed_flags(
+    include_incomplete: bool,
+    page_token: Option<&str>,
+) -> (Vec<(i64, bool)>, Vec<(i64, bool)>) {
+    candle_columns_closed_flags_from(Vec::new(), include_incomplete, page_token).await
+}
+
+// The server's `is_closed` column is read row by row: the open candle it
+// marks reads `false`, and a newest row it marks closed reads `true` even on
+// a first page read with `include_incomplete`. Reference rows stay closed.
+#[tokio::test]
+async fn candle_columns_read_the_servers_closed_flags() {
+    let (primary, reference) =
+        candle_columns_closed_flags_from(vec![true, false], true, None).await;
+    assert_eq!(primary, [(60, true), (120, false)]);
+    assert_eq!(reference, [(60, true), (120, true)]);
+    let (primary, _) = candle_columns_closed_flags_from(vec![true, true], true, None).await;
+    assert_eq!(primary, [(60, true), (120, true)]);
 }
 
 // Without `include_incomplete` every row is a closed candle, on any page.

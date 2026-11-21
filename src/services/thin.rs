@@ -23,20 +23,6 @@ macro_rules! thin_service {
     };
 }
 
-macro_rules! realtime_only_service {
-    ($name:ident) => {
-        #[derive(Clone)]
-        pub struct $name {
-            pub(crate) ctx: ServiceContext,
-        }
-        impl $name {
-            pub fn new(ctx: ServiceContext) -> Self {
-                Self { ctx }
-            }
-        }
-    };
-}
-
 thin_service!(
     ChainAnalyticsService,
     crate::connect::chain::analytics::v1::ChainAnalyticsServiceClient<
@@ -53,7 +39,6 @@ thin_service!(
     HeatmapService,
     crate::connect::marketdata::v1::HeatmapServiceClient<crate::transport::SharedTransport>
 );
-realtime_only_service!(PoliciesService);
 thin_service!(
     SubAccountsService,
     crate::connect::auth::v1::SubaccountServiceClient<crate::transport::SharedTransport>
@@ -110,6 +95,17 @@ impl HeatmapService {
     /// requested, and a reply that names another tier, or none, is refused
     /// with [`crate::Error::ResponseContract`]. A depth above 1000 is a
     /// validation error before any request.
+    ///
+    /// The chain is a replay of the top-N view the depth selects: the base
+    /// keyframe holds the top N levels per side, and each bucket's deltas,
+    /// applied oldest first, set every listed price's quantity. A quantity of
+    /// 0 deletes the level: it was removed from the book or left the top N. A
+    /// level that enters the top N is listed even when the bucket did not
+    /// change it, and changes deeper than N are omitted, so the replay needs
+    /// no clipping and gives the same book after each bucket at every page
+    /// limit. In `peak` mode the base keyframe is only the replay's starting
+    /// point: do not render it as a bucket. The newest buckets can be read
+    /// again with more updates and a higher `book_seq_end`.
     pub async fn get(
         &self,
         symbol: &str,
@@ -226,6 +222,12 @@ impl HeatmapService {
     /// Subscribe to live heatmap buckets (requires `realtime` feature + hydrated catalogs)
     /// on the channel the server publishes `interval` on (`1s`, `1m`, `5m` or `1h`,
     /// or `INTERVAL_1S`). Any other interval is a validation error before connecting.
+    ///
+    /// Key buckets by `ts_sec` and replace a stored bucket only with one of a
+    /// higher `book_seq_end`, final or not: a final bucket can be published
+    /// again with later updates and a higher `book_seq_end`, and the same
+    /// final payload can arrive more than once. Updates of a bucket still
+    /// open are best effort.
     pub async fn subscribe_live(
         &self,
         symbol: &str,
@@ -554,47 +556,6 @@ impl InternalTransfersService {
     }
 }
 
-impl PoliciesService {
-    /// Subscribe to private subaccount policy updates (requires `realtime` feature).
-    pub async fn subscribe(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
-    {
-        self.subscribe_subaccount_policies(account_id).await
-    }
-
-    /// Subscribe to private subaccount policy updates (requires `realtime` feature).
-    pub async fn subscribe_subaccount_policies(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::SubaccountPolicy>>
-    {
-        let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
-        let channel = format!("private:auth:subaccount-policies:{account}:proto");
-        self.ctx
-            .realtime
-            .subscribe_proto(
-                &channel,
-                crate::codecs::decode::subaccount_policy_from_bytes,
-            )
-            .await
-    }
-
-    /// Subscribe to private API-key policy updates (requires `realtime` feature).
-    pub async fn subscribe_api_policies(
-        &self,
-        account_id: Option<&str>,
-    ) -> crate::errors::Result<crate::realtime::TypedSubscription<crate::models::ApiPolicy>> {
-        let account = super::scope::resolve_account_id(&self.ctx, account_id)?;
-        let channel = format!("private:auth:api-policies:{account}:proto");
-        self.ctx
-            .realtime
-            .subscribe_proto(&channel, crate::codecs::decode::api_policy_from_bytes)
-            .await
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct GetSubaccountOpts {
     pub include_api_keys: bool,
@@ -615,7 +576,12 @@ pub struct GetSubaccountOpts {
 }
 
 impl SubAccountsService {
-    /// Subscribe to private subaccount updates (requires `realtime` feature).
+    /// Subscribe to the sub-accounts the account owns
+    /// (`private:auth:subaccounts:{account}:proto`). An API key needs
+    /// `READ_SUBACCOUNTS`; a token refusal carries that read's error code.
+    /// Sub-accounts the account holds a delegated role on are on a separate
+    /// stream for signed-in sessions only, which this API-key SDK does not
+    /// subscribe to.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -716,9 +682,7 @@ impl SubAccountsService {
         };
         let mut result = get_subaccount_from_proto(&resp)?;
         result.balances = if opts.include_balances {
-            Some(result.balances.unwrap_or(crate::models::BalancesList {
-                balances: Vec::new(),
-            }))
+            Some(result.balances.unwrap_or_default())
         } else {
             None
         };
@@ -845,7 +809,11 @@ impl SubAccountsService {
 }
 
 impl AddressBookService {
-    /// Subscribe to address-book view invalidations (requires `realtime` feature).
+    /// Subscribe to invalidations of the account's own address book
+    /// (`private:auth:address-books:{account}:proto`). An API key needs
+    /// `READ_ADDRESS_BOOK`; a token refusal carries that read's error code.
+    /// Address books of sub-accounts read through a sub-account role are on
+    /// a separate stream for signed-in sessions only.
     pub async fn subscribe(
         &self,
         account_id: Option<&str>,
@@ -1586,7 +1554,9 @@ impl LifecycleService {
     ///
     /// When `account_id` is `Some`, uses that account's private channel, and
     /// an ID that is not one (empty or blank included) is refused; only `None`
-    /// subscribes to the public open-flows channel.
+    /// subscribes to the public open-flows channel. The private channel needs
+    /// `READ_FUNDING_FLOWS`, as listing account flows does; a token refusal
+    /// carries that read's error code.
     pub async fn subscribe_open_flows(
         &self,
         account_id: Option<&str>,
